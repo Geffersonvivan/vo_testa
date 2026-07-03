@@ -92,7 +92,7 @@ GOVERN. MANUT. FRIGOBAR◄─┘  LOJA   RESTAURANTE  LAVANDERIA
 | 13 | Canais/OTAs | Reservas | 2 |
 | 14 | Fiscal (NF-e/NFS-e) | Núcleo | 2 |
 
-### As três "veias" transversais
+### As quatro "veias" transversais
 
 1. **Conta do quarto (folio)** — Loja, Restaurante, Lavanderia e Frigobar lançam consumo
    na conta da hospedagem. Hóspede paga tudo consolidado no check-out.
@@ -100,6 +100,12 @@ GOVERN. MANUT. FRIGOBAR◄─┘  LOJA   RESTAURANTE  LAVANDERIA
    pelo caixa do operador daquele módulo. Cada módulo é um centro de receita/custo.
 3. **Estoque** — todo produto que entra/sai em qualquer módulo passa pelo motor de
    estoque. Transferências entre módulos são rastreadas dos dois lados.
+4. **Natureza fiscal (serviço × consumo)** — todo item vendável e todo lançamento
+   nasce classificado como **SERVIÇO** (diária, lavanderia do hóspede, taxas,
+   day use) ou **CONSUMO** (produto: loja, restaurante, frigobar). A classificação
+   é obrigatória desde a fase 1 porque a nota fiscal é separada: serviço → NFS-e
+   (ISS, municipal); consumo → NF-e/NFC-e (ICMS, estadual). Extratos, fechamento
+   de conta e relatórios sempre permitem visão separada por natureza.
 
 ---
 
@@ -161,6 +167,9 @@ GOVERN. MANUT. FRIGOBAR◄─┘  LOJA   RESTAURANTE  LAVANDERIA
 ### 4.5 Motor PDV/Comandas (engine interna)
 
 - **Venda/Comanda**: itens, quantidades, preços, descontos, operador, módulo de origem.
+- **Natureza fiscal por item**: todo item vendável é classificado como **consumo**
+  (produto físico, baixa estoque) ou **serviço** (não baixa estoque). Uma comanda
+  pode misturar os dois; o fechamento e a futura emissão fiscal separam por natureza.
 - **Dois destinos de cobrança**:
   (a) **pagamento imediato** — cai na sessão de caixa do operador;
   (b) **conta do quarto** — lança na hospedagem ativa (exige módulo Reservas;
@@ -216,7 +225,9 @@ Orçamento → Pré-reserva → Confirmada → Hospedado → Check-out (encerrad
 - **Check-in**: da reserva ou **walk-in** (sem reserva); ficha do hóspede (FNRH);
   acompanhantes; abertura automática da conta da hospedagem.
 - **Conta da hospedagem (folio)**: diárias lançadas automaticamente (rotina diária),
-  consumos dos PDVs, serviços, descontos, adiantamentos como crédito; extrato completo.
+  consumos dos PDVs, serviços, descontos, adiantamentos como crédito; extrato completo
+  com **separação serviço × consumo** (subtotais por natureza — base para a nota
+  fiscal separada e para o hóspede conferir a conta).
 - **Check-out**: confere conta, recebe saldo (múltiplas formas), encerra hospedagem,
   dispara tarefa de faxina (Governança) e libera a UH após limpeza.
 - **Tarifas**: matriz TipoUH × Temporada; tarifa manual por reserva com permissão;
@@ -343,7 +354,7 @@ API expõe somente o necessário (nunca dados internos/financeiros de outros hó
 |---|---|
 | **CRM do Hóspede** | Histórico consolidado de estadias e consumo, preferências, hóspede recorrente, pesquisa de satisfação pós-estadia, campanhas (aniversário, retorno) |
 | **Canais/OTAs** | Sincronização Booking/Airbnb: começa com iCal (disponibilidade), evolui para channel manager via API (tarifas + reservas automáticas) |
-| **Fiscal** | NFS-e/NF-e/NFC-e via intermediador (Focus NFe/eNotas); emissão no check-out e nos PDVs |
+| **Fiscal** | Emissão via intermediador (Focus NFe/eNotas), **separada por natureza**: serviços → NFS-e (ISS); consumo/produtos → NF-e/NFC-e (ICMS). No check-out, o sistema agrupa os lançamentos da conta por natureza e emite os documentos correspondentes; nos PDVs, emissão na venda avulsa. A classificação vem pronta da fase 1 (natureza em todo item/lançamento) |
 | Extensões | Day use/Day pass formal, eventos, fidelidade, BI histórico com origem de hóspedes |
 
 ---
@@ -359,7 +370,8 @@ Pessoa ─┬─ Hóspede ──────────┐
 TipoUH ── UH ── Reserva ── Hospedagem ── ContaHospedagem (folio)
    │       │      │  │                        │
  Tarifa    │      │  └ Acompanhantes          ├─ Lançamento (diária, consumo,
-   │       │      └ MotivoCancelamento        │   serviço, desconto, crédito)
+   │       │      └ MotivoCancelamento        │   serviço, desconto, crédito;
+   │       │                                  │   natureza: SERVIÇO | CONSUMO)
 Temporada  │                                  ├─ Pagamento ─ Estorno
            ├─ StatusLimpeza (Governança)      └─ Adiantamento
            ├─ TarefaGovernanca ── ChecklistItem
@@ -392,6 +404,9 @@ ModuloContratado · TrilhaAuditoria (genérica)
   nunca update/delete).
 - `Pagamento`/`Estorno`: nunca deletados; estorno referencia o pagamento original.
 - Valores monetários: `DecimalField`, nunca float.
+- Todo item vendável (`Produto`, item de cardápio, serviço de lavanderia, diária)
+  e todo `Lançamento` carregam **natureza fiscal** (`SERVICO` | `CONSUMO`) —
+  obrigatória, sem default silencioso, para a emissão de nota separada (módulo Fiscal).
 
 ---
 
