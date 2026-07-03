@@ -1,0 +1,182 @@
+/* CRM Pousada Vô Testa — estilos base */
+
+:root {
+  --verde-escuro: #1f3d2b;
+  --verde: #2e5e40;
+  --areia: #f5f1e8;
+  --terracota: #c05621;
+  --cinza-texto: #374151;
+  --cinza-claro: #e5e7eb;
+  --branco: #ffffff;
+  --erro: #b91c1c;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: var(--cinza-texto);
+  background: var(--areia);
+}
+
+/* ---------- Layout com sidebar ---------- */
+
+.layout { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: 240px;
+  flex-shrink: 0;
+  background: var(--verde-escuro);
+  color: var(--branco);
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 0;
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  padding: .5rem 1.25rem 1.25rem;
+}
+
+.marca-icone { font-size: 1.8rem; }
+.marca strong { display: block; font-size: .95rem; }
+.marca small { opacity: .7; font-size: .75rem; }
+
+.sidebar nav { flex: 1; overflow-y: auto; }
+
+.nav-item {
+  display: block;
+  padding: .55rem 1.25rem;
+  color: var(--branco);
+  text-decoration: none;
+  font-size: .9rem;
+  border-left: 3px solid transparent;
+}
+
+.nav-item:hover { background: rgba(255, 255, 255, .08); }
+.nav-item.ativo { border-left-color: var(--terracota); background: rgba(255, 255, 255, .1); }
+.nav-item.desabilitado { opacity: .45; cursor: default; }
+
+.sidebar-rodape {
+  padding: 1rem 1.25rem 0;
+  border-top: 1px solid rgba(255, 255, 255, .15);
+  font-size: .85rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .5rem;
+}
+
+button.link {
+  background: none;
+  border: none;
+  color: var(--branco);
+  opacity: .8;
+  cursor: pointer;
+  font-size: .85rem;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.conteudo { flex: 1; padding: 2rem 2.5rem; }
+
+h1 { margin: 0 0 .25rem; color: var(--verde-escuro); }
+h2 { color: var(--verde); font-size: 1.05rem; margin-top: 2rem; }
+.subtitulo { margin-top: 0; opacity: .75; }
+
+/* ---------- Cartões ---------- */
+
+.cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: .75rem;
+}
+
+.cartao {
+  background: var(--branco);
+  border: 1px solid var(--cinza-claro);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+
+.etiqueta {
+  align-self: flex-start;
+  background: var(--areia);
+  color: var(--terracota);
+  font-size: .7rem;
+  padding: .15rem .5rem;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+/* ---------- Mensagens ---------- */
+
+.mensagem {
+  padding: .6rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  background: var(--branco);
+  border: 1px solid var(--cinza-claro);
+}
+
+.mensagem.error { border-color: var(--erro); color: var(--erro); }
+
+/* ---------- Login ---------- */
+
+.login-pagina {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, var(--verde-escuro), var(--verde));
+}
+
+.login-cartao {
+  background: var(--branco);
+  border-radius: 12px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 360px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, .25);
+}
+
+.login-marca { padding: 0 0 1.25rem; color: var(--verde-escuro); }
+
+.login-cartao label {
+  display: block;
+  font-size: .85rem;
+  font-weight: 600;
+  margin: .9rem 0 .3rem;
+}
+
+.login-cartao input {
+  width: 100%;
+  padding: .55rem .7rem;
+  border: 1px solid var(--cinza-claro);
+  border-radius: 6px;
+  font-size: .95rem;
+}
+
+.login-cartao input:focus { outline: 2px solid var(--verde); border-color: var(--verde); }
+
+.botao-primario {
+  width: 100%;
+  margin-top: 1.25rem;
+  padding: .65rem;
+  background: var(--verde);
+  color: var(--branco);
+  border: none;
+  border-radius: 6px;
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.botao-primario:hover { background: var(--verde-escuro); }

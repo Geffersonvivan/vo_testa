@@ -13,7 +13,7 @@ build/
 # Django
 db.sqlite3
 *.sqlite3
-/static/
+/staticfiles/
 /media/
 local_settings.py
 
@@ -41,3 +41,6 @@ env/
 
 # Logs
 *.log
+
+# Word lock files
+~$*

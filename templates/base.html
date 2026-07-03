@@ -1,0 +1,54 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}CRM Vô Testa{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <script src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
+</head>
+<body>
+{% if user.is_authenticated %}
+<div class="layout">
+  <aside class="sidebar">
+    <div class="marca">
+      <span class="marca-icone">🏡</span>
+      <div>
+        <strong>Pousada Vô Testa</strong>
+        <small>CRM &amp; Gestão</small>
+      </div>
+    </div>
+    <nav>
+      <a href="{% url 'dashboard' %}" class="nav-item ativo">📊 Dashboard</a>
+      {% for m in menu_modulos %}
+        {% if m.url %}
+          <a href="{{ m.url }}" class="nav-item">{{ m.icone }} {{ m.nome }}</a>
+        {% else %}
+          <span class="nav-item desabilitado" title="Em construção">{{ m.icone }} {{ m.nome }}</span>
+        {% endif %}
+      {% endfor %}
+    </nav>
+    <div class="sidebar-rodape">
+      <span>{{ user }}</span>
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="link">Sair</button>
+      </form>
+    </div>
+  </aside>
+  <main class="conteudo">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="mensagem {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+    {% block conteudo %}{% endblock %}
+  </main>
+</div>
+{% else %}
+  {% block conteudo_publico %}{% endblock %}
+{% endif %}
+</body>
+</html>

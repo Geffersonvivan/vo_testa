@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block titulo %}Dashboard — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<h1>Dashboard</h1>
+<p class="subtitulo">Visão geral da pousada. Os indicadores de cada módulo aparecem aqui conforme forem implementados.</p>
+
+<h2>Módulos contratados</h2>
+<div class="cartoes">
+  {% for m in modulos %}
+    <div class="cartao">
+      <strong>{{ m.get_codigo_display }}</strong>
+      <span class="etiqueta">em construção</span>
+    </div>
+  {% empty %}
+    <p>Nenhum módulo ativo. Ative módulos no <a href="{% url 'admin:index' %}">admin</a>.</p>
+  {% endfor %}
+</div>
+{% endblock %}

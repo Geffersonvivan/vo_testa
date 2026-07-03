@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block titulo %}Entrar — CRM Vô Testa{% endblock %}
+
+{% block conteudo_publico %}
+<div class="login-pagina">
+  <div class="login-cartao">
+    <div class="marca login-marca">
+      <span class="marca-icone">🏡</span>
+      <div>
+        <strong>Pousada Vô Testa</strong>
+        <small>CRM &amp; Gestão</small>
+      </div>
+    </div>
+    {% if form.errors %}
+      <div class="mensagem error">Usuário ou senha incorretos.</div>
+    {% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <label for="id_username">Usuário</label>
+      <input type="text" name="username" id="id_username" autofocus required>
+      <label for="id_password">Senha</label>
+      <input type="password" name="password" id="id_password" required>
+      <button type="submit" class="botao-primario">Entrar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
