@@ -22,6 +22,13 @@ Pesquisa de mercado: `docs/REFERENCIA_DESBRAVADOR.md`.
 
 Config por variável de ambiente (`.env` local — ver `.env.example`). `DEBUG=1` no dev.
 
+## Deploy
+
+**NUNCA fazer deploy sem comando explícito do usuário.** Commit e push são normais;
+subir para servidor (Railway etc.), só quando ele mandar. Quando autorizado: criar
+projeto Railway novo para o CRM — o projeto `pousada-vo-testa` existente é o SITE
+em produção (repo `Pousada_Vo_Testa.git`), não tocar.
+
 ## Processo por módulo
 
 Ao iniciar qualquer fase/módulo, **consultar primeiro como o Desbravador resolve**:

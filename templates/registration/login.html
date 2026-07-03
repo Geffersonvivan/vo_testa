@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block titulo %}Entrar — CRM Vô Testa{% endblock %}
 
@@ -6,7 +7,7 @@
 <div class="login-pagina">
   <div class="login-cartao">
     <div class="marca login-marca">
-      <span class="marca-icone">🏡</span>
+      <img src="{% static 'img/simbolo-lampiao.png' %}" alt="Pousada Vô Testa" class="marca-logo marca-logo-grande">
       <div>
         <strong>Pousada Vô Testa</strong>
         <small>CRM &amp; Gestão</small>
