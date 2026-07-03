@@ -13,12 +13,31 @@ class Usuario(AbstractUser):
     AUTH_USER_MODEL não pode ser trocado depois.
     """
 
+    modulos = models.ManyToManyField(
+        "nucleo.ModuloContratado",
+        blank=True,
+        verbose_name="módulos com acesso",
+        related_name="usuarios",
+        help_text=(
+            "Módulos que este usuário pode acessar. "
+            "Superusuários acessam todos os módulos ativos."
+        ),
+    )
+
     class Meta:
         verbose_name = "usuário"
         verbose_name_plural = "usuários"
 
     def __str__(self):
         return self.get_full_name() or self.username
+
+    def pode_acessar(self, codigo: str) -> bool:
+        """Acesso = módulo ativo E (superusuário OU módulo atribuído no Admin)."""
+        if not modulo_ativo(codigo):
+            return False
+        if self.is_superuser:
+            return True
+        return self.modulos.filter(codigo=codigo, ativo=True).exists()
 
 
 class ModuloContratado(models.Model):

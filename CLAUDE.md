@@ -22,6 +22,13 @@ Pesquisa de mercado: `docs/REFERENCIA_DESBRAVADOR.md`.
 
 Config por variável de ambiente (`.env` local — ver `.env.example`). `DEBUG=1` no dev.
 
+## Processo por módulo
+
+Ao iniciar qualquer fase/módulo, **consultar primeiro como o Desbravador resolve**:
+<https://www.desbravador.com.br/produtos/hoteis-e-pousadas> (+ resumo em
+`docs/REFERENCIA_DESBRAVADOR.md`) — funcionalidades, fluxos e telas — antes de
+desenhar o nosso.
+
 ## Arquitetura (regras que não se quebram)
 
 - **Núcleo + módulos contratáveis.** Cada módulo é um app Django em `apps/`.
@@ -39,6 +46,9 @@ Config por variável de ambiente (`.env` local — ver `.env.example`). `DEBUG=1
 - **Auditoria:** operações sensíveis (estorno, cancelamento, ajuste, reabertura de
   caixa) registram quem/quando/por quê.
 - `AUTH_USER_MODEL = nucleo.Usuario` — nunca usar `django.contrib.auth.models.User`.
+- **Acesso por usuário × módulo, gerido pelo Admin:** toda view de módulo usa
+  `@requer_modulo(Modulo.X)` (`apps/nucleo/permissoes.py`). Módulo inativo → 404;
+  usuário sem o módulo em `Usuario.modulos` → 403. Superusuário acessa tudo.
 
 ## Convenções
 

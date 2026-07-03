@@ -1,8 +1,16 @@
 # Especificação — CRM/PMS Pousada Vô Testa
 
-**Versão:** 0.1 (rascunho para refinamento)
+**Versão:** 0.2
 **Data:** 03/07/2026
-**Referências:** `docs/REFERENCIA_DESBRAVADOR.md`, `BASE_Projeto/apresentacao_easy_web.pdf`
+**Referências:**
+
+- **Benchmark de mercado (consulta obrigatória):** <https://www.desbravador.com.br/produtos/hoteis-e-pousadas>
+- `docs/REFERENCIA_DESBRAVADOR.md` (levantamento dos 9 produtos)
+- `docs/apresentacao_easy_web.pdf`
+
+> **Processo:** ao iniciar a construção de cada fase/módulo, consultar o link do
+> Desbravador acima (e o levantamento) para verificar como o mercado resolve
+> aquele módulo — funcionalidades, fluxos e telas — antes de desenhar o nosso.
 
 ---
 
@@ -111,7 +119,12 @@ GOVERN. MANUT. FRIGOBAR◄─┘  LOJA   RESTAURANTE  LAVANDERIA
 ### 4.2 Usuários e permissões
 
 - Login individual por funcionário (e-mail + senha). Sem login compartilhado.
-- **Perfis por módulo**: cada perfil define acesso por módulo e nível
+- **Acesso por usuário × módulo, gerido pelo Admin** *(implementado na fase 0)*:
+  o administrador atribui a cada usuário os módulos que ele pode acessar
+  (`Usuario.modulos`). Superusuário acessa todos os módulos ativos. Toda view de
+  módulo usa `@requer_modulo(...)`: módulo não contratado → 404; usuário sem o
+  módulo atribuído → 403. Menu e dashboard só exibem o que o usuário pode acessar.
+- **Perfis por módulo** (evolução): cada perfil define nível dentro do módulo
   (visualizar / operar / gerenciar). Ex.: "Recepção" opera Reservas e Frigobar;
   "Loja" opera Loja; "Gerência" gerencia tudo.
 - Ações sensíveis (estorno, desconto acima de X%, reabertura de caixa, ajuste de

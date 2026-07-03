@@ -6,7 +6,11 @@ from .models import ModuloContratado, Usuario
 
 @admin.register(Usuario)
 class UsuarioAdmin(UserAdmin):
-    pass
+    fieldsets = UserAdmin.fieldsets + (
+        ("Acesso a módulos", {"fields": ("modulos",)}),
+    )
+    filter_horizontal = UserAdmin.filter_horizontal + ("modulos",)
+    list_display = ["username", "first_name", "last_name", "is_active", "is_superuser"]
 
 
 @admin.register(ModuloContratado)

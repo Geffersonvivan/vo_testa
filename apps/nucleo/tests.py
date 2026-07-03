@@ -61,3 +61,68 @@ class RegistroDeModulosTests(TestCase):
     def test_menu_so_aparece_para_usuario_logado(self):
         resposta = self.client.get(reverse("login"))
         self.assertNotContains(resposta, "nav-item")
+
+
+class PermissoesPorModuloTests(TestCase):
+    def setUp(self):
+        self.funcionaria = Usuario.objects.create_user(
+            username="loja", password="senha-forte-123"
+        )
+        self.funcionaria.modulos.add(
+            ModuloContratado.objects.get(codigo=Modulo.LOJA)
+        )
+        self.gerente = Usuario.objects.create_superuser(
+            username="gerente", password="senha-forte-123"
+        )
+
+    def test_usuario_acessa_somente_modulos_atribuidos(self):
+        self.assertTrue(self.funcionaria.pode_acessar(Modulo.LOJA))
+        self.assertFalse(self.funcionaria.pode_acessar(Modulo.RESERVAS))
+
+    def test_superusuario_acessa_todos_os_modulos_ativos(self):
+        self.assertTrue(self.gerente.pode_acessar(Modulo.RESERVAS))
+        self.assertTrue(self.gerente.pode_acessar(Modulo.LOJA))
+
+    def test_modulo_inativo_nega_acesso_mesmo_atribuido(self):
+        ModuloContratado.objects.filter(codigo=Modulo.LOJA).update(ativo=False)
+        self.assertFalse(self.funcionaria.pode_acessar(Modulo.LOJA))
+        self.assertFalse(self.gerente.pode_acessar(Modulo.LOJA))
+
+    def test_menu_filtra_por_permissao_do_usuario(self):
+        self.client.login(username="loja", password="senha-forte-123")
+        resposta = self.client.get(reverse("dashboard"))
+        self.assertContains(resposta, "Loja")
+        self.assertNotContains(resposta, "Governança")
+
+    def test_decorator_requer_modulo(self):
+        from django.core.exceptions import PermissionDenied
+        from django.http import Http404, HttpResponse
+        from django.test import RequestFactory
+
+        from .permissoes import requer_modulo
+
+        @requer_modulo(Modulo.LOJA)
+        def view_loja(request):
+            return HttpResponse("ok")
+
+        @requer_modulo(Modulo.FISCAL)  # não contratado
+        def view_fiscal(request):
+            return HttpResponse("ok")
+
+        fabrica = RequestFactory()
+
+        pedido = fabrica.get("/loja/")
+        pedido.user = self.funcionaria
+        self.assertEqual(view_loja(pedido).status_code, 200)
+
+        pedido = fabrica.get("/loja/")
+        pedido.user = Usuario.objects.create_user(
+            username="sem-acesso", password="senha-forte-123"
+        )
+        with self.assertRaises(PermissionDenied):
+            view_loja(pedido)
+
+        pedido = fabrica.get("/fiscal/")
+        pedido.user = self.gerente
+        with self.assertRaises(Http404):
+            view_fiscal(pedido)
