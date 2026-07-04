@@ -44,3 +44,6 @@ env/
 
 # Word lock files
 ~$*
+
+# Documentos pessoais
+Logo/*.pdf
