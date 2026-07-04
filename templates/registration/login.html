@@ -1,29 +1,27 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block titulo %}Entrar — CRM Vô Testa{% endblock %}
+{% block titulo %}Entrar — Pousada Vô Testa{% endblock %}
 
 {% block conteudo_publico %}
 <div class="login-pagina">
+  <img src="{% static 'img/logotipo-pergaminho.png' %}" alt="Pousada Vô Testa" class="login-lockup">
+
   <div class="login-cartao">
-    <div class="marca login-marca">
-      <img src="{% static 'img/simbolo-lampiao.png' %}" alt="Pousada Vô Testa" class="marca-logo marca-logo-grande">
-      <div>
-        <strong>Pousada Vô Testa</strong>
-        <small>CRM &amp; Gestão</small>
-      </div>
-    </div>
+    <p class="letreiro">Acesso da equipe</p>
+    <h1>Entrar no sistema</h1>
     {% if form.errors %}
-      <div class="mensagem error">Usuário ou senha incorretos.</div>
+      <div class="mensagem error">Usuário ou senha incorretos. Confira e tente de novo.</div>
     {% endif %}
     <form method="post">
       {% csrf_token %}
       <label for="id_username">Usuário</label>
-      <input type="text" name="username" id="id_username" autofocus required>
+      <input type="text" name="username" id="id_username" autocomplete="username" autofocus required>
       <label for="id_password">Senha</label>
-      <input type="password" name="password" id="id_password" required>
+      <input type="password" name="password" id="id_password" autocomplete="current-password" required>
       <button type="submit" class="botao-primario">Entrar</button>
     </form>
   </div>
+
 </div>
 {% endblock %}

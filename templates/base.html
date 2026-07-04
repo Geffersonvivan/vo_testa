@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}CRM Vô Testa{% endblock %}</title>
+  <link rel="icon" href="{% static 'img/simbolo-dourado.png' %}" type="image/png">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <script src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
@@ -14,20 +15,27 @@
 <div class="layout">
   <aside class="sidebar">
     <div class="marca">
-      <img src="{% static 'img/simbolo-lampiao.png' %}" alt="Pousada Vô Testa" class="marca-logo">
+      <img src="{% static 'img/simbolo-dourado.png' %}" alt="" class="marca-logo">
       <div>
-        <strong>Pousada Vô Testa</strong>
-        <small>CRM &amp; Gestão</small>
+        <span class="marca-nome">Vô Testa</span>
+        <span class="marca-sub">Pousada · CRM</span>
       </div>
     </div>
     <nav>
-      <a href="{% url 'dashboard' %}" class="nav-item ativo">📊 Dashboard</a>
-      {% for m in menu_modulos %}
-        {% if m.url %}
-          <a href="{{ m.url }}" class="nav-item">{{ m.icone }} {{ m.nome }}</a>
-        {% else %}
-          <span class="nav-item desabilitado" title="Em construção">{{ m.icone }} {{ m.nome }}</span>
-        {% endif %}
+      <div class="nav-grupo">
+        <a href="{% url 'dashboard' %}" class="nav-item ativo">Visão geral</a>
+      </div>
+      {% for grupo in menu_modulos %}
+        <div class="nav-grupo">
+          <span class="nav-titulo letreiro">{{ grupo.titulo }}</span>
+          {% for m in grupo.itens %}
+            {% if m.url %}
+              <a href="{{ m.url }}" class="nav-item">{{ m.nome }}</a>
+            {% else %}
+              <span class="nav-item desabilitado" title="Em construção">{{ m.nome }}</span>
+            {% endif %}
+          {% endfor %}
+        </div>
       {% endfor %}
     </nav>
     <div class="sidebar-rodape">

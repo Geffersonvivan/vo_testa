@@ -3,7 +3,7 @@ from .modulos import APRESENTACAO, Modulo
 
 
 def menu_modulos(request):
-    """Itens do menu lateral: módulos ativos QUE o usuário pode acessar."""
+    """Menu lateral agrupado por área, apenas com módulos que o usuário acessa."""
     if not request.user.is_authenticated:
         return {"menu_modulos": []}
 
@@ -14,18 +14,21 @@ def menu_modulos(request):
             request.user.modulos.filter(ativo=True).values_list("codigo", flat=True)
         )
 
-    itens = []
+    grupos: dict[str, list] = {}
     for codigo in modulos_ativos():
         if permitidos is not None and codigo not in permitidos:
             continue
         apres = APRESENTACAO.get(codigo, {})
-        itens.append(
+        grupos.setdefault(apres.get("grupo", "Outros"), []).append(
             {
                 "codigo": codigo,
                 "nome": Modulo(codigo).label,
-                "icone": apres.get("icone", "▪️"),
                 # url é preenchida conforme cada módulo for implementado
                 "url": None,
             }
         )
-    return {"menu_modulos": itens}
+    return {
+        "menu_modulos": [
+            {"titulo": titulo, "itens": itens} for titulo, itens in grupos.items()
+        ]
+    }
