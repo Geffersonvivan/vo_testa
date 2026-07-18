@@ -36,7 +36,7 @@
                 </div>
                 {% elif request.GET.proposta == 'erro' %}
                 <div class="mb-4 rounded-xl bg-red-50 border border-red-200 text-red-900 text-sm px-4 py-3">
-                    Não deu para enviar. Confira os campos obrigatórios e tente de novo.
+                    Não deu para enviar. Veja o aviso acima, ajuste e envie de novo.
                 </div>
                 {% endif %}
                 <form method="post" action="{% url 'core:pedir_proposta' %}" class="space-y-4">
@@ -44,35 +44,35 @@
                     <input type="hidden" name="tipo_interesse" value="evento">
                     <div>
                         <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Nome / empresa *</label>
-                        <input type="text" name="nome" required class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="Nome ou razão social">
+                        <input type="text" name="nome" required value="{{ proposta.nome|default:'' }}" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="Nome ou razão social">
                     </div>
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
                             <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">WhatsApp *</label>
-                            <input type="text" name="telefone" required class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="(00) 00000-0000" inputmode="tel" maxlength="15" data-mask="telefone" autocomplete="tel">
+                            <input type="text" name="telefone" required value="{{ proposta.telefone|default:'' }}" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="(00) 00000-0000" inputmode="tel" maxlength="15" data-mask="telefone" autocomplete="tel">
                         </div>
                         <div>
                             <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">E-mail</label>
-                            <input type="email" name="email" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="voce@empresa.com">
+                            <input type="email" name="email" value="{{ proposta.email|default:'' }}" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="voce@empresa.com">
                         </div>
                     </div>
                     <div class="grid sm:grid-cols-3 gap-4">
                         <div>
                             <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Data início</label>
-                            <input type="date" name="checkin" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white">
+                            <input type="date" name="checkin" value="{{ proposta.checkin|default:'' }}" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white">
                         </div>
                         <div>
                             <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Data fim</label>
-                            <input type="date" name="checkout" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white">
+                            <input type="date" name="checkout" value="{{ proposta.checkout|default:'' }}" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white">
                         </div>
                         <div>
                             <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Pessoas</label>
-                            <input type="number" name="hospedes" min="1" value="20" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white">
+                            <input type="number" name="hospedes" min="1" value="{{ proposta.hospedes|default:'20' }}" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white">
                         </div>
                     </div>
                     <div>
                         <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Sobre o evento</label>
-                        <textarea name="mensagem" rows="3" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="Tipo de evento, necessidades, hospedagem junto…"></textarea>
+                        <textarea name="mensagem" rows="3" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="Tipo de evento, necessidades, hospedagem junto…">{{ proposta.mensagem|default:'' }}</textarea>
                     </div>
                     <button type="submit" class="w-full bg-madeira text-pergaminho font-semibold py-3 rounded-full hover:bg-lampiao hover:text-madeira transition">
                         Enviar proposta de evento

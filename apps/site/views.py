@@ -74,6 +74,11 @@ def home(request):
     galeria = FotoGaleria.objects.all()[:12]
     galeria_faixa = FotoGaleria.objects.all()[:6]
 
+    # Rascunho após erro de validação (PRG) — preenche o form de volta uma vez.
+    proposta = {}
+    if request.GET.get('proposta') == 'erro':
+        proposta = request.session.pop('proposta_rascunho', {}) or {}
+
     context = {
         'config': config,
         'quartos': quartos,
@@ -83,6 +88,7 @@ def home(request):
         'galeria': galeria,
         'galeria_faixa': galeria_faixa,
         'proposta_form': PropostaSiteForm(),
+        'proposta': proposta,
     }
     return render(request, 'site/home.html', context)
 
@@ -102,9 +108,25 @@ def pedir_proposta(request):
         return _voltar('erro')
     form = PropostaSiteForm(request.POST)
     if not form.is_valid():
-        messages.error(request, 'Confira os dados do formulário (nome e WhatsApp ou e-mail).')
+        erros = []
+        for campo, lista in form.errors.items():
+            for err in lista:
+                erros.append(str(err))
+        messages.error(
+            request,
+            ' · '.join(erros) if erros else 'Confira os dados do formulário.',
+        )
+        # Guarda o que veio no POST para reexibir (redirect limpa os inputs).
+        request.session['proposta_rascunho'] = {
+            chave: request.POST.get(chave, '')
+            for chave in (
+                'nome', 'telefone', 'email', 'tipo_interesse',
+                'checkin', 'checkout', 'hospedes', 'mensagem',
+            )
+        }
         return _voltar('erro')
     dados = form.cleaned_data
+    request.session.pop('proposta_rascunho', None)
     try:
         from apps.comercial import services as comercial
         op = comercial.capturar_lead_site(

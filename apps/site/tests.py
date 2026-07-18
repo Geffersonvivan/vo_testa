@@ -361,3 +361,31 @@ class EventosEHomeTests(TestCase):
         op = Oportunidade.objects.get(pessoa__email='evento@xpto.com')
         self.assertEqual(op.tipo_interesse, 'evento')
         self.assertIn('Evento', op.titulo)
+
+    def test_proposta_evento_aceita_mesmo_dia(self):
+        from apps.comercial.models import Oportunidade
+        r = self.client.post(reverse('core:pedir_proposta'), {
+            'nome': 'Festa Único Dia',
+            'telefone': '4999112233',
+            'email': 'festa@dia.com',
+            'tipo_interesse': 'evento',
+            'checkin': '2026-12-20',
+            'checkout': '2026-12-20',
+            'hospedes': '40',
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('proposta=ok', r['Location'])
+        self.assertTrue(Oportunidade.objects.filter(pessoa__email='festa@dia.com').exists())
+
+    def test_proposta_hospedagem_rejeita_mesmo_dia(self):
+        r = self.client.post(reverse('core:pedir_proposta'), {
+            'nome': 'Casal',
+            'telefone': '4999112244',
+            'email': 'casal@noite.com',
+            'tipo_interesse': 'hospedagem',
+            'checkin': '2026-12-20',
+            'checkout': '2026-12-20',
+            'hospedes': '2',
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('proposta=erro', r['Location'])

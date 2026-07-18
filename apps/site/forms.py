@@ -246,8 +246,14 @@ class PropostaSiteForm(forms.Form):
     def clean(self):
         cleaned = super().clean()
         checkin, checkout = cleaned.get('checkin'), cleaned.get('checkout')
-        if checkin and checkout and checkout <= checkin:
-            self.add_error('checkout', 'O check-out deve ser depois do check-in.')
+        tipo = cleaned.get('tipo_interesse') or 'hospedagem'
+        # Evento / day use: mesmo dia é válido. Hospedagem: saída depois da entrada.
+        if checkin and checkout:
+            if tipo in ('evento', 'day_use'):
+                if checkout < checkin:
+                    self.add_error('checkout', 'A data fim não pode ser antes da data início.')
+            elif checkout <= checkin:
+                self.add_error('checkout', 'O check-out deve ser depois do check-in.')
         if not cleaned.get('email') and not cleaned.get('telefone'):
             raise forms.ValidationError('Informe e-mail ou WhatsApp para retorno.')
         if not cleaned.get('tipo_interesse'):
