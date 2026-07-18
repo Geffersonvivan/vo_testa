@@ -45,6 +45,6 @@ urlpatterns = [
     path("", include("apps.site.urls")),
 ]
 
-# Servir mídia no dev (fotos dos quartos). Em produção, whitenoise/CDN.
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Mídia (fotos do site). Em produção Railway ainda sem S3/CDN — serve pelo app.
+# Trocar por storage externo no cutover definitivo.
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
