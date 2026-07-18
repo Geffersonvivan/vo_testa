@@ -1,9 +1,9 @@
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.http import HttpResponse
-from django.urls import include, path
+from django.urls import include, path, re_path
+from django.views.static import serve
 
 
 def healthz(_request):
@@ -45,6 +45,12 @@ urlpatterns = [
     path("", include("apps.site.urls")),
 ]
 
-# Mídia (fotos do site). Em produção Railway ainda sem S3/CDN — serve pelo app.
-# Trocar por storage externo no cutover definitivo.
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Mídia (fotos do site). static() do Django só age com DEBUG=1; em produção
+# (Railway, ainda sem S3) servimos com django.views.static.serve.
+urlpatterns += [
+    re_path(
+        r"^media/(?P<path>.*)$",
+        serve,
+        {"document_root": settings.MEDIA_ROOT},
+    ),
+]
