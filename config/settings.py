@@ -26,15 +26,19 @@ ALLOWED_HOSTS = [
 ]
 if DEBUG and not ALLOWED_HOSTS:
     ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
-# Railway: domínio público injetado + wildcard dos *.up.railway.app
+# Railway: domínio público injetado + wildcards + loopback do healthcheck
 for _host in (
     os.environ.get("RAILWAY_PUBLIC_DOMAIN", "").strip(),
     os.environ.get("RAILWAY_PRIVATE_DOMAIN", "").strip(),
+    ".railway.app",
+    ".up.railway.app",
+    "healthcheck.railway.app",
+    "localhost",
+    "127.0.0.1",
+    "[::1]",
 ):
     if _host and _host not in ALLOWED_HOSTS:
         ALLOWED_HOSTS.append(_host)
-if not any(h == ".up.railway.app" or h.endswith(".up.railway.app") for h in ALLOWED_HOSTS):
-    ALLOWED_HOSTS.append(".up.railway.app")
 
 CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o.strip()
