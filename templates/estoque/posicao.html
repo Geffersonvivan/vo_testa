@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block titulo %}Estoque — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<div class="pagina-cabecalho">
+  <h1>Posição de estoque</h1>
+  <a href="{% url 'estoque:entrada' %}" class="botao-primario">Registrar entrada</a>
+</div>
+{% include "estoque/partials/nav.html" %}
+
+<p class="subtitulo">
+  Saldo por produto{% if local %} no local <strong>{{ local.nome }}</strong>{% else %} (todos os locais){% endif %}.
+  {% if alertas %}<span class="texto-alerta">{{ alertas }} produto{{ alertas|pluralize }} no estoque mínimo.</span>{% endif %}
+</p>
+
+<div class="filtros">
+  <a href="{% url 'estoque:posicao' %}" class="selo {% if not local and not so_alerta %}selo-ativo{% endif %}">Todos os locais</a>
+  {% for lo in locais %}
+    <a href="?local={{ lo.pk }}" class="selo {% if local.pk == lo.pk %}selo-ativo{% endif %}">{{ lo.nome }}</a>
+  {% endfor %}
+  <a href="?alerta=1{% if local %}&local={{ local.pk }}{% endif %}" class="selo selo-alerta {% if so_alerta %}selo-ativo{% endif %}">Só alertas</a>
+</div>
+
+<table class="tabela">
+  <thead>
+    <tr><th>Produto</th><th>Categoria</th><th>Saldo</th><th>Mínimo</th><th>Custo médio</th><th>Valor</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for l in linhas %}
+      <tr class="{% if l.abaixo_minimo %}linha-alerta{% endif %}">
+        <td><a href="{% url 'estoque:kardex' l.produto.pk %}">{{ l.produto.nome }}</a>
+          {% if l.abaixo_minimo %}<span class="selo selo-alerta">mínimo</span>{% endif %}</td>
+        <td>{{ l.produto.categoria.nome }}</td>
+        <td>{{ l.saldo }} {{ l.produto.get_unidade_display|lower }}</td>
+        <td>{{ l.produto.estoque_minimo }}</td>
+        <td>R$ {{ l.produto.custo_medio }}</td>
+        <td>R$ {{ l.valor }}</td>
+        <td><a href="{% url 'estoque:kardex' l.produto.pk %}" class="botao-neutro">Kardex</a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="vazio">Nenhum produto {% if so_alerta %}no estoque mínimo{% else %}cadastrado. <a href="{% url 'estoque:produto_novo' %}">Cadastre o primeiro</a>{% endif %}.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

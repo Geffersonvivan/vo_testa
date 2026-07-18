@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block titulo %}Recados do turno — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Operação</p>
+<h1>Recados do turno</h1>
+<p class="subtitulo">Recados compartilhados entre os turnos — leia ao assumir o seu.</p>
+
+<form method="post" class="form-cartao">
+  {% csrf_token %}
+  {% include "nucleo/partials/campos.html" %}
+  <div class="acoes">
+    <button type="submit" class="botao-primario">Registrar ocorrência</button>
+  </div>
+</form>
+
+<h2>Últimas ocorrências</h2>
+<div class="logbook-lista">
+  {% for e in entradas %}
+    <article class="logbook-entrada {% if e.importante %}logbook-importante{% endif %}">
+      <header>
+        <strong>{{ e.autor }}</strong>
+        <time>{{ e.criado_em|date:"d/m/Y H:i" }}</time>
+        {% if e.importante %}<span class="selo selo-alerta">importante</span>{% endif %}
+      </header>
+      <p>{{ e.texto|linebreaksbr }}</p>
+    </article>
+  {% empty %}
+    <p class="vazio">Nenhuma ocorrência registrada ainda. O primeiro turno começa aqui.</p>
+  {% endfor %}
+</div>
+{% endblock %}

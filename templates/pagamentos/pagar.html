@@ -1,0 +1,66 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pagamento — Pousada Vô Testa</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <style>
+    body { background: var(--canvas); display: grid; place-items: center; min-height: 100vh; margin: 0; padding: 1.5rem; }
+    .pay { background: var(--superficie); border-radius: var(--raio-g); box-shadow: var(--sombra-3);
+           max-width: 460px; width: 100%; padding: 2rem; text-align: center; }
+    .pay h1 { font-family: var(--fonte-titulo); margin: .2rem 0 .4rem; font-size: 1.25rem; }
+    .pay .valor { font-family: var(--fonte-titulo); font-size: 2.4rem; color: var(--musgo); margin: 1rem 0; }
+    .pay code { display: block; word-break: break-all; background: var(--pergaminho); border-radius: var(--raio-p);
+                padding: .8rem; font-size: .8rem; margin: 1rem 0; }
+    .pay .selo { display: inline-block; margin-bottom: 1rem; }
+    .pay .marca-logo { width: 190px; max-width: 70%; height: auto; margin: 0 auto 1.4rem; display: block; }
+    .pay .acoes { display: flex; flex-direction: column; gap: .6rem; margin-top: 1.4rem; }
+    .pay .acoes a { text-decoration: none; display: block; }
+  </style>
+</head>
+<body>
+  <div class="pay">
+    <img src="{% static 'img/logotipo-noturno-limpo.png' %}" alt="Pousada Vô Testa" class="marca-logo">
+    <h1>{{ cobranca.descricao }}</h1>
+    <span class="selo selo-pg-{{ cobranca.status }}">{{ cobranca.get_status_display }}</span>
+    <div class="valor">R$ {{ cobranca.valor }}</div>
+    <p class="subtitulo">{{ cobranca.get_metodo_display }}{% if cobranca.metodo == 'cartao' and cobranca.parcelas > 1 %} · {{ cobranca.parcelas }}×{% endif %}</p>
+
+    {% if cobranca.status == 'pago' %}
+      <p style="color:var(--sucesso);font-weight:700;margin:0 0 .4rem">✓ Pagamento confirmado. Obrigado!</p>
+      <p class="subtitulo" style="margin:0">Sua reserva está garantida. Guarde o comprovante se precisar.</p>
+      <div class="acoes">
+        {% if url_recibo_site %}
+          <a href="{{ url_recibo_site }}" class="botao-primario">Ver minha reserva</a>
+        {% endif %}
+        <a href="{% url 'core:home' %}" class="botao-neutro">Voltar ao site</a>
+      </div>
+    {% elif cobranca.status == 'pendente' %}
+      {% if cobranca.metodo == 'pix' and cobranca.pix_copia_cola %}
+        <span class="letreiro">Pix copia-e-cola</span>
+        <code>{{ cobranca.pix_copia_cola }}</code>
+      {% elif cobranca.metodo == 'boleto' and cobranca.payload.linha_digitavel %}
+        <span class="letreiro">Linha digitável (sandbox)</span>
+        <code>{{ cobranca.payload.linha_digitavel }}</code>
+      {% elif cobranca.metodo == 'cartao' %}
+        <p class="subtitulo">Pagamento com cartão (sandbox). Confirme abaixo para simular a aprovação.</p>
+      {% endif %}
+      <form method="post" action="{% url 'pagamentos:pagar_simular' cobranca.token %}">
+        {% csrf_token %}
+        <button type="submit" class="botao-primario" style="width:100%">Já paguei</button>
+      </form>
+      <p class="subtitulo" style="margin-top:1rem;font-size:.78rem">Ambiente de testes (sandbox). Nenhum valor real é cobrado.</p>
+      <div class="acoes">
+        <a href="{% url 'core:home' %}" class="botao-neutro">Cancelar e voltar ao site</a>
+      </div>
+    {% else %}
+      <p class="subtitulo">Esta cobrança está {{ cobranca.get_status_display|lower }}.</p>
+      <div class="acoes">
+        <a href="{% url 'core:home' %}" class="botao-neutro">Voltar ao site</a>
+      </div>
+    {% endif %}
+  </div>
+</body>
+</html>

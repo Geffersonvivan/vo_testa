@@ -1,0 +1,27 @@
+{% comment %}
+Combobox de pessoa com busca instantânea + agrupamento por papel.
+Parâmetros do include:
+  dados       lista de {id, nome, grupo} (ver nucleo.seletores.pessoas_agrupadas)
+  dados_id    id único do json_script nesta página (ex.: "hospedes-data")
+  campo       name do input enviado no POST (ex.: "hospede")
+  placeholder texto do campo (opcional)
+  valor_id    id pré-selecionado (opcional, para edição)
+{% endcomment %}
+{{ dados|json_script:dados_id }}
+<div class="combo" x-data="comboPessoa" data-dados="{{ dados_id }}" data-sel="{{ valor_id|default:'' }}"
+     @click.outside="open=false">
+  <input type="hidden" name="{{ campo }}" :value="sel">
+  <input type="text" class="combo-input" placeholder="{{ placeholder|default:'Buscar…' }}" autocomplete="off"
+         x-model="q" @focus="open=true" @input="open=true; if(!q){sel=''}">
+  <div class="combo-lista" x-show="open" x-cloak>
+    <template x-for="[grupo, lista] in grupos" :key="grupo">
+      <div class="combo-grupo">
+        <div class="combo-grupo-cab" x-text="grupo"></div>
+        <template x-for="it in lista" :key="it.id">
+          <button type="button" class="combo-opcao" @click="escolher(it)" x-text="it.nome"></button>
+        </template>
+      </div>
+    </template>
+    <div class="combo-vazio" x-show="grupos.length === 0">Nenhum resultado.</div>
+  </div>
+</div>

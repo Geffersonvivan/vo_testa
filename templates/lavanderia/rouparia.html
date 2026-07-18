@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block titulo %}Rouparia — Lavanderia{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'lavanderia:painel' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Lavanderia
+</a>
+<p class="pagina-eyebrow letreiro">Lavanderia</p>
+<h1>Rouparia interna</h1>
+<p class="subtitulo">Enxoval da casa por estado. A faxina da Governança recolhe automaticamente o enxoval sujo (em uso → suja).</p>
+
+<div class="colunas colunas-2-1">
+  <section>
+    <h2>Posição do enxoval</h2>
+    <table class="tabela">
+      <thead>
+        <tr><th>Item</th><th class="num">Limpa</th><th class="num">Em uso</th><th class="num">Suja</th><th class="num">Lavando</th><th class="num">Total</th></tr>
+      </thead>
+      <tbody>
+        {% for l in posicao %}
+          <tr>
+            <td>{{ l.item.nome }}{% if l.abaixo_minimo %} <span class="selo prioridade-alta dica" data-dica="Abaixo do mínimo ({{ l.item.minimo }})">baixo</span>{% endif %}</td>
+            <td class="num">{{ l.estados.limpa }}</td>
+            <td class="num">{{ l.estados.em_uso }}</td>
+            <td class="num">{{ l.estados.suja }}</td>
+            <td class="num">{{ l.estados.lavando }}</td>
+            <td class="num"><strong>{{ l.total }}</strong></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="vazio">Nenhum item de enxoval. Cadastre ao lado.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <div class="painel-bloco" style="margin-bottom:1.2rem">
+      <h2 style="margin-top:0">Movimentar</h2>
+      <form method="post" action="{% url 'lavanderia:rouparia_mover' %}" class="form-cartao" x-data="{ acao: 'adquirir' }">
+        {% csrf_token %}
+        <div class="campo"><label>Item</label>
+          <select name="item" required>{% for i in itens %}<option value="{{ i.pk }}">{{ i.nome }}</option>{% endfor %}</select>
+        </div>
+        <div class="campo"><label>Ação</label>
+          <select name="acao" x-model="acao">
+            <option value="adquirir">Adquirir (entra limpa)</option>
+            <option value="distribuir">Distribuir (limpa → em uso)</option>
+            <option value="coletar">Coletar suja (em uso → suja)</option>
+            <option value="enviar">Enviar p/ lavar (suja → lavando)</option>
+            <option value="receber">Receber limpa (lavando → limpa)</option>
+            <option value="baixar">Baixar (desgaste/dano)</option>
+          </select>
+        </div>
+        <div class="form-grade" x-show="acao === 'baixar'" x-cloak style="display:none">
+          <div class="campo"><label>De qual estado</label>
+            <select name="estado">{% for v, r in estados %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
+          </div>
+          <div class="campo"><label>Motivo</label><input type="text" name="motivo" placeholder="desgaste"></div>
+        </div>
+        <div class="campo"><label>Quantidade</label><input type="number" name="quantidade" min="1" value="1" required></div>
+        <div class="acoes"><button type="submit" class="botao-primario">Registrar</button></div>
+      </form>
+    </div>
+
+    <div class="painel-bloco">
+      <h2 style="margin-top:0">Novo item de enxoval</h2>
+      <form method="post" action="{% url 'lavanderia:rouparia_item' %}" class="form-cartao">
+        {% csrf_token %}
+        <div class="campo"><label>Nome</label><input type="text" name="nome" placeholder="Ex.: Lençol casal" required></div>
+        <div class="form-grade">
+          <div class="campo"><label>Mínimo (limpa)</label><input type="number" name="minimo" min="0" value="0"></div>
+          <div class="campo"><label>Peças por faxina</label><input type="number" name="por_faxina" min="0" value="0"></div>
+        </div>
+        <div class="acoes"><button type="submit" class="botao-primario">Cadastrar</button></div>
+      </form>
+    </div>
+  </section>
+</div>
+{% endblock %}

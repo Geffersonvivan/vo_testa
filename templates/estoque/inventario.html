@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block titulo %}Contagem — Estoque{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<div class="pagina-cabecalho">
+  <h1>Inventário #{{ inventario.pk }} — {{ inventario.local.nome }}</h1>
+  <span class="selo">{{ inventario.get_status_display }}</span>
+</div>
+{% include "estoque/partials/nav.html" %}
+
+{% if inventario.status == "aberto" %}
+  <p class="subtitulo">Informe a quantidade contada de cada produto. Salve para continuar depois, ou aplique para gerar os ajustes.</p>
+  <form method="post">
+    {% csrf_token %}
+    <table class="tabela">
+      <thead>
+        <tr><th>Produto</th><th>Saldo no sistema</th><th>Contado</th><th>Diferença</th></tr>
+      </thead>
+      <tbody>
+        {% for item in itens %}
+          <tr>
+            <td>{{ item.produto.nome }}</td>
+            <td>{{ item.saldo_sistema }} {{ item.produto.get_unidade_display|lower }}</td>
+            <td><input type="number" step="0.001" min="0" name="item_{{ item.pk }}" value="{{ item.quantidade_contada }}"></td>
+            <td class="{% if item.diferenca %}texto-alerta{% endif %}">{{ item.diferenca }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="vazio">Nenhum produto ativo para contar.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="acoes">
+      <button type="submit" class="botao-neutro">Salvar contagem</button>
+      <button type="submit" name="aplicar" value="1" class="botao-primario"
+              onclick="return confirm('Aplicar o inventário? Os ajustes serão gerados e não podem ser desfeitos (só por novo ajuste).')">
+        Aplicar inventário
+      </button>
+    </div>
+  </form>
+{% else %}
+  <p class="subtitulo">Inventário {{ inventario.get_status_display|lower }} em {{ inventario.aplicado_em|date:"d/m/Y H:i" }}.</p>
+  <table class="tabela">
+    <thead><tr><th>Produto</th><th>Saldo no sistema</th><th>Contado</th><th>Diferença</th></tr></thead>
+    <tbody>
+      {% for item in itens %}
+        <tr>
+          <td>{{ item.produto.nome }}</td>
+          <td>{{ item.saldo_sistema }}</td>
+          <td>{{ item.quantidade_contada }}</td>
+          <td>{{ item.diferenca }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+{% endblock %}

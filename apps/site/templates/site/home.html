@@ -1,0 +1,54 @@
+{% extends 'site/base.html' %}
+
+{% block title %}Pousada Vô Testa — Um lugar fora do tempo{% endblock %}
+
+{% block content %}
+
+{# Cada âncora do menu envolve a divisória + seção — scroll pousa na divisa, sob o header #}
+{# Ordem: vitrine/fotos primeiro → blocos de reserva depois (Hero com busca mantido) #}
+{% include 'site/sections/hero.html' %}
+
+<div id="sobre">
+{% include 'site/partials/dividers.html' with type='1' %}
+{% include 'site/sections/sobre.html' %}
+</div>
+
+<div id="experiencias">
+{% include 'site/partials/dividers.html' with type='5' %}
+{% include 'site/sections/experiencias.html' %}
+</div>
+
+<div id="galeria">
+{% include 'site/partials/dividers.html' with type='1' %}
+{% include 'site/sections/galeria.html' %}
+</div>
+
+{% include 'site/partials/dividers.html' with type='2' %}
+{% include 'site/sections/faixa_fotos.html' %}
+
+{% include 'site/partials/dividers.html' with type='2' %}
+{% include 'site/sections/depoimentos.html' %}
+
+<div id="quartos">
+{% include 'site/partials/dividers.html' with type='2' %}
+{% include 'site/sections/quartos.html' %}
+</div>
+
+<div id="dia-pousada">
+{% include 'site/partials/dividers.html' with type='3' %}
+{% include 'site/sections/dia_pousada.html' %}
+</div>
+
+<div id="eventos">
+{% include 'site/partials/dividers.html' with type='4' %}
+{% include 'site/sections/eventos.html' %}
+</div>
+
+{% include 'site/sections/cta.html' %}
+
+<div id="contato">
+{% include 'site/partials/dividers.html' with type='1' %}
+{% include 'site/sections/contato.html' %}
+</div>
+
+{% endblock %}

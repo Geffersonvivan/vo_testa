@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block titulo %}Safrapay — Pagamentos{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Financeiro · Gateway</p>
+<div class="pagina-cabecalho">
+  <h1>Safrapay</h1>
+  {% if safrapay.pronto_para_api %}
+    <span class="selo" style="background:color-mix(in srgb, var(--sucesso) 18%, transparent);color:var(--sucesso)">Pronto para API</span>
+  {% else %}
+    <span class="selo">Fase: evidências (Token ainda não existe)</span>
+  {% endif %}
+</div>
+<p class="subtitulo">
+  O Token em Developers → Keys <strong>só aparece depois</strong> das evidências de teste.
+  Até lá usamos o sandbox do CRM (<code>simulado</code>) nos três meios e anexamos o JSON no formato da API HML.
+</p>
+
+<div class="cartao" style="margin-top:1rem">
+  <h2 class="letreiro" style="margin:0 0 .8rem;font-size:.85rem">Gerar evidências agora</h2>
+  <p style="margin:0 0 1rem;color:var(--tinta-suave);font-size:.9rem;line-height:1.55">
+    Cria 3 cobranças de R$&nbsp;10,00 (Pix, cartão, boleto) no sandbox e grava o JSON em
+    <code>evidencias/safrapay/</code> (também baixa no navegador). Coloque os prints em
+    <code>evidencias/safrapay/prints/</code>.
+  </p>
+  <form method="post" action="{% url 'pagamentos:safrapay_evidencias' %}">
+    {% csrf_token %}
+    <button type="submit" class="botao-primario">Gerar evidências (Pix + cartão + boleto)</button>
+  </form>
+</div>
+
+<div class="cartao" style="margin-top:1rem">
+  <h2 class="letreiro" style="margin:0 0 .8rem;font-size:.85rem">Configuração atual</h2>
+  <table class="tabela">
+    <tbody>
+      <tr><td>Gateway ativo</td><td><code>{{ safrapay.gateway }}</code></td></tr>
+      <tr><td>Ambiente</td><td><code>{{ safrapay.env }}</code> → {{ safrapay.gateway_url }}</td></tr>
+      <tr>
+        <td>ID (<code>SAFRAPAY_ID</code>)</td>
+        <td>{% if safrapay.id_ok %}<span class="selo" style="color:var(--sucesso)">Preenchido</span>{% else %}<span class="selo">Vazio</span>{% endif %}</td>
+      </tr>
+      <tr>
+        <td>Código de Ativação</td>
+        <td>{% if safrapay.codigo_ativacao_ok %}<span class="selo" style="color:var(--sucesso)">Preenchido</span>{% else %}<span class="selo">Vazio</span>{% endif %}</td>
+      </tr>
+      <tr>
+        <td>Token (<code>SAFRAPAY_TOKEN</code>)</td>
+        <td>{% if safrapay.token_ok %}<span class="selo" style="color:var(--sucesso)">Preenchido</span>{% else %}<span class="selo">Ainda não — só após evidências</span>{% endif %}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+{% if safrapay.avisos %}
+<div class="cartao" style="margin-top:1rem">
+  <h2 class="letreiro" style="margin:0 0 .6rem;font-size:.85rem">Avisos</h2>
+  <ul style="margin:0;padding-left:1.1rem;line-height:1.65;color:var(--tinta-suave)">
+    {% for a in safrapay.avisos %}<li>{{ a }}</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="cartao" style="margin-top:1rem">
+  <h2 class="letreiro" style="margin:0 0 .6rem;font-size:.85rem">Ordem correta (SafraPay)</h2>
+  <ol style="margin:0;padding-left:1.2rem;line-height:1.65;color:var(--tinta-suave)">
+    {% for p in safrapay.processo_homologacao %}<li>{{ p }}</li>{% endfor %}
+  </ol>
+</div>
+
+<div class="cartao" style="margin-top:1rem">
+  <h2 class="letreiro" style="margin:0 0 .6rem;font-size:.85rem">Próximos passos (nós)</h2>
+  <ol style="margin:0;padding-left:1.2rem;line-height:1.65;color:var(--tinta-suave)">
+    {% for p in safrapay.proximos_passos %}<li>{{ p }}</li>{% endfor %}
+  </ol>
+</div>
+
+<p style="margin-top:1.2rem">
+  <a href="{% url 'pagamentos:painel' %}" class="botao-neutro">← Voltar ao painel</a>
+</p>
+{% endblock %}

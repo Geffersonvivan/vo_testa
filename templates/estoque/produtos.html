@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block titulo %}Produtos — Estoque{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<div class="pagina-cabecalho">
+  <h1>Produtos</h1>
+  <a href="{% url 'estoque:produto_novo' %}" class="botao-primario">Novo produto</a>
+</div>
+{% include "estoque/partials/nav.html" %}
+
+<form method="get" class="barra-busca">
+  <input type="search" name="q" value="{{ busca }}" placeholder="Buscar por nome ou código de barras">
+  <button type="submit" class="botao-neutro">Buscar</button>
+</form>
+
+<table class="tabela">
+  <thead>
+    <tr><th>Produto</th><th>Categoria</th><th>Unidade</th><th>Natureza</th><th>Custo médio</th><th>Preço venda</th><th>Saldo</th></tr>
+  </thead>
+  <tbody>
+    {% for p in produtos %}
+      <tr>
+        <td><a href="{% url 'estoque:produto_editar' p.pk %}">{{ p.nome }}</a>{% if not p.ativo %} <span class="selo selo-neutro">inativo</span>{% endif %}</td>
+        <td>{{ p.categoria.nome }}</td>
+        <td>{{ p.get_unidade_display }}</td>
+        <td>{{ p.get_natureza_display }}</td>
+        <td>R$ {{ p.custo_medio }}</td>
+        <td>R$ {{ p.preco_venda }}</td>
+        <td>{{ p.saldo }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="vazio">Nenhum produto cadastrado. Cadastre categorias e locais primeiro, depois os produtos.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "portal/base.html" %}
+
+{% block titulo %}Sua opinião — Pousada Vô Testa{% endblock %}
+
+{% block conteudo %}
+<div class="pt-card">
+  <p class="letreiro">NPS</p>
+  <h2>Como foi sua estadia?</h2>
+  <p class="subtitulo">
+    Em breve você poderá avaliar a pousada numa escala de 0 a 10 por aqui.
+    Sua opinião ajuda a gente a melhorar o aconchego do Vô Testa.
+  </p>
+  <div class="pt-nps-escala" aria-hidden="true">
+    {% for n in "0123456789"|make_list %}
+      <span class="pt-nps-nota desabilitada">{{ n }}</span>
+    {% endfor %}
+    <span class="pt-nps-nota desabilitada">10</span>
+  </div>
+  <p class="subtitulo" style="margin-top:1rem;font-size:.85rem">
+    Pesquisa registrada para a próxima fase (CRM do Hóspede). Por enquanto só o atalho.
+  </p>
+  <div class="pt-acoes" style="margin-top:1rem">
+    <a href="{% url 'portal:home' token %}" class="botao-neutro" style="text-align:center;text-decoration:none">Voltar</a>
+  </div>
+</div>
+{% endblock %}

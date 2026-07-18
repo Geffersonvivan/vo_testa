@@ -1,0 +1,28 @@
+<div id="comanda-itens" class="comanda-itens">
+  {% if erro %}<div class="mensagem error">{{ erro }}</div>{% endif %}
+  {% if comanda.itens.all %}
+    <div class="comanda-lista">
+      {% for i in comanda.itens.all %}
+        <div class="pdv-item">
+          <span class="comanda-qtd">{{ i.quantidade|floatformat:"-3" }}×</span>
+          <span class="pdv-item-nome">{{ i.descricao }}</span>
+          <span class="pdv-sub">R$ {{ i.subtotal }}</span>
+          {% if comanda.aberta %}
+            <button type="button" class="pdv-x" title="Remover"
+                    hx-post="{% url 'restaurante:remover_item' comanda.pk i.pk %}"
+                    hx-target="#comanda-itens" hx-swap="outerHTML">&times;</button>
+          {% else %}<span></span>{% endif %}
+        </div>
+      {% endfor %}
+    </div>
+    <div class="comanda-total-linha">
+      <span class="letreiro">Total</span>
+      <strong>R$ {{ comanda.total }}</strong>
+    </div>
+  {% else %}
+    <div class="pdv-vazio">
+      <svg viewBox="0 0 24 24" class="ico"><path d="M4 8h16l-1 12H5z"/><path d="M9 8V6a3 3 0 016 0v2"/></svg>
+      <span>Comanda vazia. Toque num item do cardápio.</span>
+    </div>
+  {% endif %}
+</div>

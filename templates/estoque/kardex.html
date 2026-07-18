@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block titulo %}Kardex — {{ produto.nome }}{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<div class="pagina-cabecalho">
+  <h1>Kardex — {{ produto.nome }}</h1>
+  <a href="{% url 'estoque:produtos' %}" class="botao-neutro">Voltar aos produtos</a>
+</div>
+{% include "estoque/partials/nav.html" %}
+
+<div class="cartoes cartoes-indicadores">
+  <div class="cartao">
+    <span class="indicador-rotulo letreiro">Saldo total</span>
+    <span class="indicador-valor">{{ saldo }} {{ produto.get_unidade_display|lower }}</span>
+  </div>
+  <div class="cartao">
+    <span class="indicador-rotulo letreiro">Custo médio</span>
+    <span class="indicador-valor">R$ {{ produto.custo_medio }}</span>
+  </div>
+  <div class="cartao">
+    <span class="indicador-rotulo letreiro">Preço de venda</span>
+    <span class="indicador-valor">R$ {{ produto.preco_venda }}</span>
+  </div>
+</div>
+
+<table class="tabela">
+  <thead>
+    <tr><th>Data</th><th>Tipo</th><th>Local</th><th>Quantidade</th><th>Custo unit.</th><th>Documento</th></tr>
+  </thead>
+  <tbody>
+    {% for m in movimentos %}
+      <tr>
+        <td>{{ m.criado_em|date:"d/m/Y H:i" }}</td>
+        <td>{{ m.get_tipo_display }}</td>
+        <td>{{ m.local.nome }}</td>
+        <td class="{% if m.entrada %}texto-entrada{% else %}texto-alerta{% endif %}">{{ m.quantidade }}</td>
+        <td>R$ {{ m.custo_unitario }}</td>
+        <td>{{ m.documento|default:"—" }}{% if m.observacao %} <small class="ajuda">{{ m.observacao }}</small>{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vazio">Sem movimentos. Registre uma entrada para começar.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

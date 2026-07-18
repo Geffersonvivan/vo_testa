@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block titulo %}Módulos — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Configurações</p>
+<h1>Central de Módulos</h1>
+<p class="subtitulo">
+  O CRM é contratado por módulos. Aqui você vê o catálogo completo — o que está
+  <strong>funcionando</strong>, o que está <strong>em construção</strong> e o que está
+  <strong>disponível para contratar</strong> — com as dependências de cada um.
+  <span class="mono-num">{{ total_ativos }}</span> de {{ total }} ativos.
+</p>
+
+<div class="legenda-modulos">
+  <span class="selo-status status-funcionando">Funcionando</span>
+  <span class="selo-status status-construcao">Em construção</span>
+  <span class="selo-status status-disponivel">Disponível</span>
+</div>
+
+{% for grupo in grupos %}
+  <h2>{{ grupo.titulo }}</h2>
+  <div class="grid-modulos">
+    {% for m in grupo.itens %}
+      <div class="modulo-card modulo-{{ m.status }}">
+        <div class="modulo-card-topo">
+          <strong>{{ m.nome }}</strong>
+          <span class="selo-status status-{{ m.status }}">
+            {% if m.status == "funcionando" %}Funcionando{% elif m.status == "construcao" %}Em construção{% else %}Disponível{% endif %}
+          </span>
+        </div>
+        <p class="modulo-card-desc">{{ m.descricao }}</p>
+        {% if m.dependencias %}
+          <p class="modulo-dep">Requer: {{ m.dependencias|join:", " }}</p>
+        {% endif %}
+        <form method="post" class="modulo-card-acao">
+          {% csrf_token %}
+          <input type="hidden" name="codigo" value="{{ m.codigo }}">
+          {% if m.ativo %}
+            <input type="hidden" name="acao" value="desativar">
+            {% if m.bloqueia_desativar %}
+              <button type="button" class="botao-neutro" disabled
+                      title="{{ m.bloqueia_desativar|join:', ' }} depende(m) deste módulo">Desativar</button>
+              <span class="modulo-trava dica" data-dica="{{ m.bloqueia_desativar|join:', ' }} depende(m) deste módulo">🔒</span>
+            {% else %}
+              <button type="submit" class="botao-neutro"
+                      onclick="return confirm('Desativar {{ m.nome }}? Ele some dos menus.')">Desativar</button>
+            {% endif %}
+          {% else %}
+            <input type="hidden" name="acao" value="ativar">
+            <button type="submit" class="botao-primario">Ativar</button>
+          {% endif %}
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+{% endfor %}
+{% endblock %}

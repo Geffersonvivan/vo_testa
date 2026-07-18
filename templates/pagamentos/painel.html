@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block titulo %}Pagamentos Online — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Financeiro</p>
+<div class="pagina-cabecalho">
+  <h1>Pagamentos Online</h1>
+  <a href="{% url 'pagamentos:safrapay' %}" class="botao-neutro">Safrapay · chaves</a>
+</div>
+<p class="subtitulo">
+  Cobranças por Pix, cartão, boleto ou link.
+  Gateway ativo: <strong>{{ safrapay.gateway }}</strong>
+  {% if safrapay.gateway == 'simulado' %}(sandbox local){% elif safrapay.pronto_para_api %}· API pronta{% else %}· aguardando Token{% endif %}.
+</p>
+
+<div class="colunas colunas-2-1">
+  <section>
+    <h2>Cobranças</h2>
+    <table class="tabela">
+      <thead><tr><th>#</th><th>Método</th><th>Descrição</th><th class="num">Valor</th><th>Situação</th></tr></thead>
+      <tbody>
+        {% for c in cobrancas %}
+          <tr class="linha-clique" onclick="location.href='{% url 'pagamentos:detalhe' c.pk %}'">
+            <td>{{ c.pk }}</td>
+            <td>{{ c.get_metodo_display }}</td>
+            <td>{{ c.descricao }}</td>
+            <td class="num">R$ {{ c.valor }}</td>
+            <td><span class="selo selo-pg-{{ c.status }}">{{ c.get_status_display }}</span></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="vazio">Nenhuma cobrança ainda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2 style="margin-top:1.4rem">Conciliação</h2>
+    <table class="tabela">
+      <thead><tr><th>Situação</th><th class="num">Qtd</th><th class="num">Total</th></tr></thead>
+      <tbody>
+        {% for r in conciliacao %}
+          <tr><td>{{ r.status }}</td><td class="num">{{ r.qtd }}</td><td class="num">R$ {{ r.total }}</td></tr>
+        {% empty %}
+          <tr><td colspan="3" class="vazio">Sem movimento.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="painel-bloco" x-data="{ fin: 'avulso', metodo: 'pix' }">
+    <h2 style="margin-top:0">Nova cobrança</h2>
+    <form method="post" action="{% url 'pagamentos:criar' %}" class="form-cartao">
+      {% csrf_token %}
+      <div class="campo"><label>Descrição</label><input type="text" name="descricao" placeholder="Ex.: Sinal reserva #12" required></div>
+      <div class="form-grade">
+        <div class="campo"><label>Valor (R$)</label><input type="number" name="valor" min="0.01" step="0.01" required></div>
+        <div class="campo"><label>Método</label>
+          <select name="metodo" x-model="metodo">{% for v, r in metodos %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
+        </div>
+      </div>
+      <div class="campo" x-show="metodo === 'cartao'" x-cloak style="display:none">
+        <label>Parcelas</label><input type="number" name="parcelas" min="1" max="12" value="1">
+      </div>
+      <div class="campo"><label>Finalidade</label>
+        <select name="finalidade" x-model="fin">{% for v, r in finalidades %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
+      </div>
+      <div class="campo" x-show="fin === 'sinal_reserva'" x-cloak style="display:none">
+        <label>Reserva</label>
+        <select name="reserva_id">
+          <option value="">Escolha…</option>
+          {% for r in reservas %}<option value="{{ r.id }}">{{ r.rotulo }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="campo"><label>Pagador (opcional)</label>
+        {% include "componentes/combo_pessoa.html" with dados=pagadores dados_id="pagadores-data" campo="pagador" placeholder="Buscar pessoa…" %}
+      </div>
+      <div class="acoes"><button type="submit" class="botao-primario">Gerar cobrança</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

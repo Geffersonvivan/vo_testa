@@ -1,0 +1,87 @@
+{% extends 'site/reservas/base_reserva.html' %}
+{% load static %}
+
+{% block title %}Reservar — Seus dados | Pousada Vô Testa{% endblock %}
+
+{% block reserva_content %}
+<div class="grid md:grid-cols-3 gap-8">
+    <div class="md:col-span-2">
+        <h2 class="font-display text-2xl font-bold text-madeira mb-6">Seus Dados</h2>
+
+        <!-- Form de reserva -->
+        <form method="post" action="{% url 'core:resumo_reserva' %}" id="form-dados">
+            {% csrf_token %}
+            <input type="hidden" name="quarto_id" value="{{ quarto.id }}">
+            <input type="hidden" name="checkin" value="{{ busca.checkin|date:'Y-m-d' }}">
+            <input type="hidden" name="checkout" value="{{ busca.checkout|date:'Y-m-d' }}">
+            <input type="hidden" name="hospedes" value="{{ busca.hospedes }}">
+            <input type="hidden" name="modalidade" value="{{ modalidade|default:busca.modalidade }}">
+            <input type="hidden" name="metodo_pagamento" value="pix">
+
+            <div id="dados-campos">
+                {% include 'site/reservas/partials/dados_campos.html' %}
+            </div>
+
+            <div class="flex justify-between mt-8">
+                <a href="{% url 'core:reservar' %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}{% if modalidade %}&modalidade={{ modalidade }}{% elif busca.modalidade %}&modalidade={{ busca.modalidade }}{% endif %}"
+                   class="text-madeira/40 hover:text-madeira transition flex items-center gap-2 text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+                    Trocar quarto
+                </a>
+                <button type="submit" class="bg-madeira text-pergaminho font-bold px-8 py-3 rounded-xl hover:bg-madeira/90 transition flex items-center gap-2 shadow-lg shadow-madeira/20">
+                    Continuar
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Resumo lateral -->
+    <div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-madeira/5 sticky top-28">
+            <h3 class="font-display text-lg font-bold text-madeira mb-4">Resumo</h3>
+            <div class="aspect-video bg-gradient-to-br from-pergaminho to-pergaminho/40 rounded-xl flex items-center justify-center mb-4 overflow-hidden">
+                {% if quarto.foto_principal %}
+                <img src="{{ quarto.foto_principal.url }}" alt="{{ quarto.nome }}" class="w-full h-full object-cover" style="view-transition-name: quarto-foto-{{ quarto.id }}">
+                {% else %}
+                <p class="text-madeira/20 text-xs">[ {{ quarto.nome }} ]</p>
+                {% endif %}
+            </div>
+            <h4 class="text-madeira font-semibold mb-1">{{ quarto.nome }}</h4>
+            <p class="text-madeira/40 text-xs mb-4">{{ quarto.categoria.nome }} · {{ quarto.capacidade }} hóspedes · {{ quarto.metragem }}m²</p>
+            <div class="space-y-2 text-sm border-t border-pergaminho pt-4">
+                <div class="flex justify-between"><span class="text-madeira/40">Check-in</span><span>{{ busca.checkin|date:'d/m/Y' }}</span></div>
+                <div class="flex justify-between"><span class="text-madeira/40">Check-out</span><span>{{ busca.checkout|date:'d/m/Y' }}</span></div>
+                <div class="flex justify-between"><span class="text-madeira/40">Noites</span><span>{{ resumo.noites }}</span></div>
+                <div class="flex justify-between"><span class="text-madeira/40">Diária</span><span>R$ {{ resumo.preco_noite|floatformat:0 }}</span></div>
+            </div>
+            <div class="border-t border-madeira/10 mt-4 pt-4">
+                <div class="flex justify-between text-lg font-bold">
+                    <span class="text-madeira">Total</span>
+                    <span class="text-madeira">R$ {{ resumo.subtotal|floatformat:2 }}</span>
+                </div>
+                <p class="text-musgo text-xs mt-1 font-medium">Pix: R$ {{ resumo.total|floatformat:2 }} ({{ resumo.desconto_pct|floatformat:0 }}% off)</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    #form-dados input[type=text], #form-dados input[type=email],
+    #form-dados input[type=tel], #form-dados textarea {
+        width: 100%;
+        background: #fff;
+        border: 1px solid rgba(79, 44, 29, .12);
+        border-radius: .75rem;
+        padding: .75rem 1rem;
+        color: #4F2C1D;
+        font-size: .875rem;
+    }
+    #form-dados input:focus, #form-dados textarea:focus {
+        outline: none; border-color: #4F2C1D; box-shadow: 0 0 0 2px rgba(79, 44, 29, .12);
+    }
+    #form-dados textarea { resize: none; }
+</style>
+{% endblock %}

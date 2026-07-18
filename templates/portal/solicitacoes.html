@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block titulo %}Solicitações do portal{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Online</p>
+<h1>Portal do Hóspede</h1>
+<p class="subtitulo">Pedidos e solicitações que chegaram pelo app do hóspede (QR Code). Cada um já virou comanda/tarefa no módulo dono.</p>
+
+<table class="tabela">
+  <thead><tr><th>Quando</th><th>Quarto</th><th>Tipo</th><th>Detalhe</th></tr></thead>
+  <tbody>
+    {% for s in solicitacoes %}
+      <tr>
+        <td>{{ s.criado_em|date:"d/m H:i" }}</td>
+        <td>{{ s.uh_numero }}</td>
+        <td><span class="selo">{{ s.get_tipo_display }}</span></td>
+        <td>{{ s.detalhe }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Nenhuma solicitação ainda.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block titulo %}Painel comercial — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Comercial</p>
+<div class="pagina-cabecalho">
+  <h1>Painel comercial</h1>
+  <a href="{% url 'comercial:funil' %}" class="botao-mini">Ir ao funil</a>
+</div>
+<p class="subtitulo">Mês corrente · forecast = ponderado das abertas · realizado = ganhos fechados no mês.</p>
+
+<div class="cartoes-indicadores colunas">
+  <div class="cartao"><span class="indicador-rotulo letreiro">Oportunidades abertas</span><span class="indicador-valor">{{ abertas }}</span></div>
+  <div class="cartao"><span class="indicador-rotulo letreiro">Valor no funil</span><span class="indicador-valor">R$ {{ valor_funil }}</span></div>
+  <div class="cartao"><span class="indicador-rotulo letreiro">Forecast (ponderado)</span><span class="indicador-valor">R$ {{ gestao.forecast }}</span></div>
+  <div class="cartao"><span class="indicador-rotulo letreiro">Realizado (mês)</span><span class="indicador-valor">R$ {{ gestao.realizado }}</span></div>
+  <div class="cartao"><span class="indicador-rotulo letreiro">Meta / atingimento</span><span class="indicador-valor">R$ {{ gestao.meta }} · {{ gestao.atingimento }}%</span></div>
+  <div class="cartao"><span class="indicador-rotulo letreiro">Conversão (mês)</span><span class="indicador-valor">{{ dados.conversao }}%</span></div>
+  <div class="cartao"><span class="indicador-rotulo letreiro">Ganhas / Perdidas</span><span class="indicador-valor">{{ dados.ganhas }} / {{ dados.perdidas }}</span></div>
+  <div class="cartao"><span class="indicador-rotulo letreiro">Score médio (abertas)</span><span class="indicador-valor">{{ gestao.score_medio }}</span></div>
+</div>
+
+<div class="colunas colunas-2-1" style="margin-top:1.2rem">
+  <section>
+    <h2>Funil por etapa (em aberto)</h2>
+    <table class="tabela">
+      <thead><tr><th>Etapa</th><th class="num">Oportunidades</th><th class="num">Valor</th></tr></thead>
+      <tbody>
+        {% for col in colunas %}
+          <tr>
+            <td>{{ col.etapa.nome }} <small class="letreiro">{{ col.etapa.probabilidade }}%</small></td>
+            <td class="num">{{ col.itens|length }}</td>
+            <td class="num">R$ {{ col.total }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2 style="margin-top:1.4rem">Tempo médio por etapa (horas)</h2>
+    <table class="tabela">
+      <thead><tr><th>Etapa</th><th class="num">Média (h)</th></tr></thead>
+      <tbody>
+        {% for t in gestao.tempo_por_etapa %}
+          <tr><td>{{ t.etapa }}</td><td class="num">{{ t.horas }}</td></tr>
+        {% empty %}
+          <tr><td colspan="2" class="vazio">Ainda sem histórico de movimentação no período.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <h2 style="margin-top:1.4rem">Top scores (abertas)</h2>
+    <table class="tabela">
+      <thead><tr><th>Score</th><th>Oportunidade</th><th>Lead</th><th class="num">Valor</th></tr></thead>
+      <tbody>
+        {% for o in gestao.top_scores %}
+          <tr>
+            <td>{{ o.score }}</td>
+            <td><a href="{% url 'comercial:oportunidade' o.pk %}">{{ o.titulo }}</a></td>
+            <td>{{ o.pessoa.nome }}</td>
+            <td class="num">R$ {{ o.valor_estimado }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="vazio">Nenhuma oportunidade aberta.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <aside>
+    <h2>Meta do mês</h2>
+    <form method="post" action="{% url 'comercial:meta' %}" class="cartao" style="padding:1rem;margin-bottom:1rem">
+      {% csrf_token %}
+      <div class="campo">{{ meta_form.valor_meta.label_tag }}{{ meta_form.valor_meta }}</div>
+      <div class="campo">{{ meta_form.oportunidades_meta.label_tag }}{{ meta_form.oportunidades_meta }}</div>
+      <p class="subtitulo" style="font-size:.8rem">Ganhos no mês: {{ gestao.ganhos_qtd }}{% if gestao.meta_qtd %} / meta {{ gestao.meta_qtd }}{% endif %}</p>
+      <button type="submit" class="botao-primario botao-largo">Salvar meta</button>
+    </form>
+
+    <h2>Motivos de perda</h2>
+    <table class="tabela">
+      <thead><tr><th>Motivo</th><th class="num">Qtd.</th></tr></thead>
+      <tbody>
+        {% for p in perdas %}
+          <tr><td>{{ p.motivo_perda__nome }}</td><td class="num">{{ p.n }}</td></tr>
+        {% empty %}
+          <tr><td colspan="2" class="vazio">Nenhuma perda registrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </aside>
+</div>
+{% endblock %}

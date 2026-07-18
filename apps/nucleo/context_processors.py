@@ -1,5 +1,18 @@
+from django.urls import NoReverseMatch, reverse
+
 from .models import modulos_ativos
 from .modulos import APRESENTACAO, Modulo
+
+
+def _url_do_modulo(apres: dict) -> str | None:
+    """Resolve a URL declarada no catálogo (módulos sem telas ficam sem link)."""
+    url_name = apres.get("url_name")
+    if not url_name:
+        return None
+    try:
+        return reverse(url_name)
+    except NoReverseMatch:
+        return None
 
 
 def menu_modulos(request):
@@ -23,8 +36,7 @@ def menu_modulos(request):
             {
                 "codigo": codigo,
                 "nome": Modulo(codigo).label,
-                # url é preenchida conforme cada módulo for implementado
-                "url": None,
+                "url": _url_do_modulo(apres),
             }
         )
     return {

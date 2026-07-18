@@ -1,0 +1,95 @@
+<!-- LOCALIZAÇÃO / CONTATO -->
+<section class="fade-section py-16 sm:py-24 bg-pergaminho">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="grid md:grid-cols-2 gap-10 sm:gap-16">
+            <div>
+                <p class="text-lampiao text-xs sm:text-sm tracking-[0.3em] uppercase mb-3 sm:mb-4">Localização</p>
+                <h2 class="font-display text-3xl sm:text-4xl font-black text-madeira mb-6">Como Chegar</h2>
+                <p class="text-madeira/70 leading-relaxed mb-8">
+                    A Pousada Vô Testa fica às margens do lago, cercada pela natureza e a poucos minutos do centro. Um refúgio fora do tempo, mas perto de tudo.
+                </p>
+                <div class="space-y-4">
+                    <div class="flex items-start gap-4">
+                        <div class="w-10 h-10 bg-lampiao/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
+                            <svg class="w-5 h-5 text-lampiao" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-madeira font-semibold text-sm">Endereço</p>
+                            <p class="text-madeira/50 text-sm">{{ config.endereco }}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-10 h-10 bg-lampiao/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
+                            <svg class="w-5 h-5 text-lampiao" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-madeira font-semibold text-sm">Telefone</p>
+                            <p class="text-madeira/50 text-sm">{{ config.telefone }}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-4">
+                        <div class="w-10 h-10 bg-lampiao/10 rounded-lg flex items-center justify-center flex-shrink-0 mt-1">
+                            <svg class="w-5 h-5 text-lampiao" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-madeira font-semibold text-sm">Email</p>
+                            <p class="text-madeira/50 text-sm">{{ config.email }}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl border border-madeira/10 p-6 sm:p-8 shadow-sm">
+                <p class="text-lampiao text-xs tracking-[0.25em] uppercase mb-2">Comercial</p>
+                <h3 class="font-display text-2xl font-black text-madeira mb-2">Pedir proposta</h3>
+                <p class="text-madeira/60 text-sm mb-6">Datas flexíveis, grupo ou orçamento personalizado — a gente responde pelo funil comercial.</p>
+                <form method="post" action="{% url 'core:pedir_proposta' %}" class="space-y-4">
+                    {% csrf_token %}
+                    <div>
+                        <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Nome *</label>
+                        <input type="text" name="nome" required class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-pergaminho/40" placeholder="Seu nome">
+                    </div>
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">WhatsApp *</label>
+                            <input type="text" name="telefone" required class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-pergaminho/40" placeholder="(00) 00000-0000" inputmode="tel" maxlength="15" data-mask="telefone" autocomplete="tel">
+                        </div>
+                        <div>
+                            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">E-mail</label>
+                            <input type="email" name="email" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-pergaminho/40" placeholder="voce@email.com">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Interesse</label>
+                        <select name="tipo_interesse" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-pergaminho/40">
+                            <option value="hospedagem">Hospedagem</option>
+                            <option value="evento">Evento / confraternização</option>
+                            <option value="day_use">Dia na Pousada</option>
+                        </select>
+                    </div>
+                    <div class="grid sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Check-in</label>
+                            <input type="date" name="checkin" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-pergaminho/40">
+                        </div>
+                        <div>
+                            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Check-out</label>
+                            <input type="date" name="checkout" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-pergaminho/40">
+                        </div>
+                        <div>
+                            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Hóspedes</label>
+                            <input type="number" name="hospedes" min="1" value="2" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-pergaminho/40">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Mensagem</label>
+                        <textarea name="mensagem" rows="3" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-pergaminho/40" placeholder="Preferências de quarto, datas flexíveis ou outros detalhes da estadia."></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-madeira text-pergaminho font-semibold py-3 rounded-full hover:bg-lampiao hover:text-madeira transition">
+                        Enviar pedido de proposta
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>

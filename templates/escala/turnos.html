@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block titulo %}Turnos — Escala{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'escala:grade' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Escala
+</a>
+<p class="pagina-eyebrow letreiro">Equipe</p>
+<h1>Turnos</h1>
+<p class="subtitulo">Faixas de horário por setor — as linhas da grade da escala.</p>
+
+<div class="colunas">
+  <section>
+    <table class="tabela">
+      <thead><tr><th>Nome</th><th>Setor</th><th>Horário</th><th>Situação</th></tr></thead>
+      <tbody>
+        {% for t in turnos %}
+          <tr><td>{{ t.nome }}</td><td>{{ t.get_setor_display }}</td>
+              <td>{{ t.inicio|time:"H:i" }}–{{ t.fim|time:"H:i" }}</td>
+              <td>{% if t.ativo %}Ativo{% else %}Inativo{% endif %}</td></tr>
+        {% empty %}
+          <tr><td colspan="4" class="vazio">Nenhum turno ainda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <section class="painel-bloco">
+    <h2 style="margin-top:0">Novo turno</h2>
+    <form method="post" class="form-cartao">
+      {% csrf_token %}
+      <div class="campo"><label>Nome</label><input type="text" name="nome" placeholder="Ex.: Manhã" required></div>
+      <div class="campo"><label>Setor</label>
+        <select name="setor">{% for v, r in setores %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
+      </div>
+      <div class="form-grade">
+        <div class="campo"><label>Início</label><input type="time" name="inicio" required></div>
+        <div class="campo"><label>Fim</label><input type="time" name="fim" required></div>
+      </div>
+      <div class="acoes"><button type="submit" class="botao-primario">Salvar</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

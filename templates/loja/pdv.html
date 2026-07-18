@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block titulo %}Loja — PDV{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<div class="pagina-cabecalho">
+  <h1>Loja — venda balcão</h1>
+  <a href="{% url 'loja:vendas' %}" class="botao-neutro">Histórico de vendas</a>
+</div>
+
+{% if not local %}
+  <p class="subtitulo">Nenhum local de estoque ativo. Cadastre um depósito da Loja em Estoque → Locais.</p>
+{% else %}
+<div class="pdv" x-data="pdv()">
+  <section class="pdv-produtos">
+    <div class="pdv-produtos-topo">
+      <div class="pdv-busca-wrap">
+        <svg viewBox="0 0 24 24" class="ico"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <input type="search" class="pdv-busca" placeholder="Buscar produto…" x-model="filtro">
+      </div>
+      <form method="get" class="pdv-local">
+        <span class="letreiro">Estoque</span>
+        <label class="select-wrap">
+          <select name="local" onchange="this.form.submit()">
+            {% for lo in locais %}
+              <option value="{{ lo.pk }}" {% if lo.pk == local.pk %}selected{% endif %}>{{ lo.nome }}</option>
+            {% endfor %}
+          </select>
+        </label>
+      </form>
+    </div>
+
+    <div class="pdv-lista">
+      <template x-for="p in produtosFiltrados()" :key="p.id">
+        <button type="button" class="pdv-produto" :class="{esgotado: p.saldo <= 0}" :disabled="p.saldo <= 0" @click="add(p)">
+          <span class="pdv-produto-nome" x-text="p.nome"></span>
+          <span class="pdv-produto-meta">
+            <span class="pdv-preco" x-text="reais(p.preco)"></span>
+            <small class="pdv-saldo" x-text="p.saldo > 0 ? ('saldo ' + p.saldo) : 'esgotado'"></small>
+          </span>
+          <span class="pdv-add" aria-hidden="true">+</span>
+        </button>
+      </template>
+      <p class="pdv-lista-vazia" x-show="!produtosFiltrados().length">Nenhum produto encontrado.</p>
+    </div>
+  </section>
+
+  <aside class="pdv-painel">
+    <div class="pdv-painel-topo">
+      <h2>Carrinho</h2>
+      <span class="pdv-contador" x-show="cart.length" x-text="cart.length + (cart.length > 1 ? ' itens' : ' item')"></span>
+    </div>
+
+    <div class="pdv-carrinho">
+      <template x-for="(i, idx) in cart" :key="i.id">
+        <div class="pdv-item">
+          <div class="pdv-qtd">
+            <button type="button" @click="dec(idx)" aria-label="Menos">−</button>
+            <span x-text="i.qtd"></span>
+            <button type="button" @click="inc(idx)" aria-label="Mais">+</button>
+          </div>
+          <span class="pdv-item-nome" x-text="i.nome"></span>
+          <span class="pdv-sub" x-text="reais(i.preco * i.qtd)"></span>
+          <button type="button" class="pdv-x" @click="remove(idx)" aria-label="Remover">&times;</button>
+        </div>
+      </template>
+      <div class="pdv-vazio" x-show="!cart.length">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M6 6h15l-1.5 9h-12z"/><path d="M6 6L5 3H2"/><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/></svg>
+        <span>Toque num produto para montar a venda.</span>
+      </div>
+    </div>
+
+    <div class="pdv-resumo">
+      <div class="pdv-linha-desc">
+        <span>Desconto</span>
+        <div class="input-reais"><span>R$</span><input type="number" min="0" step="0.01" x-model.number="desconto"></div>
+      </div>
+      <div class="pdv-total"><span class="letreiro">Total</span><strong x-text="reais(total())"></strong></div>
+    </div>
+
+    <label class="select-wrap pdv-cliente">
+      <select x-model="cliente_id">
+        <option value="">Cliente avulso</option>
+        {% for p in clientes %}<option value="{{ p.pk }}">{{ p.nome }}</option>{% endfor %}
+      </select>
+    </label>
+
+    <div class="pdv-seg" role="tablist">
+      <button type="button" :class="{ativo: destino === 'caixa'}" @click="destino = 'caixa'">Pagar agora</button>
+      {% if contas %}<button type="button" :class="{ativo: destino === 'conta'}" @click="destino = 'conta'">Conta do quarto</button>{% endif %}
+    </div>
+
+    <label class="select-wrap" x-show="destino === 'caixa'" x-cloak>
+      <select x-model="forma_id">
+        <option value="">Forma de pagamento…</option>
+        {% for f in formas %}<option value="{{ f.pk }}">{{ f.nome }}</option>{% endfor %}
+      </select>
+    </label>
+    {% if contas %}
+    <label class="select-wrap" x-show="destino === 'conta'" x-cloak>
+      <select x-model="conta_id">
+        <option value="">Quarto / hóspede…</option>
+        {% for c in contas %}<option value="{{ c.id }}">{{ c.rotulo }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+
+    <button type="button" class="botao-primario pdv-finalizar" :disabled="!cart.length" @click="finalizar()">
+      Finalizar venda · <span x-text="reais(total())"></span>
+    </button>
+  </aside>
+</div>
+
+<script>
+  function pdv() {
+    return {
+      produtos: JSON.parse('{{ produtos_json|escapejs }}'),
+      cart: [], filtro: '', desconto: 0, destino: 'caixa',
+      forma_id: '', cliente_id: '', conta_id: '',
+      reais(v) { return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 }); },
+      produtosFiltrados() {
+        const f = this.filtro.toLowerCase();
+        return this.produtos.filter(p => p.nome.toLowerCase().includes(f));
+      },
+      add(p) {
+        const item = this.cart.find(i => i.id === p.id);
+        if (item) { if (item.qtd < p.saldo) item.qtd++; else toast('Sem saldo suficiente.', 'error'); }
+        else this.cart.push({ id: p.id, nome: p.nome, preco: p.preco, saldo: p.saldo, qtd: 1 });
+      },
+      inc(i) { const it = this.cart[i]; if (it.qtd < it.saldo) it.qtd++; else toast('Sem saldo suficiente.', 'error'); },
+      dec(i) { const it = this.cart[i]; if (it.qtd > 1) it.qtd--; else this.cart.splice(i, 1); },
+      remove(i) { this.cart.splice(i, 1); },
+      subtotal() { return this.cart.reduce((s, i) => s + i.preco * i.qtd, 0); },
+      total() { return Math.max(0, this.subtotal() - (this.desconto || 0)); },
+      async finalizar() {
+        if (!this.cart.length) return;
+        if (this.destino === 'caixa' && !this.forma_id) { toast('Escolha a forma de pagamento.', 'error'); return; }
+        if (this.destino === 'conta' && !this.conta_id) { toast('Escolha a conta do quarto.', 'error'); return; }
+        const body = {
+          local_id: {{ local.pk }}, destino: this.destino,
+          forma_id: this.destino === 'caixa' ? this.forma_id : null,
+          conta_id: this.destino === 'conta' ? this.conta_id : null,
+          cliente_id: this.cliente_id || null,
+          desconto: this.desconto || 0,
+          itens: this.cart.map(i => ({ produto_id: i.id, quantidade: i.qtd })),
+        };
+        const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        try {
+          const r = await fetch('{{ url_finalizar }}', {
+            method: 'POST', headers: { 'X-CSRFToken': csrf, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          const d = await r.json();
+          if (!r.ok) { toast(d.erro || 'Não foi possível finalizar.', 'error'); return; }
+          window.location.href = d.url;
+        } catch (e) { toast('Falha de conexão.', 'error'); }
+      },
+    };
+  }
+</script>
+<form>{% csrf_token %}</form>
+{% endif %}
+{% endblock %}

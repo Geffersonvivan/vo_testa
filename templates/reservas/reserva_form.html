@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block titulo %}Nova reserva — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Reservas</p>
+<h1>Nova reserva</h1>
+<p class="subtitulo">A diária vem da tarifa vigente (temporadas); orçamento não segura o quarto.</p>
+
+<form method="post" class="form-cartao">
+  {% csrf_token %}
+  {% include "nucleo/partials/campos.html" %}
+  <div class="acoes">
+    <button type="submit" class="botao-primario">Criar pré-reserva</button>
+    <button type="submit" name="orcamento" value="1" class="botao-neutro">Salvar como orçamento</button>
+    <a href="{% url 'reservas:mapa' %}" class="botao-neutro">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

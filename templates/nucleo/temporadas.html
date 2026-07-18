@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block titulo %}Temporadas — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Cadastros</p>
+<div class="pagina-cabecalho">
+  <h1>Temporadas</h1>
+  <a href="{% url 'temporada_nova' %}" class="botao-primario">Nova temporada</a>
+</div>
+<p class="subtitulo">Calendário tarifário: períodos de baixa, média, alta, super alta e feriados.</p>
+
+<table class="tabela">
+  <thead>
+    <tr><th>Nome</th><th>Classificação</th><th>Início</th><th>Fim</th></tr>
+  </thead>
+  <tbody>
+    {% for t in temporadas %}
+      <tr>
+        <td><a href="{% url 'temporada_editar' t.pk %}">{{ t.nome }}</a></td>
+        <td>{{ t.get_classificacao_display }}</td>
+        <td>{{ t.inicio|date:"d/m/Y" }}</td>
+        <td>{{ t.fim|date:"d/m/Y" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Nenhuma temporada cadastrada. As tarifas por período dependem delas.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block titulo %}Conferência #{{ conf.pk }} — Frigobar{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'frigobar:painel' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Frigobar
+</a>
+<p class="pagina-eyebrow letreiro">Frigobar</p>
+<div class="pagina-cabecalho">
+  <h1>Conferência #{{ conf.pk }} — {{ conf.uh.numero }}</h1>
+  <span class="selo {% if conf.status == 'reposta' %}selo-limpa{% else %}selo-em_andamento{% endif %}">{{ conf.get_status_display }}</span>
+</div>
+<p class="subtitulo">
+  {{ conf.get_momento_display }} · {{ conf.conta_ref }} · conferida por
+  {{ conf.criado_por.get_short_name|default:conf.criado_por.username }} em {{ conf.criado_em|date:"d/m/Y H:i" }}.
+</p>
+
+<div class="colunas colunas-2-1">
+  <section class="painel-bloco">
+    <h2 style="margin-top:0">Consumo lançado na conta</h2>
+    <table class="tabela">
+      <thead><tr><th>Produto</th><th class="num">Qtd</th><th class="num">Unit.</th><th class="num">Subtotal</th></tr></thead>
+      <tbody>
+        {% for i in conf.itens.all %}
+          <tr><td>{{ i.descricao }}</td><td class="num">{{ i.quantidade }}</td>
+              <td class="num">R$ {{ i.preco_unitario }}</td><td class="num">R$ {{ i.subtotal }}</td></tr>
+        {% empty %}
+          <tr><td colspan="4" class="vazio">Nenhum consumo — frigobar intacto.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if conf.itens.all %}
+      <p class="ficha-texto"><strong>Total lançado:</strong> R$ {{ conf.total }} (natureza CONSUMO, na conta {{ conf.conta_ref }}).</p>
+    {% endif %}
+  </section>
+
+  <section class="painel-bloco">
+    <h2 style="margin-top:0">Reposição</h2>
+    {% if conf.status == 'reposta' %}
+      <p class="subtitulo">Reposto em {{ conf.reposto_em|date:"d/m/Y H:i" }} — estoque central baixado.</p>
+    {% elif conf.pendente_reposicao %}
+      <p class="subtitulo">Baixa o consumido do estoque central para repor o frigobar.</p>
+      <form method="post" action="{% url 'frigobar:repor' conf.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="botao-primario" style="width:100%">Repor do estoque central</button>
+      </form>
+    {% else %}
+      <p class="subtitulo">Nada a repor.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

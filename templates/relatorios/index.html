@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block titulo %}Relatórios — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Gestão</p>
+<div class="pagina-cabecalho">
+  <h1>Relatórios</h1>
+</div>
+<p class="subtitulo">Consolidados que cruzam módulos e relatórios individuais por módulo. Escolha um período dentro de cada relatório.</p>
+
+{% for grupo, itens in grupos.items %}
+  <h2 class="secao-titulo letreiro" style="margin-top:1.4rem">{{ grupo }}</h2>
+  <div class="cartoes-atalhos colunas">
+    {% for r in itens %}
+      <a href="{% url 'relatorios:relatorio' r.chave %}" class="cartao cartao-atalho">
+        <span class="atalho-titulo">{{ r.nome }}</span>
+        <span class="atalho-seta">→</span>
+      </a>
+    {% endfor %}
+  </div>
+{% empty %}
+  <p class="vazio">Nenhum relatório disponível — ative os módulos correspondentes.</p>
+{% endfor %}
+{% endblock %}

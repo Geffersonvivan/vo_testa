@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block titulo %}Escala — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Equipe</p>
+<div class="pagina-cabecalho">
+  <h1>Escala da equipe</h1>
+  <div class="pagina-acoes">
+    <a href="{% url 'escala:minha' %}" class="botao-neutro">Minha escala</a>
+    <a href="{% url 'escala:trocas' %}" class="botao-neutro">Trocas</a>
+    <a href="{% url 'escala:ausencias' %}" class="botao-neutro">Ausências</a>
+    <a href="{% url 'escala:turnos' %}" class="botao-neutro">Turnos</a>
+  </div>
+</div>
+
+<div class="subnav" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+  <a href="?inicio={{ anterior|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro">‹ Semana anterior</a>
+  <strong>{{ inicio|date:"d/m" }} – {{ grade.dias|last|date:"d/m/Y" }}</strong>
+  <a href="?inicio={{ proximo|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro">Próxima semana ›</a>
+  <form method="get" style="margin-left:auto">
+    <input type="hidden" name="inicio" value="{{ inicio|date:'Y-m-d' }}">
+    <select name="setor" onchange="this.form.submit()">
+      <option value="">Todos os setores</option>
+      {% for v, r in setores %}<option value="{{ v }}" {% if setor == v %}selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+
+{% if grade.linhas %}
+<table class="tabela escala-grade">
+  <thead>
+    <tr>
+      <th>Turno</th>
+      {% for d in grade.dias %}<th class="{% if d == hoje %}col-hoje{% endif %}">{{ d|date:"D d/m" }}</th>{% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for linha in grade.linhas %}
+      <tr>
+        <td class="escala-turno">
+          <strong>{{ linha.turno.nome }}</strong>
+          <small>{{ linha.turno.get_setor_display }} · {{ linha.turno.inicio|time:"H:i" }}–{{ linha.turno.fim|time:"H:i" }}</small>
+        </td>
+        {% for c in linha.celulas %}
+          <td class="{% if c.data == hoje %}col-hoje{% endif %}">
+            {% for a in c.atribs %}
+              <span class="escala-chip">
+                {{ a.funcionario.pessoa.nome }}
+                <form method="post" action="{% url 'escala:remover_atribuicao' a.pk %}" style="display:inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="voltar" value="?inicio={{ inicio|date:'Y-m-d' }}">
+                  <button type="submit" class="chip-x" title="Remover">&times;</button>
+                </form>
+              </span>
+            {% empty %}<span class="escala-vazio">—</span>{% endfor %}
+          </td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+  <p class="bloco-vazio">Nenhum turno ativo. Cadastre em <a href="{% url 'escala:turnos' %}">Turnos</a>.</p>
+{% endif %}
+
+<section class="painel-bloco" style="max-width:720px;margin-top:1.4rem">
+  <h2 style="margin-top:0">Escalar funcionário</h2>
+  <form method="post" action="{% url 'escala:atribuir' %}" class="abrir-comanda">
+    {% csrf_token %}
+    <input type="hidden" name="semana" value="{{ inicio|date:'Y-m-d' }}">
+    <select name="funcionario" required>
+      <option value="">Funcionário…</option>
+      {% for f in funcionarios %}<option value="{{ f.pk }}">{{ f.pessoa.nome }} ({{ f.cargo }})</option>{% endfor %}
+    </select>
+    <select name="turno" required>
+      <option value="">Turno…</option>
+      {% for t in turnos %}<option value="{{ t.pk }}">{{ t }}</option>{% endfor %}
+    </select>
+    <input type="date" name="data" value="{{ hoje|date:'Y-m-d' }}" required>
+    <button type="submit" class="botao-primario">Escalar</button>
+  </form>
+</section>
+{% endblock %}

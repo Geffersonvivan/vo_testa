@@ -1,0 +1,33 @@
+<div class="space-y-4">
+    {% if dados_form.non_field_errors %}
+    <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{{ dados_form.non_field_errors }}</div>
+    {% endif %}
+    <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Nome completo *</label>
+            {{ dados_form.nome }}
+            {% if dados_form.nome.errors %}<p class="text-red-500 text-xs mt-1">{{ dados_form.nome.errors|striptags }}</p>{% endif %}
+        </div>
+        <div>
+            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">CPF *</label>
+            {{ dados_form.cpf }}
+            {% if dados_form.cpf.errors %}<p class="text-red-500 text-xs mt-1">{{ dados_form.cpf.errors|striptags }}</p>{% endif %}
+        </div>
+    </div>
+    <div class="grid sm:grid-cols-2 gap-4">
+        <div>
+            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Email *</label>
+            {{ dados_form.email }}
+            {% if dados_form.email.errors %}<p class="text-red-500 text-xs mt-1">{{ dados_form.email.errors|striptags }}</p>{% endif %}
+        </div>
+        <div>
+            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">WhatsApp *</label>
+            {{ dados_form.telefone }}
+            {% if dados_form.telefone.errors %}<p class="text-red-500 text-xs mt-1">{{ dados_form.telefone.errors|striptags }}</p>{% endif %}
+        </div>
+    </div>
+    <div>
+        <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Observações (opcional)</label>
+        {{ dados_form.observacoes }}
+    </div>
+</div>

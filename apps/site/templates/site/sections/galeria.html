@@ -1,0 +1,31 @@
+{% load static %}
+
+<!-- GALERIA -->
+<section class="fade-section py-16 sm:py-24 bg-madeira">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="text-center mb-10 sm:mb-16">
+            <p class="text-lampiao text-xs sm:text-sm tracking-[0.3em] uppercase mb-3 sm:mb-4">Galeria</p>
+            <h2 class="font-display text-3xl sm:text-4xl md:text-5xl font-black text-pergaminho mb-4">Momentos no Tempo</h2>
+        </div>
+
+        <!-- Grid masonry simulado -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4">
+            {% for foto in galeria %}
+            <div class="{% if foto.destaque %}row-span-2{% endif %} aspect-square bg-pergaminho/10 rounded-xl overflow-hidden relative group">
+                {% if foto.imagem %}
+                <img src="{{ foto.imagem.url }}" alt="{{ foto.legenda }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                {% if foto.legenda %}
+                <div class="absolute inset-0 bg-gradient-to-t from-noturno/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+                    <span class="text-pergaminho text-xs">{{ foto.legenda }}</span>
+                </div>
+                {% endif %}
+                {% else %}
+                <div class="w-full h-full flex items-center justify-center">
+                    <span class="text-pergaminho/20 text-xs">[ {{ foto.legenda|default:"Foto" }} ]</span>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>

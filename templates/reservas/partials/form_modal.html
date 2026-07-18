@@ -1,0 +1,67 @@
+{# Conteúdo do modal de nova reserva (carregado e revalidado via HTMX). #}
+<form hx-post="{% url 'reservas:nova' %}" hx-target="this" hx-swap="outerHTML" class="modal-form"
+      x-data="{ fat: '{{ form.faturamento.value|default:'particular' }}' }">
+  {% csrf_token %}
+  <header class="modal-cabecalho">
+    <h2>Nova reserva</h2>
+    <button type="button" class="modal-fechar" onclick="fecharModal()" aria-label="Fechar">&times;</button>
+  </header>
+
+  <div class="modal-corpo">
+    {% if form.non_field_errors %}
+      <div class="mensagem error">{{ form.non_field_errors|join:" " }}</div>
+    {% endif %}
+    <div class="form-grade">
+      <div class="campo col-2 {% if form.hospede.errors %}campo-erro{% endif %}">
+        {{ form.hospede.label_tag }}
+        <div class="campo-com-acao">
+          {% include "componentes/combo_pessoa.html" with dados=hospedes_data dados_id="hospedes-data" campo="hospede" placeholder="Buscar hóspede/cliente…" valor_id=form.hospede.value %}
+          <button type="button" class="botao-mini" onclick="abrirNovoHospede()">+ Novo</button>
+        </div>
+        {% for erro in form.hospede.errors %}<small class="erro">{{ erro }}</small>{% endfor %}
+      </div>
+
+      <div id="bloco-novo-hospede" class="bloco-inline col-2" style="display:none"
+           data-url="{% url 'pessoa_nova_rapida' %}">
+        <p class="bloco-titulo letreiro">Cadastro rápido de hóspede</p>
+        <div class="bloco-campos">
+          <input type="text" id="nh-nome" placeholder="Nome*" autocomplete="off">
+          <input type="text" id="nh-documento" class="mascara-cpfcnpj" placeholder="CPF/CNPJ"
+                 inputmode="numeric" autocomplete="off">
+          <input type="text" id="nh-telefone" class="mascara-telefone" placeholder="Telefone"
+                 inputmode="numeric" autocomplete="off">
+          <input type="email" id="nh-email" placeholder="E-mail" autocomplete="off">
+        </div>
+        <small class="erro" id="nh-erro"></small>
+        <div class="acoes">
+          <button type="button" class="botao-primario" onclick="salvarNovoHospede()">Salvar hóspede</button>
+          <button type="button" class="botao-neutro" onclick="fecharNovoHospede()">Cancelar</button>
+        </div>
+      </div>
+
+      {% include "reservas/partials/campo.html" with campo=form.uh classe="col-2" %}
+      {% include "reservas/partials/campo.html" with campo=form.checkin %}
+      {% include "reservas/partials/campo.html" with campo=form.checkout %}
+      {% include "reservas/partials/campo.html" with campo=form.adultos %}
+      {% include "reservas/partials/campo.html" with campo=form.criancas %}
+      {% include "reservas/partials/campo.html" with campo=form.canal %}
+      {% include "reservas/partials/campo.html" with campo=form.valor_diaria %}
+      <div id="tarifa-hint" class="tarifa-hint col-2" data-url="{% url 'reservas:tarifa_preview' %}"></div>
+      {% include "reservas/partials/campo.html" with campo=form.faturamento classe="col-2" %}
+      <div class="col-2" x-show="fat !== 'particular'" x-cloak style="display:none">
+        <div class="campo {% if form.titular.errors %}campo-erro{% endif %}">
+          {{ form.titular.label_tag }}
+          {% include "componentes/combo_pessoa.html" with dados=titulares_data dados_id="titulares-data" campo="titular" placeholder="Buscar agência/empresa…" valor_id=form.titular.value %}
+          {% for erro in form.titular.errors %}<small class="erro">{{ erro }}</small>{% endfor %}
+        </div>
+      </div>
+      {% include "reservas/partials/campo.html" with campo=form.observacoes classe="col-2" %}
+    </div>
+  </div>
+
+  <footer class="modal-acoes">
+    <button type="submit" class="botao-primario">Criar pré-reserva</button>
+    <button type="submit" name="orcamento" value="1" class="botao-neutro">Salvar como orçamento</button>
+    <button type="button" class="botao-neutro" onclick="fecharModal()">Cancelar</button>
+  </footer>
+</form>

@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block titulo %}Instagram — Comercial{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Comercial · Proposta</p>
+<div class="pagina-cabecalho">
+  <h1>Instagram</h1>
+  <span class="selo">Em breve</span>
+</div>
+<p class="subtitulo">{{ proposta.objetivo }}</p>
+
+<div class="cartao" style="margin-top:1rem">
+  <h2 class="letreiro" style="margin:0 0 .6rem;font-size:.85rem">Recomendação</h2>
+  <p style="margin:0;color:var(--tinta-suave)">{{ proposta.recomendacao }}</p>
+</div>
+
+<div class="cartao" style="margin-top:1rem">
+  <h2 class="letreiro" style="margin:0 0 .8rem;font-size:.85rem">Encaixe no CRM (quando implementar)</h2>
+  <ul style="margin:0;padding-left:1.1rem;line-height:1.65;color:var(--tinta-suave)">
+    {% for item in proposta.encaixe_crm %}
+      <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+</div>
+
+{% for op in proposta.opcoes %}
+<div class="cartao" style="margin-top:1rem">
+  <div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;margin-bottom:.6rem">
+    <h2 class="letreiro" style="margin:0;font-size:.85rem">{{ op.id }}. {{ op.nome }}</h2>
+    {% if op.pronto %}
+      <span class="selo" style="background:color-mix(in srgb, var(--sucesso) 18%, transparent);color:var(--sucesso)">Já funciona</span>
+    {% else %}
+      <span class="selo">A implementar</span>
+    {% endif %}
+    <span style="font-size:.8rem;color:var(--tinta-suave)">Esforço: {{ op.esforco }}</span>
+  </div>
+  <p style="margin:0 0 .8rem;color:var(--tinta-suave)">{{ op.como }}</p>
+  <p class="letreiro" style="margin:0 0 .4rem;font-size:.75rem">Próximos passos</p>
+  <ul style="margin:0;padding-left:1.1rem;line-height:1.65;color:var(--tinta-suave)">
+    {% for passo in op.proximos_passos %}
+      <li>{{ passo }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endfor %}
+
+<div class="cartao" style="margin-top:1rem">
+  <h2 class="letreiro" style="margin:0 0 .6rem;font-size:.85rem">Fora desta fase</h2>
+  <ul style="margin:0;padding-left:1.1rem;line-height:1.65;color:var(--tinta-suave)">
+    {% for item in proposta.fora_desta_fase %}
+      <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

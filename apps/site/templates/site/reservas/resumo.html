@@ -1,0 +1,164 @@
+{% extends 'site/reservas/base_reserva.html' %}
+{% load static %}
+
+{% block title %}Reservar — Resumo | Pousada Vô Testa{% endblock %}
+
+{% block reserva_content %}
+{% with sub=resumo.subtotal pct=config.desconto_pix %}
+<h2 class="font-display text-2xl font-bold text-madeira mb-6 text-center">Confirme sua Reserva</h2>
+
+<div class="max-w-2xl mx-auto" id="resumo-reserva"
+     data-subtotal="{{ sub }}"
+     data-desconto-pct="{{ pct }}">
+    <div class="bg-lampiao/10 border border-lampiao/20 rounded-xl p-3 mb-6 flex items-center justify-center gap-2 text-center">
+        <svg class="w-4 h-4 text-madeira flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span class="text-madeira text-sm">Revise os detalhes e escolha como pagar antes de confirmar.</span>
+    </div>
+
+    <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-madeira/5">
+        <!-- Acomodação -->
+        <div class="p-6 border-b border-pergaminho">
+            <div class="flex items-center gap-2 mb-3">
+                <svg class="w-4 h-4 text-madeira/50 gear-spin" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+                <span class="text-madeira/50 text-xs uppercase tracking-wider font-semibold">Acomodação</span>
+            </div>
+            <h3 class="text-madeira font-display text-xl font-bold">{{ quarto.nome }}</h3>
+            <p class="text-madeira/40 text-sm">{{ quarto.categoria.nome }} · {{ quarto.capacidade }} hóspedes · {{ quarto.metragem }}m²</p>
+        </div>
+
+        <!-- Datas -->
+        <div class="p-6 border-b border-pergaminho grid grid-cols-3 gap-4 text-center">
+            <div>
+                <p class="text-madeira/40 text-xs uppercase mb-1">Check-in</p>
+                <p class="text-madeira font-semibold">{{ busca.checkin|date:'d/m/Y' }}</p>
+            </div>
+            <div>
+                <p class="text-madeira/40 text-xs uppercase mb-1">Noites</p>
+                <p class="text-madeira font-display text-2xl font-bold">{{ resumo.noites }}</p>
+            </div>
+            <div>
+                <p class="text-madeira/40 text-xs uppercase mb-1">Check-out</p>
+                <p class="text-madeira font-semibold">{{ busca.checkout|date:'d/m/Y' }}</p>
+            </div>
+        </div>
+
+        <!-- Hóspede -->
+        <div class="p-6 border-b border-pergaminho">
+            <p class="text-madeira/50 text-xs uppercase tracking-wider font-semibold mb-3">Hóspede</p>
+            <div class="grid grid-cols-2 gap-3 text-sm">
+                <div><span class="text-madeira/40">Nome:</span> <span class="text-madeira">{{ dados.nome }}</span></div>
+                <div><span class="text-madeira/40">CPF:</span> <span class="text-madeira">{{ dados.cpf }}</span></div>
+                <div><span class="text-madeira/40">Email:</span> <span class="text-madeira">{{ dados.email }}</span></div>
+                <div><span class="text-madeira/40">WhatsApp:</span> <span class="text-madeira">{{ dados.telefone }}</span></div>
+            </div>
+        </div>
+
+        <!-- Forma de pagamento -->
+        <div class="p-6 border-b border-pergaminho">
+            <p class="text-madeira/50 text-xs uppercase tracking-wider font-semibold mb-3">Forma de pagamento</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="opcoes-pagamento" role="radiogroup" aria-label="Forma de pagamento">
+                <label class="opcao-pag cursor-pointer rounded-xl border-2 border-madeira/15 p-4 text-center transition hover:border-madeira/40 has-[:checked]:border-madeira has-[:checked]:bg-madeira/5">
+                    <input type="radio" name="metodo_ui" value="pix" class="sr-only" {% if metodo == 'pix' %}checked{% endif %}>
+                    <span class="block font-bold text-madeira">Pix</span>
+                    <span class="block text-xs text-musgo mt-1">{{ pct }}% de desconto</span>
+                </label>
+                <label class="opcao-pag cursor-pointer rounded-xl border-2 border-madeira/15 p-4 text-center transition hover:border-madeira/40 has-[:checked]:border-madeira has-[:checked]:bg-madeira/5">
+                    <input type="radio" name="metodo_ui" value="cartao" class="sr-only" {% if metodo == 'cartao' %}checked{% endif %}>
+                    <span class="block font-bold text-madeira">Cartão</span>
+                    <span class="block text-xs text-madeira/40 mt-1">Crédito</span>
+                </label>
+                <label class="opcao-pag cursor-pointer rounded-xl border-2 border-madeira/15 p-4 text-center transition hover:border-madeira/40 has-[:checked]:border-madeira has-[:checked]:bg-madeira/5">
+                    <input type="radio" name="metodo_ui" value="boleto" class="sr-only" {% if metodo == 'boleto' %}checked{% endif %}>
+                    <span class="block font-bold text-madeira">Boleto</span>
+                    <span class="block text-xs text-madeira/40 mt-1">Bancário</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Valores -->
+        <div class="p-6">
+            <p class="text-madeira/50 text-xs uppercase tracking-wider font-semibold mb-3">Valores</p>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-madeira/50">{{ resumo.noites }} noite{{ resumo.noites|pluralize }} × R$ {{ resumo.preco_noite|floatformat:2 }}{% if resumo.temporada %} ({{ resumo.temporada.get_tipo_display }}){% endif %}</span>
+                    <span>R$ {{ resumo.subtotal|floatformat:2 }}</span>
+                </div>
+                <div class="flex justify-between text-musgo" id="linha-desconto" hidden>
+                    <span>Desconto Pix (<span id="pct-label">{{ pct }}</span>%)</span>
+                    <span>− R$ <span id="desconto-valor">0,00</span></span>
+                </div>
+                <div class="flex justify-between border-t border-madeira/10 pt-3 mt-3 text-xl font-bold">
+                    <span class="text-madeira">Total</span>
+                    <span class="text-madeira">R$ <span id="total-valor">{{ resumo.total|floatformat:2 }}</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex justify-between mt-8">
+        <a href="{% url 'core:selecionar_quarto' quarto.id %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}"
+           class="text-madeira/40 hover:text-madeira transition flex items-center gap-2 text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+            Editar dados
+        </a>
+
+        <form method="post" action="{% url 'core:finalizar_reserva' %}" id="form-finalizar">
+            {% csrf_token %}
+            <input type="hidden" name="quarto_id" value="{{ quarto.id }}">
+            <input type="hidden" name="checkin" value="{{ busca.checkin|date:'Y-m-d' }}">
+            <input type="hidden" name="checkout" value="{{ busca.checkout|date:'Y-m-d' }}">
+            <input type="hidden" name="hospedes" value="{{ busca.hospedes }}">
+            <input type="hidden" name="modalidade" value="{{ modalidade|default:busca.modalidade }}">
+            <input type="hidden" name="metodo_pagamento" id="metodo_pagamento" value="{{ metodo|default:'pix' }}">
+            <input type="hidden" name="nome" value="{{ dados.nome }}">
+            <input type="hidden" name="cpf" value="{{ dados.cpf }}">
+            <input type="hidden" name="email" value="{{ dados.email }}">
+            <input type="hidden" name="telefone" value="{{ dados.telefone }}">
+            <input type="hidden" name="observacoes" value="{{ dados.observacoes }}">
+            <button type="submit" class="bg-madeira text-pergaminho font-bold px-8 py-3 rounded-xl hover:bg-madeira/90 transition flex items-center gap-2 shadow-lg shadow-madeira/20">
+                Confirmar Reserva
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+            </button>
+        </form>
+    </div>
+
+    <p class="text-madeira/40 text-xs text-center mt-4">
+        Após confirmar, você será direcionado ao pagamento do sinal. Pix tem {{ pct }}% de desconto.
+    </p>
+</div>
+{% endwith %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var root = document.getElementById('resumo-reserva');
+  if (!root) return;
+  var subtotal = parseFloat(root.dataset.subtotal || '0');
+  var pct = parseFloat(root.dataset.descontoPct || '0');
+  var hidden = document.getElementById('metodo_pagamento');
+  var linhaDesc = document.getElementById('linha-desconto');
+  var elDesc = document.getElementById('desconto-valor');
+  var elTotal = document.getElementById('total-valor');
+
+  function brl(n) {
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function atualizar(metodo) {
+    if (hidden) hidden.value = metodo;
+    var desconto = metodo === 'pix' ? subtotal * pct / 100 : 0;
+    var total = subtotal - desconto;
+    if (linhaDesc) linhaDesc.hidden = desconto <= 0;
+    if (elDesc) elDesc.textContent = brl(desconto);
+    if (elTotal) elTotal.textContent = brl(total);
+  }
+
+  document.querySelectorAll('input[name="metodo_ui"]').forEach(function (radio) {
+    radio.addEventListener('change', function () { atualizar(radio.value); });
+  });
+  var checked = document.querySelector('input[name="metodo_ui"]:checked');
+  atualizar(checked ? checked.value : 'pix');
+})();
+</script>
+{% endblock %}

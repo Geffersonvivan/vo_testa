@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block titulo %}Lavanderia — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<div class="pagina-cabecalho">
+  <h1>Lavanderia</h1>
+  <div class="pagina-acoes">
+    <a href="{% url 'lavanderia:rouparia' %}" class="botao-neutro">Rouparia</a>
+    <a href="{% url 'lavanderia:servicos' %}" class="botao-neutro">Tabela de preços</a>
+    <a href="{% url 'lavanderia:historico' %}" class="botao-neutro">Histórico</a>
+  </div>
+</div>
+<p class="subtitulo">Serviço de lavagem ao hóspede: recebida → lavando → pronta → entregue, cobrando na conta do quarto ou no caixa.</p>
+
+{% if not tem_servico %}
+  <p class="bloco-vazio">Cadastre serviços na <a href="{% url 'lavanderia:servicos' %}">tabela de preços</a> antes de abrir ordens.</p>
+{% else %}
+
+<section class="painel-bloco" style="max-width:680px;margin-bottom:1.6rem">
+  <h2 style="margin-top:0">Nova ordem</h2>
+  <form method="post" action="{% url 'lavanderia:abrir' %}" class="abrir-comanda">
+    {% csrf_token %}
+    {% include "componentes/combo_pessoa.html" with dados=clientes dados_id="clientes-data" campo="cliente" placeholder="Hóspede/cliente…" %}
+    <input type="text" name="rotulo" placeholder="Ou identifique (ex.: quarto 12)">
+    <label class="prazo-campo">Pronto para <input type="date" name="prazo"></label>
+    <button type="submit" class="botao-primario">Abrir</button>
+  </form>
+</section>
+
+<h2>Ordens em produção</h2>
+<div class="comandas-grid">
+  {% for o in abertas %}
+    <a href="{% url 'lavanderia:ordem' o.pk %}" class="comanda-card">
+      <div class="comanda-card-topo">
+        <strong>{{ o.titulo }}</strong>
+        <span class="selo {% if o.status == 'pronta' %}selo-limpa{% else %}selo-em_andamento{% endif %}">{{ o.get_status_display }}</span>
+      </div>
+      <span class="comanda-card-itens">{{ o.itens.count }} item{{ o.itens.count|pluralize }}{% if o.prazo %} · pronto {{ o.prazo|date:"d/m" }}{% endif %}</span>
+      <span class="comanda-card-total">R$ {{ o.total }}</span>
+    </a>
+  {% empty %}
+    <p class="bloco-vazio">Nenhuma ordem em produção. Abra a primeira acima.</p>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,67 @@
+{% load static %}
+
+<!-- HERO SECTION -->
+<section id="inicio" class="relative min-h-screen flex items-center justify-center overflow-hidden">
+    <!-- Background -->
+    <div class="absolute inset-0 bg-gradient-to-br from-noturno via-madeira to-noturno"></div>
+
+    <!-- Conteúdo Hero -->
+    <div class="relative z-10 text-center px-4 sm:px-6 max-w-4xl w-full">
+        <p class="text-pergaminho/60 text-xs sm:text-sm tracking-[0.3em] sm:tracking-[0.4em] uppercase mb-4 sm:mb-6 font-medium">{{ config.texto_boas_vindas }}</p>
+
+        <!-- Logo oficial centralizada -->
+        <img src="{% static 'site/img/logo-hero.png' %}" alt="Pousada Vô Testa" class="h-56 sm:h-80 md:h-[34rem] w-auto mx-auto mb-4 sm:mb-6">
+
+        <p class="text-pergaminho/80 text-base sm:text-lg md:text-xl mb-6 sm:mb-10 max-w-2xl mx-auto leading-relaxed px-2">
+            {{ config.frase_hero }}
+        </p>
+
+        <!-- Barra de busca de reserva -->
+        <form action="{% url 'core:reservar' %}" method="get"
+              class="bg-noturno/60 backdrop-blur-md rounded-xl sm:rounded-2xl p-4 sm:p-6 max-w-3xl mx-auto border border-lampiao/20">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 items-end">
+                <div class="text-left">
+                    <label class="text-pergaminho/60 text-[10px] sm:text-xs uppercase tracking-wider mb-1 block">Check-in</label>
+                    <input type="text" name="checkin" required data-picker="checkin" placeholder="Selecione" autocomplete="off"
+                           class="w-full bg-noturno/50 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-pergaminho text-xs sm:text-sm border border-pergaminho/10 focus:border-lampiao outline-none cursor-pointer">
+                </div>
+                <div class="text-left">
+                    <label class="text-pergaminho/60 text-[10px] sm:text-xs uppercase tracking-wider mb-1 block">Check-out</label>
+                    <input type="text" name="checkout" required data-picker="checkout" placeholder="Selecione" autocomplete="off"
+                           class="w-full bg-noturno/50 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-pergaminho text-xs sm:text-sm border border-pergaminho/10 focus:border-lampiao outline-none cursor-pointer">
+                </div>
+                <div class="text-left">
+                    <label class="text-pergaminho/60 text-[10px] sm:text-xs uppercase tracking-wider mb-1 block">Hóspedes</label>
+                    <input type="number" name="hospedes" min="1" value="2" required
+                           class="w-full bg-noturno/50 rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 text-pergaminho text-xs sm:text-sm border border-pergaminho/10 focus:border-lampiao outline-none">
+                </div>
+                <button type="submit" class="bg-lampiao text-noturno font-bold text-xs sm:text-sm px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg hover:bg-lampiao/90 transition pulse-btn flex items-center justify-center gap-2">
+                    <svg class="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    Ver Disponibilidade
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Números de impacto -->
+    <div class="absolute bottom-0 left-0 right-0 bg-madeira/80 backdrop-blur-sm border-t border-lampiao/20">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 text-center">
+            <div>
+                <span class="font-display text-xl sm:text-3xl font-black text-lampiao">{{ config.numero_viajantes }}</span>
+                <p class="text-pergaminho/60 text-[10px] sm:text-xs mt-1">Viajantes resgatados<br>do tempo moderno</p>
+            </div>
+            <div>
+                <span class="font-display text-xl sm:text-3xl font-black text-lampiao">{{ config.numero_quartos }}</span>
+                <p class="text-pergaminho/60 text-[10px] sm:text-xs mt-1">Quartos temporais<br>temáticos</p>
+            </div>
+            <div>
+                <span class="font-display text-xl sm:text-3xl font-black text-lampiao">{{ config.numero_zonas }}</span>
+                <p class="text-pergaminho/60 text-[10px] sm:text-xs mt-1">Zonas exploráveis entre<br>passado, presente e futuro</p>
+            </div>
+            <div>
+                <span class="font-display text-xl sm:text-3xl font-black text-lampiao">{{ config.numero_avaliacoes }}</span>
+                <p class="text-pergaminho/60 text-[10px] sm:text-xs mt-1">Avaliações positivas no<br>Booking e Reclame Aqui</p>
+            </div>
+        </div>
+    </div>
+</section>

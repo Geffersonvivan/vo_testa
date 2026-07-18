@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ titulo }}</title>
+</head>
+<body style="margin:0;padding:0;background:#EFDBB2;font-family:Georgia,'Times New Roman',serif;color:#4F2C1D;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EFDBB2;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border-radius:4px;overflow:hidden;">
+
+        <!-- Hero (brasão já vem na arte) -->
+        <tr>
+          <td style="padding:0;line-height:0;background:#051C2C;">
+            <img src="cid:{{ cid_hero }}" width="560" alt="Pousada Vô Testa" style="display:block;width:100%;max-width:560px;height:auto;border:0;">
+          </td>
+        </tr>
+
+        <!-- Faixa título -->
+        <tr>
+          <td align="center" style="background:#051C2C;padding:16px 20px 20px;">
+            <p style="margin:0;color:#D7A048;font-size:22px;letter-spacing:.06em;font-weight:bold;">
+              ◆◆◆&nbsp;&nbsp;{{ titulo }}&nbsp;&nbsp;◆◆◆
+            </p>
+          </td>
+        </tr>
+
+        <!-- Roda + saudação (como na prancheta) -->
+        <tr>
+          <td align="center" style="padding:28px 28px 8px;background:#ffffff;">
+            <img src="cid:{{ cid_roda }}" width="52" alt="" style="display:block;width:52px;height:auto;margin:0 auto 16px;border:0;">
+            <p style="margin:0 0 14px;font-size:20px;color:#4F2C1D;font-weight:bold;">Olá, {{ reserva.hospede.nome }}!</p>
+            {% if pago %}
+            <p style="margin:0;font-size:15px;line-height:1.6;color:#4F2C1D;max-width:420px;">
+              Está tudo certo com a sua compra!<br>
+              Obrigado por escolher o Vô Testa.<br>
+              Aqui abaixo, você encontra os detalhes da sua estadia.<br>
+              Estamos te esperando na outra linha temporal.<br>
+              Boa viagem!
+            </p>
+            {% else %}
+            <p style="margin:0;font-size:15px;line-height:1.6;color:#4F2C1D;max-width:420px;">
+              Recebemos a sua reserva — falta só confirmar o pagamento do sinal.<br>
+              Aqui abaixo estão os detalhes. Guarde este e-mail: pelo link você acompanha o status e paga com segurança.
+            </p>
+            {% endif %}
+          </td>
+        </tr>
+
+        <!-- Cartão de detalhes -->
+        <tr>
+          <td style="padding:22px 28px 8px;background:#ffffff;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #051C2C;border-radius:2px;">
+              <tr>
+                <td style="padding:18px 14px;border-bottom:1px solid #E8D9B8;width:50%;vertical-align:top;">
+                  <p style="margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8A6A4A;font-family:Arial,Helvetica,sans-serif;">Chegada</p>
+                  <p style="margin:0;font-size:15px;color:#051C2C;font-weight:bold;">{{ chegada }}</p>
+                </td>
+                <td style="padding:18px 14px;border-bottom:1px solid #E8D9B8;width:50%;vertical-align:top;">
+                  <p style="margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8A6A4A;font-family:Arial,Helvetica,sans-serif;">Partida</p>
+                  <p style="margin:0;font-size:15px;color:#051C2C;font-weight:bold;">{{ partida }}</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:18px 14px;border-bottom:1px solid #E8D9B8;vertical-align:top;">
+                  <p style="margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8A6A4A;font-family:Arial,Helvetica,sans-serif;">Hóspedes</p>
+                  <p style="margin:0;font-size:15px;color:#051C2C;font-weight:bold;">{{ reserva.num_hospedes }} pessoa{{ reserva.num_hospedes|pluralize }}</p>
+                </td>
+                <td style="padding:18px 14px;border-bottom:1px solid #E8D9B8;vertical-align:top;">
+                  <p style="margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8A6A4A;font-family:Arial,Helvetica,sans-serif;">Código da reserva</p>
+                  <p style="margin:0;font-size:15px;color:#051C2C;font-weight:bold;">{{ reserva.codigo }}</p>
+                  {% if url_whatsapp %}
+                  <p style="margin:8px 0 0;font-size:13px;font-family:Arial,Helvetica,sans-serif;">
+                    <a href="{{ url_whatsapp }}" style="color:#B0741C;">Falar com a pousada</a>
+                  </p>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:18px 14px;border-bottom:1px solid #E8D9B8;vertical-align:top;">
+                  <p style="margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8A6A4A;font-family:Arial,Helvetica,sans-serif;">Acomodação</p>
+                  <p style="margin:0;font-size:15px;color:#051C2C;font-weight:bold;">{{ reserva.quarto.nome }}</p>
+                </td>
+                <td style="padding:18px 14px;border-bottom:1px solid #E8D9B8;vertical-align:top;">
+                  <p style="margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8A6A4A;font-family:Arial,Helvetica,sans-serif;">Pagamento</p>
+                  <p style="margin:0;font-size:15px;color:#051C2C;font-weight:bold;">{{ metodo }}</p>
+                  <p style="margin:6px 0 0;font-size:16px;color:#2E483E;font-weight:bold;">
+                    {% if pago %}Total pago{% else %}Total{% endif %} R$ {{ reserva.valor_total }}
+                  </p>
+                </td>
+              </tr>
+              <tr>
+                <td colspan="2" style="padding:18px 14px;vertical-align:top;">
+                  <p style="margin:0 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8A6A4A;font-family:Arial,Helvetica,sans-serif;">Endereço</p>
+                  <p style="margin:0;font-size:14px;line-height:1.45;color:#051C2C;">{{ endereco }}</p>
+                  {% if url_google_maps %}
+                  <p style="margin:10px 0 0;font-size:13px;font-family:Arial,Helvetica,sans-serif;">
+                    <a href="{{ url_google_maps }}" style="color:#B0741C;">Google Maps</a>
+                    {% if url_apple_maps %}
+                    &nbsp;|&nbsp;
+                    <a href="{{ url_apple_maps }}" style="color:#B0741C;">Apple Maps</a>
+                    {% endif %}
+                  </p>
+                  {% endif %}
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- CTA -->
+        <tr>
+          <td align="center" style="padding:24px 28px 8px;background:#ffffff;">
+            <a href="{{ url_reserva }}"
+               style="display:inline-block;background:#051C2C;color:#EFDBB2;text-decoration:none;font-weight:bold;font-size:14px;padding:14px 28px;border-radius:8px;font-family:Arial,Helvetica,sans-serif;">
+              {% if pago %}Ver minha reserva{% else %}Ver reserva / pagar{% endif %}
+            </a>
+            <p style="margin:14px 0 0;color:#8A6A4A;font-size:12px;word-break:break-all;line-height:1.4;font-family:Arial,Helvetica,sans-serif;">
+              Ou abra:<br>
+              <a href="{{ url_reserva }}" style="color:#B0741C;">{{ url_reserva }}</a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Rodapé -->
+        <tr>
+          <td align="center" style="padding:28px 24px 22px;background:#F5E6C8;">
+            <p style="margin:0 0 10px;font-size:11px;line-height:1.55;color:#6B4E35;font-family:Arial,Helvetica,sans-serif;text-align:center;">
+              Este e-mail foi enviado automaticamente por
+              <strong>naoresponda@pousadavotesta.com.br</strong> e não aceita respostas.
+              Dúvidas: <a href="mailto:{{ email_contato }}" style="color:#B0741C;">{{ email_contato }}</a>
+              {% if url_whatsapp %}
+              ou <a href="{{ url_whatsapp }}" style="color:#B0741C;">WhatsApp</a>
+              {% endif %}.
+            </p>
+            <p style="margin:0 0 12px;font-size:11px;line-height:1.45;color:#6B4E35;font-family:Arial,Helvetica,sans-serif;text-align:center;">
+              {{ razao_social }} · CNPJ {{ cnpj }}<br>
+              POUSADA VÔ TESTA · Itá/SC
+            </p>
+            <p style="margin:0;font-size:12px;font-family:Arial,Helvetica,sans-serif;">
+              {% if instagram_url %}<a href="{{ instagram_url }}" style="color:#B0741C;text-decoration:none;">Instagram</a>{% endif %}
+              {% if instagram_url and facebook_url %}&nbsp;·&nbsp;{% endif %}
+              {% if facebook_url %}<a href="{{ facebook_url }}" style="color:#B0741C;text-decoration:none;">Facebook</a>{% endif %}
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

@@ -3,19 +3,326 @@
 {% block titulo %}Visão geral — CRM Vô Testa{% endblock %}
 
 {% block conteudo %}
-<p class="pagina-eyebrow letreiro">Pousada Vô Testa</p>
-<h1>Visão geral</h1>
-<p class="subtitulo">O resumo do dia da pousada aparece aqui — ocupação, chegadas, saídas e caixas — conforme os módulos forem entrando em operação.</p>
-
-<h2>Módulos contratados</h2>
-<div class="cartoes">
-  {% for m in modulos %}
-    <div class="cartao">
-      <strong>{{ m.get_codigo_display }}</strong>
-      <span class="etiqueta">em construção</span>
-    </div>
-  {% empty %}
-    <p>Nenhum módulo ativo. Ative módulos no <a href="{% url 'admin:index' %}">admin</a>.</p>
-  {% endfor %}
+<p class="pagina-eyebrow letreiro">Recepção · hoje</p>
+<div class="pagina-cabecalho">
+  <h1>O corredor</h1>
+  {% if corredor %}
+  <div class="acoes" style="margin:0">
+    <a href="{% url 'reservas:mapa_quartos' %}" class="botao-neutro">Filtros e troca</a>
+    <button type="button" class="botao-primario" hx-get="{% url 'reservas:nova' %}" hx-target="#modal-conteudo">Nova reserva</button>
+  </div>
+  {% endif %}
 </div>
+<p class="subtitulo">A casa fala primeiro — situação de cada quarto agora.</p>
+
+{% if corredor %}
+<section class="corredor-hero">
+  {% include "reservas/partials/corredor.html" with quartos=corredor.quartos hoje=corredor.hoje amanha=corredor.amanha %}
+  <div class="corredor-legenda">
+    {% for s in corredor.situacoes_filtro %}
+      <span class="chip-legenda sit-{{ s.cod }}"><i></i>{{ s.label }} <b>{{ s.n }}</b></span>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="mural">
+  <div class="mural-cabecalho">
+    <span class="mural-titulo">
+      <svg viewBox="0 0 24 24" class="ico"><path d="M9 4h6l-1 6 3 2v2H7v-2l3-2z"/><path d="M12 14v6"/></svg>
+      Recados do turno
+    </span>
+    <a href="{% url 'logbook' %}" class="mural-link">Escrever · ver todos</a>
+  </div>
+  {% if recados_turno %}
+    <div class="mural-notas">
+      {% for r in recados_turno %}
+        <a href="{% url 'logbook' %}" class="mural-nota {% if r.importante %}mural-importante{% endif %}">
+          {% if r.importante %}<span class="mural-flag">importante</span>{% endif %}
+          <span class="mural-nota-txt">{{ r.texto }}</span>
+          <small class="mural-nota-autor">{{ r.autor }} · {{ r.criado_em|date:"d/m H:i" }}</small>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <a href="{% url 'logbook' %}" class="mural-vazio">Nenhum recado ainda. Deixe um aviso para o próximo turno →</a>
+  {% endif %}
+</section>
+
+{% if atencao %}
+<section class="atencao-secao">
+  <div class="secao-cabecalho">
+    <h2>Precisa de atenção</h2>
+    <span class="secao-contagem">{{ atencao|length }}</span>
+  </div>
+  <div class="atencao-grid">
+    {% for a in atencao %}
+      <a href="{{ a.url }}" class="atencao-item atencao-{{ a.nivel }}">
+        <span class="atencao-ponto"></span>
+        <span class="atencao-txt">
+          <strong>{{ a.rotulo }}</strong>
+          <small>{{ a.detalhe }}</small>
+        </span>
+        <svg viewBox="0 0 24 24" class="ico atencao-seta"><path d="M9 6l6 6-6 6"/></svg>
+      </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<div class="cartoes cartoes-indicadores kpis">
+  {% if resumo_reservas %}
+    <a href="{% url 'reservas:mapa' %}" class="cartao kpi cartao-link">
+      <div class="kpi-topo">
+        <span class="kpi-rotulo letreiro">Ocupação</span>
+        <svg viewBox="0 0 24 24" class="ico kpi-ico"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/></svg>
+      </div>
+      <div class="kpi-valor">{{ resumo_reservas.ocupacao }}%</div>
+      <div class="kpi-nota">{{ resumo_reservas.hospedadas }} de {{ resumo_reservas.uhs_ativas }} quartos ocupados</div>
+    </a>
+    <a href="{% url 'reservas:lista' %}?status=confirmada" class="cartao kpi cartao-link">
+      <div class="kpi-topo">
+        <span class="kpi-rotulo letreiro">Chegadas hoje</span>
+        <svg viewBox="0 0 24 24" class="ico kpi-ico"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+      </div>
+      <div class="kpi-valor">{{ resumo_reservas.chegadas_hoje }}</div>
+      <div class="kpi-nota">check-ins previstos</div>
+    </a>
+    <a href="{% url 'reservas:lista' %}?status=hospedada" class="cartao kpi cartao-link">
+      <div class="kpi-topo">
+        <span class="kpi-rotulo letreiro">Saídas hoje</span>
+        <svg viewBox="0 0 24 24" class="ico kpi-ico"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+      </div>
+      <div class="kpi-valor">{{ resumo_reservas.saidas_hoje }}</div>
+      <div class="kpi-nota">check-outs previstos</div>
+    </a>
+  {% endif %}
+  <a href="{% url 'caixa_sessoes' %}" class="cartao kpi cartao-link {% if indicadores.caixas_abertos %}ok{% endif %}">
+    <div class="kpi-topo">
+      <span class="kpi-rotulo letreiro">Caixas abertos</span>
+      <svg viewBox="0 0 24 24" class="ico kpi-ico"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
+    </div>
+    <div class="kpi-valor">{{ indicadores.caixas_abertos }}</div>
+    <div class="kpi-nota">em operação agora</div>
+  </a>
+  <a href="{% url 'contas' %}" class="cartao kpi cartao-link {% if indicadores.contas_vencidas %}alerta{% endif %}">
+    <div class="kpi-topo">
+      <span class="kpi-rotulo letreiro">Contas vencidas</span>
+      <svg viewBox="0 0 24 24" class="ico kpi-ico"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>
+    </div>
+    <div class="kpi-valor">{{ indicadores.contas_vencidas }}</div>
+    <div class="kpi-nota">a pagar/receber em atraso</div>
+  </a>
+  {% if indicadores.estoque_minimo is not None %}
+    <a href="{% url 'estoque:posicao' %}?alerta=1" class="cartao kpi cartao-link {% if indicadores.estoque_minimo %}alerta{% endif %}">
+      <div class="kpi-topo">
+        <span class="kpi-rotulo letreiro">Estoque mínimo</span>
+        <svg viewBox="0 0 24 24" class="ico kpi-ico"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
+      </div>
+      <div class="kpi-valor">{{ indicadores.estoque_minimo }}</div>
+      <div class="kpi-nota">produtos para repor</div>
+    </a>
+  {% endif %}
+</div>
+
+{% if graficos %}
+<h2>Indicadores para decisão</h2>
+<div class="graficos-grid">
+  {% if graficos.ocupacao %}
+    <div class="grafico-card col2">
+      <h3>Ocupação — próximos 14 dias</h3>
+      <div class="grafico-caixa"><canvas id="g-ocupacao"></canvas></div>
+    </div>
+  {% endif %}
+  {% if graficos.receita %}
+    <div class="grafico-card col2">
+      <h3>Receita da semana <small>serviço × consumo</small></h3>
+      <div class="grafico-caixa"><canvas id="g-receita"></canvas></div>
+    </div>
+  {% endif %}
+  {% if graficos.tipos %}
+    <div class="grafico-card">
+      <h3>Ocupação por tipo <small>média 14 dias</small></h3>
+      <div class="grafico-caixa"><canvas id="g-tipos"></canvas></div>
+    </div>
+  {% endif %}
+  {% if graficos.funil %}
+    <div class="grafico-card">
+      <h3>Funil de reservas</h3>
+      <div class="grafico-caixa"><canvas id="g-funil"></canvas></div>
+    </div>
+  {% endif %}
+  {% if graficos.canais %}
+    <div class="grafico-card grafico-pizza">
+      <h3>Origem das reservas</h3>
+      <div class="grafico-caixa"><canvas id="g-canais"></canvas></div>
+    </div>
+  {% endif %}
+  {% if graficos.pagamento %}
+    <div class="grafico-card grafico-pizza">
+      <h3>Mix de pagamento <small>recebido no caixa</small></h3>
+      <div class="grafico-caixa"><canvas id="g-pagamento"></canvas></div>
+    </div>
+  {% endif %}
+</div>
+{{ graficos|json_script:"dados-graficos" }}
+{% endif %}
+
+<div class="painel-2col igual">
+  <section class="painel-bloco">
+    <h2>Chegadas de hoje</h2>
+    {% if resumo_reservas.chegadas %}
+      <div class="lista-fluxo">
+        {% for r in resumo_reservas.chegadas %}
+          <a href="{% url 'reservas:detalhe' r.pk %}" class="fluxo-item">
+            <span class="fluxo-uh">{{ r.uh.numero|cut:"Quarto " }}</span>
+            <span class="fluxo-info">
+              <strong>{{ r.hospede.nome }}</strong>
+              <small>{{ r.uh.tipo.nome }} · {{ r.noites }} noite{{ r.noites|pluralize }}</small>
+            </span>
+            <span class="selo mapa-cor-{{ r.status }}">{{ r.get_status_display }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="bloco-vazio">Sem chegadas previstas para hoje.</p>
+    {% endif %}
+  </section>
+
+  <section class="painel-bloco">
+    <h2>Saídas de hoje</h2>
+    {% if resumo_reservas.saidas %}
+      <div class="lista-fluxo">
+        {% for r in resumo_reservas.saidas %}
+          <a href="{% url 'reservas:detalhe' r.pk %}" class="fluxo-item">
+            <span class="fluxo-uh">{{ r.uh.numero|cut:"Quarto " }}</span>
+            <span class="fluxo-info">
+              <strong>{{ r.hospede.nome }}</strong>
+              <small>{{ r.uh.tipo.nome }}</small>
+            </span>
+            <span class="selo mapa-cor-{{ r.status }}">Check-out</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="bloco-vazio">Sem saídas previstas para hoje.</p>
+    {% endif %}
+  </section>
+</div>
+
+<h2>Atalhos dos módulos</h2>
+{% for grupo in grupos_modulos %}
+  <p class="area-titulo letreiro">{{ grupo.titulo }}</p>
+  <div class="modulos-lista">
+    {% for m in grupo.itens %}
+      {% if m.url %}
+        <a href="{{ m.url }}" class="modulo-chip modulo-ativo">{{ m.nome }}</a>
+      {% else %}
+        <span class="modulo-chip modulo-breve">{{ m.nome }} <em>em breve</em></span>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% empty %}
+  <p class="bloco-vazio">Nenhum módulo ativo.</p>
+{% endfor %}
+
+{% if graficos %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  const dados = JSON.parse(document.getElementById('dados-graficos').textContent);
+  if (!window.Chart) return;
+  Chart.defaults.font.family = "'Hanken Grotesk', -apple-system, sans-serif";
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = '#64717B';
+  const NOTURNO = '#051C2C', LAMPIAO = '#D7A048', MUSGO = '#2E483E', MADEIRA = '#4F2C1D';
+  const PALETA = [NOTURNO, LAMPIAO, MUSGO, MADEIRA, '#2C6E7A', '#B0741C'];
+  const semGrade = { grid: { display: false }, border: { display: false } };
+  const gradeY = { grid: { color: '#E7DFCF' }, border: { display: false } };
+  const ctx = id => { const el = document.getElementById(id); return el ? el.getContext('2d') : null; };
+  const reais = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+  if (dados.ocupacao) {
+    const cores = dados.ocupacao.fds.map(f => f ? '#B0741C' : LAMPIAO);
+    new Chart(ctx('g-ocupacao'), {
+      type: 'line',
+      data: { labels: dados.ocupacao.labels, datasets: [{
+        data: dados.ocupacao.valores, borderColor: LAMPIAO,
+        backgroundColor: 'rgba(215,160,72,.14)', fill: true, tension: .35,
+        borderWidth: 2, pointRadius: 3, pointBackgroundColor: cores, pointBorderColor: cores }] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y + '% ocupado' } } },
+        scales: { x: semGrade, y: { ...gradeY, min: 0, max: 100, ticks: { callback: v => v + '%' } } } }
+    });
+  }
+  if (dados.receita) {
+    new Chart(ctx('g-receita'), {
+      type: 'bar',
+      data: { labels: dados.receita.labels, datasets: [
+        { label: 'Serviço', data: dados.receita.servico, backgroundColor: MUSGO, stack: 's', borderRadius: 3 },
+        { label: 'Consumo', data: dados.receita.consumo, backgroundColor: LAMPIAO, stack: 's', borderRadius: 3 } ] },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => c.dataset.label + ': ' + reais(c.parsed.y) } } },
+        scales: { x: { ...semGrade, stacked: true }, y: { ...gradeY, stacked: true, ticks: { callback: v => 'R$ ' + v } } } }
+    });
+  }
+  if (dados.tipos) {
+    new Chart(ctx('g-tipos'), {
+      type: 'bar',
+      data: { labels: dados.tipos.labels, datasets: [{ data: dados.tipos.valores, backgroundColor: MUSGO, borderRadius: 4 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.x + '% ocupado' } } },
+        scales: { x: { ...gradeY, min: 0, max: 100, ticks: { callback: v => v + '%' } }, y: semGrade } }
+    });
+  }
+  const opcoesPizza = (fmt, extra) => ({
+    responsive: true, maintainAspectRatio: false, cutout: '72%', radius: '92%',
+    plugins: {
+      legend: {
+        position: 'right',
+        labels: {
+          usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8,
+          padding: 10, font: { size: 11.5 },
+          generateLabels: chart => {
+            const ds = chart.data.datasets[0];
+            const total = ds.data.reduce((a, b) => a + b, 0) || 1;
+            return chart.data.labels.map((lab, i) => ({
+              text: lab + ' · ' + fmt(ds.data[i]) + ' (' + Math.round(ds.data[i] * 100 / total) + '%)',
+              fillStyle: ds.backgroundColor[i], strokeStyle: ds.backgroundColor[i],
+              pointStyle: 'circle', index: i,
+            }));
+          },
+        },
+      },
+      ...extra,
+    },
+  });
+  const inteiro = v => v.toLocaleString('pt-BR');
+  const reaisCurto = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+  if (dados.canais) {
+    new Chart(ctx('g-canais'), {
+      type: 'doughnut',
+      data: { labels: dados.canais.labels, datasets: [{ data: dados.canais.valores, backgroundColor: PALETA, borderColor: '#fff', borderWidth: 3, hoverOffset: 4 }] },
+      options: opcoesPizza(inteiro, { tooltip: { callbacks: { label: c => c.label + ': ' + inteiro(c.parsed) + ' reserva' + (c.parsed > 1 ? 's' : '') } } })
+    });
+  }
+  if (dados.funil) {
+    new Chart(ctx('g-funil'), {
+      type: 'bar',
+      data: { labels: dados.funil.labels, datasets: [{ data: dados.funil.valores, backgroundColor: MADEIRA, borderRadius: 4 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { ...gradeY, ticks: { precision: 0 } }, y: semGrade } }
+    });
+  }
+  if (dados.pagamento) {
+    new Chart(ctx('g-pagamento'), {
+      type: 'doughnut',
+      data: { labels: dados.pagamento.labels, datasets: [{ data: dados.pagamento.valores, backgroundColor: PALETA, borderColor: '#fff', borderWidth: 3, hoverOffset: 4 }] },
+      options: opcoesPizza(reaisCurto, { tooltip: { callbacks: { label: c => c.label + ': ' + reais(c.parsed) } } })
+    });
+  }
+})();
+</script>
+{% endif %}
 {% endblock %}

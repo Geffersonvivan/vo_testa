@@ -1,0 +1,106 @@
+{% extends 'site/reservas/base_reserva.html' %}
+{% load static %}
+
+{% block title %}Reservar — Quartos | Pousada Vô Testa{% endblock %}
+
+{% block reserva_content %}
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div>
+        <h2 class="font-display text-2xl font-bold text-madeira">
+            {% if busca.eh_day_use %}Dia na Pousada{% else %}Quartos Disponíveis{% endif %}
+        </h2>
+        <p class="text-madeira/50 text-sm">
+            {% if busca.eh_day_use %}
+                {{ busca.checkin|date:'d M Y' }} · {{ busca.hospedes }} pessoa{{ busca.hospedes|pluralize }}
+            {% else %}
+                {{ busca.checkin|date:'d M' }} – {{ busca.checkout|date:'d M Y' }} ·
+                {{ busca.noites }} noite{{ busca.noites|pluralize }} · {{ busca.hospedes }} hóspede{{ busca.hospedes|pluralize }}
+            {% endif %}
+        </p>
+    </div>
+    <span class="bg-musgo/10 text-musgo text-xs px-3 py-1.5 rounded-full border border-musgo/20 font-medium">
+        {{ num_disponiveis }} disponíve{{ num_disponiveis|pluralize:"l,is" }}
+    </span>
+</div>
+
+<div class="space-y-4 mb-8">
+    {% for r in resultados %}
+    {% if r.disponivel %}
+    <div class="bg-white rounded-2xl overflow-hidden shadow-sm border border-madeira/5 hover:shadow-md hover:border-lampiao/30 transition-all">
+        <div class="flex flex-col md:flex-row">
+            <div class="md:w-72 aspect-video md:aspect-auto bg-gradient-to-br from-pergaminho to-pergaminho/40 flex items-center justify-center flex-shrink-0 relative">
+                {% if r.quarto.foto_principal %}
+                <img src="{{ r.quarto.foto_principal.url }}" alt="{{ r.quarto.nome }}" class="w-full h-full object-cover" style="view-transition-name: quarto-foto-{{ r.quarto.id }}">
+                {% else %}
+                <p class="text-madeira/20 text-sm">[ Foto ]</p>
+                {% endif %}
+                {% if forloop.first %}
+                <span class="absolute top-3 left-3 bg-madeira text-pergaminho text-[10px] font-bold px-2.5 py-1 rounded-full">Última vaga!</span>
+                {% endif %}
+            </div>
+            <div class="flex-1 p-5 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-madeira/50 text-xs uppercase tracking-wider">{{ r.quarto.categoria.nome }}</span>
+                        {% if r.eh_day_use %}
+                        <span class="bg-lampiao/15 text-lampiao text-[10px] font-bold px-2 py-0.5 rounded-full">Dia na Pousada</span>
+                        {% endif %}
+                        <span class="text-lampiao text-xs">★ {{ r.quarto.nota_avaliacao }}</span>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-madeira mb-2">{{ r.quarto.nome }}</h3>
+                    <p class="text-madeira/50 text-sm mb-3">{{ r.quarto.descricao_curta }}</p>
+                    <div class="flex gap-2 flex-wrap text-madeira/40 text-xs">
+                        <span class="bg-pergaminho px-2 py-0.5 rounded">{{ r.quarto.capacidade }} pessoas</span>
+                        {% if r.quarto.metragem %}<span class="bg-pergaminho px-2 py-0.5 rounded">{{ r.quarto.metragem }}m²</span>{% endif %}
+                    </div>
+                </div>
+                <div class="flex items-end justify-between mt-4 pt-4 border-t border-pergaminho">
+                    <div>
+                        {% if r.tem_ajuste %}
+                        <p class="text-madeira/30 text-xs line-through">R$ {{ r.preco_base|floatformat:0 }}/{{ r.unidade_preco }}</p>
+                        <p class="text-madeira/60 text-xs">{{ r.temporada.get_tipo_display }}: R$ {{ r.preco_noite|floatformat:0 }}/{{ r.unidade_preco }}</p>
+                        {% else %}
+                        <p class="text-madeira/60 text-xs">R$ {{ r.preco_noite|floatformat:0 }}/{{ r.unidade_preco }}</p>
+                        {% endif %}
+                        <p class="text-madeira font-display text-2xl font-bold mt-1">R$ {{ r.total|floatformat:0 }} <span class="text-madeira/30 text-xs font-normal">total</span></p>
+                    </div>
+                    <a href="{% url 'core:selecionar_quarto' r.quarto.id %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}{% if busca.modalidade %}&modalidade={{ busca.modalidade }}{% endif %}"
+                       class="bg-madeira text-pergaminho font-bold text-sm px-6 py-2.5 rounded-xl hover:bg-madeira/90 transition shadow-sm">
+                        Reservar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white/50 rounded-2xl overflow-hidden border border-madeira/5 opacity-60 relative">
+        <div class="absolute inset-0 bg-white/50 z-10 flex items-center justify-center backdrop-blur-[1px]">
+            <span class="bg-madeira/10 text-madeira/60 text-sm font-semibold px-5 py-2 rounded-xl border border-madeira/10">Indisponível para este período</span>
+        </div>
+        <div class="flex flex-col md:flex-row">
+            <div class="md:w-72 aspect-video md:aspect-auto bg-gradient-to-br from-pergaminho to-pergaminho/40 flex items-center justify-center flex-shrink-0">
+                <p class="text-madeira/15 text-sm">[ Foto ]</p>
+            </div>
+            <div class="flex-1 p-5">
+                <span class="text-madeira/30 text-xs uppercase tracking-wider">{{ r.quarto.categoria.nome }}</span>
+                <h3 class="font-display text-xl font-bold text-madeira/30 mb-2">{{ r.quarto.nome }}</h3>
+                <p class="text-madeira/20 text-sm">{{ r.quarto.descricao_curta }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% empty %}
+    <div class="text-center py-16">
+        <p class="text-madeira/60 text-lg mb-2">Nenhuma cabana comporta {{ busca.hospedes }} hóspede{{ busca.hospedes|pluralize }}.</p>
+        <p class="text-madeira/40 text-sm">Tente reduzir o número de hóspedes ou escolher outras datas.</p>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="flex justify-between">
+    <a href="{% url 'core:reservar' %}{% if busca.modalidade %}?modalidade={{ busca.modalidade }}{% endif %}" class="text-madeira/40 hover:text-madeira transition flex items-center gap-2 text-sm">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+        Alterar datas
+    </a>
+</div>
+{% endblock %}

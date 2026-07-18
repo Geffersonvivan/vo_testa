@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block titulo %}Manutenção — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Hospedagem</p>
+<div class="pagina-cabecalho">
+  <h1>Manutenção</h1>
+</div>
+<p class="subtitulo">Ordens de serviço de quartos e áreas comuns. Bloquear um quarto o tira da disponibilidade até a conclusão.</p>
+
+{% if bloqueados %}
+  <p class="aviso-inline">
+    <svg viewBox="0 0 24 24" class="ico"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+    {{ bloqueados }} quarto{{ bloqueados|pluralize }} bloqueado{{ bloqueados|pluralize }} por manutenção (fora da disponibilidade).
+  </p>
+{% endif %}
+
+<div class="colunas colunas-2-1">
+  <section>
+    <h2>Ordens abertas</h2>
+    <table class="tabela">
+      <thead>
+        <tr><th>#</th><th>Alvo</th><th>Título</th><th>Prioridade</th><th>Situação</th><th>Bloqueio</th></tr>
+      </thead>
+      <tbody>
+        {% for os in abertas %}
+          <tr class="linha-clique" onclick="location.href='{% url 'manutencao:detalhe' os.pk %}'">
+            <td>{{ os.pk }}</td>
+            <td>{{ os.alvo }}</td>
+            <td>{{ os.titulo }}</td>
+            <td><span class="selo prioridade-{{ os.prioridade }}">{{ os.get_prioridade_display }}</span></td>
+            <td>
+              <span class="selo {% if os.status == 'em_andamento' %}selo-em_andamento{% else %}selo-limpa{% endif %}">
+                {{ os.get_status_display }}
+              </span>
+            </td>
+            <td>{% if os.bloqueia_uh %}🔒 quarto{% else %}—{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="vazio">Nenhuma OS aberta. Tudo em ordem.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="painel-bloco" x-data="{ alvo: 'quarto', tipo: 'corretiva' }">
+    <h2 style="margin-top:0">Nova ordem de serviço</h2>
+    <form method="post" action="{% url 'manutencao:nova' %}" class="form-cartao">
+      {% csrf_token %}
+
+      <div class="pdv-seg">
+        <button type="button" :class="{ativo: alvo === 'quarto'}" @click="alvo = 'quarto'">Quarto</button>
+        <button type="button" :class="{ativo: alvo === 'area'}" @click="alvo = 'area'">Área comum</button>
+      </div>
+
+      <div class="campo" x-show="alvo === 'quarto'">
+        <label>Quarto</label>
+        <select name="uh">
+          <option value="">Escolha…</option>
+          {% for q in quartos %}<option value="{{ q.pk }}">{{ q.numero }}{% if q.status == 'bloqueada' %} (bloqueado){% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="campo" x-show="alvo === 'area'" x-cloak style="display:none">
+        <label>Área comum</label>
+        <input type="text" name="area" placeholder="Ex.: piscina, recepção, corredor">
+      </div>
+
+      <div class="campo"><label>Título*</label><input type="text" name="titulo" placeholder="Ex.: ar-condicionado sem gelar" required></div>
+      <div class="campo"><label>Descrição</label><textarea name="descricao" rows="2"></textarea></div>
+
+      <div class="form-grade">
+        <div class="campo">
+          <label>Tipo</label>
+          <select name="tipo" x-model="tipo">
+            {% for v, r in tipos %}<option value="{{ v }}">{{ r }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="campo">
+          <label>Prioridade</label>
+          <select name="prioridade">
+            {% for v, r in prioridades %}<option value="{{ v }}" {% if v == 'media' %}selected{% endif %}>{{ r }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="campo">
+        <label>Responsável (interno)</label>
+        <select name="responsavel">
+          <option value="">A definir…</option>
+          {% for u in responsaveis %}<option value="{{ u.pk }}">{{ u.get_short_name|default:u.username }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="campo">
+        <label>Prestador externo <small class="opcional">(opcional)</small></label>
+        {% include "componentes/combo_pessoa.html" with dados=prestadores_data dados_id="prestadores-data" campo="prestador" placeholder="Empresa/fornecedor…" %}
+      </div>
+
+      <div class="campo">
+        <label>Previsto para <small class="opcional">(opcional)</small></label>
+        <input type="date" name="previsto_para">
+      </div>
+
+      <div class="form-grade" x-show="tipo === 'preventiva'" x-cloak style="display:none">
+        <div class="campo"><label>Repetir a cada (meses)</label><input type="number" name="recorrencia_meses" min="1" placeholder="6"></div>
+        <div class="campo"><label>Agendada para</label><input type="date" name="agendada_para"></div>
+      </div>
+
+      <label class="filtro-check" x-show="alvo === 'quarto'">
+        <input type="checkbox" name="bloquear" value="1"> Bloquear o quarto durante o reparo
+      </label>
+
+      <div class="acoes"><button type="submit" class="botao-primario">Abrir OS</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

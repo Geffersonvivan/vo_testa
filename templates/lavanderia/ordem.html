@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block titulo %}Lavanderia #{{ ordem.pk }}{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'lavanderia:painel' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Lavanderia
+</a>
+<p class="pagina-eyebrow letreiro">Lavanderia</p>
+<div class="pagina-cabecalho">
+  <h1>Ordem #{{ ordem.pk }} — {{ ordem.titulo }}</h1>
+  <span class="selo {% if ordem.status == 'cancelada' %}selo-alerta{% elif ordem.status == 'entregue' %}selo-limpa{% else %}selo-em_andamento{% endif %}">{{ ordem.get_status_display }}</span>
+</div>
+{% if ordem.prazo %}<p class="subtitulo">Prometida para {{ ordem.prazo|date:"d/m/Y" }}.</p>{% endif %}
+
+<div class="pdv" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <section class="pdv-produtos">
+    {% if ordem.em_producao %}
+      <p class="subtitulo">Toque num serviço da tabela para lançar na ordem.</p>
+      <div class="pdv-lista">
+        {% for s in servicos %}
+          <button type="button" class="pdv-produto"
+                  hx-post="{% url 'lavanderia:add_item' ordem.pk %}"
+                  hx-vals='{"servico_id": {{ s.id }}, "quantidade": 1}'
+                  hx-target="#ordem-itens" hx-swap="outerHTML">
+            <span class="pdv-produto-nome">{{ s.nome }}</span>
+            <span class="pdv-produto-meta">
+              <span class="pdv-preco">R$ {{ s.preco }}</span>
+              <small class="pdv-saldo">por {{ s.get_unidade_display|lower }}</small>
+            </span>
+            <span class="pdv-add" aria-hidden="true">+</span>
+          </button>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="subtitulo">
+        Ordem {{ ordem.get_status_display|lower }}
+        {% if ordem.status == 'cancelada' %}{% if ordem.motivo_cancelamento %} — motivo: <strong>{{ ordem.motivo_cancelamento }}</strong>{% endif %}
+        {% elif ordem.conta_ref %} — lançada na conta: <strong>{{ ordem.conta_ref }}</strong>
+        {% elif ordem.forma_pagamento %} — paga com <strong>{{ ordem.forma_pagamento.nome }}</strong>{% endif %}.
+      </p>
+    {% endif %}
+  </section>
+
+  <aside class="pdv-painel">
+    <div class="pdv-painel-topo">
+      <h2>Peças</h2>
+      <span class="pdv-contador">{{ ordem.titulo }}</span>
+    </div>
+    <div class="pdv-carrinho">
+      {% include "lavanderia/partials/itens.html" %}
+    </div>
+
+    {% if ordem.em_producao %}
+      {% if ordem.status != 'pronta' %}
+        <form method="post" action="{% url 'lavanderia:avancar' ordem.pk %}" style="margin:.6rem 1.3rem 0">
+          {% csrf_token %}
+          <button type="submit" class="botao-neutro" style="width:100%">
+            {% if ordem.status == 'recebida' %}Enviar para lavagem{% else %}Marcar como pronta{% endif %}
+          </button>
+        </form>
+      {% endif %}
+
+      <form method="post" action="{% url 'lavanderia:entregar' ordem.pk %}" class="comanda-fechar" x-data="{ destino: 'caixa' }">
+        {% csrf_token %}
+        <input type="hidden" name="destino" :value="destino">
+        <div class="pdv-resumo">
+          <div class="pdv-linha-desc">
+            <span>Desconto</span>
+            <div class="input-reais"><span>R$</span><input type="number" name="desconto" min="0" step="0.01" value="0"></div>
+          </div>
+        </div>
+        <div class="pdv-seg" style="margin:0 1.3rem">
+          <button type="button" :class="{ativo: destino === 'caixa'}" @click="destino = 'caixa'">Pagar agora</button>
+          {% if contas %}<button type="button" :class="{ativo: destino === 'conta'}" @click="destino = 'conta'">Conta do quarto</button>{% endif %}
+        </div>
+        <label class="select-wrap" style="margin:.6rem 1.3rem 0" x-show="destino === 'caixa'" x-cloak>
+          <select name="forma"><option value="">Forma de pagamento…</option>
+            {% for f in formas %}<option value="{{ f.pk }}">{{ f.nome }}</option>{% endfor %}
+          </select>
+        </label>
+        {% if contas %}
+        <label class="select-wrap" style="margin:.6rem 1.3rem 0" x-show="destino === 'conta'" x-cloak>
+          <select name="conta_id"><option value="">Quarto / hóspede…</option>
+            {% for c in contas %}<option value="{{ c.id }}">{{ c.rotulo }}</option>{% endfor %}
+          </select>
+        </label>
+        {% endif %}
+        <button type="submit" class="botao-primario pdv-finalizar">Entregar e cobrar</button>
+      </form>
+
+      {% if eh_gerente %}
+        <div class="comanda-extras">
+          <details class="acao-sensivel">
+            <summary>Cancelar ordem</summary>
+            <form method="post" action="{% url 'lavanderia:cancelar' ordem.pk %}" class="form-cartao">
+              {% csrf_token %}
+              <div class="campo"><label>Motivo</label><input type="text" name="motivo" required></div>
+              <div class="acoes"><button type="submit" class="botao-perigo">Cancelar ordem</button></div>
+            </form>
+          </details>
+        </div>
+      {% endif %}
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

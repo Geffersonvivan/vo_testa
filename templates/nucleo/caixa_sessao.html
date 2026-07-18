@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block titulo %}Sessão de caixa — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Financeiro</p>
+<h1>Sessão de caixa — {{ sessao.get_modulo_display }}</h1>
+<p class="subtitulo">
+  Operador {{ sessao.operador }} · aberta em {{ sessao.aberta_em|date:"d/m/Y H:i" }}
+  {% if sessao.fechada_em %} · fechada em {{ sessao.fechada_em|date:"d/m/Y H:i" }}{% endif %}
+</p>
+
+<div class="cartoes cartoes-indicadores">
+  <div class="cartao">
+    <span class="indicador-rotulo letreiro">Fundo de troco</span>
+    <span class="indicador-valor">R$ {{ sessao.fundo_troco }}</span>
+  </div>
+  {% if not sessao.aberta %}
+    <div class="cartao">
+      <span class="indicador-rotulo letreiro">Contado</span>
+      <span class="indicador-valor">R$ {{ sessao.valor_contado }}</span>
+    </div>
+    <div class="cartao">
+      <span class="indicador-rotulo letreiro">Diferença</span>
+      <span class="indicador-valor {% if sessao.diferenca != 0 %}texto-alerta{% endif %}">R$ {{ sessao.diferenca }}</span>
+    </div>
+  {% endif %}
+  {% for nome, total in sessao.totais_por_forma %}
+    <div class="cartao">
+      <span class="indicador-rotulo letreiro">{{ nome }}</span>
+      <span class="indicador-valor">R$ {{ total }}</span>
+    </div>
+  {% endfor %}
+</div>
+
+{% if sessao.observacoes_fechamento %}
+  <p><strong>Observações do fechamento:</strong> {{ sessao.observacoes_fechamento }}</p>
+{% endif %}
+
+{% if eh_gerente and not sessao.aberta %}
+  <details class="acao-sensivel">
+    <summary>Reabrir sessão (gerência)</summary>
+    <form method="post" action="{% url 'caixa_reabrir' sessao.pk %}" class="form-cartao">
+      {% csrf_token %}
+      <div class="campo">
+        <label for="motivo-reabertura">Motivo da reabertura</label>
+        <textarea id="motivo-reabertura" name="motivo" rows="2" required></textarea>
+      </div>
+      <div class="acoes">
+        <button type="submit" class="botao-perigo">Reabrir — fica auditado</button>
+      </div>
+    </form>
+  </details>
+{% endif %}
+
+<h2>Movimentos</h2>
+<table class="tabela">
+  <thead>
+    <tr><th>Hora</th><th>Tipo</th><th>Forma</th><th>Valor</th><th>Descrição</th>{% if eh_gerente %}<th></th>{% endif %}</tr>
+  </thead>
+  <tbody>
+    {% for m in movimentos %}
+      <tr>
+        <td>{{ m.criado_em|date:"d/m H:i" }}</td>
+        <td><span class="dica" data-dica="{{ m.tipo_ajuda }}">{{ m.get_tipo_display }}</span>{% if m.motivo %} <small class="ajuda">({{ m.motivo }})</small>{% endif %}</td>
+        <td>{{ m.forma_pagamento|default:"Dinheiro" }}</td>
+        <td>R$ {{ m.valor }}</td>
+        <td>{{ m.descricao }}</td>
+        {% if eh_gerente %}
+          <td>
+            {% if m.tipo == "recebimento" and sessao.aberta %}
+              <details class="acao-sensivel">
+                <summary>Estornar</summary>
+                <form method="post" action="{% url 'estorno' m.pk %}" class="form-inline">
+                  {% csrf_token %}
+                  <input type="number" step="0.01" min="0.01" name="valor" value="{{ m.valor }}" required>
+                  <input type="text" name="motivo" placeholder="Motivo (obrigatório)" required>
+                  <button type="submit" class="botao-perigo">Confirmar</button>
+                </form>
+              </details>
+            {% endif %}
+          </td>
+        {% endif %}
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vazio">Sessão sem movimentos.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

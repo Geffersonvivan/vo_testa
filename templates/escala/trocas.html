@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block titulo %}Trocas de turno — Escala{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'escala:grade' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Escala
+</a>
+<p class="pagina-eyebrow letreiro">Equipe</p>
+<h1>Trocas de turno</h1>
+<p class="subtitulo">Solicitação de substituição com aprovação da gerência.</p>
+
+<div class="colunas colunas-2-1">
+  <section>
+    <h2>Pendentes</h2>
+    <table class="tabela">
+      <thead><tr><th>Turno</th><th>Sai</th><th>Entra</th><th>Motivo</th><th></th></tr></thead>
+      <tbody>
+        {% for t in pendentes %}
+          <tr>
+            <td>{{ t.atribuicao.turno.nome }} · {{ t.atribuicao.data|date:"d/m" }}</td>
+            <td>{{ t.solicitante.pessoa.nome }}</td>
+            <td>{{ t.substituto.pessoa.nome }}</td>
+            <td>{{ t.motivo }}</td>
+            <td class="num">
+              {% if eh_gerente %}
+                <form method="post" action="{% url 'escala:decidir_troca' t.pk %}" style="display:inline">
+                  {% csrf_token %}<input type="hidden" name="acao" value="aprovar">
+                  <button class="botao-mini" title="Aprovar">✓</button>
+                </form>
+                <form method="post" action="{% url 'escala:decidir_troca' t.pk %}" style="display:inline">
+                  {% csrf_token %}<input type="hidden" name="acao" value="recusar">
+                  <button class="chip-x" title="Recusar">&times;</button>
+                </form>
+              {% else %}<span class="opcional">aguardando</span>{% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="vazio">Nenhuma troca pendente.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if recentes %}
+      <h2 style="margin-top:1.4rem">Decididas</h2>
+      <table class="tabela">
+        <thead><tr><th>Sai → Entra</th><th>Situação</th></tr></thead>
+        <tbody>
+          {% for t in recentes %}
+            <tr><td>{{ t.solicitante.pessoa.nome }} → {{ t.substituto.pessoa.nome }}</td>
+                <td><span class="selo {% if t.status == 'aprovada' %}selo-limpa{% else %}selo-alerta{% endif %}">{{ t.get_status_display }}</span></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+  </section>
+
+  <section class="painel-bloco">
+    <h2 style="margin-top:0">Solicitar troca</h2>
+    <form method="post" class="form-cartao">
+      {% csrf_token %}
+      <div class="campo"><label>Turno a ceder</label>
+        <select name="atribuicao" required>
+          <option value="">Escolha…</option>
+          {% for a in atribuicoes %}<option value="{{ a.pk }}">{{ a.data|date:"d/m" }} · {{ a.turno.nome }} · {{ a.funcionario.pessoa.nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="campo"><label>Substituto</label>
+        <select name="substituto" required>{% for f in funcionarios %}<option value="{{ f.pk }}">{{ f.pessoa.nome }}</option>{% endfor %}</select>
+      </div>
+      <div class="campo"><label>Motivo</label><input type="text" name="motivo"></div>
+      <div class="acoes"><button type="submit" class="botao-primario">Solicitar</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

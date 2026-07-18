@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Protótipo — Puxe a Manivela com Amigos | Pousada Vô Testa</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { colors: {
+  noturno:'#051C2C', madeira:'#4F2C1D', lampiao:'#D7A048', pergaminho:'#EFDBB2', musgo:'#2E483E'
+}, fontFamily:{ display:['Georgia','serif'], body:['system-ui','sans-serif'] } } } };
+</script>
+<style>
+  body{ background: linear-gradient(180deg,#FBF7EE 0%, #EFDBB2 100%); }
+  .gear{ transition: all .5s ease; transform-origin:50% 50%; opacity:.2 }
+  .gear.on{ opacity:1; animation: spin 8s linear infinite }
+  .gear.rev.on{ animation: spin 6s linear infinite reverse }
+  @keyframes spin{ to{ transform: rotate(360deg) } }
+  .pop{ animation: pop .5s ease-out }
+  @keyframes pop{ 0%{transform:scale(.6);opacity:0} 60%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+  .glow{ animation: glow 2.4s infinite }
+  @keyframes glow{ 0%,100%{box-shadow:0 0 0 0 rgba(46,72,62,.4)} 50%{box-shadow:0 0 30px 8px rgba(46,72,62,.25)} }
+  .confete{ position:fixed; width:8px; height:12px; top:-20px; animation: fall linear forwards; z-index:60 }
+  @keyframes fall{ to{ transform: translateY(105vh) rotate(540deg); opacity:0 } }
+</style>
+</head>
+<body class="font-body text-madeira min-h-screen">
+
+<header class="border-b border-madeira/10 bg-white/80 backdrop-blur">
+  <div class="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <svg class="w-7 h-7 text-madeira gear on" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="6"/><g fill="currentColor"><rect x="44" y="12" width="12" height="16" rx="3"/><rect x="44" y="72" width="12" height="16" rx="3"/><rect x="12" y="44" width="16" height="12" rx="3"/><rect x="72" y="44" width="16" height="12" rx="3"/></g></svg>
+      <div><span class="font-display text-lg font-bold">Pousada Vô Testa</span>
+      <span class="block text-madeira/40 text-[11px]">Protótipo — Puxe a Manivela com Amigos (#4) · claro + musgo</span></div>
+    </div>
+    <span class="text-madeira/30 text-xs hidden sm:block">demonstração interativa</span>
+  </div>
+</header>
+
+<main class="max-w-2xl mx-auto px-4 py-8">
+  <div class="text-center mb-6">
+    <p class="text-musgo text-xs tracking-[0.35em] uppercase mb-2 font-semibold">Grupo · 10–13 Jul 2026</p>
+    <h1 class="font-display text-3xl sm:text-4xl font-bold text-madeira">Fuga dos Engenheiros</h1>
+    <p class="text-madeira/60 text-sm mt-1">Quanto mais amigos embarcam na mesma data, mais engrenagens giram — e o grupo todo ganha.</p>
+  </div>
+
+  <!-- engrenagens de progresso -->
+  <div class="bg-white border border-madeira/5 shadow-sm rounded-3xl p-6 mb-5">
+    <div class="flex items-center justify-center gap-2 mb-4" id="gears"></div>
+    <div class="h-2 bg-madeira/10 rounded-full overflow-hidden mb-3">
+      <div id="barra" class="h-full bg-musgo transition-all duration-700" style="width:33%"></div>
+    </div>
+    <p class="text-center text-sm text-madeira/70"><span id="qtd">1</span> de <span id="meta">3</span> cabanas reservadas — <span id="faltam" class="text-musgo font-semibold">faltam 2</span></p>
+
+    <div id="premio" class="mt-4 rounded-2xl border border-madeira/15 p-4 text-center transition-all">
+      <p class="text-madeira/50 text-xs uppercase tracking-wider mb-1">Recompensa do grupo</p>
+      <p id="premioTitulo" class="font-display text-lg font-bold text-madeira">🔥 Fogueira coletiva + café especial da roça</p>
+      <p id="premioStatus" class="text-madeira/40 text-xs mt-1">destrava quando o grupo fechar 3 cabanas</p>
+    </div>
+  </div>
+
+  <!-- participantes -->
+  <div class="bg-white border border-madeira/5 shadow-sm rounded-3xl p-6 mb-5">
+    <p class="text-madeira/50 text-xs uppercase tracking-wider mb-3">Já embarcaram</p>
+    <div id="gente" class="flex flex-wrap gap-3"></div>
+  </div>
+
+  <!-- ações -->
+  <div class="grid sm:grid-cols-2 gap-3">
+    <a href="#" class="bg-madeira text-pergaminho font-bold py-3 rounded-xl text-center hover:bg-madeira/90 transition shadow-lg shadow-madeira/20">Reservar minha cabana</a>
+    <button onclick="entrou()" class="border border-musgo/40 bg-musgo/10 text-musgo font-semibold py-3 rounded-xl hover:bg-musgo/20 transition flex items-center justify-center gap-2">
+      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+      Compartilhar no WhatsApp
+    </button>
+  </div>
+  <p class="text-center text-madeira/30 text-xs mt-5">
+    <button onclick="entrou()" class="underline hover:text-musgo">simular: um amigo reservou</button> ·
+    <button onclick="reset()" class="hover:text-madeira/60">↺ reiniciar</button>
+  </p>
+</main>
+
+<script>
+const meta = 3;
+const nomes = ['Maria','João','Ana','Lucas','Bia','Rafa'];
+let qtd = 1;
+
+function render() {
+  const g = document.getElementById('gears');
+  let html = '';
+  for (let i=0;i<meta;i++){
+    const on = i < qtd ? 'on' : '';
+    const rev = i%2 ? 'rev' : '';
+    html += `<svg class="gear ${rev} ${on} w-16 h-16 text-lampiao" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="8"/><g fill="currentColor"><rect x="44" y="12" width="12" height="16" rx="3"/><rect x="44" y="72" width="12" height="16" rx="3"/><rect x="12" y="44" width="16" height="12" rx="3"/><rect x="72" y="44" width="16" height="12" rx="3"/></g></svg>`;
+    if (i<meta-1) html += `<span class="w-6 h-0.5 ${i<qtd-1?'bg-musgo':'bg-madeira/15'}"></span>`;
+  }
+  g.innerHTML = html;
+
+  document.getElementById('qtd').textContent = qtd;
+  document.getElementById('meta').textContent = meta;
+  document.getElementById('barra').style.width = Math.min(100, qtd/meta*100) + '%';
+  const faltam = Math.max(0, meta-qtd);
+  document.getElementById('faltam').textContent = faltam>0 ? `faltam ${faltam}` : 'completo! 🎉';
+
+  document.getElementById('gente').innerHTML = nomes.slice(0,qtd).map(n=>`
+    <div class="pop flex flex-col items-center gap-1">
+      <div class="w-11 h-11 rounded-full bg-musgo/15 text-musgo font-bold flex items-center justify-center">${n.slice(0,2).toUpperCase()}</div>
+      <span class="text-xs text-madeira/60">${n}</span>
+    </div>`).join('') + (qtd<meta?`
+    <div class="flex flex-col items-center gap-1 opacity-40">
+      <div class="w-11 h-11 rounded-full border-2 border-dashed border-madeira/30 flex items-center justify-center text-madeira/40">+</div>
+      <span class="text-xs text-madeira/40">você?</span>
+    </div>`:'');
+
+  const premio = document.getElementById('premio');
+  const titulo = document.getElementById('premioTitulo');
+  const status = document.getElementById('premioStatus');
+  if (qtd>=meta){
+    premio.classList.add('bg-musgo','border-musgo','glow');
+    titulo.classList.remove('text-madeira'); titulo.classList.add('text-pergaminho');
+    status.textContent = '✓ desbloqueado! todos do grupo ganham';
+    status.className = 'text-pergaminho/80 text-xs mt-1 font-semibold';
+  } else {
+    premio.classList.remove('bg-musgo','border-musgo','glow');
+    titulo.classList.add('text-madeira'); titulo.classList.remove('text-pergaminho');
+    status.textContent = `destrava quando o grupo fechar ${meta} cabanas`;
+    status.className = 'text-madeira/40 text-xs mt-1';
+  }
+}
+function confete(){
+  const cores=['#D7A048','#4F2C1D','#2E483E'];
+  for(let i=0;i<80;i++){ const c=document.createElement('div'); c.className='confete';
+    c.style.left=Math.random()*100+'vw'; c.style.background=cores[i%3];
+    c.style.animationDuration=(2+Math.random()*1.5)+'s'; c.style.animationDelay=(Math.random()*.5)+'s';
+    document.body.appendChild(c); setTimeout(()=>c.remove(),4000);
+  }
+}
+function entrou(){ if(qtd<nomes.length){ qtd++; render(); if(qtd>=meta) confete(); } }
+function reset(){ qtd=1; render(); }
+render();
+</script>
+</body>
+</html>

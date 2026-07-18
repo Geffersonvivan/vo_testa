@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block titulo %}Auditoria — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Gestão</p>
+<div class="pagina-cabecalho">
+  <h1>Auditoria</h1>
+  <a href="{% url 'auditoria:trilha' %}" class="botao-neutro">Trilha de auditoria</a>
+</div>
+<p class="subtitulo">Varredura de pendências do CRM. Só aponta — a correção é feita no módulo dono.</p>
+
+<div class="cartoes-indicadores colunas">
+  <div class="cartao"><span class="indicador-rotulo letreiro">Pendências</span><span class="indicador-valor">{{ resumo.total }}</span></div>
+  <div class="cartao"><span class="indicador-rotulo letreiro">Alta</span><span class="indicador-valor texto-alerta">{{ resumo.por_gravidade.alta }}</span></div>
+  <div class="cartao"><span class="indicador-rotulo letreiro">Média</span><span class="indicador-valor">{{ resumo.por_gravidade.media }}</span></div>
+  <div class="cartao"><span class="indicador-rotulo letreiro">Baixa</span><span class="indicador-valor">{{ resumo.por_gravidade.baixa }}</span></div>
+</div>
+
+<table class="tabela" style="margin-top:1.2rem">
+  <thead>
+    <tr><th>Gravidade</th><th>Área</th><th>Pendência</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for a in achados %}
+      <tr>
+        <td><span class="selo prioridade-{% if a.gravidade == 'alta' %}urgente{% elif a.gravidade == 'media' %}alta{% else %}baixa{% endif %}">{{ a.gravidade }}</span></td>
+        <td>{{ a.area }}</td>
+        <td>{{ a.descricao }}</td>
+        <td class="num">{% if a.url %}<a href="{{ a.url }}" class="botao-mini">Resolver</a>{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Nenhuma pendência encontrada. CRM em ordem. 🎉</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

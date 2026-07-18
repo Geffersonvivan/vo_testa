@@ -2,7 +2,7 @@ from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from .modulos import DEPENDENCIAS, Modulo
+from ..modulos import DEPENDENCIAS, Modulo
 
 
 class Usuario(AbstractUser):
@@ -91,7 +91,7 @@ def modulo_ativo(codigo: str) -> bool:
 
 def modulos_ativos() -> list[str]:
     """Códigos de todos os módulos ativos, na ordem do catálogo."""
-    from .modulos import APRESENTACAO
+    from ..modulos import APRESENTACAO
 
     ativos = set(
         ModuloContratado.objects.filter(ativo=True).values_list("codigo", flat=True)

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block titulo %}Pessoas — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Cadastros</p>
+<div class="pagina-cabecalho">
+  <h1>Pessoas</h1>
+  <a href="{% url 'pessoa_nova' %}" class="botao-primario">Nova pessoa</a>
+</div>
+<p class="subtitulo">Hóspedes, agências/empresas, fornecedores, funcionários e clientes avulsos — uma base única.</p>
+
+<form method="get" class="barra-busca">
+  <input type="search" name="q" value="{{ busca }}" placeholder="Buscar por nome, CPF/CNPJ ou e-mail">
+  {% if papel %}<input type="hidden" name="papel" value="{{ papel }}">{% endif %}
+  <button type="submit" class="botao-neutro">Buscar</button>
+</form>
+
+<div class="filtros">
+  {% for f in filtros %}
+    <a href="?{% if busca %}q={{ busca|urlencode }}&{% endif %}{% if f.chave %}papel={{ f.chave }}{% endif %}"
+       class="selo {% if papel == f.chave %}selo-ativo{% endif %}">
+      {{ f.rotulo }} <span class="selo-contador">{{ f.total }}</span>
+    </a>
+  {% endfor %}
+</div>
+
+<table class="tabela">
+  <thead>
+    <tr><th>Nome</th><th>Tipo</th><th>Papéis</th><th>Documento</th><th>Telefone</th><th>Situação</th></tr>
+  </thead>
+  <tbody>
+    {% for p in pessoas %}
+      <tr>
+        <td><a href="{% url 'pessoa_editar' p.pk %}">{{ p.nome }}</a></td>
+        <td><span class="selo selo-tipo-{{ p.tipo }} dica" data-dica="{{ p.get_tipo_display }}">{{ p.sigla_tipo }}</span></td>
+        <td>
+          {% for papel in p.papeis %}<span class="selo">{{ papel }}</span>{% empty %}<span class="selo selo-neutro">Cliente avulso</span>{% endfor %}
+        </td>
+        <td>{{ p.documento|default:"—" }}</td>
+        <td>{{ p.telefone|default:"—" }}</td>
+        <td>{% if p.ativo %}Ativa{% else %}Inativa{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vazio">Nenhuma pessoa neste filtro. {% if busca or papel %}<a href="{% url 'pessoas' %}">Limpar filtros</a>{% else %}Comece pela primeira!{% endif %}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

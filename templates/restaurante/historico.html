@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block titulo %}Histórico de comandas — Restaurante{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'restaurante:comandas' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Comandas abertas
+</a>
+<p class="pagina-eyebrow letreiro">Restaurante Piscina</p>
+<h1>Histórico de comandas</h1>
+<p class="subtitulo">Comandas já fechadas e canceladas. Clique numa linha para ver os itens.</p>
+
+<div class="filtros">
+  {% for f in filtros %}
+    <a href="{% if f.chave %}?status={{ f.chave }}{% else %}{% url 'restaurante:historico' %}{% endif %}"
+       class="selo {% if filtro == f.chave %}selo-ativo{% endif %}">
+      {{ f.rotulo }} <span class="selo-contador">{{ f.total }}</span>
+    </a>
+  {% endfor %}
+</div>
+
+<table class="tabela">
+  <thead>
+    <tr>
+      <th>#</th><th>Ponto / cliente</th><th>Situação</th>
+      <th class="num">Total</th><th>Fecho</th><th>Quando</th><th>Operador</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in comandas %}
+      <tr class="linha-clique" onclick="location.href='{% url 'restaurante:comanda' c.pk %}'">
+        <td>{{ c.pk }}</td>
+        <td>{{ c.titulo }}</td>
+        <td>
+          <span class="selo {% if c.status == 'cancelada' %}selo-alerta{% else %}selo-limpa{% endif %}">
+            {{ c.get_status_display }}
+          </span>
+        </td>
+        <td class="num">R$ {{ c.total }}</td>
+        <td>
+          {% if c.status == 'cancelada' %}
+            <span class="dica" data-dica="{{ c.motivo_cancelamento|default:'Sem motivo registrado' }}">Cancelada</span>
+          {% elif c.conta_ref %}Conta: {{ c.conta_ref }}
+          {% elif c.forma_pagamento %}{{ c.forma_pagamento.nome }}
+          {% else %}—{% endif %}
+        </td>
+        <td>{{ c.fechada_em|default:c.aberta_em|date:"d/m H:i" }}</td>
+        <td>{{ c.criado_por.get_short_name|default:c.criado_por.username }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="vazio">Nenhuma comanda neste filtro.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

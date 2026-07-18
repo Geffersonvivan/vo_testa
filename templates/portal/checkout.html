@@ -1,0 +1,41 @@
+{% extends "portal/base.html" %}
+
+{% block titulo %}Conta & check-out — Pousada Vô Testa{% endblock %}
+
+{% block conteudo %}
+<div class="pt-card">
+  <a href="{% url 'portal:home' token %}" class="voltar">‹ Voltar</a>
+  <h2>Sua conta — {{ e.uh }}</h2>
+  {% for l in e.lancamentos %}
+    <div class="pt-linha">
+      <span>{{ l.descricao }} <small class="opcional">{{ l.natureza }}</small></span>
+      <span>{% if not l.debito %}−{% endif %}R$ {{ l.valor }}</span>
+    </div>
+  {% empty %}
+    <p class="subtitulo">Nenhum lançamento até agora.</p>
+  {% endfor %}
+  <div class="pt-linha" style="border-top:2px solid var(--fio);margin-top:.4rem;padding-top:.7rem">
+    <strong>Saldo a pagar</strong><strong class="pt-saldo" style="font-size:1.4rem">R$ {{ e.saldo }}</strong>
+  </div>
+</div>
+
+<div class="pt-card">
+  <h2>Check-out expresso</h2>
+  {% if e.saldo > 0 %}
+    <p class="subtitulo">Pague o saldo pelo celular e a recepção finaliza sua saída.</p>
+    <form method="post" action="{% url 'portal:pagar_saldo' token %}" class="pt-acoes">
+      {% csrf_token %}
+      <label class="select-wrap"><select name="metodo">
+        <option value="pix">Pix</option><option value="cartao">Cartão de crédito</option>
+      </select></label>
+      <button type="submit" class="botao-primario">Pagar R$ {{ e.saldo }} e sair</button>
+    </form>
+  {% else %}
+    <p class="subtitulo">Sua conta está quitada. 🎉</p>
+    <form method="post" action="{% url 'portal:checkout_recepcao' token %}" class="pt-acoes">
+      {% csrf_token %}
+      <button type="submit" class="botao-primario">Solicitar check-out</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

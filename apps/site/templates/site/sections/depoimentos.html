@@ -1,0 +1,32 @@
+<!-- DEPOIMENTOS -->
+<section class="fade-section py-16 sm:py-24 bg-pergaminho">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="text-center mb-10 sm:mb-16">
+            <p class="text-lampiao text-xs sm:text-sm tracking-[0.3em] uppercase mb-3 sm:mb-4">Depoimentos</p>
+            <h2 class="font-display text-3xl sm:text-4xl md:text-5xl font-black text-madeira mb-3 sm:mb-4">Histórias de Quem Já Veio</h2>
+            <p class="text-madeira/50 max-w-xl mx-auto text-sm sm:text-base">Quem passou por aqui nunca mais esqueceu.</p>
+        </div>
+
+        <div class="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">
+            {% for dep in depoimentos %}
+            <div class="bg-white/70 rounded-2xl p-6 sm:p-8 border border-madeira/10">
+                <div class="flex gap-1 mb-4">
+                    <span class="text-lampiao text-lg">{% for i in "12345" %}{% if forloop.counter <= dep.nota %}★{% else %}☆{% endif %}{% endfor %}</span>
+                </div>
+                <p class="text-madeira/70 text-sm leading-relaxed mb-6 italic">
+                    "{{ dep.texto }}"
+                </p>
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-lampiao/20 rounded-full flex items-center justify-center">
+                        <span class="text-lampiao font-bold text-sm">{% for parte in dep.nome_hospede.split %}{{ parte.0 }}{% endfor %}</span>
+                    </div>
+                    <div>
+                        <p class="text-madeira font-semibold text-sm">{{ dep.nome_hospede }}</p>
+                        <p class="text-madeira/40 text-xs">{{ dep.get_plataforma_display }} • {{ dep.data_avaliacao|date:"F Y" }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>

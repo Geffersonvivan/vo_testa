@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block titulo %}OS #{{ os.pk }} — Manutenção{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'manutencao:painel' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Manutenção
+</a>
+<p class="pagina-eyebrow letreiro">Manutenção</p>
+<div class="pagina-cabecalho">
+  <h1>OS #{{ os.pk }} — {{ os.titulo }}</h1>
+  <span class="selo {% if os.status == 'cancelada' %}selo-alerta{% elif os.status == 'concluida' %}selo-limpa{% else %}selo-em_andamento{% endif %}">
+    {{ os.get_status_display }}
+  </span>
+</div>
+
+<div class="colunas colunas-2-1">
+  <section class="painel-bloco">
+    <dl class="ficha">
+      <div><dt>Alvo</dt><dd>{{ os.alvo }}{% if os.bloqueia_uh %} <span class="selo prioridade-urgente">🔒 bloqueado</span>{% endif %}</dd></div>
+      <div><dt>Tipo</dt><dd>{{ os.get_tipo_display }}</dd></div>
+      <div><dt>Prioridade</dt><dd><span class="selo prioridade-{{ os.prioridade }}">{{ os.get_prioridade_display }}</span></dd></div>
+      <div><dt>Responsável</dt><dd>{% if os.responsavel %}{{ os.responsavel.get_short_name|default:os.responsavel.username }}{% else %}A definir{% endif %}</dd></div>
+      {% if os.prestador %}<div><dt>Prestador</dt><dd>{{ os.prestador.nome }} <small>(externo)</small></dd></div>{% endif %}
+      <div><dt>Aberta em</dt><dd>{{ os.aberta_em|date:"d/m/Y H:i" }} por {{ os.criado_por.get_short_name|default:os.criado_por.username }}</dd></div>
+      {% if os.previsto_para %}<div><dt>Previsto para</dt><dd>{{ os.previsto_para|date:"d/m/Y" }}</dd></div>{% endif %}
+      {% if os.agendada_para %}<div><dt>Agendada</dt><dd>{{ os.agendada_para|date:"d/m/Y" }}{% if os.recorrencia_meses %} · repete a cada {{ os.recorrencia_meses }} m{% endif %}</dd></div>{% endif %}
+      {% if os.concluida_em %}<div><dt>Encerrada</dt><dd>{{ os.concluida_em|date:"d/m/Y H:i" }}</dd></div>{% endif %}
+      <div><dt>Custo</dt><dd>R$ {{ os.custo_total }} <small>(mão de obra R$ {{ os.custo_maodeobra }} + peças R$ {{ os.custo_pecas }})</small></dd></div>
+      {% if os.nota_fiscal %}<div><dt>Nota fiscal</dt><dd>{{ os.nota_fiscal }}</dd></div>{% endif %}
+      {% if os.garantia_ate %}<div><dt>Garantia até</dt><dd>{{ os.garantia_ate|date:"d/m/Y" }}</dd></div>{% endif %}
+    </dl>
+    {% if os.descricao %}<p class="ficha-texto"><strong>Descrição:</strong> {{ os.descricao }}</p>{% endif %}
+    {% if os.resolucao %}<p class="ficha-texto"><strong>Resolução:</strong> {{ os.resolucao }}</p>{% endif %}
+    {% if os.motivo_cancelamento %}<p class="ficha-texto"><strong>Cancelamento:</strong> {{ os.motivo_cancelamento }}</p>{% endif %}
+  </section>
+
+  {% if os.aberta_ou_andamento %}
+  <section class="painel-bloco">
+    <h2 style="margin-top:0">Ações</h2>
+
+    {% if os.status == 'aberta' %}
+      <form method="post" action="{% url 'manutencao:iniciar' os.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="botao-neutro" style="width:100%">Iniciar (em andamento)</button>
+      </form>
+    {% endif %}
+
+    <details class="acao-bloco" open>
+      <summary>Concluir OS</summary>
+      <form method="post" action="{% url 'manutencao:concluir' os.pk %}" class="form-cartao">
+        {% csrf_token %}
+        <div class="form-grade">
+          <div class="campo"><label>Mão de obra (R$)</label><input type="number" name="custo_maodeobra" min="0" step="0.01" value="{{ os.custo_maodeobra }}"></div>
+          <div class="campo"><label>Peças (R$)</label><input type="number" name="custo_pecas" min="0" step="0.01" value="{{ os.custo_pecas }}"></div>
+        </div>
+        <div class="form-grade">
+          <div class="campo"><label>Nota fiscal / documento <small class="opcional">(opcional)</small></label><input type="text" name="nota_fiscal" value="{{ os.nota_fiscal }}"></div>
+          <div class="campo"><label>Garantia até <small class="opcional">(opcional)</small></label><input type="date" name="garantia_ate" value="{{ os.garantia_ate|date:'Y-m-d' }}"></div>
+        </div>
+        <div class="campo"><label>Resolução</label><textarea name="resolucao" rows="2" placeholder="O que foi feito"></textarea></div>
+        <div class="acoes"><button type="submit" class="botao-primario">Concluir{% if os.bloqueia_uh %} e liberar quarto{% endif %}</button></div>
+      </form>
+    </details>
+
+    {% if eh_gerente %}
+      <details class="acao-sensivel">
+        <summary>Cancelar OS</summary>
+        <form method="post" action="{% url 'manutencao:cancelar' os.pk %}" class="form-cartao">
+          {% csrf_token %}
+          <div class="campo"><label>Motivo</label><input type="text" name="motivo" required></div>
+          <div class="acoes"><button type="submit" class="botao-perigo">Cancelar OS</button></div>
+        </form>
+      </details>
+    {% endif %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

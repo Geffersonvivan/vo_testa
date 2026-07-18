@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block titulo %}NPS — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Online · Proposta</p>
+<div class="pagina-cabecalho">
+  <h1>NPS</h1>
+  <span class="selo">Em breve — fase 2</span>
+</div>
+<p class="subtitulo">{{ proposta.objetivo }}</p>
+
+<div class="cartao" style="margin-top:1rem">
+  <h2 class="letreiro" style="margin:0 0 .6rem;font-size:.85rem">Proposta registrada</h2>
+  <p style="margin:0 0 .8rem;color:var(--tinta-suave)">
+    Status: <strong>{{ proposta.status }}</strong> · Fase: {{ proposta.fase }} ·
+    Documento: <code>{{ proposta.documento }}</code>
+  </p>
+  <ul style="margin:0;padding-left:1.1rem;line-height:1.6">
+    {% for item in proposta.escopo_ui %}
+      <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<div class="cartao" style="margin-top:1rem">
+  <h2 class="letreiro" style="margin:0 0 .6rem;font-size:.85rem">API específica (stub)</h2>
+  <p style="margin:0 0 .8rem;color:var(--tinta-suave)">
+    Base <code>{{ proposta.api.base }}</code> — endpoints respondem
+    <strong>HTTP 501</strong> até a implementação.
+  </p>
+  <table class="tabela">
+    <thead>
+      <tr><th>Método</th><th>Path</th><th>Descrição</th></tr>
+    </thead>
+    <tbody>
+      {% for ep in proposta.api.endpoints %}
+        <tr>
+          <td><code>{{ ep.metodo }}</code></td>
+          <td><code>{{ ep.path }}</code></td>
+          <td>{{ ep.descricao }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="cartao" style="margin-top:1rem">
+  <h2 class="letreiro" style="margin:0 0 .6rem;font-size:.85rem">Fora desta fase</h2>
+  <ul style="margin:0;padding-left:1.1rem;line-height:1.6">
+    {% for item in proposta.fora_desta_fase %}
+      <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

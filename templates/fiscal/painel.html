@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block titulo %}Fiscal — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Financeiro</p>
+<h1>Fiscal — Notas eletrônicas</h1>
+<p class="subtitulo">
+  Emissão de NFS-e (serviço) e NFC-e (consumo). Gateway ativo:
+  <span class="selo">{{ gateway }}</span>
+  {% if gateway == 'simulado' %}<small class="opcional">(sandbox — sem valor fiscal)</small>{% endif %}
+</p>
+
+<table class="tabela">
+  <thead>
+    <tr><th>#</th><th>Tipo</th><th>Natureza</th><th>Descrição</th><th class="num">Valor</th><th>Situação</th><th>Nº</th></tr>
+  </thead>
+  <tbody>
+    {% for d in documentos %}
+      <tr class="linha-clique" onclick="location.href='{% url 'fiscal:detalhe' d.pk %}'">
+        <td>{{ d.pk }}</td>
+        <td>{{ d.get_tipo_display }}</td>
+        <td>{{ d.get_natureza_display }}</td>
+        <td>{{ d.descricao }}</td>
+        <td class="num">R$ {{ d.valor }}</td>
+        <td><span class="selo {% if d.status == 'autorizada' %}selo-limpa{% elif d.status == 'rejeitada' or d.status == 'cancelada' %}selo-alerta{% else %}selo-em_andamento{% endif %}">{{ d.get_status_display }}</span></td>
+        <td>{{ d.numero|default:"—" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="vazio">Nenhum documento emitido ainda. (Esqueleto do módulo — emissão a ligar às contas/vendas na fase 2.)</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<p class="ficha-texto opcional">
+  Módulo em construção — ver <code>docs/Implementar_fiscal.md</code>. Backends do gateway:
+  <strong>simulado</strong> (sandbox, ativo), <strong>focus</strong> e <strong>governo</strong> (a configurar).
+</p>
+{% endblock %}

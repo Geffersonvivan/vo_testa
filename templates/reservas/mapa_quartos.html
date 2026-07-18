@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block titulo %}Mapa de quartos — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Reservas</p>
+<div class="pagina-cabecalho">
+  <h1>O corredor</h1>
+  <div class="acoes" style="margin:0">
+    <a href="{% url 'reservas:mapa' %}" class="botao-neutro">Mapa de reservas</a>
+    <button type="button" class="botao-primario" hx-get="{% url 'reservas:nova' %}" hx-target="#modal-conteudo">Nova reserva</button>
+  </div>
+</div>
+<p class="subtitulo">Mesma visão da home — filtre, clique ou arraste um ocupado sobre um livre para trocar.</p>
+
+<div class="quartos corredor-hero" x-data="{ tipos: [], sits: [] }">
+  <div class="quartos-filtros">
+    <div class="quartos-filtro-grupo">
+      <span class="letreiro">Situação</span>
+      {% for s in situacoes_filtro %}
+        <label class="filtro-check sit-{{ s.cod }}">
+          <input type="checkbox" value="{{ s.cod }}" x-model="sits">
+          {{ s.label }} <span class="filtro-n">{{ s.n }}</span>
+        </label>
+      {% endfor %}
+    </div>
+    <div class="quartos-filtro-grupo">
+      <span class="letreiro">Tipo</span>
+      {% for t in tipos %}
+        <label class="filtro-check">
+          <input type="checkbox" value="{{ t.pk }}" x-model="tipos"> {{ t.nome }}
+        </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% include "reservas/partials/corredor.html" with quartos=quartos hoje=hoje amanha=amanha filtravel=True arrastar=True %}
+</div>
+
+<form style="display:none">{% csrf_token %}</form>
+<script>
+(function () {
+  let reserva = null, nome = "", de = "";
+  document.querySelectorAll('.porta[data-reserva]').forEach(el => {
+    el.addEventListener('dragstart', e => {
+      reserva = el.dataset.reserva; nome = el.dataset.nome; de = el.dataset.num;
+      el.classList.add('arrastando'); e.dataTransfer.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', () => el.classList.remove('arrastando'));
+  });
+  document.querySelectorAll('.porta[data-uh-livre]').forEach(el => {
+    el.addEventListener('dragover', e => { if (reserva) { e.preventDefault(); el.classList.add('drop-alvo'); } });
+    el.addEventListener('dragleave', () => el.classList.remove('drop-alvo'));
+    el.addEventListener('drop', async e => {
+      e.preventDefault(); el.classList.remove('drop-alvo');
+      if (!reserva) return;
+      const uh = el.dataset.uhLivre, num = el.dataset.num, rid = reserva;
+      reserva = null;
+      if (!confirm(`Mover ${nome} do Quarto ${de} para o Quarto ${num}? A conta (diárias, consumo, pagamentos) vai junto.`)) return;
+      const fd = new FormData();
+      fd.append('novo_uh', uh); fd.append('motivo', 'Troca pelo mapa de quartos');
+      const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      try {
+        const r = await fetch(`{% url 'reservas:trocar_quarto' 0 %}`.replace('/0/', `/${rid}/`), {
+          method: 'POST', headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'fetch' }, body: fd,
+        });
+        const d = await r.json();
+        if (d.ok) { toast(`Quarto trocado para o ${num}. A conta foi junto.`, 'success'); setTimeout(() => location.reload(), 700); }
+        else toast(d.erro || 'Não foi possível trocar.', 'error');
+      } catch (err) { toast('Falha de conexão.', 'error'); }
+    });
+  });
+})();
+</script>
+{% endblock %}

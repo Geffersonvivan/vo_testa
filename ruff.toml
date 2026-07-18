@@ -1,0 +1,23 @@
+# Configuração do Ruff (lint) — CRM Vô Testa.
+# Rodar: .venv/bin/ruff check apps/ config/
+#        .venv/bin/ruff check apps/ config/ --fix   (corrige o que for seguro)
+
+target-version = "py314"
+line-length = 100
+
+# Não lintar código gerado / ambiente.
+extend-exclude = [
+    "**/migrations/**",
+    ".venv",
+    "staticfiles",
+]
+
+[lint]
+# Conjunto padrão (pyflakes + erros do pycodestyle) + ordenação de imports (I)
+# e modernizações seguras (UP). Mantém a base verde sem exigir refactors amplos.
+select = ["E4", "E7", "E9", "F", "I", "UP"]
+
+[lint.per-file-ignores]
+# Testes e seeds podem ter linhas longas e imports locais por conveniência.
+"**/tests.py" = ["E501"]
+"**/management/commands/*.py" = ["E501"]

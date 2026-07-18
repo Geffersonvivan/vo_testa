@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block titulo %}Pontos de atendimento — Restaurante{% endblock %}
+
+{% block conteudo %}
+<a href="#" class="voltar" onclick="history.back(); return false;">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Voltar
+</a>
+<p class="pagina-eyebrow letreiro">Restaurante Piscina</p>
+<h1>Pontos de atendimento</h1>
+<p class="subtitulo">Mesas, guarda-sóis, espreguiçadeiras, bar — qualquer lugar onde se abre comanda.</p>
+
+<div class="colunas">
+  <section>
+    <h2>Pontos cadastrados</h2>
+    <table class="tabela">
+      <thead><tr><th>Nome/número</th><th>Situação</th></tr></thead>
+      <tbody>
+        {% for m in mesas %}
+          <tr><td>{{ m.nome }}</td><td>{% if m.ativa %}Ativa{% else %}Inativa{% endif %}</td></tr>
+        {% empty %}
+          <tr><td colspan="2" class="vazio">Nenhum ponto ainda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <section>
+    <h2>Novo ponto</h2>
+    <form method="post" class="form-cartao">
+      {% csrf_token %}
+      <div class="campo"><label>Nome/número</label><input type="text" name="nome" placeholder="Ex.: Guarda-sol 1" required></div>
+      <div class="acoes"><button type="submit" class="botao-primario">Salvar</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

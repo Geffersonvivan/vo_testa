@@ -1,0 +1,75 @@
+{% load static %}
+
+<!-- EVENTOS & CONFRATERNIZAÇÕES -->
+<section class="fade-section py-16 sm:py-24 bg-noturno relative overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+        <div class="grid md:grid-cols-2 gap-10 sm:gap-14 items-start md:items-center">
+            <div>
+                <p class="text-lampiao text-xs sm:text-sm tracking-[0.3em] uppercase mb-3 sm:mb-4">Para empresas e grupos</p>
+                <h2 class="font-display text-3xl sm:text-4xl md:text-5xl font-black text-pergaminho mb-4 sm:mb-6 leading-tight">
+                    Eventos &amp; confraternizações
+                </h2>
+                <p class="text-pergaminho/60 leading-relaxed mb-6 text-sm sm:text-base">
+                    A estrutura do Vô Testa recebe celebrações, reuniões e encontros corporativos —
+                    com a mesma alma inventiva da pousada. Conta conosco para montar a proposta
+                    sob consulta: datas, tamanho do grupo e o que a casa pode oferecer.
+                </p>
+                <ul class="space-y-3 text-pergaminho/70 text-sm mb-8">
+                    <li class="flex gap-3"><span class="text-lampiao">◆</span> Confraternizações de empresa</li>
+                    <li class="flex gap-3"><span class="text-lampiao">◆</span> Reservas para eventos e celebrações</li>
+                    <li class="flex gap-3"><span class="text-lampiao">◆</span> Grupos com hospedagem sob medida</li>
+                </ul>
+                <p class="text-pergaminho/40 text-xs">
+                    Preferência por hospedagem? Use
+                    <a href="{% url 'core:reservar' %}" class="text-lampiao hover:underline">Fazer Reserva</a>.
+                    Só um dia na estrutura?
+                    <a href="{% url 'core:reservar' %}?modalidade=day_use" class="text-lampiao hover:underline">Dia na Pousada</a>.
+                </p>
+            </div>
+
+            <div class="bg-pergaminho rounded-2xl p-6 sm:p-8 border border-lampiao/20">
+                <h3 class="font-display text-xl font-bold text-madeira mb-1">Pedir proposta de evento</h3>
+                <p class="text-madeira/50 text-sm mb-5">Entra no funil comercial — a equipe retorna pelo WhatsApp ou e-mail.</p>
+                <form method="post" action="{% url 'core:pedir_proposta' %}" class="space-y-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="tipo_interesse" value="evento">
+                    <div>
+                        <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Nome / empresa *</label>
+                        <input type="text" name="nome" required class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="Nome ou razão social">
+                    </div>
+                    <div class="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">WhatsApp *</label>
+                            <input type="text" name="telefone" required class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="(00) 00000-0000" inputmode="tel" maxlength="15" data-mask="telefone" autocomplete="tel">
+                        </div>
+                        <div>
+                            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">E-mail</label>
+                            <input type="email" name="email" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="voce@empresa.com">
+                        </div>
+                    </div>
+                    <div class="grid sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Data início</label>
+                            <input type="date" name="checkin" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white">
+                        </div>
+                        <div>
+                            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Data fim</label>
+                            <input type="date" name="checkout" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white">
+                        </div>
+                        <div>
+                            <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Pessoas</label>
+                            <input type="number" name="hospedes" min="1" value="20" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">Sobre o evento</label>
+                        <textarea name="mensagem" rows="3" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="Tipo de evento, necessidades, hospedagem junto…"></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-madeira text-pergaminho font-semibold py-3 rounded-full hover:bg-lampiao hover:text-madeira transition">
+                        Enviar proposta de evento
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block titulo %}Vendas da Loja{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<div class="pagina-cabecalho">
+  <h1>Vendas da Loja</h1>
+  <a href="{% url 'loja:pdv' %}" class="botao-primario">Nova venda</a>
+</div>
+
+<table class="tabela">
+  <thead>
+    <tr><th>#</th><th>Data</th><th>Destino</th><th>Cliente</th><th>Total</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    {% for v in vendas %}
+      <tr class="{% if v.status == 'cancelada' %}linha-alerta{% endif %}">
+        <td><a href="{% url 'loja:venda' v.pk %}">#{{ v.pk }}</a></td>
+        <td>{{ v.criado_em|date:"d/m/Y H:i" }}</td>
+        <td>{% if v.destino == 'conta' %}Conta — {{ v.conta_ref }}{% else %}{{ v.forma_pagamento.nome|default:"—" }}{% endif %}</td>
+        <td>{{ v.cliente.nome|default:"Avulso" }}</td>
+        <td>R$ {{ v.total }}</td>
+        <td>{{ v.get_status_display }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vazio">Nenhuma venda ainda. <a href="{% url 'loja:pdv' %}">Fazer a primeira</a>.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

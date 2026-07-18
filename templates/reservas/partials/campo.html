@@ -1,0 +1,7 @@
+{# Um campo do grid do modal. `classe` opcional: "col-2" ocupa a linha toda. #}
+<div class="campo {{ classe }} {% if campo.errors %}campo-erro{% endif %}">
+  {{ campo.label_tag }}
+  {{ campo }}
+  {% if campo.help_text %}<small class="ajuda">{{ campo.help_text }}</small>{% endif %}
+  {% for erro in campo.errors %}<small class="erro">{{ erro }}</small>{% endfor %}
+</div>

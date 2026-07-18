@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block titulo %}Sessões de caixa — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Financeiro</p>
+<h1>Sessões de caixa</h1>
+<p class="subtitulo">Histórico de aberturas e fechamentos, com as diferenças de conferência.</p>
+
+<table class="tabela">
+  <thead>
+    <tr><th>Aberta em</th><th>Operador</th><th>Módulo</th><th>Status</th><th>Diferença</th></tr>
+  </thead>
+  <tbody>
+    {% for s in sessoes %}
+      <tr>
+        <td><a href="{% url 'caixa_sessao' s.pk %}">{{ s.aberta_em|date:"d/m/Y H:i" }}</a></td>
+        <td>{{ s.operador }}</td>
+        <td>{{ s.get_modulo_display }}</td>
+        <td>{{ s.get_status_display }}</td>
+        <td>
+          {% if s.diferenca is not None %}
+            <span class="{% if s.diferenca != 0 %}texto-alerta{% endif %}">R$ {{ s.diferenca }}</span>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="vazio">Nenhuma sessão de caixa registrada ainda.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

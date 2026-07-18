@@ -8,53 +8,460 @@
   <link rel="icon" href="{% static 'img/simbolo-dourado.png' %}" type="image/png">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <script>
+    // Combobox de pessoa com busca + agrupamento (componentes/combo_pessoa.html).
+    // Registrado antes do Alpine (defer) para o alpine:init pegar.
+    document.addEventListener("alpine:init", () => {
+      Alpine.data("comboPessoa", () => ({
+        q: "", open: false, sel: "", itens: [],
+        init() {
+          this.itens = JSON.parse(document.getElementById(this.$el.dataset.dados).textContent);
+          const inicial = this.$el.dataset.sel;
+          if (inicial) {
+            this.sel = inicial;
+            const achou = this.itens.find((it) => String(it.id) === String(inicial));
+            if (achou) this.q = achou.nome;
+          }
+        },
+        get grupos() {
+          const f = this.q.trim().toLowerCase();
+          const mapa = new Map();
+          for (const it of this.itens) {
+            if (f && !it.nome.toLowerCase().includes(f)) continue;
+            if (!mapa.has(it.grupo)) mapa.set(it.grupo, []);
+            mapa.get(it.grupo).push(it);
+          }
+          return Array.from(mapa.entries());
+        },
+        escolher(it) { this.sel = it.id; this.q = it.nome; this.open = false; },
+        adicionar(it) { this.itens.push(it); this.escolher(it); },
+      }));
+    });
+  </script>
   <script src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
 </head>
 <body>
 {% if user.is_authenticated %}
-<div class="layout">
+{% with atual=request.resolver_match.url_name %}
+<div class="app" id="app">
+  <div class="sidebar-backdrop" onclick="fecharSidebarMobile()"></div>
   <aside class="sidebar">
-    <div class="marca">
-      <img src="{% static 'img/simbolo-dourado.png' %}" alt="" class="marca-logo">
-      <div>
-        <span class="marca-nome">Vô Testa</span>
-        <span class="marca-sub">Pousada · CRM</span>
-      </div>
+    <div class="sidebar-topo">
+      <a href="{% url 'dashboard' %}" class="marca">
+        <img src="{% static 'img/logotipo-pergaminho-limpo.png' %}" alt="Vô Testa · Pousada" class="marca-full">
+        <img src="{% static 'img/simbolo-dourado.png' %}" alt="Vô Testa" class="marca-icone">
+      </a>
+      <button class="sidebar-toggle" onclick="alternarSidebar()" aria-label="Recolher menu" title="Recolher (⌘\\)">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
     </div>
+
+    <button class="acao-topo" onclick="abrirNovaReserva()">
+      <svg viewBox="0 0 24 24" class="ico"><path d="M12 5v14M5 12h14"/></svg>
+      <span class="rotulo">Nova reserva</span>
+    </button>
+
     <nav>
       <div class="nav-grupo">
-        <a href="{% url 'dashboard' %}" class="nav-item ativo">Visão geral</a>
+        <a href="{% url 'dashboard' %}" class="nav-item {% if atual == 'dashboard' %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+          <span class="rotulo">Visão geral</span>
+        </a>
       </div>
+
       {% for grupo in menu_modulos %}
         <div class="nav-grupo">
           <span class="nav-titulo letreiro">{{ grupo.titulo }}</span>
           {% for m in grupo.itens %}
             {% if m.url %}
-              <a href="{{ m.url }}" class="nav-item">{{ m.nome }}</a>
+              <a href="{{ m.url }}" class="nav-item {% if request.resolver_match.namespace == m.codigo and request.resolver_match.url_name != 'instagram' %}ativo{% endif %}">
+                <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
+                <span class="rotulo">{{ m.nome }}</span>
+              </a>
+              {% if m.codigo == 'comercial' %}
+              <a href="{% url 'comercial:instagram' %}" class="nav-item {% if request.resolver_match.namespace == 'comercial' and request.resolver_match.url_name == 'instagram' %}ativo{% endif %}" title="Proposta Instagram → Comercial">
+                <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.25"/></svg>
+                <span class="rotulo">Instagram</span>
+              </a>
+              {% endif %}
             {% else %}
-              <span class="nav-item desabilitado" title="Em construção">{{ m.nome }}</span>
+              <span class="nav-item desabilitado" title="Em construção">
+                <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
+                <span class="rotulo">{{ m.nome }}</span>
+              </span>
             {% endif %}
           {% endfor %}
         </div>
       {% endfor %}
+
+      <div class="nav-grupo">
+        <span class="nav-titulo letreiro">Relacionamento</span>
+        <a href="{% url 'nps:painel' %}" class="nav-item {% if request.resolver_match.namespace == 'nps' %}ativo{% endif %}" title="Proposta NPS — fase CRM do Hóspede">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.9 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/></svg>
+          <span class="rotulo">NPS</span>
+        </a>
+      </div>
+
+      <div class="nav-grupo">
+        <span class="nav-titulo letreiro">Operação</span>
+        <a href="{% url 'caixa' %}" class="nav-item {% if atual == 'caixa' %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
+          <span class="rotulo">Caixa</span>
+        </a>
+        <a href="{% url 'logbook' %}" class="nav-item {% if atual == 'logbook' %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M4 5h13a2 2 0 012 2v12H6a2 2 0 01-2-2z"/><path d="M8 8h7M8 12h7"/></svg>
+          <span class="rotulo">Recados do turno</span>
+        </a>
+      </div>
+
+      <div class="nav-grupo">
+        <span class="nav-titulo letreiro">Cadastros</span>
+        <a href="{% url 'pessoas' %}" class="nav-item {% if 'pessoa' in atual %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0111 0"/><path d="M16 11a3 3 0 000-6"/><path d="M15 20a5.5 5.5 0 016-5"/></svg>
+          <span class="rotulo">Pessoas</span>
+        </a>
+        <a href="{% url 'estrutura' %}" class="nav-item {% if 'uh' in atual or atual == 'estrutura' %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/></svg>
+          <span class="rotulo">Quartos &amp; tipos</span>
+        </a>
+        <a href="{% url 'temporadas' %}" class="nav-item {% if 'temporada' in atual %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
+          <span class="rotulo">Temporadas</span>
+        </a>
+      </div>
+
+      <div class="nav-grupo">
+        <span class="nav-titulo letreiro">Financeiro</span>
+        <a href="{% url 'lancamentos' %}" class="nav-item {% if 'lancamento' in atual %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M7 17V9M7 9l-3 3M7 9l3 3"/><path d="M17 7v8M17 15l3-3M17 15l-3-3"/></svg>
+          <span class="rotulo">Lançamentos</span>
+        </a>
+        <a href="{% url 'contas' %}" class="nav-item {% if 'conta' in atual %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>
+          <span class="rotulo">Contas a pagar/receber</span>
+        </a>
+        <a href="{% url 'caixa_sessoes' %}" class="nav-item {% if 'caixa_sess' in atual %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="4" width="18" height="5" rx="1.5"/><rect x="3" y="10.5" width="18" height="5" rx="1.5"/><rect x="3" y="17" width="18" height="3" rx="1.5"/></svg>
+          <span class="rotulo">Sessões de caixa</span>
+        </a>
+      </div>
+
+      {% if user.is_staff or user.is_superuser %}
+      <div class="nav-grupo">
+        <span class="nav-titulo letreiro">Configurações</span>
+        <a href="{% url 'modulos_central' %}" class="nav-item {% if atual == 'modulos_central' %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+          <span class="rotulo">Módulos</span>
+        </a>
+      </div>
+      {% endif %}
     </nav>
+
     <div class="sidebar-rodape">
-      <span>{{ user }}</span>
+      <div class="usuario-mini">
+        <span class="avatar">{{ user.get_full_name|default:user.username|slice:":1"|upper }}</span>
+        <span class="usuario-nome">{{ user }}</span>
+      </div>
       <form method="post" action="{% url 'logout' %}">
         {% csrf_token %}
-        <button type="submit" class="link">Sair</button>
+        <button type="submit" class="link" title="Sair">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4M6 12h9"/></svg>
+        </button>
       </form>
     </div>
   </aside>
-  <main class="conteudo">
-    {% if messages %}
-      {% for message in messages %}
-        <div class="mensagem {{ message.tags }}">{{ message }}</div>
-      {% endfor %}
-    {% endif %}
-    {% block conteudo %}{% endblock %}
-  </main>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-mobile" onclick="abrirSidebarMobile()" aria-label="Abrir menu">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <button class="busca-global" onclick="abrirPaleta()">
+        <svg viewBox="0 0 24 24" class="ico"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+        <span>Buscar hóspede, reserva, produto…</span>
+        <kbd>⌘K</kbd>
+      </button>
+      <div class="topbar-dir">
+        <span class="avatar avatar-topo">{{ user.get_full_name|default:user.username|slice:":1"|upper }}</span>
+      </div>
+    </header>
+
+    <main class="conteudo">
+      {% block conteudo %}{% endblock %}
+    </main>
+  </div>
 </div>
+
+{# Toasts (mensagens Django viram notificações) #}
+<div class="toasts" id="toasts">
+  {% for message in messages %}
+    <div class="toast toast-{{ message.tags|default:'info' }}" role="status">
+      <span class="toast-txt">{{ message }}</span>
+      <button class="toast-x" onclick="this.parentElement.remove()" aria-label="Fechar">&times;</button>
+    </div>
+  {% endfor %}
+</div>
+
+{# Paleta de comandos (⌘K) #}
+<div id="paleta" class="paleta-overlay" style="display:none" onclick="if(event.target===this) fecharPaleta()">
+  <div class="paleta" role="dialog" aria-modal="true" aria-label="Buscar e comandos"
+       data-url-busca="{% url 'busca_global' %}">
+    <div class="paleta-busca">
+      <svg viewBox="0 0 24 24" class="ico"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input type="text" id="paleta-input" placeholder="Buscar ou digitar um comando…" autocomplete="off">
+      <kbd>esc</kbd>
+    </div>
+    <div class="paleta-lista" id="paleta-lista"></div>
+    <div class="paleta-rodape">
+      <span><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
+      <span><kbd>↵</kbd> abrir</span>
+    </div>
+  </div>
+</div>
+
+{# Modal global (HTMX carrega o formulário em #modal-conteudo) #}
+<div id="modal-reserva" class="modal-overlay" style="display:none"
+     onclick="if(event.target===this) fecharModal()">
+  <div id="modal-conteudo" class="modal-caixa" role="dialog" aria-modal="true"></div>
+</div>
+
+<script>
+  // ---------- Sidebar ----------
+  const APP = document.getElementById('app');
+  // Rail ícone-só por padrão (Operação Lampião); usuário pode expandir (⌘\).
+  if (localStorage.getItem('sidebar') !== 'aberta') APP.classList.add('recolhida');
+  function alternarSidebar() {
+    APP.classList.toggle('recolhida');
+    localStorage.setItem('sidebar', APP.classList.contains('recolhida') ? 'recolhida' : 'aberta');
+  }
+  function abrirSidebarMobile() { APP.classList.add('sidebar-aberta'); }
+  function fecharSidebarMobile() { APP.classList.remove('sidebar-aberta'); }
+
+  // ---------- Modal ----------
+  function abrirModal() { document.getElementById('modal-reserva').style.display = 'flex'; }
+  function fecharModal() {
+    document.getElementById('modal-reserva').style.display = 'none';
+    document.getElementById('modal-conteudo').innerHTML = '';
+  }
+  function abrirNovaReserva() {
+    fecharPaleta();
+    htmx.ajax('GET', '/reservas/nova/', '#modal-conteudo');
+  }
+  document.body.addEventListener('htmx:afterSwap', e => {
+    if (e.detail.target.id === 'modal-conteudo') { abrirModal(); atualizarTarifaHint(); }
+  });
+
+  // ---------- Toasts ----------
+  function toast(msg, tipo) {
+    const cont = document.getElementById('toasts');
+    const el = document.createElement('div');
+    el.className = 'toast toast-' + (tipo || 'success');
+    el.setAttribute('role', 'status');
+    el.innerHTML = '<span class="toast-txt"></span><button class="toast-x" aria-label="Fechar">&times;</button>';
+    el.querySelector('.toast-txt').textContent = msg;
+    el.querySelector('.toast-x').onclick = () => el.remove();
+    cont.appendChild(el);
+    agendarSaida(el);
+  }
+  function agendarSaida(el) {
+    setTimeout(() => { el.classList.add('toast-saindo'); setTimeout(() => el.remove(), 400); }, 5000);
+  }
+  document.querySelectorAll('#toasts .toast').forEach(agendarSaida);
+
+  // ---------- Paleta de comandos ----------
+  const COMANDOS = [
+    { rotulo: 'Nova reserva', tipo: 'Ação', acao: abrirNovaReserva, icone: 'add' },
+    { rotulo: 'Visão geral', tipo: 'Ir para', url: '{% url "dashboard" %}' },
+    { rotulo: 'Mapa de reservas', tipo: 'Ir para', url: '/reservas/' },
+    { rotulo: 'Mapa de quartos', tipo: 'Ir para', url: '/reservas/quartos/' },
+    { rotulo: 'Lista de reservas', tipo: 'Ir para', url: '/reservas/lista/' },
+    { rotulo: 'Caixa', tipo: 'Ir para', url: '{% url "caixa" %}' },
+    { rotulo: 'Sessões de caixa', tipo: 'Ir para', url: '{% url "caixa_sessoes" %}' },
+    { rotulo: 'Pessoas', tipo: 'Ir para', url: '{% url "pessoas" %}' },
+    { rotulo: 'Quartos & tipos', tipo: 'Ir para', url: '{% url "estrutura" %}' },
+    { rotulo: 'Temporadas', tipo: 'Ir para', url: '{% url "temporadas" %}' },
+    { rotulo: 'Lançamentos', tipo: 'Ir para', url: '{% url "lancamentos" %}' },
+    { rotulo: 'Contas a pagar/receber', tipo: 'Ir para', url: '{% url "contas" %}' },
+    { rotulo: 'Estoque', tipo: 'Ir para', url: '/estoque/' },
+    { rotulo: 'Produtos', tipo: 'Ir para', url: '/estoque/produtos/' },
+    { rotulo: 'Recados do turno', tipo: 'Ir para', url: '{% url "logbook" %}' },
+  ];
+  let paletaItens = [], paletaSel = 0, paletaTimer = null;
+
+  function abrirPaleta() {
+    document.getElementById('paleta').style.display = 'flex';
+    const inp = document.getElementById('paleta-input');
+    inp.value = ''; inp.focus();
+    renderPaleta(COMANDOS);
+  }
+  function fecharPaleta() { document.getElementById('paleta').style.display = 'none'; }
+
+  function renderPaleta(itens) {
+    paletaItens = itens; paletaSel = 0;
+    const lista = document.getElementById('paleta-lista');
+    if (!itens.length) { lista.innerHTML = '<div class="paleta-vazio">Nada encontrado.</div>'; return; }
+    lista.innerHTML = itens.map((it, i) =>
+      '<button class="paleta-item' + (i === 0 ? ' sel' : '') + '" data-i="' + i + '">'
+      + '<span class="paleta-rot">' + escapeHtml(it.rotulo) + '</span>'
+      + '<span class="paleta-tipo">' + escapeHtml(it.tipo) + '</span></button>'
+    ).join('');
+    lista.querySelectorAll('.paleta-item').forEach(b => {
+      b.onmouseenter = () => marcar(+b.dataset.i);
+      b.onclick = () => ativar(+b.dataset.i);
+    });
+  }
+  function marcar(i) {
+    paletaSel = i;
+    document.querySelectorAll('.paleta-item').forEach((b, j) => b.classList.toggle('sel', j === i));
+  }
+  function ativar(i) {
+    const it = paletaItens[i]; if (!it) return;
+    fecharPaleta();
+    if (it.acao) it.acao();
+    else if (it.url) window.location.href = it.url;
+  }
+  function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  async function buscarPaleta(q) {
+    const estaticos = COMANDOS.filter(c => c.rotulo.toLowerCase().includes(q.toLowerCase()));
+    if (q.length < 2) { renderPaleta(q ? estaticos : COMANDOS); return; }
+    try {
+      const url = document.querySelector('.paleta').dataset.urlBusca + '?q=' + encodeURIComponent(q);
+      const d = await (await fetch(url)).json();
+      const remotos = (d.resultados || []).map(r => ({ rotulo: r.rotulo, tipo: r.tipo, url: r.url }));
+      renderPaleta(estaticos.concat(remotos));
+    } catch (e) { renderPaleta(estaticos); }
+  }
+  document.addEventListener('input', e => {
+    if (e.target.id !== 'paleta-input') return;
+    clearTimeout(paletaTimer);
+    const q = e.target.value.trim();
+    paletaTimer = setTimeout(() => buscarPaleta(q), 160);
+  });
+
+  // ---------- Atalhos de teclado ----------
+  document.addEventListener('keydown', e => {
+    const digitando = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); abrirPaleta(); return; }
+    if ((e.metaKey || e.ctrlKey) && e.key === '\\') { e.preventDefault(); alternarSidebar(); return; }
+    if (e.key === 'Escape') { fecharPaleta(); fecharModal(); fecharSidebarMobile(); return; }
+    const paletaAberta = document.getElementById('paleta').style.display === 'flex';
+    if (paletaAberta) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); marcar(Math.min(paletaSel + 1, paletaItens.length - 1)); scrollSel(); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); marcar(Math.max(paletaSel - 1, 0)); scrollSel(); }
+      if (e.key === 'Enter') { e.preventDefault(); ativar(paletaSel); }
+      return;
+    }
+    if (digitando) return;
+    if (e.key === '/') { e.preventDefault(); abrirPaleta(); }
+    if (e.key.toLowerCase() === 'n') abrirNovaReserva();
+  });
+  function scrollSel() {
+    const el = document.querySelector('.paleta-item.sel');
+    if (el) el.scrollIntoView({ block: 'nearest' });
+  }
+
+  // ---------- Aviso ao vivo da tarifa no modal de reserva ----------
+  async function atualizarTarifaHint() {
+    const hint = document.getElementById('tarifa-hint');
+    if (!hint) return;
+    const uh = document.getElementById('id_uh');
+    const ci = document.getElementById('id_checkin');
+    const co = document.getElementById('id_checkout');
+    if (!uh || !ci || !co || !uh.value || !ci.value || !co.value) { hint.innerHTML = ''; return; }
+    try {
+      const url = hint.dataset.url + '?uh=' + uh.value + '&checkin=' + ci.value + '&checkout=' + co.value;
+      const d = await (await fetch(url)).json();
+      if (d.erro) { hint.innerHTML = ''; return; }
+      hint.classList.toggle('tarifa-hint-alta', d.feriado_ou_alta);
+      hint.innerHTML = 'Tarifa vigente: <strong>R$ ' + d.diaria + '</strong>/noite · '
+        + d.temporada + ' · ' + d.noites + ' noite' + (d.noites > 1 ? 's' : '')
+        + ' = <strong>R$ ' + d.total + '</strong>';
+    } catch (e) { hint.innerHTML = ''; }
+  }
+  document.addEventListener('change', e => {
+    if (['id_uh', 'id_checkin', 'id_checkout'].includes(e.target.id)) atualizarTarifaHint();
+  });
+
+  // ---------- Cadastro rápido de hóspede no modal ----------
+  function abrirNovoHospede() {
+    document.getElementById('bloco-novo-hospede').style.display = 'block';
+    document.getElementById('nh-nome').focus();
+  }
+  function fecharNovoHospede() {
+    document.getElementById('bloco-novo-hospede').style.display = 'none';
+    document.getElementById('nh-erro').textContent = '';
+    ['nome', 'documento', 'telefone', 'email'].forEach(c => {
+      document.getElementById('nh-' + c).value = '';
+    });
+  }
+  async function salvarNovoHospede() {
+    const bloco = document.getElementById('bloco-novo-hospede');
+    const erro = document.getElementById('nh-erro');
+    const nome = document.getElementById('nh-nome').value.trim();
+    erro.textContent = '';
+    if (!nome) { erro.textContent = 'Informe o nome do hóspede.'; return; }
+    const dados = new FormData();
+    dados.append('nome', nome);
+    dados.append('documento', document.getElementById('nh-documento').value);
+    dados.append('telefone', document.getElementById('nh-telefone').value);
+    dados.append('email', document.getElementById('nh-email').value);
+    const csrf = document.querySelector('#modal-conteudo [name=csrfmiddlewaretoken]').value;
+    try {
+      const resp = await fetch(bloco.dataset.url, { method: 'POST', headers: { 'X-CSRFToken': csrf }, body: dados });
+      const dado = await resp.json();
+      if (!resp.ok) { erro.textContent = dado.erro || 'Não foi possível salvar.'; return; }
+      const sel = document.querySelector('#modal-conteudo [name=hospede]');
+      sel.add(new Option(dado.nome, dado.id, true, true));
+      fecharNovoHospede();
+      toast('Hóspede cadastrado.', 'success');
+    } catch (e) { erro.textContent = 'Falha de conexão. Tente de novo.'; }
+  }
+
+  // ---------- Máscaras ----------
+  function mascaraTelefone(v) {
+    const d = v.replace(/\D/g, '').slice(0, 11);
+    if (!d) return '';
+    let r = '(' + d.slice(0, 2);
+    if (d.length >= 3) {
+      r += ') ';
+      if (d.length <= 6) r += d.slice(2);
+      else if (d.length <= 10) r += d.slice(2, 6) + '-' + d.slice(6);
+      else r += d.slice(2, 7) + '-' + d.slice(7);
+    }
+    return r;
+  }
+  function mascaraCpfCnpj(v) {
+    const d = v.replace(/\D/g, '').slice(0, 14);
+    if (d.length <= 11) {
+      return d.replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+    }
+    return d.replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2')
+            .replace(/(\d{3})(\d)/, '$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+  }
+  function mascaraReais(v) {
+    let d = v.replace(/\D/g, '');
+    if (!d) return '';
+    d = String(parseInt(d, 10));
+    while (d.length < 3) d = '0' + d;                       // garante os centavos
+    const cents = d.slice(-2);
+    let int = d.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, '.');  // milhar
+    return int + ',' + cents;
+  }
+  document.addEventListener('input', e => {
+    const t = e.target;
+    if (t.classList && t.classList.contains('mascara-telefone')) t.value = mascaraTelefone(t.value);
+    else if (t.classList && t.classList.contains('mascara-cpfcnpj')) t.value = mascaraCpfCnpj(t.value);
+    else if (t.classList && t.classList.contains('mascara-reais')) t.value = mascaraReais(t.value);
+  });
+  // Antes de enviar, converte "1.784,00" → "1784.00" para o backend (DecimalField).
+  document.addEventListener('submit', e => {
+    e.target.querySelectorAll('.mascara-reais').forEach(el => {
+      if (el.value) el.value = el.value.replace(/\./g, '').replace(',', '.');
+    });
+  }, true);
+</script>
+{% endwith %}
 {% else %}
   {% block conteudo_publico %}{% endblock %}
 {% endif %}

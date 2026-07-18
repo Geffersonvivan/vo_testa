@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ titulo }} — Relatórios{% endblock %}
+
+{% block conteudo %}
+<style media="print">
+  .app-sidebar, .app-topbar, .rel-controles, .botao-neutro, .botao-mini { display: none !important; }
+  .app-conteudo, main { margin: 0 !important; padding: 0 !important; }
+  .cartao { box-shadow: none !important; border: 1px solid #ddd !important; }
+</style>
+
+<div class="rel-controles">
+  <p class="pagina-eyebrow letreiro">Relatórios · {{ grupo }}</p>
+  <div class="pagina-cabecalho">
+    <h1>{{ titulo }}</h1>
+    <div style="display:flex; gap:.5rem">
+      <a href="?{% if f.de %}de={{ f.de }}&ate={{ f.ate }}{% else %}preset={{ f.preset|default:'mes' }}{% endif %}&export=csv" class="botao-neutro">Exportar CSV</a>
+      <button type="button" class="botao-neutro" onclick="window.print()">Imprimir / PDF</button>
+      <a href="{% url 'relatorios:index' %}" class="botao-mini">Voltar</a>
+    </div>
+  </div>
+
+  <form method="get" class="rel-filtro" style="display:flex; gap:.6rem; align-items:end; flex-wrap:wrap; margin:.8rem 0 1.2rem">
+    <div class="segmentado">
+      <a href="?preset=hoje" class="chip {% if rotulo == 'hoje' %}chip-ativo{% endif %}">Hoje</a>
+      <a href="?preset=semana" class="chip {% if rotulo == 'semana' %}chip-ativo{% endif %}">Semana</a>
+      <a href="?preset=mes" class="chip {% if rotulo == 'mês' %}chip-ativo{% endif %}">Mês</a>
+    </div>
+    <label>De <input type="date" name="de" value="{{ f.de }}"></label>
+    <label>Até <input type="date" name="ate" value="{{ f.ate }}"></label>
+    <button type="submit" class="botao-mini">Aplicar</button>
+  </form>
+</div>
+
+<p class="subtitulo">Período: {{ inicio|date:"d/m/Y" }} a {{ fim|date:"d/m/Y" }} ({{ rotulo }})</p>
+
+<div class="cartoes-indicadores colunas">
+  {% for rotulo_kpi, valor in dados.kpis %}
+    <div class="cartao">
+      <span class="indicador-rotulo letreiro">{{ rotulo_kpi }}</span>
+      <span class="indicador-valor">{{ valor }}</span>
+    </div>
+  {% endfor %}
+</div>
+
+<table class="tabela" style="margin-top:1.2rem">
+  <thead>
+    <tr>{% for c in dados.colunas %}<th {% if not forloop.first %}class="num"{% endif %}>{{ c }}</th>{% endfor %}</tr>
+  </thead>
+  <tbody>
+    {% for linha in dados.linhas %}
+      <tr>{% for celula in linha %}<td {% if not forloop.first %}class="num"{% endif %}>{{ celula }}</td>{% endfor %}</tr>
+    {% empty %}
+      <tr><td colspan="{{ dados.colunas|length }}" class="vazio">Sem dados no período.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

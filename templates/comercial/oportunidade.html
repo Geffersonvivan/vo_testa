@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ op.titulo }} — Comercial{% endblock %}
+
+{% block conteudo %}
+<div class="pagina-cabecalho">
+  <div>
+    <p class="pagina-eyebrow letreiro">Comercial · Oportunidade</p>
+    <h1>{{ op.titulo }}</h1>
+  </div>
+  <a href="{% url 'comercial:funil' %}" class="botao-mini">Voltar ao funil</a>
+</div>
+
+<div class="op-layout">
+  <main style="display:flex; flex-direction:column; gap:1.1rem">
+    <section class="cartao op-resumo">
+      <div class="op-resumo-topo">
+        <div>
+          <span class="op-lead">{{ op.pessoa.nome }}</span>
+          <span class="op-sub">{{ op.get_faturamento_display }} · {{ op.get_tipo_interesse_display }} · origem {{ op.get_origem_display }} · score {{ op.score }}</span>
+        </div>
+        <span class="selo {% if op.status == 'ganha' %}selo-limpa{% elif op.status == 'perdida' %}selo-alerta{% else %}selo-em_andamento{% endif %}">{{ op.get_status_display }}</span>
+      </div>
+      <div class="op-campos">
+        <div class="op-campo"><span class="rot">Etapa</span><span class="val">{{ op.etapa.nome }}</span></div>
+        <div class="op-campo"><span class="rot">Valor estimado</span><span class="val">R$ {{ op.valor_estimado }}</span></div>
+        <div class="op-campo"><span class="rot">Previsão ponderada</span><span class="val">R$ {{ op.valor_ponderado }}</span></div>
+        <div class="op-campo"><span class="rot">Responsável</span><span class="val">{% if op.responsavel %}{{ op.responsavel.get_full_name|default:op.responsavel.username }}{% else %}—{% endif %}</span></div>
+        <div class="op-campo"><span class="rot">Período previsto</span><span class="val">{% if op.checkin_previsto %}{{ op.checkin_previsto|date:"d/m/Y" }} → {{ op.checkout_previsto|date:"d/m/Y" }}{% else %}—{% endif %}</span></div>
+        <div class="op-campo"><span class="rot">Quartos / Hóspedes</span><span class="val">{{ op.quartos }} / {{ op.hospedes }}</span></div>
+      </div>
+      {% if op.observacao %}<p class="op-obs">{{ op.observacao }}</p>{% endif %}
+      {% if op.reserva_id %}
+        <p class="aviso-inline op-aviso">Convertida na reserva <a href="{% url 'reservas:detalhe' op.reserva_id %}">#{{ op.reserva_id }}</a>{% if op.cobranca_sinal_id %} · sinal #{{ op.cobranca_sinal_id }}{% endif %}.</p>
+      {% endif %}
+      {% if op.nps_convidado_em %}
+        <p class="aviso-inline op-aviso">Hand-off NPS registrado em {{ op.nps_convidado_em|date:"d/m/Y H:i" }}.</p>
+      {% endif %}
+      {% if op.status == 'perdida' and op.motivo_perda %}
+        <p class="aviso-inline op-aviso">Perdida — motivo: {{ op.motivo_perda.nome }}.</p>
+      {% endif %}
+    </section>
+
+    {% if cotacoes %}
+    <section class="cartao" style="padding:1.1rem 1.2rem">
+      <div class="cartao-cabeca"><h2>Cotações</h2></div>
+      <table class="tabela">
+        <thead><tr><th>Quando</th><th>Tipo</th><th>Período</th><th>Diária</th><th>Total</th><th>Validade</th></tr></thead>
+        <tbody>
+          {% for c in cotacoes %}
+            <tr>
+              <td>{{ c.criado_em|date:"d/m H:i" }}</td>
+              <td>{{ c.tipo_uh.nome }}</td>
+              <td>{{ c.checkin|date:"d/m" }} → {{ c.checkout|date:"d/m/Y" }}</td>
+              <td class="num">R$ {{ c.valor_diaria }}</td>
+              <td class="num">R$ {{ c.valor_total }}</td>
+              <td>{{ c.validade|date:"d/m/Y" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+
+    <section class="cartao" style="padding:1.1rem 1.2rem">
+      <div class="cartao-cabeca"><h2>Templates (copiar)</h2></div>
+      <div class="form-grade">
+        <div class="campo col-2">
+          <label>WhatsApp — proposta</label>
+          <textarea rows="5" readonly onclick="this.select()">{{ templates.whatsapp_proposta }}</textarea>
+        </div>
+        <div class="campo col-2">
+          <label>E-mail — proposta</label>
+          <textarea rows="5" readonly onclick="this.select()">{{ templates.email_proposta }}</textarea>
+        </div>
+        <div class="campo col-2">
+          <label>WhatsApp — obrigado / NPS</label>
+          <textarea rows="3" readonly onclick="this.select()">{{ templates.whatsapp_obrigado }}</textarea>
+        </div>
+      </div>
+    </section>
+
+    <section class="cartao" style="padding:1.1rem 1.2rem">
+      <div class="cartao-cabeca"><h2>Linha do tempo</h2></div>
+
+      {% if op.aberta %}
+        <form method="post" action="{% url 'comercial:atividade' op.pk %}" class="op-nova-atividade">
+          {% csrf_token %}
+          <select name="tipo" aria-label="Tipo">{% for v, r in tipos_atividade %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
+          <input type="text" name="descricao" placeholder="Registrar ligação, WhatsApp, nota ou tarefa…" required>
+          <input type="datetime-local" name="quando" title="Quando (opcional)">
+          <label class="check-inline" title="Desmarque para agendar como tarefa">
+            <input type="checkbox" name="concluida" value="1" checked> feito
+          </label>
+          <button type="submit" class="botao-primario">Adicionar</button>
+        </form>
+      {% endif %}
+
+      <table class="tabela">
+        <thead><tr><th>Quando</th><th>Tipo</th><th>Descrição</th><th></th></tr></thead>
+        <tbody>
+          {% for at in atividades %}
+            <tr class="{% if not at.concluida %}linha-pendente{% endif %}">
+              <td>{{ at.quando|date:"d/m/Y H:i" }}</td>
+              <td>{{ at.get_tipo_display }}</td>
+              <td>{{ at.descricao }}{% if not at.concluida %} <span class="selo selo-em_andamento">tarefa</span>{% endif %}</td>
+              <td class="num">
+                {% if not at.concluida %}
+                  <form method="post" action="{% url 'comercial:concluir_tarefa' at.pk %}">{% csrf_token %}<button class="botao-mini">Concluir</button></form>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="vazio">Nenhuma atividade ainda. Registre a primeira acima.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  {% if op.aberta %}
+    <aside class="op-rail">
+      <div class="cartao op-acoes">
+        <p class="rot-secao">Mover etapa</p>
+        <form method="post" action="{% url 'comercial:mover' op.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'comercial:oportunidade' op.pk %}">
+          <select name="etapa" onchange="this.form.submit()">
+            {% for e in etapas %}<option value="{{ e.id }}" {% if e.id == op.etapa_id %}selected{% endif %}>{{ e.nome }}</option>{% endfor %}
+          </select>
+        </form>
+
+        <div class="sep"></div>
+
+        <details class="op-det" open>
+          <summary>Registrar cotação</summary>
+          <form method="post" action="{% url 'comercial:cotar' op.pk %}">
+            {% csrf_token %}
+            <div class="campo">{{ cotacao_form.tipo_uh.label_tag }}{{ cotacao_form.tipo_uh }}</div>
+            <div class="campo">{{ cotacao_form.checkin.label_tag }}{{ cotacao_form.checkin }}</div>
+            <div class="campo">{{ cotacao_form.checkout.label_tag }}{{ cotacao_form.checkout }}</div>
+            <div class="campo">{{ cotacao_form.valor_diaria.label_tag }}{{ cotacao_form.valor_diaria }}</div>
+            <div class="campo">{{ cotacao_form.validade.label_tag }}{{ cotacao_form.validade }}</div>
+            <div class="campo">{{ cotacao_form.observacao.label_tag }}{{ cotacao_form.observacao }}</div>
+            <button type="submit" class="botao-neutro botao-largo">Salvar cotação</button>
+          </form>
+        </details>
+
+        <div class="sep"></div>
+
+        <details class="op-det op-det-ganhar">
+          <summary>Ganhar → criar reserva</summary>
+          <form method="post" action="{% url 'comercial:converter' op.pk %}">
+            {% csrf_token %}
+            <div class="campo">{{ conversao_form.tipo_uh.label_tag }}{{ conversao_form.tipo_uh }}</div>
+            <div class="campo">{{ conversao_form.checkin.label_tag }}{{ conversao_form.checkin }}</div>
+            <div class="campo">{{ conversao_form.checkout.label_tag }}{{ conversao_form.checkout }}</div>
+            <div class="campo">{{ conversao_form.valor_diaria.label_tag }}{{ conversao_form.valor_diaria }}</div>
+            {% if pagamentos_ativo %}
+              <label class="check-inline">{{ conversao_form.criar_sinal }} {{ conversao_form.criar_sinal.label }}</label>
+              <div class="campo">{{ conversao_form.valor_sinal.label_tag }}{{ conversao_form.valor_sinal }}</div>
+            {% endif %}
+            <button type="submit" class="botao-primario botao-largo">Criar reserva</button>
+          </form>
+        </details>
+
+        <details class="op-det op-det-perder">
+          <summary>Marcar como perdida</summary>
+          <form method="post" action="{% url 'comercial:perder' op.pk %}">
+            {% csrf_token %}
+            <div class="campo">{{ perda_form.motivo.label_tag }}{{ perda_form.motivo }}</div>
+            <button type="submit" class="botao-neutro botao-largo">Confirmar perda</button>
+          </form>
+        </details>
+      </div>
+    </aside>
+  {% endif %}
+</div>
+{% endblock %}

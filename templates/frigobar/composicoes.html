@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block titulo %}Composição do frigobar{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'frigobar:painel' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Frigobar
+</a>
+<p class="pagina-eyebrow letreiro">Frigobar</p>
+<h1>Composição por tipo de quarto</h1>
+<p class="subtitulo">O kit padrão do frigobar de cada tipo de quarto — base da conferência.</p>
+
+<div class="colunas colunas-2-1">
+  <section>
+    {% for grupo in tipos %}
+      <div class="painel-bloco" style="margin-bottom:1rem">
+        <h2 style="margin-top:0">{{ grupo.tipo.nome }}</h2>
+        <table class="tabela">
+          <thead><tr><th>Produto</th><th class="num">Qtd</th><th></th></tr></thead>
+          <tbody>
+            {% for i in grupo.itens %}
+              <tr>
+                <td>{{ i.produto.nome }}</td>
+                <td class="num">{{ i.quantidade }}</td>
+                <td class="num">
+                  <form method="post" action="{% url 'frigobar:remover_composicao' i.pk %}" onsubmit="return confirm('Remover {{ i.produto.nome }} da composição?')">
+                    {% csrf_token %}<button type="submit" class="pdv-x" title="Remover">&times;</button>
+                  </form>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="3" class="vazio">Sem itens.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endfor %}
+  </section>
+
+  <section class="painel-bloco">
+    <h2 style="margin-top:0">Adicionar / atualizar</h2>
+    <form method="post" class="form-cartao">
+      {% csrf_token %}
+      <div class="campo"><label>Tipo de quarto</label>
+        <select name="tipo_uh" required>{% for t in todos_tipos %}<option value="{{ t.pk }}">{{ t.nome }}</option>{% endfor %}</select>
+      </div>
+      <div class="campo"><label>Produto</label>
+        <select name="produto" required>{% for p in produtos %}<option value="{{ p.pk }}">{{ p.nome }} (R$ {{ p.preco_venda }})</option>{% endfor %}</select>
+      </div>
+      <div class="campo"><label>Quantidade padrão</label><input type="number" name="quantidade" min="1" value="1" required></div>
+      <div class="acoes"><button type="submit" class="botao-primario">Salvar</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

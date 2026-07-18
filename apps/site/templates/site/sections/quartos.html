@@ -1,0 +1,71 @@
+{% load static %}
+
+<!-- QUARTOS TEMÁTICOS -->
+<section class="fade-section py-16 sm:py-24 bg-noturno relative overflow-hidden">
+    <!-- Ampulheta decorativa -->
+    <div class="absolute left-[-3%] top-[10%] opacity-[0.04]">
+        <img src="{% static 'site/img/ilustracao-ampulheta.png' %}" alt="" class="w-[250px]" aria-hidden="true">
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+        <div class="text-center mb-10 sm:mb-16">
+            <p class="text-lampiao text-xs sm:text-sm tracking-[0.3em] uppercase mb-3 sm:mb-4">Acomodações</p>
+            <h2 class="font-display text-3xl sm:text-4xl md:text-5xl font-black text-pergaminho mb-3 sm:mb-4">Quartos Temáticos</h2>
+            <p class="text-pergaminho/50 max-w-2xl mx-auto text-sm sm:text-base px-2">Cada cabana foi projetada para ser diferente da outra. Do estilo arquitetônico à decoração, do ambiente ao detalhe que você só percebe quando fecha a porta e olha ao redor. Escolher sua cabana no Vô Testa é escolher em qual história você quer despertar.</p>
+        </div>
+
+        <div class="grid md:grid-cols-3 gap-6 sm:gap-8">
+            {% for quarto in quartos %}
+            <div class="group bg-noturno border border-lampiao/20 rounded-2xl overflow-hidden hover:border-lampiao/50 transition-all duration-500 hover:-translate-y-2">
+                <div class="aspect-[4/3] bg-gradient-to-br from-madeira/30 to-madeira/10 flex items-center justify-center relative overflow-hidden">
+                    {% if quarto.foto_principal %}
+                    <img src="{{ quarto.foto_principal.url }}" alt="{{ quarto.nome }}" class="w-full h-full object-cover">
+                    {% else %}
+                    <p class="text-pergaminho/30 text-sm">[ Foto do Quarto ]</p>
+                    {% endif %}
+                    {% if forloop.first %}
+                    <div class="absolute top-4 right-4 bg-lampiao text-noturno text-xs font-bold px-3 py-1 rounded-full">
+                        Última vaga!
+                    </div>
+                    {% elif forloop.last %}
+                    <div class="absolute top-4 right-4 bg-musgo text-pergaminho text-xs font-bold px-3 py-1 rounded-full">
+                        Mais reservado
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="p-5 sm:p-6">
+                    <div class="flex items-center gap-2 mb-2">
+                        <svg class="w-4 h-4 text-lampiao gear-spin" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+                        <span class="text-lampiao/60 text-xs uppercase tracking-wider">{{ quarto.categoria.nome }}</span>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-pergaminho mb-2">{{ quarto.nome }}</h3>
+                    <p class="text-pergaminho/50 text-sm mb-4">{{ quarto.descricao_curta }}</p>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="text-lampiao font-body text-2xl font-bold">R$ {{ quarto.preco_base|floatformat:0 }}</span>
+                            <span class="text-pergaminho/40 text-xs"> /noite</span>
+                        </div>
+                        <a href="{% url 'core:reservar' %}" class="bg-lampiao/10 text-lampiao text-sm px-4 py-2 rounded-lg border border-lampiao/30 hover:bg-lampiao hover:text-noturno transition">
+                            Reservar
+                        </a>
+                    </div>
+                    <div class="flex gap-3 mt-4 pt-4 border-t border-pergaminho/10">
+                        <span class="text-pergaminho/40 text-xs flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
+                            {{ quarto.capacidade }} hóspedes
+                        </span>
+                        <span class="text-pergaminho/40 text-xs flex items-center gap-1">{{ quarto.metragem }}m²</span>
+                        <span class="text-pergaminho/40 text-xs flex items-center gap-1">★ {{ quarto.nota_avaliacao }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="text-center mt-12">
+            <a href="{% url 'core:reservar' %}" class="text-lampiao border border-lampiao/30 px-8 py-3 rounded-full hover:bg-lampiao hover:text-noturno transition text-sm font-semibold">
+                Ver todos os quartos →
+            </a>
+        </div>
+    </div>
+</section>

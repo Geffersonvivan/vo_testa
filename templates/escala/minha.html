@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block titulo %}Minha escala{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'escala:grade' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Escala
+</a>
+<p class="pagina-eyebrow letreiro">Equipe</p>
+<h1>Minha escala</h1>
+<p class="subtitulo">Seus próximos turnos (30 dias).</p>
+
+{% if not tem_funcionario %}
+  <p class="bloco-vazio">Seu login não está vinculado a um cadastro de funcionário. Peça à gerência para vincular.</p>
+{% else %}
+<table class="tabela">
+  <thead><tr><th>Data</th><th>Turno</th><th>Setor</th><th>Horário</th></tr></thead>
+  <tbody>
+    {% for a in atribs %}
+      <tr><td>{{ a.data|date:"D, d/m/Y" }}</td><td>{{ a.turno.nome }}</td>
+          <td>{{ a.turno.get_setor_display }}</td>
+          <td>{{ a.turno.inicio|time:"H:i" }}–{{ a.turno.fim|time:"H:i" }}</td></tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Você não tem turnos escalados nos próximos 30 dias.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,42 @@
+{% load static %}
+
+<!-- DIA NA POUSADA (DAY USE) -->
+<section class="fade-section py-16 sm:py-24 bg-pergaminho relative overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6">
+        <div class="grid md:grid-cols-2 gap-10 sm:gap-14 items-center">
+            <div class="order-2 md:order-1">
+                <div class="aspect-[4/3] rounded-2xl overflow-hidden border border-madeira/10 bg-madeira/5 flex items-center justify-center">
+                    {# Ilustração própria — não reusa foto de quarto da vitrine #}
+                    <img src="{% static 'site/img/ilustracao-roda.png' %}" alt="Dia na Pousada — estrutura Vô Testa" class="w-48 sm:w-56 opacity-80">
+                </div>
+            </div>
+            <div class="order-1 md:order-2">
+                <p class="text-lampiao text-xs sm:text-sm tracking-[0.3em] uppercase mb-3 sm:mb-4">Sem pernoite</p>
+                <h2 class="font-display text-3xl sm:text-4xl md:text-5xl font-black text-madeira mb-4 sm:mb-6 leading-tight">
+                    Dia na Pousada
+                </h2>
+                <p class="text-madeira/70 leading-relaxed mb-6 text-sm sm:text-base">
+                    Consuma a estrutura do Vô Testa sem se hospedar: piscina, mirantes e passeio
+                    pela casa inventiva. Reserva no mesmo fluxo dos quartos — com conta, consumo
+                    no restaurante e o restante da operação no CRM.
+                </p>
+                <ul class="space-y-3 text-madeira/70 text-sm mb-8">
+                    <li class="flex gap-3"><span class="text-lampiao">◆</span> Área da piscina</li>
+                    <li class="flex gap-3"><span class="text-lampiao">◆</span> Mirantes e passeio pela estrutura</li>
+                    <li class="flex gap-3"><span class="text-lampiao">◆</span> Consumo à parte (restaurante, loja…)</li>
+                </ul>
+                <div class="flex flex-wrap gap-3 items-center">
+                    <a href="{% url 'core:reservar' %}?modalidade=day_use"
+                       class="inline-flex items-center gap-2 bg-madeira text-pergaminho font-semibold text-sm px-6 py-3 rounded-full hover:bg-lampiao hover:text-madeira transition">
+                        Reservar Dia na Pousada
+                    </a>
+                    {% if dia_pousada %}
+                    <span class="text-madeira/50 text-sm">
+                        a partir de <strong class="text-madeira">R$ {{ dia_pousada.preco_base|floatformat:0 }}</strong>/dia
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block titulo %}Inventário — Estoque{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<h1>Inventário</h1>
+{% include "estoque/partials/nav.html" %}
+<p class="subtitulo">Contagem física por local. Ao aplicar, o sistema gera os ajustes auditados das diferenças.</p>
+
+<div class="colunas">
+  <section>
+    <h2>Inventários</h2>
+    <table class="tabela">
+      <thead><tr><th>Aberto em</th><th>Local</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for inv in inventarios %}
+          <tr>
+            <td><a href="{% url 'estoque:inventario' inv.pk %}">{{ inv.criado_em|date:"d/m/Y H:i" }}</a></td>
+            <td>{{ inv.local.nome }}</td>
+            <td>{{ inv.get_status_display }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="vazio">Nenhum inventário ainda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <section>
+    <h2>Abrir contagem</h2>
+    <form method="post" class="form-cartao">
+      {% csrf_token %}
+      {% include "nucleo/partials/campos.html" %}
+      <div class="acoes"><button type="submit" class="botao-primario">Abrir inventário</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

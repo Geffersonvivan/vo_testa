@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block titulo %}Caixa — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Operação</p>
+<h1>Caixa</h1>
+
+{% if not sessao %}
+  <p class="subtitulo">Você não tem caixa aberto. Abra a sessão do seu módulo com o fundo de troco.</p>
+  <form method="post" action="{% url 'caixa_abrir' %}" class="form-cartao">
+    {% csrf_token %}
+    {% include "nucleo/partials/campos.html" with form=form_abrir %}
+    <div class="acoes">
+      <button type="submit" class="botao-primario">Abrir caixa</button>
+    </div>
+  </form>
+
+{% else %}
+  <p class="subtitulo">
+    Caixa <strong>{{ sessao.get_modulo_display }}</strong>, aberto em {{ sessao.aberta_em|date:"d/m/Y H:i" }}
+    com fundo de R$ {{ sessao.fundo_troco }}.
+  </p>
+
+  <div class="cartoes cartoes-indicadores">
+    <div class="cartao">
+      <span class="indicador-rotulo letreiro">Movimentos</span>
+      <span class="indicador-valor">{{ sessao.movimentos.count }}</span>
+    </div>
+    {% for nome, total in sessao.totais_por_forma %}
+      <div class="cartao">
+        <span class="indicador-rotulo letreiro">{{ nome }}</span>
+        <span class="indicador-valor">R$ {{ total }}</span>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="colunas">
+    <section>
+      <h2>Registrar movimento
+        <span class="info-dica dica" data-dica="Recebimento = entra dinheiro por pagamento · Reforço = coloca troco no caixa · Sangria = retira dinheiro do caixa">ⓘ</span>
+      </h2>
+      <form method="post" action="{% url 'caixa_movimento' %}" class="form-cartao">
+        {% csrf_token %}
+        {% include "nucleo/partials/campos.html" with form=form_movimento %}
+        <div class="acoes">
+          <button type="submit" class="botao-primario">Registrar</button>
+        </div>
+      </form>
+    </section>
+
+    <section>
+      <h2>Fechar caixa</h2>
+      <form method="post" action="{% url 'caixa_fechar' %}" class="form-cartao">
+        {% csrf_token %}
+        {% include "nucleo/partials/campos.html" with form=form_fechar %}
+        <div class="acoes">
+          <button type="submit" class="botao-perigo"
+                  onclick="return confirm('Fechar o caixa? Confira o dinheiro da gaveta antes.')">
+            Fechar caixa
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <h2>Movimentos da sessão</h2>
+  <table class="tabela">
+    <thead>
+      <tr><th>Hora</th><th>Tipo</th><th>Forma</th><th>Valor</th><th>Descrição</th></tr>
+    </thead>
+    <tbody>
+      {% for m in sessao.movimentos.all %}
+        <tr>
+          <td>{{ m.criado_em|date:"H:i" }}</td>
+          <td><span class="dica" data-dica="{{ m.tipo_ajuda }}">{{ m.get_tipo_display }}</span></td>
+          <td>{{ m.forma_pagamento|default:"Dinheiro" }}</td>
+          <td>R$ {{ m.valor }}</td>
+          <td>{{ m.descricao }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="vazio">Nenhum movimento ainda nesta sessão.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+{% endblock %}

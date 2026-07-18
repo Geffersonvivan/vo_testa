@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block titulo %}Funil de vendas — Comercial{% endblock %}
+
+{% block conteudo %}
+<div x-data="{ nova: false, perda: false, perdaOp: null, perdaEtapa: null }">
+  <div class="pagina-cabecalho">
+    <div>
+      <p class="pagina-eyebrow letreiro">Comercial</p>
+      <h1>Funil de vendas</h1>
+    </div>
+    <div style="display:flex; gap:.5rem; align-items:center">
+      <a href="{% url 'comercial:tarefas' %}" class="botao-neutro">Tarefas</a>
+      <a href="{% url 'comercial:painel' %}" class="botao-neutro">Painel</a>
+      <button type="button" class="botao-primario" @click="nova = true">+ Nova oportunidade</button>
+    </div>
+  </div>
+  <p class="subtitulo">Arraste entre etapas abertas. Ganho só via conversão em reserva; perda pede motivo.</p>
+
+  <div class="funil-topo">
+    <div class="funil-kpis">
+      <div class="funil-kpi"><span class="valor">R$ {{ valor_total }}</span><span class="rotulo">No funil</span></div>
+      <div class="funil-kpi"><span class="valor">R$ {{ ponderado_total }}</span><span class="rotulo">Previsão ponderada</span></div>
+      <div class="funil-kpi"><span class="valor">{{ qtd_total }}</span><span class="rotulo">Abertas</span></div>
+    </div>
+    <div class="seg-filtro">
+      <a href="?" class="{% if not fat %}ativo{% endif %}">Todos</a>
+      {% for valor, rotulo in faturamento_filtros %}
+        <a href="?fat={{ valor }}" class="{% if fat == valor %}ativo{% endif %}">{{ rotulo }}</a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="funil-board">
+    {% for col in colunas %}
+      <div class="funil-coluna" data-etapa="{{ col.etapa.id }}" data-tipo="{{ col.etapa.tipo }}"
+           style="--cor-etapa: {% if col.etapa.tipo == 'ganho' %}var(--sucesso){% elif col.etapa.tipo == 'perdido' %}var(--perigo){% else %}var(--lampiao){% endif %}"
+           ondragover="colDragOver(event)" ondragleave="colDragLeave(event)"
+           ondrop="soltarCard(event, {{ col.etapa.id }}, '{{ col.etapa.tipo }}')">
+        <div class="funil-coluna-cabeca">
+          <div class="linha">
+            <span class="nome">{{ col.etapa.nome }}</span>
+            <span class="cont">{{ col.itens|length }}</span>
+          </div>
+          <div class="funil-meter"><span style="width:{{ col.etapa.probabilidade }}%"></span></div>
+          <div class="sub">R$ {{ col.total }} · {{ col.etapa.probabilidade }}%</div>
+        </div>
+        <div class="funil-cards">
+          {% for op in col.itens %}
+            <article class="funil-card fat-{{ op.faturamento }}" draggable="true" data-op="{{ op.id }}"
+                     ondragstart="cardDragStart(event, '{{ op.id }}')" ondragend="cardDragEnd(event)"
+                     onclick="location.href='{% url 'comercial:oportunidade' op.pk %}'">
+              <p class="titulo">{{ op.titulo }}</p>
+              <p class="pessoa">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+                {{ op.pessoa.nome }}
+              </p>
+              <div class="rodape">
+                <span class="valor">R$ {{ op.valor_estimado }}</span>
+                <span class="fchip fchip-{{ op.faturamento }}">{{ op.get_faturamento_display }}</span>
+              </div>
+              <p class="tarefa" style="opacity:.75">score {{ op.score }}</p>
+              {% if op.proxima_tarefa %}
+                <p class="tarefa">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                  {{ op.proxima_tarefa.quando|date:"d/m H:i" }}
+                </p>
+              {% else %}
+                <p class="tarefa alerta">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>
+                  sem próxima ação
+                </p>
+              {% endif %}
+            </article>
+          {% empty %}
+            <div class="funil-vazio">{% if col.etapa.tipo == 'ganho' %}Ganho só via converter{% else %}Solte um card aqui{% endif %}</div>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {# Modal — Nova oportunidade #}
+  <div class="modal-overlay" x-show="nova" x-cloak @click.self="nova = false">
+    <div class="modal-caixa">
+      <form method="post" action="{% url 'comercial:nova' %}" class="modal-form" id="form-nova-op">
+        {% csrf_token %}
+        <header class="modal-cabecalho">
+          <h2>Nova oportunidade</h2>
+          <button type="button" class="modal-fechar" @click="nova = false" aria-label="Fechar">&times;</button>
+        </header>
+        <div class="modal-corpo">
+          <div class="form-grade">
+            <div class="campo col-2" x-data="{ novoLead: false }">
+              <label>Lead (pessoa, agência ou empresa)</label>
+              <div class="campo-com-acao" id="combo-lead">
+                {% include "componentes/combo_pessoa.html" with dados=pessoas_data dados_id="pessoas-data" campo="pessoa" placeholder="Buscar lead…" %}
+                <button type="button" class="botao-mini" @click="novoLead = !novoLead" x-text="novoLead ? 'Fechar' : '+ Novo'"></button>
+              </div>
+              <div class="bloco-inline" x-show="novoLead" x-cloak style="display:none"
+                   id="bloco-novo-lead" data-url="{% url 'comercial:lead_novo' %}">
+                <p class="bloco-titulo letreiro">Cadastrar lead — entra na categoria Prospecção</p>
+                <div class="bloco-campos">
+                  <input type="text" id="nl-nome" placeholder="Nome*" autocomplete="off">
+                  <input type="text" id="nl-telefone" class="mascara-telefone" placeholder="Telefone" inputmode="numeric" autocomplete="off">
+                  <input type="email" id="nl-email" placeholder="E-mail" autocomplete="off">
+                  <input type="text" id="nl-documento" class="mascara-cpfcnpj" placeholder="CPF/CNPJ" inputmode="numeric" autocomplete="off">
+                </div>
+                <small class="erro" id="nl-erro"></small>
+                <div class="acoes">
+                  <button type="button" class="botao-primario" onclick="salvarNovoLead()">Salvar lead</button>
+                  <button type="button" class="botao-neutro" @click="novoLead = false">Cancelar</button>
+                </div>
+              </div>
+            </div>
+            <div class="campo col-2"><label>Título</label><input type="text" name="titulo" placeholder="Ex.: Feriadão — família Silva (2 quartos)"></div>
+            <div class="campo"><label>Etapa</label><select name="etapa">{% for e in etapas %}{% if e.tipo == 'aberta' %}<option value="{{ e.id }}">{{ e.nome }}</option>{% endif %}{% endfor %}</select></div>
+            <div class="campo"><label>Faturamento</label><select name="faturamento">{% for v, r in faturamentos %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select></div>
+            <div class="campo"><label>Origem</label><select name="origem">{% for v, r in origens %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select></div>
+            <div class="campo"><label>Valor estimado (R$)</label><input type="text" name="valor_estimado" class="mascara-reais" inputmode="numeric" placeholder="0,00"></div>
+            <div class="campo"><label>Check-in previsto</label><input type="date" name="checkin_previsto"></div>
+            <div class="campo"><label>Check-out previsto</label><input type="date" name="checkout_previsto"></div>
+            <div class="campo"><label>Quartos</label><input type="number" name="quartos" value="1" min="1"></div>
+            <div class="campo"><label>Hóspedes</label><input type="number" name="hospedes" value="2" min="1"></div>
+            <div class="campo col-2"><label>Responsável</label><select name="responsavel"><option value="">—</option>{% for u in responsaveis %}<option value="{{ u.id }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}</select></div>
+            <div class="campo col-2"><label>Observação</label><textarea name="observacao" rows="2"></textarea></div>
+          </div>
+        </div>
+        <footer class="modal-acoes">
+          <button type="submit" class="botao-primario">Criar oportunidade</button>
+          <button type="button" class="botao-neutro" @click="nova = false">Cancelar</button>
+        </footer>
+      </form>
+    </div>
+  </div>
+
+  {# Modal — Motivo da perda no drag #}
+  <div class="modal-overlay" x-show="perda" x-cloak @click.self="perda = false">
+    <div class="modal-caixa" style="max-width:420px">
+      <form method="post" :action="'/crm/comercial/' + perdaOp + '/mover/'" class="modal-form">
+        {% csrf_token %}
+        <input type="hidden" name="etapa" :value="perdaEtapa">
+        <header class="modal-cabecalho">
+          <h2>Motivo da perda</h2>
+          <button type="button" class="modal-fechar" @click="perda = false" aria-label="Fechar">&times;</button>
+        </header>
+        <div class="modal-corpo">
+          <div class="campo">
+            <label>Por que perdemos?</label>
+            <select name="motivo" required>
+              <option value="">Selecione…</option>
+              {% for m in motivos_perda %}<option value="{{ m.id }}">{{ m.nome }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <footer class="modal-acoes">
+          <button type="submit" class="botao-primario">Confirmar perda</button>
+          <button type="button" class="botao-neutro" @click="perda = false">Cancelar</button>
+        </footer>
+      </form>
+    </div>
+  </div>
+</div>
+
+<form id="form-mover" method="post" style="display:none">{% csrf_token %}<input type="hidden" name="etapa" id="mover-etapa"></form>
+
+<script>
+  async function salvarNovoLead() {
+    const bloco = document.getElementById('bloco-novo-lead');
+    const erro = document.getElementById('nl-erro');
+    const nome = document.getElementById('nl-nome').value.trim();
+    erro.textContent = '';
+    if (!nome) { erro.textContent = 'Informe o nome do lead.'; return; }
+    const dados = new FormData();
+    dados.append('nome', nome);
+    dados.append('telefone', document.getElementById('nl-telefone').value);
+    dados.append('email', document.getElementById('nl-email').value);
+    dados.append('documento', document.getElementById('nl-documento').value);
+    const csrf = document.querySelector('#form-nova-op [name=csrfmiddlewaretoken]').value;
+    try {
+      const resp = await fetch(bloco.dataset.url, { method: 'POST', headers: { 'X-CSRFToken': csrf }, body: dados });
+      const dado = await resp.json();
+      if (!resp.ok) { erro.textContent = dado.erro || 'Não foi possível salvar.'; return; }
+      const combo = document.querySelector('#combo-lead .combo');
+      Alpine.$data(combo).adicionar({ id: dado.id, nome: dado.nome, grupo: dado.grupo });
+      ['nome', 'telefone', 'email', 'documento'].forEach(c => { document.getElementById('nl-' + c).value = ''; });
+      Alpine.$data(bloco.closest('[x-data]')).novoLead = false;
+      if (typeof toast === 'function') toast('Lead cadastrado em Prospecção.', 'success');
+    } catch (e) { erro.textContent = 'Falha de conexão. Tente de novo.'; }
+  }
+
+  function cardDragStart(ev, opId) {
+    ev.dataTransfer.setData('op', opId);
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.currentTarget.classList.add('arrastando');
+  }
+  function cardDragEnd(ev) { ev.currentTarget.classList.remove('arrastando'); }
+  function colDragOver(ev) { ev.preventDefault(); ev.currentTarget.classList.add('dragover'); }
+  function colDragLeave(ev) { ev.currentTarget.classList.remove('dragover'); }
+  function soltarCard(ev, etapaId, tipo) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('dragover');
+    const opId = ev.dataTransfer.getData('op');
+    if (!opId) return;
+    if (tipo === 'ganho') {
+      if (typeof toast === 'function') {
+        toast('Ganho só via «Converter em reserva» no detalhe da oportunidade.', 'error');
+      } else {
+        alert('Ganho só via converter em reserva no detalhe.');
+      }
+      return;
+    }
+    if (tipo === 'perdido') {
+      const root = document.querySelector('[x-data]');
+      const data = Alpine.$data(root);
+      data.perdaOp = opId;
+      data.perdaEtapa = etapaId;
+      data.perda = true;
+      return;
+    }
+    const form = document.getElementById('form-mover');
+    form.action = '/crm/comercial/' + opId + '/mover/';
+    document.getElementById('mover-etapa').value = etapaId;
+    form.submit();
+  }
+</script>
+{% endblock %}

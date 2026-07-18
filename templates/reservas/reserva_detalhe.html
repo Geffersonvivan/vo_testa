@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+{% load nucleo_extras %}
+
+{% block titulo %}Reserva #{{ reserva.pk }} — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<a href="#" class="voltar" onclick="history.back(); return false;">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Voltar
+</a>
+<p class="pagina-eyebrow letreiro">Reservas</p>
+<div class="pagina-cabecalho">
+  <h1>Reserva #{{ reserva.pk }} — {{ reserva.hospede.nome }}</h1>
+  <span class="selo mapa-cor-{{ reserva.status }} dica" data-dica="{{ reserva.status_ajuda }}">{{ reserva.get_status_display }}</span>
+</div>
+<p class="subtitulo">
+  {{ reserva.uh }} · {{ reserva.checkin|date:"d/m/Y" }} → {{ reserva.checkout|date:"d/m/Y" }}
+  ({{ reserva.noites }} noite{{ reserva.noites|pluralize }}) ·
+  {{ reserva.adultos }} adulto{{ reserva.adultos|pluralize }}{% if reserva.criancas %} + {{ reserva.criancas }} criança{{ reserva.criancas|pluralize }}{% endif %} ·
+  diária R$ {{ reserva.valor_diaria }} · {{ reserva.get_canal_display }}
+</p>
+<p class="subtitulo">
+  Faturamento: <strong>{{ reserva.get_faturamento_display }}</strong>
+  {% if reserva.titular %} · titular <strong>{{ reserva.titular.nome }}</strong>{% endif %}
+  · quem paga: {{ reserva.pagador.nome }}
+</p>
+{% if reserva.observacoes %}<p><strong>Observações:</strong> {{ reserva.observacoes }}</p>{% endif %}
+{% if reserva.motivo_cancelamento %}
+  <div class="mensagem error"><strong>Cancelada:</strong> {{ reserva.motivo_cancelamento }}</div>
+{% endif %}
+
+{# ---------- Ações por estado ---------- #}
+<div class="acoes acoes-reserva">
+  {% if reserva.status == "orcamento" or reserva.status == "pre_reserva" %}
+    <form method="post" action="{% url 'reservas:confirmar' reserva.pk %}">
+      {% csrf_token %}<button type="submit" class="botao-primario">Confirmar reserva</button>
+    </form>
+  {% endif %}
+  {% if reserva.status == "confirmada" or reserva.status == "pre_reserva" %}
+    {% if aviso_checkin %}
+      <div class="mensagem warning">{{ aviso_checkin }}
+        {% if 'governanca'|modulo_ativo %}
+          <a href="{% url 'governanca:painel' %}">Abrir governança</a>
+        {% endif %}
+      </div>
+    {% endif %}
+    <form method="post" action="{% url 'reservas:checkin' reserva.pk %}">
+      {% csrf_token %}<button type="submit" class="botao-primario"{% if aviso_checkin %} disabled title="{{ aviso_checkin }}"{% endif %}>Fazer entrada (check-in)</button>
+    </form>
+  {% endif %}
+  {% if reserva.status == "hospedada" %}
+    {% if frigobar_pendente %}
+      <div class="mensagem warning">Conferência do frigobar pendente.
+        <a href="{% url 'frigobar:conferir' %}?conta={{ conta.pk }}">Conferir agora</a>
+      </div>
+    {% endif %}
+    <form method="post" action="{% url 'reservas:checkout' reserva.pk %}"
+          onsubmit="return confirm('Concluir a saída (check-out)? A conta precisa estar zerada.')">
+      {% csrf_token %}<button type="submit" class="botao-primario"{% if frigobar_pendente %} disabled title="Conferência do frigobar pendente"{% endif %}>Fazer saída (check-out)</button>
+    </form>
+    {% if 'appsite'|modulo_ativo %}
+      <a href="{% url 'portal:qr' reserva.pk %}" class="botao-neutro">QR do hóspede</a>
+    {% endif %}
+  {% endif %}
+  {% if reserva.status == "confirmada" %}
+    <form method="post" action="{% url 'reservas:no_show' reserva.pk %}"
+          onsubmit="return confirm('Registrar no-show?')">
+      {% csrf_token %}<button type="submit" class="botao-neutro">Marcar não comparecimento</button>
+    </form>
+  {% endif %}
+  {% if 'fiscal'|modulo_ativo and reserva.conta %}
+    <form method="post" action="{% url 'fiscal:emitir_nfse' %}">
+      {% csrf_token %}<input type="hidden" name="conta_id" value="{{ reserva.conta.pk }}">
+      <button type="submit" class="botao-neutro">Emitir NFS-e da hospedagem</button>
+    </form>
+  {% endif %}
+</div>
+
+{% if reserva.status == "orcamento" or reserva.status == "pre_reserva" or reserva.status == "confirmada" %}
+  <div class="colunas">
+    <section>
+      <h2>Adiantamento / sinal
+        <span class="info-dica dica" data-dica="Valor pago antes da entrada; vira crédito na conta do quarto.">ⓘ</span>
+      </h2>
+      <form method="post" action="{% url 'reservas:adiantamento_novo' reserva.pk %}" class="form-cartao">
+        {% csrf_token %}
+        {% include "nucleo/partials/campos.html" with form=form_recebimento %}
+        <div class="acoes"><button type="submit" class="botao-primario">Receber no meu caixa</button></div>
+      </form>
+      {% if reserva.adiantamentos.exists %}
+        <table class="tabela">
+          <thead><tr><th>Data</th><th>Valor</th></tr></thead>
+          <tbody>
+            {% for a in reserva.adiantamentos.all %}
+              <tr><td>{{ a.criado_em|date:"d/m/Y H:i" }}</td><td>R$ {{ a.valor }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    </section>
+    <section>
+      <h2>Cancelar reserva</h2>
+      <form method="post" action="{% url 'reservas:cancelar' reserva.pk %}" class="form-cartao">
+        {% csrf_token %}
+        {% include "nucleo/partials/campos.html" with form=form_cancelamento %}
+        <div class="acoes"><button type="submit" class="botao-perigo">Cancelar reserva</button></div>
+      </form>
+    </section>
+  </div>
+{% endif %}
+
+{# ---------- Trocar de quarto ---------- #}
+{% if reserva.ativa %}
+  <details class="acao-sensivel troca-quarto">
+    <summary>Trocar de quarto</summary>
+    <p class="ajuda">A conta (diárias, consumo e pagamentos) vai junto — pertence à reserva, não ao quarto.</p>
+    {% if quartos_livres %}
+      <form method="post" action="{% url 'reservas:trocar_quarto' reserva.pk %}" class="form-cartao">
+        {% csrf_token %}
+        <div class="campo">
+          <label>Novo quarto (livres no período)</label>
+          <select name="novo_uh" required>
+            <option value="">Escolha…</option>
+            {% for uh in quartos_livres %}
+              <option value="{{ uh.pk }}">{{ uh.numero }} — {{ uh.tipo.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="campo">
+          <label>Motivo (opcional)</label>
+          <input type="text" name="motivo" placeholder="Ex.: hóspede pediu andar térreo">
+        </div>
+        <div class="acoes"><button type="submit" class="botao-primario">Mover a reserva</button></div>
+      </form>
+    {% else %}
+      <p class="bloco-vazio">Nenhum quarto livre no período desta reserva.</p>
+    {% endif %}
+  </details>
+{% endif %}
+
+{# ---------- Acompanhantes ---------- #}
+<h2>Acompanhantes</h2>
+{% if reserva.acompanhantes.exists %}
+  <table class="tabela">
+    <thead><tr><th>Nome</th><th>Documento</th></tr></thead>
+    <tbody>
+      {% for a in reserva.acompanhantes.all %}
+        <tr><td>{{ a.nome }}</td><td>{{ a.documento|default:"—" }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endif %}
+{% if reserva.ativa %}
+  <form method="post" action="{% url 'reservas:acompanhante_novo' reserva.pk %}" class="form-inline form-cartao">
+    {% csrf_token %}
+    <input type="text" name="nome" placeholder="Nome do acompanhante" required>
+    <input type="text" name="documento" placeholder="Documento (opcional)">
+    <button type="submit" class="botao-neutro">Incluir</button>
+  </form>
+{% endif %}
+
+{# ---------- Conta do quarto ---------- #}
+{% if conta %}
+  <h2>Conta do quarto {% if not conta.aberta %}<span class="selo selo-neutro">fechada</span>{% endif %}</h2>
+
+  <div class="cartoes cartoes-indicadores">
+    {% for natureza, total in conta.total_por_natureza.items %}
+      <div class="cartao">
+        <span class="indicador-rotulo letreiro">{{ natureza }}</span>
+        <span class="indicador-valor">R$ {{ total }}</span>
+      </div>
+    {% endfor %}
+    <div class="cartao">
+      <span class="indicador-rotulo letreiro">Pago + adiantado</span>
+      <span class="indicador-valor">R$ {{ conta.total_pago|add:conta.total_adiantamentos }}</span>
+    </div>
+    <div class="cartao">
+      <span class="indicador-rotulo letreiro">Saldo a receber</span>
+      <span class="indicador-valor {% if conta.saldo != 0 %}texto-alerta{% endif %}">R$ {{ conta.saldo }}</span>
+    </div>
+  </div>
+
+  <table class="tabela">
+    <thead>
+      <tr><th>Data</th><th>Tipo</th><th>Natureza</th><th>Descrição</th><th>Valor</th></tr>
+    </thead>
+    <tbody>
+      {% for l in conta.lancamentos.all %}
+        <tr>
+          <td>{{ l.criado_em|date:"d/m H:i" }}</td>
+          <td>{{ l.get_tipo_display }}</td>
+          <td>{{ l.get_natureza_display }}</td>
+          <td>{{ l.descricao }}</td>
+          <td>{% if l.tipo == "desconto" %}−{% endif %}R$ {{ l.valor }}</td>
+        </tr>
+      {% endfor %}
+      {% for p in conta.pagamentos.all %}
+        <tr>
+          <td>{{ p.criado_em|date:"d/m H:i" }}</td>
+          <td>Pagamento</td>
+          <td>—</td>
+          <td>{{ p.movimento_caixa.forma_pagamento }}{% if p.observacao %} · <em>{{ p.observacao }}</em>{% endif %}</td>
+          <td>−R$ {{ p.valor }}</td>
+        </tr>
+      {% endfor %}
+      {% for a in reserva.adiantamentos.all %}
+        <tr>
+          <td>{{ a.criado_em|date:"d/m H:i" }}</td>
+          <td>Adiantamento</td>
+          <td>—</td>
+          <td>Crédito de sinal</td>
+          <td>−R$ {{ a.valor }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if conta.aberta %}
+    <div class="colunas">
+      <section>
+        <h2>Lançar na conta</h2>
+        <form method="post" action="{% url 'reservas:lancamento_novo' reserva.pk %}" class="form-cartao">
+          {% csrf_token %}
+          {% include "nucleo/partials/campos.html" with form=form_lancamento %}
+          <div class="acoes"><button type="submit" class="botao-primario">Lançar</button></div>
+        </form>
+      </section>
+      <section>
+        <h2>Receber pagamento</h2>
+        <form method="post" action="{% url 'reservas:pagamento_novo' reserva.pk %}" class="form-cartao">
+          {% csrf_token %}
+          {% include "nucleo/partials/campos.html" with form=form_recebimento %}
+          <div class="acoes"><button type="submit" class="botao-primario">Receber no meu caixa</button></div>
+        </form>
+      </section>
+    </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

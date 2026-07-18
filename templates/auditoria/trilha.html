@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block titulo %}Trilha de auditoria{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'auditoria:painel' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Auditoria
+</a>
+<div class="pagina-cabecalho">
+  <h1>Trilha de auditoria</h1>
+  <a href="?{{ f.urlencode }}{% if f %}&{% endif %}export=csv" class="botao-neutro">Exportar CSV</a>
+</div>
+<p class="subtitulo">Quem fez o quê, quando e por quê — operações sensíveis de todos os módulos.</p>
+
+<form method="get" class="filtros" style="align-items:flex-end;gap:.6rem">
+  <label class="select-wrap"><span class="opcional">Ação</span>
+    <select name="acao"><option value="">Todas</option>
+      {% for a in acoes %}<option value="{{ a }}" {% if f.acao == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+    </select></label>
+  <label class="select-wrap"><span class="opcional">Usuário</span>
+    <select name="usuario"><option value="">Todos</option>
+      {% for u in usuarios %}<option value="{{ u.pk }}" {% if f.usuario == u.pk|stringformat:'s' %}selected{% endif %}>{{ u.get_short_name|default:u.username }}</option>{% endfor %}
+    </select></label>
+  <label><span class="opcional">De</span><input type="date" name="de" value="{{ f.de }}"></label>
+  <label><span class="opcional">Até</span><input type="date" name="ate" value="{{ f.ate }}"></label>
+  <button type="submit" class="botao-primario">Filtrar</button>
+  <a href="{% url 'auditoria:trilha' %}" class="botao-neutro">Limpar</a>
+</form>
+
+<table class="tabela">
+  <thead>
+    <tr><th>Quando</th><th>Usuário</th><th>Ação</th><th>Alvo</th><th>Detalhe</th></tr>
+  </thead>
+  <tbody>
+    {% for t in registros %}
+      <tr>
+        <td>{{ t.criado_em|date:"d/m/Y H:i" }}</td>
+        <td>{{ t.usuario|default:"—" }}</td>
+        <td><span class="selo">{{ t.acao }}</span></td>
+        <td>{{ t.alvo }} #{{ t.alvo_id }}</td>
+        <td><small>{{ t.detalhe }}</small></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="vazio">Nenhum registro no filtro.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

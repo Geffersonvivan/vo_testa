@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block titulo %}Restaurante — comandas{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<div class="pagina-cabecalho">
+  <h1>Restaurante Piscina</h1>
+  <div class="pagina-acoes">
+    <a href="{% url 'restaurante:historico' %}" class="botao-neutro">Histórico</a>
+    <a href="{% url 'restaurante:mesas' %}" class="botao-neutro">Pontos</a>
+  </div>
+</div>
+<p class="subtitulo">Comandas abertas por ponto (mesa, guarda-sol, bar), hóspede ou avulso. O consumo baixa o estoque e fecha no caixa ou na conta do quarto.</p>
+
+{% if not tem_local %}
+  <p class="bloco-vazio">Cadastre um depósito do Restaurante em Estoque → Locais para começar.</p>
+{% else %}
+
+<section class="painel-bloco" style="max-width:640px;margin-bottom:1.6rem">
+  <h2 style="margin-top:0">Abrir comanda</h2>
+  <form method="post" action="{% url 'restaurante:abrir' %}" class="abrir-comanda">
+    {% csrf_token %}
+    <label class="select-wrap"><select name="mesa"><option value="">Ponto…</option>
+      {% for m in mesas %}<option value="{{ m.pk }}">{{ m.nome }}</option>{% endfor %}</select></label>
+    {% include "componentes/combo_pessoa.html" with dados=clientes dados_id="clientes-data" campo="cliente" placeholder="Hóspede/cliente…" %}
+    <input type="text" name="rotulo" placeholder="Ou identifique (ex.: guarda-sol 4)">
+    <button type="submit" class="botao-primario">Abrir</button>
+  </form>
+</section>
+
+<h2>Comandas abertas</h2>
+<div class="comandas-grid">
+  {% for c in abertas %}
+    <a href="{% url 'restaurante:comanda' c.pk %}" class="comanda-card">
+      <div class="comanda-card-topo">
+        <strong>{{ c.titulo }}</strong>
+        <span class="comanda-hora">{{ c.aberta_em|date:"H:i" }}</span>
+      </div>
+      <span class="comanda-card-itens">{{ c.itens.count }} item{{ c.itens.count|pluralize }}</span>
+      <span class="comanda-card-total">R$ {{ c.total }}</span>
+    </a>
+  {% empty %}
+    <p class="bloco-vazio">Nenhuma comanda aberta. Abra a primeira acima.</p>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,26 @@
+Olá, {{ reserva.hospede.nome }}!
+
+{% if pago %}Está tudo certo com a sua compra na Pousada Vô Testa!
+Obrigado por escolher o Vô Testa.
+{% else %}Recebemos a sua reserva na Pousada Vô Testa — falta confirmar o pagamento do sinal.
+{% endif %}
+{{ titulo }} — {{ reserva.codigo }}
+
+Chegada: {{ chegada }}
+Partida: {{ partida }}
+Hóspedes: {{ reserva.num_hospedes }}
+Acomodação: {{ reserva.quarto.nome }}
+Pagamento: {{ metodo }}
+{% if pago %}Total pago{% else %}Total{% endif %}: R$ {{ reserva.valor_total }}
+
+Endereço: {{ endereco }}
+{% if url_google_maps %}Mapa: {{ url_google_maps }}
+{% endif %}
+Acompanhe{% if not pago %} e pague{% endif %} pelo link:
+{{ url_reserva }}
+
+Este endereço (naoresponda@) não aceita respostas.
+Contato: {{ email_contato }}{% if url_whatsapp %} | WhatsApp: {{ url_whatsapp }}{% endif %}
+
+{{ razao_social }} · CNPJ {{ cnpj }}
+Pousada Vô Testa · Itá/SC

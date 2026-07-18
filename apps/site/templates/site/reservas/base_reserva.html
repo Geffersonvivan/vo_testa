@@ -1,0 +1,24 @@
+{% extends 'site/base.html' %}
+{% load static %}
+
+{% comment %}Layout base do fluxo de reservas (tema claro na paleta da pousada).{% endcomment %}
+
+{% block content %}
+<div class="bg-pergaminho min-h-screen pt-24 md:pt-28 text-madeira">
+
+    {% include 'site/reservas/partials/stepper.html' %}
+
+    <main class="max-w-5xl mx-auto px-4 py-8 sm:py-12">
+
+        {% if messages %}
+        <div class="max-w-3xl mx-auto mb-8 space-y-2">
+            {% for message in messages %}
+            <div class="bg-lampiao/10 border border-lampiao/30 text-madeira text-sm rounded-xl px-4 py-3">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% block reserva_content %}{% endblock %}
+    </main>
+</div>
+{% endblock %}

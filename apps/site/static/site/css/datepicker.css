@@ -1,0 +1,72 @@
+/* ===================================================================== *
+ * Flatpickr — paleta Vô Testa                                           *
+ *  • Popups (home, tema escuro)  → .flatpickr-calendar:not(.inline)     *
+ *  • Calendário inline (passo 1, tema claro) → .flatpickr-calendar.inline*
+ * ===================================================================== */
+
+/* ---------- POPUP (escuro) ---------- */
+.flatpickr-calendar:not(.inline) {
+    background: #051C2C;                         /* noturno */
+    border: 1px solid rgba(215, 160, 72, .35);   /* lampiao */
+    border-radius: .75rem;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .5);
+    font-family: 'Neco', serif;
+}
+.flatpickr-calendar:not(.inline).arrowTop:before,
+.flatpickr-calendar:not(.inline).arrowTop:after { border-bottom-color: #051C2C; }
+.flatpickr-calendar:not(.inline).arrowBottom:before,
+.flatpickr-calendar:not(.inline).arrowBottom:after { border-top-color: #051C2C; }
+
+.flatpickr-calendar:not(.inline) .flatpickr-months,
+.flatpickr-calendar:not(.inline) .flatpickr-current-month,
+.flatpickr-calendar:not(.inline) .flatpickr-monthDropdown-months { color: #EFDBB2; }
+.flatpickr-calendar:not(.inline) .flatpickr-month { color: #EFDBB2; fill: #EFDBB2; }
+.flatpickr-calendar:not(.inline) .cur-year { color: #EFDBB2; }
+.flatpickr-calendar:not(.inline) .flatpickr-prev-month svg,
+.flatpickr-calendar:not(.inline) .flatpickr-next-month svg { fill: #D7A048; }
+.flatpickr-calendar:not(.inline) span.flatpickr-weekday { color: rgba(215, 160, 72, .8); font-weight: 600; }
+.flatpickr-calendar:not(.inline) .flatpickr-day { color: rgba(239, 219, 178, .85); border-radius: .4rem; }
+.flatpickr-calendar:not(.inline) .flatpickr-day:hover { background: rgba(215, 160, 72, .18); border-color: transparent; }
+.flatpickr-calendar:not(.inline) .flatpickr-day.today { border-color: rgba(215, 160, 72, .6); }
+.flatpickr-calendar:not(.inline) .flatpickr-day.selected { background: #D7A048; border-color: #D7A048; color: #051C2C; }
+.flatpickr-calendar:not(.inline) .flatpickr-day.flatpickr-disabled,
+.flatpickr-calendar:not(.inline) .flatpickr-day.prevMonthDay,
+.flatpickr-calendar:not(.inline) .flatpickr-day.nextMonthDay { color: rgba(239, 219, 178, .25); }
+
+/* ---------- INLINE (claro, paleta madeira) ---------- */
+.flatpickr-calendar.inline {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    width: 100%;
+    max-width: none;
+    font-family: 'Neco', serif;
+}
+.flatpickr-calendar.inline .flatpickr-rContainer,
+.flatpickr-calendar.inline .flatpickr-days { width: 100%; }
+.flatpickr-calendar.inline .dayContainer { width: 100%; max-width: none; min-width: 100%; }
+.flatpickr-calendar.inline .flatpickr-months .flatpickr-month,
+.flatpickr-calendar.inline .flatpickr-current-month,
+.flatpickr-calendar.inline .cur-year { color: #4F2C1D; }            /* madeira */
+.flatpickr-calendar.inline .flatpickr-monthDropdown-months { background: #fff; color: #4F2C1D; }
+.flatpickr-calendar.inline .flatpickr-prev-month svg,
+.flatpickr-calendar.inline .flatpickr-next-month svg { fill: rgba(79, 44, 29, .4); }
+.flatpickr-calendar.inline .flatpickr-prev-month:hover svg,
+.flatpickr-calendar.inline .flatpickr-next-month:hover svg { fill: #4F2C1D; }
+.flatpickr-calendar.inline span.flatpickr-weekday { color: rgba(79, 44, 29, .4); font-weight: 600; }
+.flatpickr-calendar.inline .flatpickr-day { color: #4F2C1D; border-radius: .5rem; }
+.flatpickr-calendar.inline .flatpickr-day:hover { background: rgba(79, 44, 29, .08); border-color: transparent; }
+.flatpickr-calendar.inline .flatpickr-day.today { border-color: rgba(215, 160, 72, .7); }
+.flatpickr-calendar.inline .flatpickr-day.selected,
+.flatpickr-calendar.inline .flatpickr-day.startRange,
+.flatpickr-calendar.inline .flatpickr-day.endRange {
+    background: #4F2C1D; border-color: #4F2C1D; color: #EFDBB2; font-weight: 700;
+}
+.flatpickr-calendar.inline .flatpickr-day.inRange {
+    background: rgba(79, 44, 29, .08);
+    border-color: transparent;
+    box-shadow: -5px 0 0 rgba(79, 44, 29, .08), 5px 0 0 rgba(79, 44, 29, .08);
+}
+.flatpickr-calendar.inline .flatpickr-day.flatpickr-disabled,
+.flatpickr-calendar.inline .flatpickr-day.prevMonthDay,
+.flatpickr-calendar.inline .flatpickr-day.nextMonthDay { color: rgba(79, 44, 29, .2); }

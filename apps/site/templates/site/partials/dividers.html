@@ -1,0 +1,68 @@
+{% load static %}
+
+{# Divisória 1: Hero → Sobre (pergaminho, gears + símbolo + gears) #}
+{% if type == '1' %}
+<div class="relative bg-pergaminho py-8 overflow-hidden">
+    <div class="flex items-center justify-center gap-4">
+        <svg class="w-6 h-6 text-lampiao/40 gear-spin" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+        <div class="h-[2px] w-24 bg-lampiao/30"></div>
+        <img src="{% static 'site/img/simbolo-lampiao.png' %}" alt="" class="w-16 h-16 object-contain" aria-hidden="true">
+        <div class="h-[2px] w-24 bg-lampiao/30"></div>
+        <svg class="w-6 h-6 text-lampiao/40 gear-spin-reverse" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+    </div>
+</div>
+{% endif %}
+
+{# Divisória 2: Sobre → Quartos (noturno, tripla gear) #}
+{% if type == '2' %}
+<div class="relative bg-noturno py-6 overflow-hidden">
+    <div class="flex items-center justify-center gap-3">
+        <div class="h-[1px] w-16 bg-lampiao/20"></div>
+        <svg class="w-5 h-5 text-lampiao/30 gear-spin" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+        <div class="h-[1px] w-8 bg-lampiao/20"></div>
+        <svg class="w-8 h-8 text-lampiao/40 gear-spin-reverse" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+        <div class="h-[1px] w-8 bg-lampiao/20"></div>
+        <svg class="w-5 h-5 text-lampiao/30 gear-spin" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+        <div class="h-[1px] w-16 bg-lampiao/20"></div>
+    </div>
+</div>
+{% endif %}
+
+{# Divisória 3: Quartos → Experiências (pergaminho, gears + ampulheta + gears) #}
+{% if type == '3' %}
+<div class="relative bg-pergaminho py-8 overflow-hidden">
+    <div class="flex items-center justify-center gap-6">
+        <div class="h-[2px] w-20 bg-madeira/20"></div>
+        <svg class="w-7 h-7 text-madeira/30 gear-spin" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+        <img src="{% static 'site/img/ilustracao-ampulheta.png' %}" alt="" class="w-12 h-16 object-contain opacity-30" aria-hidden="true">
+        <svg class="w-7 h-7 text-madeira/30 gear-spin-reverse" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+        <div class="h-[2px] w-20 bg-madeira/20"></div>
+    </div>
+</div>
+{% endif %}
+
+{# Divisória 4: Experiências → Galeria (madeira, tripla gear) #}
+{% if type == '4' %}
+<div class="relative bg-madeira py-6 overflow-hidden">
+    <div class="flex items-center justify-center gap-4">
+        <div class="h-[1px] w-20 bg-lampiao/20"></div>
+        <svg class="w-5 h-5 text-lampiao/30 gear-spin" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+        <div class="h-[1px] w-6 bg-lampiao/20"></div>
+        <svg class="w-8 h-8 text-lampiao/40 gear-spin-reverse" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+        <div class="h-[1px] w-6 bg-lampiao/20"></div>
+        <svg class="w-5 h-5 text-lampiao/30 gear-spin" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="5"/><rect x="44" y="15" width="12" height="14" rx="3" fill="currentColor"/><rect x="44" y="71" width="12" height="14" rx="3" fill="currentColor"/><rect x="15" y="44" width="14" height="12" rx="3" fill="currentColor"/><rect x="71" y="44" width="14" height="12" rx="3" fill="currentColor"/></svg>
+        <div class="h-[1px] w-20 bg-lampiao/20"></div>
+    </div>
+</div>
+{% endif %}
+
+{# Divisória 5: Galeria → Depoimentos (pergaminho, símbolo + linhas) #}
+{% if type == '5' %}
+<div class="relative bg-pergaminho py-8 overflow-hidden">
+    <div class="flex items-center justify-center gap-6">
+        <div class="h-[2px] w-32 bg-lampiao/30"></div>
+        <img src="{% static 'site/img/simbolo-lampiao.png' %}" alt="" class="w-14 h-14 object-contain" aria-hidden="true">
+        <div class="h-[2px] w-32 bg-lampiao/30"></div>
+    </div>
+</div>
+{% endif %}

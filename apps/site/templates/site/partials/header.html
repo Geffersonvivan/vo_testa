@@ -1,0 +1,65 @@
+{% load static %}
+
+<!-- HEADER -->
+<header class="fixed top-0 w-full bg-noturno/95 backdrop-blur-sm z-50 border-b border-lampiao/20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3 md:py-4 flex items-center justify-between">
+        <!-- Logo -->
+        <a href="{% url 'core:home' %}#inicio" class="flex items-center">
+            <img src="{% static 'site/img/logo-header.png' %}" alt="Pousada Vô Testa" class="h-10 md:h-14 w-auto">
+        </a>
+
+        <!-- Nav Desktop -->
+        <nav class="hidden md:flex items-center gap-8 text-sm text-pergaminho/80">
+            <a href="{% url 'core:home' %}#inicio" class="hover:text-lampiao transition">Início</a>
+            <a href="{% url 'core:home' %}#sobre" class="hover:text-lampiao transition">Nossa História</a>
+            <a href="{% url 'core:home' %}#experiencias" class="hover:text-lampiao transition">Experiências</a>
+            <a href="{% url 'core:home' %}#galeria" class="hover:text-lampiao transition">Galeria</a>
+            <a href="{% url 'core:home' %}#quartos" class="hover:text-lampiao transition">Quartos</a>
+            <a href="{% url 'core:home' %}#dia-pousada" class="hover:text-lampiao transition">Dia na Pousada</a>
+            <a href="{% url 'core:home' %}#eventos" class="hover:text-lampiao transition">Eventos</a>
+            <a href="{% url 'core:home' %}#contato" class="hover:text-lampiao transition">Contato</a>
+            <!-- TEMPORÁRIO: link para o laboratório de protótipos (remover depois) -->
+            <a href="{% url 'core:lab' %}" class="text-lampiao font-semibold flex items-center gap-1 hover:text-pergaminho transition">
+                Lab
+                <span class="text-[9px] uppercase tracking-wider bg-lampiao/20 text-lampiao px-1.5 py-0.5 rounded">beta</span>
+            </a>
+        </nav>
+
+        <!-- CTA Desktop -->
+        <a href="{% url 'core:reservar' %}" class="hidden md:inline-flex items-center gap-2 bg-lampiao text-noturno font-semibold text-sm px-5 py-2.5 rounded-full hover:bg-lampiao/90 transition pulse-btn">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            Fazer Reserva
+        </a>
+
+        <!-- Mobile menu button -->
+        <button id="menuBtn" class="md:hidden text-pergaminho p-2 -mr-2" aria-label="Abrir menu">
+            <svg id="menuIcon" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            <svg id="closeIcon" class="w-6 h-6 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+    </div>
+</header>
+
+<!-- Overlay -->
+<div id="menuOverlay" class="fixed inset-0 bg-noturno/60 z-40 mobile-overlay md:hidden"></div>
+
+<!-- Menu Mobile Slide-in -->
+<nav id="mobileMenu" class="mobile-menu fixed top-0 right-0 h-full w-72 bg-noturno z-40 md:hidden shadow-2xl pt-20 px-6">
+    <div class="flex flex-col gap-1">
+        <a href="{% url 'core:home' %}#inicio" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Início</a>
+        <a href="{% url 'core:home' %}#sobre" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Nossa História</a>
+        <a href="{% url 'core:home' %}#experiencias" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Experiências</a>
+        <a href="{% url 'core:home' %}#galeria" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Galeria</a>
+        <a href="{% url 'core:home' %}#quartos" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Quartos</a>
+        <a href="{% url 'core:home' %}#dia-pousada" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Dia na Pousada</a>
+        <a href="{% url 'core:home' %}#eventos" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Eventos</a>
+        <a href="{% url 'core:home' %}#contato" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Contato</a>
+        <!-- TEMPORÁRIO: link para o laboratório de protótipos (remover depois) -->
+        <a href="{% url 'core:lab' %}" class="mobile-link text-lampiao font-semibold text-lg py-3 border-b border-pergaminho/10 hover:text-pergaminho transition flex items-center gap-2">
+            Lab <span class="text-[10px] uppercase tracking-wider bg-lampiao/20 px-1.5 py-0.5 rounded">beta</span>
+        </a>
+    </div>
+    <a href="{% url 'core:reservar' %}" class="mobile-link mt-6 w-full inline-flex items-center justify-center gap-2 bg-lampiao text-noturno font-semibold text-sm px-5 py-3 rounded-full">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Fazer Reserva
+    </a>
+</nav>

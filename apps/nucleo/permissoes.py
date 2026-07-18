@@ -15,6 +15,28 @@ from django.http import Http404
 from .models import modulo_ativo
 
 
+def eh_gerente(user) -> bool:
+    """
+    Ações sensíveis (estorno, reabertura de caixa, ajuste) exigem gerência.
+    Até os perfis por módulo entrarem (ESPECIFICACAO §4.2), gerência = staff
+    ou superusuário.
+    """
+    return user.is_authenticated and (user.is_superuser or user.is_staff)
+
+
+def requer_gerencia(view):
+    """403 para quem não é gerência. Usar em estorno, reabertura de caixa etc."""
+
+    @wraps(view)
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        if not eh_gerente(request.user):
+            raise PermissionDenied("Esta ação exige permissão de gerência.")
+        return view(request, *args, **kwargs)
+
+    return wrapper
+
+
 def requer_modulo(codigo: str):
     def decorator(view):
         @wraps(view)

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block titulo %}Ausências — Escala{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'escala:grade' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Escala
+</a>
+<p class="pagina-eyebrow letreiro">Equipe</p>
+<h1>Folgas e férias</h1>
+<p class="subtitulo">Quem está fora — o sistema impede escalar alguém ausente.</p>
+
+<div class="colunas">
+  <section>
+    <table class="tabela">
+      <thead><tr><th>Funcionário</th><th>Tipo</th><th>Período</th><th>Obs.</th></tr></thead>
+      <tbody>
+        {% for a in ausencias %}
+          <tr><td>{{ a.funcionario.pessoa.nome }}</td><td>{{ a.get_tipo_display }}</td>
+              <td>{{ a.inicio|date:"d/m" }} – {{ a.fim|date:"d/m/Y" }}</td><td>{{ a.observacao }}</td></tr>
+        {% empty %}
+          <tr><td colspan="4" class="vazio">Nenhuma ausência registrada.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <section class="painel-bloco">
+    <h2 style="margin-top:0">Nova ausência</h2>
+    <form method="post" class="form-cartao">
+      {% csrf_token %}
+      <div class="campo"><label>Funcionário</label>
+        <select name="funcionario" required>{% for f in funcionarios %}<option value="{{ f.pk }}">{{ f.pessoa.nome }}</option>{% endfor %}</select>
+      </div>
+      <div class="campo"><label>Tipo</label>
+        <select name="tipo">{% for v, r in tipos %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
+      </div>
+      <div class="form-grade">
+        <div class="campo"><label>Início</label><input type="date" name="inicio" required></div>
+        <div class="campo"><label>Fim</label><input type="date" name="fim" required></div>
+      </div>
+      <div class="campo"><label>Observação</label><input type="text" name="observacao"></div>
+      <div class="acoes"><button type="submit" class="botao-primario">Registrar</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

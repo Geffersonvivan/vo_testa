@@ -1,0 +1,7 @@
+# Dependências de desenvolvimento (não vão para produção).
+# Instalar: .venv/bin/pip install -r requirements-dev.txt
+-r requirements.txt
+
+ruff==0.15.20        # lint + ordenação de imports (config em ruff.toml)
+pip-audit==2.10.1    # auditoria de vulnerabilidades das dependências
+pytest==9.1.1        # execução alternativa de testes (a padrão é manage.py test)

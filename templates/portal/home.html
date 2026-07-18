@@ -1,0 +1,54 @@
+{% extends "portal/base.html" %}
+
+{% block conteudo %}
+<div class="pt-card">
+  <p class="letreiro">Olá, {{ e.hospede }}</p>
+  <h2>{{ e.uh }}</h2>
+  <p class="subtitulo">Estadia de {{ e.checkin|date:"d/m" }} a {{ e.checkout|date:"d/m/Y" }}.</p>
+  <div class="pt-linha"><span>Saldo da conta</span><strong class="pt-saldo" style="font-size:1.3rem">R$ {{ e.saldo }}</strong></div>
+  <div class="pt-acoes" style="margin-top:1rem">
+    <a href="{% url 'portal:checkout' token %}" class="botao-primario" style="text-align:center;text-decoration:none">Ver conta & check-out</a>
+  </div>
+  <div class="pt-atalhos">
+    <a href="{% url 'portal:nps' token %}" class="pt-atalho destaque" title="Avaliar a estadia (NPS)">
+      <span class="pt-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.9 7.2 18l.9-5.4L4.2 8.7l5.4-.8z"/></svg>
+      </span>
+      NPS
+    </a>
+  </div>
+</div>
+
+{% if cardapio %}
+<div class="pt-card">
+  <h2>Pedir no Restaurante 🍹</h2>
+  <form method="post" action="{% url 'portal:pedir' token %}">
+    {% csrf_token %}
+    {% for item in cardapio %}
+      <div class="pt-cardapio-item">
+        <span class="nome">{{ item.nome }}<br><span class="preco">R$ {{ item.preco }}</span></span>
+        <input type="number" name="qtd_{{ item.id }}" min="0" value="0" inputmode="numeric">
+      </div>
+    {% endfor %}
+    <div class="pt-acoes" style="margin-top:.8rem">
+      <button type="submit" class="botao-primario">Enviar pedido ao quarto</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+<div class="pt-card">
+  <h2>Precisa de algo? 🧹🔧</h2>
+  <div class="pt-acoes">
+    <form method="post" action="{% url 'portal:solicitar' token %}">
+      {% csrf_token %}<input type="hidden" name="tipo" value="limpeza">
+      <button type="submit" class="botao-neutro" style="width:100%">Pedir limpeza extra</button>
+    </form>
+    <form method="post" action="{% url 'portal:solicitar' token %}">
+      {% csrf_token %}<input type="hidden" name="tipo" value="manutencao">
+      <input type="text" name="descricao" placeholder="Descreva o problema (ex.: ar não gela)" style="width:100%;margin-bottom:.5rem">
+      <button type="submit" class="botao-neutro" style="width:100%">Chamar a manutenção</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

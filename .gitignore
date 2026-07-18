@@ -45,5 +45,15 @@ env/
 # Word lock files
 ~$*
 
-# Documentos pessoais
+# Documentos pessoais / rascunhos locais
 Logo/*.pdf
+TEMPORARIO/
+
+# Graphify (grafo de conhecimento — regenerável com /graphify .)
+graphify-out/
+
+# Evidências Safrapay (JSON + prints — não versionar)
+evidencias/safrapay/*.json
+evidencias/safrapay/prints/*
+!evidencias/safrapay/prints/.gitkeep
+!evidencias/safrapay/README.md

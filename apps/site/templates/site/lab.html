@@ -1,0 +1,127 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Laboratório de Inovação — Pousada Vô Testa</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { colors: {
+  noturno:'#051C2C', madeira:'#4F2C1D', lampiao:'#D7A048', pergaminho:'#EFDBB2', musgo:'#2E483E'
+}, fontFamily:{ display:['Georgia','serif'], body:['system-ui','sans-serif'] } } } };
+</script>
+<style>
+  body{ background: linear-gradient(180deg,#FBF7EE 0%, #EFDBB2 100%); }
+  .gear-spin{ animation: spin 16s linear infinite; transform-origin:50% 50% }
+  @keyframes spin{ to{ transform: rotate(360deg) } }
+  .card{ transition: all .25s; cursor:pointer }
+  .card:hover{ transform: translateY(-4px); box-shadow: 0 18px 40px rgba(79,44,29,.12) }
+  #modal{ animation: fade .2s ease-out }
+  @keyframes fade{ from{opacity:0} to{opacity:1} }
+  #modal .painel{ animation: zoom .25s ease-out }
+  @keyframes zoom{ from{opacity:0;transform:scale(.96)} to{opacity:1;transform:scale(1)} }
+</style>
+</head>
+<body class="font-body text-madeira min-h-screen">
+
+<header class="border-b border-madeira/10 bg-white/80 backdrop-blur">
+  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <svg class="w-7 h-7 text-madeira gear-spin" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="6"/><g fill="currentColor"><rect x="44" y="12" width="12" height="16" rx="3"/><rect x="44" y="72" width="12" height="16" rx="3"/><rect x="12" y="44" width="16" height="12" rx="3"/><rect x="72" y="44" width="16" height="12" rx="3"/></g></svg>
+      <div><span class="font-display text-lg font-bold">Pousada Vô Testa</span>
+      <span class="block text-madeira/40 text-[11px]">Laboratório de Inovação · uso interno</span></div>
+    </div>
+    <a href="/" class="text-madeira/40 hover:text-musgo text-sm">← voltar ao site</a>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-4 py-10 sm:py-14">
+  <div class="text-center mb-10">
+    <p class="text-musgo text-xs tracking-[0.35em] uppercase mb-3 font-semibold">Protótipos para avaliação</p>
+    <h1 class="font-display text-3xl sm:text-4xl font-bold mb-3">Ideias que podem encantar o hóspede</h1>
+    <p class="text-madeira/60 text-sm max-w-2xl mx-auto">Quatro conceitos interativos para inovar nas reservas — clicáveis, na identidade do Vô Testa. Cada um abre aqui mesmo, com botões de “demo” para simular a mecânica. Página oculta, não listada no menu.</p>
+  </div>
+
+  <div class="grid sm:grid-cols-2 gap-5">
+
+    <div onclick="abrir('{% static 'site/prototipos/concierge.html' %}','Converse com o Vô Testa')" class="card bg-white border border-madeira/5 shadow-sm rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-musgo text-xs font-bold bg-musgo/10 px-2.5 py-1 rounded-full">#1 · Conexão</span>
+        <span class="text-2xl">💬</span>
+      </div>
+      <h2 class="font-display text-xl font-bold mb-1">Converse com o Vô Testa</h2>
+      <p class="text-madeira/60 text-sm mb-4">Concierge com a personalidade do inventor: o hóspede conversa, ele entende a intenção e sugere a cabana certa.</p>
+      <span class="text-musgo font-semibold text-sm">Abrir protótipo →</span>
+    </div>
+
+    <div onclick="abrir('{% static 'site/prototipos/engrenagem.html' %}','A Engrenagem do Tempo')" class="card bg-white border border-madeira/5 shadow-sm rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-musgo text-xs font-bold bg-musgo/10 px-2.5 py-1 rounded-full">#2 · Antecipação</span>
+        <span class="text-2xl">⚙️</span>
+      </div>
+      <h2 class="font-display text-xl font-bold mb-1">A Engrenagem do Tempo</h2>
+      <p class="text-madeira/60 text-sm mb-4">Entre reservar e chegar, o hóspede gira a roda d'água diariamente, desperta mimos e ajuda a plantar árvores reais.</p>
+      <span class="text-musgo font-semibold text-sm">Abrir protótipo →</span>
+    </div>
+
+    <div onclick="abrir('{% static 'site/prototipos/grupo.html' %}','Puxe a Manivela com Amigos')" class="card bg-white border border-madeira/5 shadow-sm rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-musgo text-xs font-bold bg-musgo/10 px-2.5 py-1 rounded-full">#4 · Viral</span>
+        <span class="text-2xl">🔧</span>
+      </div>
+      <h2 class="font-display text-xl font-bold mb-1">Puxe a Manivela com Amigos</h2>
+      <p class="text-madeira/60 text-sm mb-4">Reserva em grupo: a cada amigo que embarca, uma engrenagem destrava e o grupo todo ganha um benefício coletivo.</p>
+      <span class="text-musgo font-semibold text-sm">Abrir protótipo →</span>
+    </div>
+
+    <div onclick="abrir('{% static 'site/prototipos/configurador.html' %}','Monte sua Máquina do Tempo')" class="card bg-white border border-madeira/5 shadow-sm rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-musgo text-xs font-bold bg-musgo/10 px-2.5 py-1 rounded-full">#5 · Escolha</span>
+        <span class="text-2xl">🕰️</span>
+      </div>
+      <h2 class="font-display text-xl font-bold mb-1">Monte sua Máquina do Tempo</h2>
+      <p class="text-madeira/60 text-sm mb-4">Configurador: o hóspede encaixa cabana, experiências e extras; a máquina ganha vida e o preço atualiza ao vivo.</p>
+      <span class="text-musgo font-semibold text-sm">Abrir protótipo →</span>
+    </div>
+
+  </div>
+
+  <p class="text-center text-madeira/30 text-xs mt-10">Detalhes e mini-conceitos em <code>Extras/INOVACAO_RESERVAS.md</code> · banco de ideias em <code>Extras/ideias_Vo_Testa_futuro.md</code></p>
+</main>
+
+<!-- MODAL -->
+<div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center p-3 sm:p-6 bg-noturno/70 backdrop-blur-sm">
+  <div class="painel bg-white rounded-2xl w-full max-w-5xl h-[88vh] flex flex-col overflow-hidden shadow-2xl">
+    <div class="flex items-center justify-between px-4 py-2.5 border-b border-madeira/10 bg-pergaminho/60 shrink-0">
+      <p id="modalTitulo" class="font-display font-bold text-madeira text-sm sm:text-base"></p>
+      <div class="flex items-center gap-3">
+        <a id="modalFull" href="#" target="_blank" class="text-madeira/50 hover:text-musgo text-xs hidden sm:inline">abrir em tela cheia ↗</a>
+        <button onclick="fechar()" aria-label="Fechar" class="w-8 h-8 rounded-full hover:bg-madeira/10 flex items-center justify-center text-madeira text-lg leading-none">✕</button>
+      </div>
+    </div>
+    <iframe id="modalFrame" class="flex-1 w-full bg-white" title="protótipo" src="about:blank"></iframe>
+  </div>
+</div>
+
+<script>
+  const modal = document.getElementById('modal');
+  const frame = document.getElementById('modalFrame');
+  function abrir(src, titulo){
+    document.getElementById('modalTitulo').textContent = titulo;
+    document.getElementById('modalFull').href = src;
+    frame.src = src;
+    modal.classList.remove('hidden'); modal.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+  }
+  function fechar(){
+    modal.classList.add('hidden'); modal.classList.remove('flex');
+    frame.src = 'about:blank';          // reseta a demo ao fechar
+    document.body.style.overflow = '';
+  }
+  modal.addEventListener('click', e => { if (e.target === modal) fechar(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) fechar(); });
+</script>
+</body>
+</html>

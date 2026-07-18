@@ -1,0 +1,14 @@
+<!-- FAIXA DE FOTOS -->
+<div class="grid grid-cols-3 md:grid-cols-6 gap-0">
+    {% for foto in galeria_faixa %}
+    <div class="aspect-square overflow-hidden {% if forloop.counter > 3 %}hidden md:block{% endif %}">
+        {% if foto.imagem %}
+        <img src="{{ foto.imagem.url }}" alt="{{ foto.legenda }}" class="w-full h-full object-cover hover:scale-105 transition-transform duration-500">
+        {% else %}
+        <div class="w-full h-full bg-madeira/20 flex items-center justify-center">
+            <span class="text-madeira/30 text-[10px]">[ {{ foto.legenda|default:"Foto" }} ]</span>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>

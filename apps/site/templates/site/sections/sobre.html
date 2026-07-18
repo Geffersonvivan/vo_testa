@@ -1,0 +1,44 @@
+{% load static %}
+
+<!-- SOBRE — A HISTÓRIA DO INVENTOR -->
+<section class="fade-section py-16 sm:py-24 bg-pergaminho relative overflow-hidden">
+    <!-- Ilustração roda d'água decorativa ao fundo -->
+    <div class="absolute right-[-8%] bottom-[-10%] opacity-[0.04]">
+        <img src="{% static 'site/img/ilustracao-roda.png' %}" alt="" class="w-[500px]" aria-hidden="true">
+    </div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+        <div class="grid md:grid-cols-2 gap-10 sm:gap-16 items-center">
+            <div>
+                <p class="text-lampiao text-xs sm:text-sm tracking-[0.3em] uppercase mb-3 sm:mb-4">Nossa História</p>
+                <h2 class="font-display text-3xl sm:text-4xl md:text-5xl font-black text-madeira mb-4 sm:mb-6 leading-tight">
+                    O Inventor que<br>Moveu as Águas
+                </h2>
+                <p class="text-madeira/70 leading-relaxed mb-6">
+                    Um lugar onde a inovação do passado inspira experiências únicas no presente. Vô Testa era um inventor. Com as próprias mãos, construiu uma roda d'água para gerar energia — uma peça que simboliza engenhosidade, conexão com a natureza e o espírito criativo que inspira cada canto desta pousada.
+                </p>
+                <p class="text-madeira/70 leading-relaxed mb-6">
+                    Hoje, a roda d'água original recebe os viajantes na entrada, abrigada dentro de um grande arco de tijolos. É o nosso marco, nosso coração. Cada quarto, cada experiência aqui dentro carrega um pouco dessa essência inventiva — a crença de que podemos transformar o que a natureza nos dá em algo extraordinário.
+                </p>
+                <p class="text-madeira/50 italic leading-relaxed mb-8 border-l-2 border-lampiao/40 pl-4">
+                    "As engrenagens do tempo desaceleraram para apreciar a beleza da natureza. Descubra um mundo novo, fora do tempo."
+                </p>
+            </div>
+
+            <!-- Placeholder da foto da roda d'água + Ilustração -->
+            <div class="relative">
+                <div class="bg-gradient-to-br from-madeira/20 to-madeira/5 rounded-3xl aspect-[3/4] flex items-center justify-center border-2 border-madeira/10 overflow-hidden">
+                    <div class="text-center p-8">
+                        <img src="{% static 'site/img/ilustracao-roda.png' %}" alt="Roda d'água" class="w-48 md:w-56 mx-auto mb-4 opacity-20">
+                        <p class="text-madeira/40 text-sm">[ Foto da Roda d'Água ]</p>
+                    </div>
+                </div>
+                <!-- Badge decorativa -->
+                <div class="absolute -bottom-4 -left-4 bg-lampiao text-noturno rounded-2xl px-5 py-3 shadow-xl">
+                    <span class="font-display text-2xl">1</span>
+                    <span class="text-xs ml-1">Roda d'água<br>original</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>

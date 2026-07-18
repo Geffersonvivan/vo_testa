@@ -1,0 +1,13 @@
+{% with atual=request.resolver_match.url_name %}
+<div class="filtros subnav">
+  <a href="{% url 'estoque:posicao' %}" class="selo {% if atual == 'posicao' %}selo-ativo{% endif %}">Posição</a>
+  <a href="{% url 'estoque:produtos' %}" class="selo {% if 'produto' in atual or atual == 'kardex' %}selo-ativo{% endif %}">Produtos</a>
+  <a href="{% url 'estoque:entrada' %}" class="selo {% if atual == 'entrada' %}selo-ativo{% endif %}">Entrada</a>
+  <a href="{% url 'estoque:saida' %}" class="selo {% if atual == 'saida' %}selo-ativo{% endif %}">Saída</a>
+  <a href="{% url 'estoque:transferencia' %}" class="selo {% if atual == 'transferencia' %}selo-ativo{% endif %}">Transferência</a>
+  <a href="{% url 'estoque:ajuste' %}" class="selo {% if atual == 'ajuste' %}selo-ativo{% endif %}">Ajuste</a>
+  <a href="{% url 'estoque:inventarios' %}" class="selo {% if 'inventario' in atual %}selo-ativo{% endif %}">Inventário</a>
+  <a href="{% url 'estoque:categorias' %}" class="selo {% if atual == 'categorias' %}selo-ativo{% endif %}">Categorias</a>
+  <a href="{% url 'estoque:locais' %}" class="selo {% if atual == 'locais' %}selo-ativo{% endif %}">Locais</a>
+</div>
+{% endwith %}

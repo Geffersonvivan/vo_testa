@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block titulo %}Documento fiscal #{{ doc.pk }}{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'fiscal:painel' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Fiscal
+</a>
+<p class="pagina-eyebrow letreiro">Financeiro</p>
+<div class="pagina-cabecalho">
+  <h1>{{ doc.get_tipo_display }} #{{ doc.pk }}</h1>
+  <span class="selo {% if doc.status == 'autorizada' %}selo-limpa{% elif doc.status == 'rejeitada' or doc.status == 'cancelada' %}selo-alerta{% else %}selo-em_andamento{% endif %}">{{ doc.get_status_display }}</span>
+</div>
+
+<div class="colunas colunas-2-1">
+  <section class="painel-bloco">
+    <dl class="ficha">
+      <div><dt>Natureza</dt><dd>{{ doc.get_natureza_display }}</dd></div>
+      <div><dt>Descrição</dt><dd>{{ doc.descricao }}</dd></div>
+      <div><dt>Valor</dt><dd><strong>R$ {{ doc.valor }}</strong></dd></div>
+      {% if doc.tomador %}<div><dt>Tomador</dt><dd>{{ doc.tomador.nome }}</dd></div>{% endif %}
+      <div><dt>Gateway</dt><dd>{{ doc.gateway|default:"—" }} · {{ doc.gateway_id|default:"—" }}</dd></div>
+      {% if doc.numero %}<div><dt>Número/série</dt><dd>{{ doc.numero }} / {{ doc.serie }}</dd></div>{% endif %}
+      {% if doc.chave %}<div><dt>Chave</dt><dd><small>{{ doc.chave }}</small></dd></div>{% endif %}
+      {% if doc.motivo_rejeicao %}<div><dt>Motivo</dt><dd>{{ doc.motivo_rejeicao }}</dd></div>{% endif %}
+      <div><dt>Emitido por</dt><dd>{{ doc.criado_por.get_short_name|default:doc.criado_por.username }} · {{ doc.criado_em|date:"d/m/Y H:i" }}</dd></div>
+    </dl>
+    {% if doc.pdf_url %}<p class="ficha-texto"><a href="{{ doc.pdf_url }}" target="_blank" class="botao-neutro">Ver DANFE/PDF</a></p>{% endif %}
+  </section>
+
+  <section>
+    {% if doc.autorizada and eh_gerente %}
+      <div class="painel-bloco" style="margin-bottom:1.2rem">
+        <h2 style="margin-top:0">Cancelar</h2>
+        <form method="post" action="{% url 'fiscal:cancelar' doc.pk %}" class="form-cartao">
+          {% csrf_token %}
+          <div class="campo"><label>Motivo</label><input type="text" name="motivo" required></div>
+          <div class="acoes"><button type="submit" class="botao-perigo">Cancelar documento</button></div>
+        </form>
+      </div>
+    {% endif %}
+    <div class="painel-bloco">
+      <h2 style="margin-top:0">Histórico</h2>
+      <ul class="timeline">
+        {% for e in doc.eventos.all %}
+          <li><strong>{{ e.tipo }}</strong> <small>{{ e.criado_em|date:"d/m H:i" }}</small></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+</div>
+{% endblock %}

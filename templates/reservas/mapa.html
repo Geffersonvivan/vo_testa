@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block titulo %}Mapa de reservas — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Reservas</p>
+<div class="pagina-cabecalho">
+  <h1>Mapa de reservas</h1>
+  <div class="acoes" style="margin:0">
+    <a href="{% url 'reservas:mapa_quartos' %}" class="botao-neutro">Mapa de quartos</a>
+    <button type="button" class="botao-primario"
+            hx-get="{% url 'reservas:nova' %}" hx-target="#modal-conteudo">Nova reserva</button>
+  </div>
+</div>
+<p class="subtitulo">Arraste sobre as noites de um quarto para reservar; ao soltar, os dados abrem em uma janela. Cada linha de tipo mostra quantos quartos livres há por dia.</p>
+
+<div class="mapa-navegacao">
+  <a href="?inicio={{ anterior|date:'Y-m-d' }}" class="botao-neutro">← Anterior</a>
+  <a href="{% url 'reservas:mapa' %}" class="botao-neutro">Hoje</a>
+  <a href="?inicio={{ proximo|date:'Y-m-d' }}" class="botao-neutro">Seguinte →</a>
+  <span class="mapa-legenda">
+    <span class="selo mapa-cor-pre_reserva">Pré-reserva</span>
+    <span class="selo mapa-cor-confirmada">Confirmada</span>
+    <span class="selo mapa-cor-hospedada">Hospedada</span>
+  </span>
+</div>
+
+<div class="mapa-rolagem">
+<table class="tabela mapa" id="mapa-grade" data-url-nova="{% url 'reservas:nova' %}">
+  <thead>
+    <tr class="mapa-meses">
+      <th class="mapa-uh"></th>
+      {% for m in meses %}<th colspan="{{ m.span }}">{{ m.rotulo|capfirst }}</th>{% endfor %}
+    </tr>
+    <tr>
+      <th class="mapa-uh">Quarto</th>
+      {% for d in dias %}
+        <th class="{% if d.fim_de_semana %}mapa-fds{% endif %} {% if d.hoje %}mapa-hoje{% endif %}">
+          {{ d.data|date:"D"|slice:":3" }}<br>{{ d.data|date:"d" }}
+        </th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for grupo in grupos %}
+      <tr class="mapa-grupo">
+        <td class="mapa-uh">
+          <strong>{{ grupo.tipo.nome }}</strong> <small>({{ grupo.uhs|length }})</small>
+        </td>
+        {% for d in grupo.disponibilidade %}
+          <td class="{% if d.fim_de_semana %}mapa-fds{% endif %} {% if d.hoje %}mapa-hoje{% endif %}">
+            <span class="mapa-livres dica {% if d.livres == 0 %}mapa-livres-zero{% endif %}"
+                  data-dica="{{ d.livres }} livre{{ d.livres|pluralize }} em {{ d.data|date:'d/m' }}">{{ d.livres }}</span>
+          </td>
+        {% endfor %}
+      </tr>
+      {% for linha in grupo.linhas %}
+        <tr class="mapa-linha" data-uh="{{ linha.uh.pk }}" data-numero="{{ linha.uh.numero }}">
+          <td class="mapa-uh">
+            <strong>{{ linha.uh.numero }}</strong>
+          </td>
+          {% for c in linha.celulas %}
+            {% if c.reserva %}
+              <td colspan="{{ c.span }}" class="mapa-ocupada dica"
+                  data-dica="{{ c.reserva.hospede.nome }} · {{ c.reserva.checkin|date:'d/m' }} → {{ c.reserva.checkout|date:'d/m' }} · {{ c.reserva.get_status_display }} — arraste para outra linha para trocar de quarto">
+                <a href="{% url 'reservas:detalhe' c.reserva.pk %}"
+                   class="mapa-barra mapa-cor-{{ c.reserva.status }}"
+                   draggable="true" data-reserva="{{ c.reserva.pk }}"
+                   data-nome="{{ c.reserva.hospede.nome }}" data-de="{{ linha.uh.numero }}">
+                  {{ c.reserva.hospede.nome|truncatechars:16 }}
+                </a>
+              </td>
+            {% else %}
+              <td class="mapa-livre {% if c.fim_de_semana %}mapa-fds{% endif %} {% if c.hoje %}mapa-hoje{% endif %}"
+                  data-uh="{{ linha.uh.pk }}" data-dia="{{ c.dia|date:'Y-m-d' }}"
+                  aria-label="Reservar {{ linha.uh.numero }} em {{ c.dia|date:'d/m' }}">+</td>
+            {% endif %}
+          {% endfor %}
+        </tr>
+      {% endfor %}
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<script>
+(function () {
+  const tabela = document.getElementById('mapa-grade');
+  if (!tabela) return;
+  const urlNova = tabela.dataset.urlNova;
+  let arrastando = false, uhAtual = null, ancora = null, ini = null, fim = null, moveu = false;
+
+  const seletorLivres = uh => tabela.querySelectorAll('.mapa-livre[data-uh="' + uh + '"]');
+  const datasLivres = uh => new Set(Array.from(seletorLivres(uh)).map(c => c.dataset.dia));
+
+  function addDias(iso, n) {
+    const [a, m, d] = iso.split('-').map(Number);
+    const dt = new Date(Date.UTC(a, m - 1, d + n));
+    return dt.toISOString().slice(0, 10);
+  }
+
+  // Estende da âncora até o alvo, parando em quarto ocupado (contiguidade).
+  function calcularIntervalo(uh, alvo) {
+    const livres = datasLivres(uh);
+    const passo = alvo >= ancora ? 1 : -1;
+    let ultimo = ancora, cur = ancora, guarda = 0;
+    while (cur !== alvo && guarda++ < 400) {
+      const prox = addDias(cur, passo);
+      if (!livres.has(prox)) break;
+      ultimo = cur = prox;
+    }
+    return ancora <= ultimo ? [ancora, ultimo] : [ultimo, ancora];
+  }
+
+  function pintar(uh, de, ate) {
+    tabela.querySelectorAll('.mapa-selecionando').forEach(c => c.classList.remove('mapa-selecionando'));
+    seletorLivres(uh).forEach(c => {
+      const d = c.dataset.dia;
+      if (d >= de && d <= ate) c.classList.add('mapa-selecionando');
+    });
+  }
+
+  function limpar() {
+    tabela.querySelectorAll('.mapa-selecionando').forEach(c => c.classList.remove('mapa-selecionando'));
+  }
+
+  function celulaEm(x, y) {
+    const el = document.elementFromPoint(x, y);
+    return el && el.closest ? el.closest('.mapa-livre') : null;
+  }
+
+  tabela.addEventListener('pointerdown', e => {
+    const cel = e.target.closest && e.target.closest('.mapa-livre');
+    if (!cel) return;
+    e.preventDefault();
+    arrastando = true; moveu = false;
+    uhAtual = cel.dataset.uh;
+    ancora = ini = fim = cel.dataset.dia;
+    pintar(uhAtual, ini, fim);
+  });
+
+  document.addEventListener('pointermove', e => {
+    if (!arrastando) return;
+    const cel = celulaEm(e.clientX, e.clientY);
+    if (!cel || cel.dataset.uh !== uhAtual) return;
+    moveu = true;
+    [ini, fim] = calcularIntervalo(uhAtual, cel.dataset.dia);
+    pintar(uhAtual, ini, fim);
+  });
+
+  document.addEventListener('pointerup', () => {
+    if (!arrastando) return;
+    arrastando = false;
+    // O último dia selecionado é a data de saída (check-out). Clique único
+    // (1 célula) vira 1 diária: entrada no dia, saída no dia seguinte.
+    const uh = uhAtual, checkin = ini;
+    const checkout = fim === ini ? addDias(fim, 1) : fim;
+    limpar();
+    if (!uh) return;
+    htmx.ajax('GET', urlNova + '?uh=' + uh + '&checkin=' + checkin + '&checkout=' + checkout,
+              '#modal-conteudo');
+  });
+
+  // ---- Arrastar uma reserva para outra linha = trocar de quarto ----
+  let dReserva = null, dNome = '', dDe = '';
+  tabela.querySelectorAll('.mapa-barra[data-reserva]').forEach(bar => {
+    bar.addEventListener('dragstart', e => {
+      dReserva = bar.dataset.reserva; dNome = bar.dataset.nome; dDe = bar.dataset.de;
+      bar.classList.add('arrastando'); e.dataTransfer.effectAllowed = 'move';
+    });
+    bar.addEventListener('dragend', () => bar.classList.remove('arrastando'));
+  });
+  tabela.querySelectorAll('.mapa-linha').forEach(row => {
+    row.addEventListener('dragover', e => {
+      if (dReserva && row.dataset.numero !== dDe) { e.preventDefault(); row.classList.add('linha-alvo'); }
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('linha-alvo'));
+    row.addEventListener('drop', async e => {
+      e.preventDefault(); row.classList.remove('linha-alvo');
+      if (!dReserva || row.dataset.numero === dDe) return;
+      const uh = row.dataset.uh, num = row.dataset.numero, rid = dReserva;
+      dReserva = null;
+      if (!confirm(`Mover ${dNome} do ${dDe} para o ${num}? A conta vai junto.`)) return;
+      const fd = new FormData(); fd.append('novo_uh', uh); fd.append('motivo', 'Troca pelo mapa de reservas');
+      const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+      try {
+        const trocarUrl = "{% url 'reservas:trocar_quarto' 0 %}".replace('/0/', '/' + rid + '/');
+        const r = await fetch(trocarUrl, {
+          method: 'POST', headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'fetch' }, body: fd,
+        });
+        const d = await r.json();
+        if (d.ok) { toast('Reserva movida para o ' + num + '. A conta foi junto.', 'success'); setTimeout(() => location.reload(), 700); }
+        else toast(d.erro || 'Não foi possível trocar.', 'error');
+      } catch (err) { toast('Falha de conexão.', 'error'); }
+    });
+  });
+})();
+</script>
+<form style="display:none">{% csrf_token %}</form>
+{% endblock %}

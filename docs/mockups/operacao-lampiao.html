@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Operação Lampião — mockup CRM Vô Testa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<style>
+  /* =========================================================
+     OPERAÇÃO LAMPIÃO — proposta visual (mockup)
+     Sujeito: CRM da recepção · Pousada Vô Testa
+     Tese: trabalhar à noite na recepção — Noturno + brasa do lampião.
+     Risco: o “corredor de portas” é o herói (não um grid de KPIs).
+     Evita: cream+terracota genérico · purple SaaS · dark acid.
+     ========================================================= */
+  :root {
+    --noite: #04151F;
+    --noite-2: #0A2433;
+    --noite-3: #143447;
+    --brasa: #E2A84A;
+    --brasa-suave: #F0C97A;
+    --madeira: #3E2418;
+    --musgo: #234A3A;
+    --nevoa: #EEF2F3;          /* papel frio operacional — não cream */
+    --neve: #FAFCFC;
+    --tinta: #0E1C24;
+    --tinta-2: #5A6B75;
+    --fio: #D5DEE3;
+    --ok: #2A7A58;
+    --warn: #B86B12;
+    --bad: #B13A2A;
+    --info: #2A6B78;
+    --fonte: "Hanken Grotesk", system-ui, sans-serif;
+    --display: "Fraunces", Georgia, serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+    --rail: 72px;
+    --glow: 0 0 28px rgba(226, 168, 74, .35);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--fonte);
+    color: var(--tinta);
+    background: var(--nevoa);
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font: inherit; }
+  a { color: inherit; text-decoration: none; }
+
+  /* —— shell —— */
+  .app {
+    display: grid;
+    grid-template-columns: var(--rail) 1fr;
+    min-height: 100vh;
+  }
+  .rail {
+    background: linear-gradient(180deg, var(--noite-2), var(--noite));
+    color: #C9D5DC;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 0 20px;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+  .marca {
+    width: 42px; height: 42px;
+    border-radius: 12px;
+    background: radial-gradient(circle at 35% 30%, var(--brasa-suave), var(--brasa) 55%, #8A5A12);
+    box-shadow: var(--glow);
+    display: grid; place-items: center;
+    margin-bottom: 12px;
+  }
+  .marca span {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: 1.1rem;
+    color: var(--noite);
+    line-height: 1;
+  }
+  .nav-ico {
+    width: 44px; height: 44px;
+    border: 0; border-radius: 12px;
+    background: transparent; color: #9BB0BC;
+    display: grid; place-items: center;
+    cursor: pointer;
+    transition: background .18s, color .18s, box-shadow .18s;
+  }
+  .nav-ico svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.7; }
+  .nav-ico:hover { background: rgba(255,255,255,.06); color: #fff; }
+  .nav-ico.ativo {
+    background: var(--noite-3);
+    color: var(--brasa-suave);
+    box-shadow: inset 0 0 0 1px rgba(226,168,74,.35), var(--glow);
+  }
+  .rail-spacer { flex: 1; }
+  .avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #1B3A4C; color: var(--brasa-suave);
+    display: grid; place-items: center;
+    font-weight: 700; font-size: .8rem;
+    border: 1px solid rgba(226,168,74,.35);
+  }
+
+  .main { min-width: 0; display: flex; flex-direction: column; }
+  .top {
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 28px;
+    background: rgba(250,252,252,.82);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--fio);
+    position: sticky; top: 0; z-index: 5;
+  }
+  .eyebrow {
+    font-size: .72rem; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--tinta-2);
+  }
+  .top h1 {
+    margin: 0; font-family: var(--display);
+    font-size: 1.35rem; font-weight: 600; letter-spacing: -.02em;
+  }
+  .busca {
+    margin-left: auto;
+    display: flex; align-items: center; gap: 10px;
+    min-width: min(420px, 46vw);
+    padding: 10px 14px;
+    border: 1px solid var(--fio);
+    border-radius: 999px;
+    background: var(--neve);
+    color: var(--tinta-2);
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .busca:hover { border-color: var(--brasa); box-shadow: 0 0 0 3px rgba(226,168,74,.15); }
+  .busca kbd {
+    margin-left: auto;
+    font-family: var(--mono); font-size: .7rem;
+    padding: 2px 7px; border-radius: 6px;
+    background: var(--nevoa); border: 1px solid var(--fio);
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 999px;
+    font-size: .78rem; font-weight: 600;
+    border: 1px solid var(--fio); background: var(--neve);
+  }
+  .pill .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--ok); box-shadow: 0 0 0 3px rgba(42,122,88,.15);
+  }
+
+  .conteudo { padding: 22px 28px 48px; display: grid; gap: 28px; }
+
+  /* —— hero: corredor —— */
+  .corredor-wrap { display: grid; gap: 14px; }
+  .corredor-cab {
+    display: flex; align-items: end; justify-content: space-between; gap: 16px;
+  }
+  .corredor-cab p {
+    margin: 4px 0 0; color: var(--tinta-2); max-width: 42ch; line-height: 1.45;
+  }
+  .filtros { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip {
+    border: 1px solid var(--fio); background: var(--neve);
+    padding: 7px 12px; border-radius: 999px;
+    font-size: .8rem; font-weight: 600; color: var(--tinta-2);
+    cursor: pointer;
+  }
+  .chip.on { background: var(--noite); color: #fff; border-color: var(--noite); }
+
+  .corredor {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 10px;
+    padding: 18px;
+    border-radius: 20px;
+    background:
+      linear-gradient(180deg, #0B2432 0%, #071820 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+    position: relative;
+    overflow: hidden;
+  }
+  .corredor::before {
+    content: "";
+    position: absolute; inset: auto 0 0 0; height: 28%;
+    background: linear-gradient(180deg, transparent, rgba(226,168,74,.08));
+    pointer-events: none;
+  }
+  .porta {
+    aspect-ratio: 3/4;
+    border-radius: 12px 12px 6px 6px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: linear-gradient(180deg, #1A3A4C, #122937);
+    color: #D7E2E8;
+    display: flex; flex-direction: column;
+    padding: 10px 8px 12px;
+    cursor: pointer;
+    transition: transform .18s, box-shadow .18s, border-color .18s;
+    position: relative;
+  }
+  .porta:hover { transform: translateY(-3px); border-color: rgba(226,168,74,.45); }
+  .porta .num {
+    font-family: var(--mono); font-weight: 600; font-size: .95rem;
+    letter-spacing: .02em;
+  }
+  .porta .meta { margin-top: auto; font-size: .68rem; color: #8FA3AF; line-height: 1.25; }
+  .porta .fecho {
+    position: absolute; right: 10px; top: 42%;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #6B808C;
+  }
+  .porta.ocupada {
+    background: linear-gradient(180deg, #243F2F, #163024);
+    box-shadow: inset 0 0 0 1px rgba(226,168,74,.25), 0 0 20px rgba(226,168,74,.12);
+  }
+  .porta.ocupada .fecho { background: var(--brasa); box-shadow: 0 0 10px var(--brasa); }
+  .porta.suja { background: linear-gradient(180deg, #4A2E22, #2E1A14); }
+  .porta.livre { opacity: .92; }
+  .porta.bloqueada { opacity: .45; filter: grayscale(.4); }
+  .porta .selo {
+    align-self: flex-start;
+    margin-top: 6px;
+    font-size: .62rem; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase;
+    padding: 3px 6px; border-radius: 999px;
+    background: rgba(0,0,0,.25);
+  }
+
+  /* —— ferramentas modernas (kit) —— */
+  .secao-titulo {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  }
+  .secao-titulo h2 {
+    margin: 0; font-family: var(--display); font-size: 1.25rem; font-weight: 600;
+  }
+  .secao-titulo span { color: var(--tinta-2); font-size: .85rem; }
+
+  .kit {
+    display: grid;
+    grid-template-columns: 1.2fr .8fr;
+    gap: 16px;
+  }
+  @media (max-width: 960px) {
+    .kit, .corredor { grid-template-columns: 1fr 1fr 1fr 1fr; }
+    .kit { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .app { grid-template-columns: 1fr; }
+    .rail { flex-direction: row; height: auto; width: 100%; position: sticky; overflow-x: auto; padding: 10px; }
+    .rail-spacer { display: none; }
+    .corredor { grid-template-columns: 1fr 1fr 1fr; }
+    .top { flex-wrap: wrap; }
+    .busca { margin-left: 0; width: 100%; min-width: 0; order: 3; }
+  }
+
+  .painel {
+    background: var(--neve);
+    border: 1px solid var(--fio);
+    border-radius: 18px;
+    padding: 18px;
+  }
+  .painel h3 {
+    margin: 0 0 14px; font-size: .78rem; font-weight: 700;
+    letter-spacing: .07em; text-transform: uppercase; color: var(--tinta-2);
+  }
+
+  .acoes { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .btn {
+    border: 0; border-radius: 12px; padding: 11px 16px;
+    font-weight: 600; cursor: pointer;
+    transition: transform .12s, box-shadow .12s, background .12s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primario {
+    color: var(--noite);
+    background: linear-gradient(180deg, var(--brasa-suave), var(--brasa));
+    box-shadow: 0 1px 0 rgba(255,255,255,.35) inset, var(--glow);
+  }
+  .btn-ghost {
+    background: transparent; color: var(--tinta);
+    border: 1px solid var(--fio);
+  }
+  .btn-noite {
+    background: var(--noite); color: #fff;
+  }
+  .btn:disabled {
+    opacity: .45; cursor: not-allowed; box-shadow: none;
+  }
+
+  .folio {
+    display: grid; gap: 0;
+    border: 1px solid var(--fio); border-radius: 14px; overflow: hidden;
+  }
+  .folio-row {
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 12px; padding: 12px 14px;
+    border-top: 1px solid var(--fio);
+    font-size: .9rem;
+  }
+  .folio-row:first-child { border-top: 0; background: #F3F7F8; }
+  .folio-row strong { font-family: var(--mono); font-weight: 600; }
+  .folio-row .muted { color: var(--tinta-2); font-size: .8rem; }
+  .folio-total {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 14px; background: var(--noite); color: #E8F0F4;
+  }
+  .folio-total em {
+    font-family: var(--display); font-style: normal; font-size: 1.4rem;
+    color: var(--brasa-suave);
+  }
+
+  .avisos { display: grid; gap: 10px; }
+  .aviso {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: start;
+    padding: 12px 14px; border-radius: 14px; border: 1px solid var(--fio);
+    background: var(--neve);
+  }
+  .aviso.alta { border-color: #E8C2BA; background: #FBF3F1; }
+  .aviso .tag {
+    font-size: .65rem; font-weight: 800; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--bad);
+    padding-top: 3px;
+  }
+  .aviso p { margin: 0; font-size: .88rem; line-height: 1.35; }
+  .aviso a { font-size: .8rem; font-weight: 700; color: var(--info); align-self: center; }
+
+  /* command palette overlay */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(4,21,31,.55);
+    display: none; place-items: start center; padding-top: 12vh; z-index: 40;
+  }
+  .overlay.on { display: grid; }
+  .paleta {
+    width: min(560px, 92vw);
+    background: var(--neve);
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,.2);
+    box-shadow: 0 30px 80px rgba(4,21,31,.45);
+    overflow: hidden;
+    animation: sobe .22s ease;
+  }
+  @keyframes sobe {
+    from { opacity: 0; transform: translateY(8px) scale(.98); }
+    to { opacity: 1; transform: none; }
+  }
+  .paleta input {
+    width: 100%; border: 0; padding: 18px 20px;
+    font-size: 1.05rem; outline: none; background: transparent;
+    border-bottom: 1px solid var(--fio);
+  }
+  .paleta ul { list-style: none; margin: 0; padding: 8px; }
+  .paleta li {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 12px 12px; border-radius: 10px; cursor: pointer;
+  }
+  .paleta li:hover, .paleta li.sel { background: #F0F5F6; }
+  .paleta li small { color: var(--tinta-2); font-family: var(--mono); font-size: .72rem; }
+
+  /* toast */
+  .toast {
+    position: fixed; right: 22px; bottom: 22px; z-index: 50;
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; border-radius: 14px;
+    background: var(--noite); color: #EAF1F4;
+    box-shadow: var(--glow), 0 16px 40px rgba(4,21,31,.35);
+    transform: translateY(120%); opacity: 0;
+    transition: transform .28s ease, opacity .28s ease;
+  }
+  .toast.on { transform: none; opacity: 1; }
+  .toast b { color: var(--brasa-suave); }
+
+  /* tokens strip */
+  .tokens {
+    display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;
+  }
+  @media (max-width: 800px) { .tokens { grid-template-columns: repeat(3, 1fr); } }
+  .swatch {
+    border-radius: 14px; padding: 14px 12px; min-height: 88px;
+    display: flex; flex-direction: column; justify-content: end;
+    border: 1px solid rgba(0,0,0,.06);
+    font-size: .72rem; font-weight: 600;
+  }
+  .swatch code { font-family: var(--mono); font-size: .68rem; opacity: .85; }
+
+  .nota {
+    padding: 16px 18px; border-radius: 16px;
+    background: #E7F0F2; border: 1px solid #C5D6DC;
+    color: #1C3A44; font-size: .92rem; line-height: 1.5;
+  }
+  .nota strong { font-weight: 700; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation: none !important; transition: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail" aria-label="Navegação">
+      <div class="marca" title="Vô Testa"><span>V</span></div>
+      <button class="nav-ico ativo" title="Hoje" aria-current="page">
+        <svg viewBox="0 0 24 24"><path d="M4 10h16M6 4v4M18 4v4M5 8h14v12H5z"/></svg>
+      </button>
+      <button class="nav-ico" title="Reservas">
+        <svg viewBox="0 0 24 24"><path d="M4 7h16v12H4zM8 7V5M16 7V5M4 11h16"/></svg>
+      </button>
+      <button class="nav-ico" title="Caixa">
+        <svg viewBox="0 0 24 24"><path d="M4 8h16v11H4zM8 8V6h8v2M12 13v3"/></svg>
+      </button>
+      <button class="nav-ico" title="Loja">
+        <svg viewBox="0 0 24 24"><path d="M6 9h12l-1 10H7L6 9zM9 9V7a3 3 0 016 0v2"/></svg>
+      </button>
+      <div class="rail-spacer"></div>
+      <div class="avatar" title="Operador">GV</div>
+    </aside>
+
+    <div class="main">
+      <header class="top">
+        <div>
+          <div class="eyebrow">Recepção · hoje</div>
+          <h1>Operação Lampião</h1>
+        </div>
+        <button class="busca" id="abrirPaleta" type="button">
+          <span>Buscar hóspede, quarto, ação…</span>
+          <kbd>⌘K</kbd>
+        </button>
+        <span class="pill"><span class="dot"></span> Caixa aberto</span>
+      </header>
+
+      <div class="conteudo">
+        <section class="corredor-wrap">
+          <div class="corredor-cab">
+            <div>
+              <div class="eyebrow">Assinatura visual</div>
+              <h2 style="margin:4px 0 0;font-family:var(--display);font-size:1.5rem;">O corredor</h2>
+              <p>Em vez de um dashboard de cartões, a casa fala primeiro: 24 portas, luz de lampião no que está vivo.</p>
+            </div>
+            <div class="filtros">
+              <button class="chip on" type="button">Todos</button>
+              <button class="chip" type="button">Ocupados</button>
+              <button class="chip" type="button">A limpar</button>
+              <button class="chip" type="button">Livres</button>
+            </div>
+          </div>
+
+          <div class="corredor" aria-label="Mapa de quartos">
+            <article class="porta ocupada"><span class="num">01</span><span class="selo">Hóspede</span><span class="fecho"></span><span class="meta">Souza · sai 18</span></article>
+            <article class="porta livre"><span class="num">02</span><span class="selo">Livre</span><span class="fecho"></span><span class="meta">Std</span></article>
+            <article class="porta suja"><span class="num">03</span><span class="selo">A limpar</span><span class="fecho"></span><span class="meta">Pós-saída</span></article>
+            <article class="porta ocupada"><span class="num">04</span><span class="selo">Hóspede</span><span class="fecho"></span><span class="meta">Gomes · sai 19</span></article>
+            <article class="porta livre"><span class="num">05</span><span class="selo">Livre</span><span class="fecho"></span><span class="meta">Std</span></article>
+            <article class="porta ocupada"><span class="num">06</span><span class="selo">Hóspede</span><span class="fecho"></span><span class="meta">Menezes</span></article>
+            <article class="porta bloqueada"><span class="num">07</span><span class="selo">Bloq.</span><span class="fecho"></span><span class="meta">Manutenção</span></article>
+            <article class="porta livre"><span class="num">08</span><span class="selo">Inspec.</span><span class="fecho"></span><span class="meta">Pronta</span></article>
+            <article class="porta ocupada"><span class="num">09</span><span class="selo">Hóspede</span><span class="fecho"></span><span class="meta">Dias</span></article>
+            <article class="porta suja"><span class="num">10</span><span class="selo">Em limpeza</span><span class="fecho"></span><span class="meta">Camareira</span></article>
+            <article class="porta livre"><span class="num">11</span><span class="selo">Livre</span><span class="fecho"></span><span class="meta">Luxo</span></article>
+            <article class="porta ocupada"><span class="num">12</span><span class="selo">Hóspede</span><span class="fecho"></span><span class="meta">Castro</span></article>
+            <article class="porta livre"><span class="num">13</span><span class="selo">Livre</span><span class="fecho"></span><span class="meta">Std</span></article>
+            <article class="porta ocupada"><span class="num">14</span><span class="selo">Hóspede</span><span class="fecho"></span><span class="meta">Reis</span></article>
+            <article class="porta livre"><span class="num">15</span><span class="selo">Livre</span><span class="fecho"></span><span class="meta">Std</span></article>
+            <article class="porta ocupada"><span class="num">16</span><span class="selo">Chegada</span><span class="fecho"></span><span class="meta">Hoje 15h</span></article>
+          </div>
+        </section>
+
+        <section class="kit">
+          <div class="painel">
+            <h3>Ferramentas</h3>
+            <div class="acoes">
+              <button class="btn btn-primario" type="button" id="toastBtn">Nova reserva</button>
+              <button class="btn btn-noite" type="button">Abrir caixa</button>
+              <button class="btn btn-ghost" type="button">Conferir frigobar</button>
+              <button class="btn btn-ghost" type="button" disabled title="Guard estrutural">Check-out</button>
+            </div>
+            <div class="folio">
+              <div class="folio-row">
+                <div>
+                  <div>Conta · Quarto 12</div>
+                  <div class="muted">Diego Castro · 2 diárias</div>
+                </div>
+                <strong>R$ 600,00</strong>
+              </div>
+              <div class="folio-row">
+                <div>Loja · água + snacks</div>
+                <strong>R$ 38,00</strong>
+              </div>
+              <div class="folio-row">
+                <div>Frigobar · conferência</div>
+                <strong>R$ 29,00</strong>
+              </div>
+              <div class="folio-total">
+                <span>A receber</span>
+                <em>R$ 667,00</em>
+              </div>
+            </div>
+          </div>
+
+          <div class="painel">
+            <h3>Atenção (estrutura da UI)</h3>
+            <div class="avisos">
+              <div class="aviso alta">
+                <span class="tag">Guard</span>
+                <p>Saída bloqueada — conferência do frigobar pendente.</p>
+                <a href="#">Conferir</a>
+              </div>
+              <div class="aviso">
+                <span class="tag" style="color:var(--warn)">Faxina</span>
+                <p>Quarto 03 sujo após check-out — entrada só depois da limpeza.</p>
+                <a href="#">Governança</a>
+              </div>
+              <div class="aviso">
+                <span class="tag" style="color:var(--info)">Sinal</span>
+                <p>Pré-reserva do site aguardando pagamento (Safrapay).</p>
+                <a href="#">Ver</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div class="secao-titulo">
+            <h2>Tokens da proposta</h2>
+            <span>Marca Vô Testa · operação limpa</span>
+          </div>
+          <div class="tokens" style="margin-top:12px">
+            <div class="swatch" style="background:#04151F;color:#EAF1F4">Noite<code>#04151F</code></div>
+            <div class="swatch" style="background:#E2A84A;color:#04151F">Brasa<code>#E2A84A</code></div>
+            <div class="swatch" style="background:#EEF2F3;color:#0E1C24">Névoa<code>#EEF2F3</code></div>
+            <div class="swatch" style="background:#FAFCFC;color:#0E1C24;border-color:#D5DEE3">Neve<code>#FAFCFC</code></div>
+            <div class="swatch" style="background:#3E2418;color:#F5E6D8">Madeira<code>#3E2418</code></div>
+            <div class="swatch" style="background:#234A3A;color:#E6F2EC">Musgo<code>#234A3A</code></div>
+          </div>
+        </section>
+
+        <div class="nota">
+          <strong>Direção:</strong> sidebar ícone-só (corredor estreito), canvas frio operacional,
+          ouro só na brasa (ativo / CTA / porta ocupada). Tipografia: Fraunces no título,
+          Hanken na UI, Plex Mono em quarto e dinheiro.
+          <strong>Risco assumido:</strong> o mapa de portas vira o herói do dia — não o grid de KPIs.
+          Isso é Vô Testa, não um SaaS genérico.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <div class="paleta" role="dialog" aria-label="Paleta de comandos">
+      <input id="paletaInput" placeholder="Ir para… ou fazer…" autocomplete="off" />
+      <ul>
+        <li class="sel"><span>Abrir mapa de quartos</span><small>reservas</small></li>
+        <li><span>Nova reserva</span><small>N</small></li>
+        <li><span>Conferir frigobar · Q12</span><small>frigobar</small></li>
+        <li><span>Abrir caixa</span><small>financeiro</small></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"><span>Reserva <b>#184</b> criada · Quarto 11</span></div>
+
+<script>
+  const overlay = document.getElementById('overlay');
+  const abrir = document.getElementById('abrirPaleta');
+  const input = document.getElementById('paletaInput');
+  const toast = document.getElementById('toast');
+
+  function togglePaleta(on) {
+    overlay.classList.toggle('on', on);
+    overlay.setAttribute('aria-hidden', on ? 'false' : 'true');
+    if (on) setTimeout(() => input.focus(), 40);
+  }
+  abrir.addEventListener('click', () => togglePaleta(true));
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) togglePaleta(false); });
+  window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      e.preventDefault(); togglePaleta(!overlay.classList.contains('on'));
+    }
+    if (e.key === 'Escape') togglePaleta(false);
+  });
+  document.getElementById('toastBtn').addEventListener('click', () => {
+    toast.classList.add('on');
+    setTimeout(() => toast.classList.remove('on'), 2600);
+  });
+  document.querySelectorAll('.chip').forEach((c) => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach((x) => x.classList.remove('on'));
+      c.classList.add('on');
+    });
+  });
+</script>
+</body>
+</html>

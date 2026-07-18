@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block titulo %}Tabela de preços — Lavanderia{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'lavanderia:painel' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Lavanderia
+</a>
+<p class="pagina-eyebrow letreiro">Lavanderia</p>
+<h1>Tabela de preços</h1>
+<p class="subtitulo">Serviços cobrados do hóspede (natureza SERVIÇO).</p>
+
+<div class="colunas">
+  <section>
+    <h2>Serviços</h2>
+    <table class="tabela">
+      <thead><tr><th>Serviço</th><th>Unidade</th><th class="num">Preço</th><th>Situação</th></tr></thead>
+      <tbody>
+        {% for s in servicos %}
+          <tr><td>{{ s.nome }}</td><td>{{ s.get_unidade_display }}</td><td class="num">R$ {{ s.preco }}</td>
+              <td>{% if s.ativo %}Ativo{% else %}Inativo{% endif %}</td></tr>
+        {% empty %}
+          <tr><td colspan="4" class="vazio">Nenhum serviço ainda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <section class="painel-bloco">
+    <h2 style="margin-top:0">Novo serviço</h2>
+    <form method="post" class="form-cartao">
+      {% csrf_token %}
+      <div class="campo"><label>Nome</label><input type="text" name="nome" placeholder="Ex.: Camisa social" required></div>
+      <div class="form-grade">
+        <div class="campo"><label>Unidade</label>
+          <select name="unidade">{% for v, r in unidades %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
+        </div>
+        <div class="campo"><label>Preço (R$)</label><input type="number" name="preco" min="0" step="0.01" required></div>
+      </div>
+      <div class="acoes"><button type="submit" class="botao-primario">Salvar</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

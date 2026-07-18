@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block titulo %}Comanda #{{ comanda.pk }} — Restaurante{% endblock %}
+
+{% block conteudo %}
+<a href="#" class="voltar" onclick="history.back(); return false;">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Voltar
+</a>
+<p class="pagina-eyebrow letreiro">Restaurante Piscina</p>
+<div class="pagina-cabecalho">
+  <h1>Comanda #{{ comanda.pk }} — {{ comanda.titulo }}</h1>
+  <span class="selo {% if comanda.status == 'cancelada' %}selo-alerta{% elif comanda.aberta %}selo-em_andamento{% else %}selo-limpa{% endif %}">{{ comanda.get_status_display }}</span>
+</div>
+
+<div class="pdv" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <section class="pdv-produtos">
+    {% if comanda.aberta %}
+      <p class="subtitulo">Toque num item do cardápio para lançar na comanda.</p>
+      <div class="pdv-lista">
+        {% for p in cardapio %}
+          <button type="button" class="pdv-produto {% if p.saldo <= 0 %}esgotado{% endif %}"
+                  {% if p.saldo > 0 %}hx-post="{% url 'restaurante:add_item' comanda.pk %}"
+                  hx-vals='{"produto_id": {{ p.id }}, "quantidade": 1}'
+                  hx-target="#comanda-itens" hx-swap="outerHTML"{% else %}disabled{% endif %}>
+            <span class="pdv-produto-nome">{{ p.nome }}</span>
+            <span class="pdv-produto-meta">
+              <span class="pdv-preco">R$ {{ p.preco }}</span>
+              <small class="pdv-saldo">{% if p.saldo > 0 %}saldo {{ p.saldo|floatformat:"-3" }}{% else %}esgotado{% endif %}</small>
+            </span>
+            <span class="pdv-add" aria-hidden="true">+</span>
+          </button>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="subtitulo">
+        Comanda {{ comanda.get_status_display|lower }}
+        {% if comanda.status == 'cancelada' %}{% if comanda.motivo_cancelamento %} — motivo: <strong>{{ comanda.motivo_cancelamento }}</strong>{% endif %}
+        {% elif comanda.conta_ref %} — lançada na conta: <strong>{{ comanda.conta_ref }}</strong>
+        {% elif comanda.forma_pagamento %} — paga com <strong>{{ comanda.forma_pagamento.nome }}</strong>{% endif %}.
+      </p>
+    {% endif %}
+  </section>
+
+  <aside class="pdv-painel">
+    <div class="pdv-painel-topo">
+      <h2>Comanda</h2>
+      <span class="pdv-contador">{{ comanda.titulo }}</span>
+    </div>
+    <div class="pdv-carrinho">
+      {% include "restaurante/partials/itens.html" %}
+    </div>
+
+    {% if comanda.aberta %}
+      <form method="post" action="{% url 'restaurante:fechar' comanda.pk %}" class="comanda-fechar" x-data="{ destino: 'caixa' }">
+        {% csrf_token %}
+        <input type="hidden" name="destino" :value="destino">
+        <div class="pdv-resumo">
+          <div class="pdv-linha-desc">
+            <span>Desconto</span>
+            <div class="input-reais"><span>R$</span><input type="number" name="desconto" min="0" step="0.01" value="0"></div>
+          </div>
+        </div>
+        <div class="pdv-seg" style="margin:0 1.3rem">
+          <button type="button" :class="{ativo: destino === 'caixa'}" @click="destino = 'caixa'">Pagar agora</button>
+          {% if contas %}<button type="button" :class="{ativo: destino === 'conta'}" @click="destino = 'conta'">Conta do quarto</button>{% endif %}
+        </div>
+        <label class="select-wrap" style="margin:.6rem 1.3rem 0" x-show="destino === 'caixa'" x-cloak>
+          <select name="forma"><option value="">Forma de pagamento…</option>
+            {% for f in formas %}<option value="{{ f.pk }}">{{ f.nome }}</option>{% endfor %}
+          </select>
+        </label>
+        {% if contas %}
+        <label class="select-wrap" style="margin:.6rem 1.3rem 0" x-show="destino === 'conta'" x-cloak>
+          <select name="conta_id"><option value="">Quarto / hóspede…</option>
+            {% for c in contas %}<option value="{{ c.id }}">{{ c.rotulo }}</option>{% endfor %}
+          </select>
+        </label>
+        {% endif %}
+        <button type="submit" class="botao-primario pdv-finalizar">Fechar comanda</button>
+      </form>
+
+      <div class="comanda-extras">
+        <form method="post" action="{% url 'restaurante:transferir' comanda.pk %}" class="form-inline">
+          {% csrf_token %}
+          <select name="mesa"><option value="">Transferir para ponto…</option>
+            {% for m in mesas %}<option value="{{ m.pk }}" {% if comanda.mesa_id == m.pk %}selected{% endif %}>{{ m.nome }}</option>{% endfor %}
+          </select>
+          <button type="submit" class="botao-neutro">Transferir</button>
+        </form>
+        {% if eh_gerente %}
+          <details class="acao-sensivel">
+            <summary>Cancelar comanda</summary>
+            <form method="post" action="{% url 'restaurante:cancelar' comanda.pk %}" class="form-cartao">
+              {% csrf_token %}
+              <div class="campo"><label>Motivo</label><input type="text" name="motivo" required></div>
+              <div class="acoes"><button type="submit" class="botao-perigo">Cancelar e devolver estoque</button></div>
+            </form>
+          </details>
+        {% endif %}
+      </div>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

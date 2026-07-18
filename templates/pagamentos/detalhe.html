@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block titulo %}Cobrança #{{ cobranca.pk }} — Pagamentos{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'pagamentos:painel' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Pagamentos
+</a>
+<p class="pagina-eyebrow letreiro">Financeiro</p>
+<div class="pagina-cabecalho">
+  <h1>Cobrança #{{ cobranca.pk }}</h1>
+  <span class="selo selo-pg-{{ cobranca.status }}">{{ cobranca.get_status_display }}</span>
+</div>
+
+<div class="colunas colunas-2-1">
+  <section class="painel-bloco">
+    <dl class="ficha">
+      <div><dt>Valor</dt><dd><strong>R$ {{ cobranca.valor }}</strong>{% if cobranca.metodo == 'cartao' and cobranca.parcelas > 1 %} em {{ cobranca.parcelas }}×{% endif %}</dd></div>
+      <div><dt>Método</dt><dd>{{ cobranca.get_metodo_display }}</dd></div>
+      <div><dt>Finalidade</dt><dd>{{ cobranca.get_finalidade_display }}{% if cobranca.reserva_id %} · reserva #{{ cobranca.reserva_id }}{% endif %}</dd></div>
+      <div><dt>Descrição</dt><dd>{{ cobranca.descricao }}</dd></div>
+      {% if cobranca.pagador %}<div><dt>Pagador</dt><dd>{{ cobranca.pagador.nome }}</dd></div>{% endif %}
+      <div><dt>Gateway</dt><dd>{{ cobranca.gateway|default:"—" }} · {{ cobranca.gateway_id|default:"—" }}</dd></div>
+      {% if cobranca.pago_em %}<div><dt>Paga em</dt><dd>{{ cobranca.pago_em|date:"d/m/Y H:i" }}</dd></div>{% endif %}
+    </dl>
+
+    {% if cobranca.metodo == 'pix' and cobranca.pix_copia_cola %}
+      <div class="pix-box">
+        <span class="letreiro">Pix copia-e-cola</span>
+        <code>{{ cobranca.pix_copia_cola }}</code>
+      </div>
+    {% endif %}
+
+    <div class="pix-box">
+      <span class="letreiro">Link de pagamento (enviar por WhatsApp/e-mail)</span>
+      <code>{{ request.scheme }}://{{ request.get_host }}{% url 'pagamentos:pagar' cobranca.token %}</code>
+    </div>
+  </section>
+
+  <section>
+    <div class="painel-bloco" style="margin-bottom:1.2rem">
+      <h2 style="margin-top:0">Ações</h2>
+      {% if cobranca.pendente %}
+        <form method="post" action="{% url 'pagamentos:simular' cobranca.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="botao-primario" style="width:100%">Simular pagamento (sandbox)</button>
+        </form>
+        <form method="post" action="{% url 'pagamentos:cancelar' cobranca.pk %}" style="margin-top:.6rem">
+          {% csrf_token %}
+          <button type="submit" class="botao-neutro" style="width:100%">Cancelar cobrança</button>
+        </form>
+      {% elif cobranca.paga and eh_gerente %}
+        <form method="post" action="{% url 'pagamentos:estornar' cobranca.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="botao-perigo" style="width:100%">Estornar</button>
+        </form>
+      {% else %}
+        <p class="subtitulo">Sem ações disponíveis neste status.</p>
+      {% endif %}
+    </div>
+
+    <div class="painel-bloco">
+      <h2 style="margin-top:0">Histórico</h2>
+      <ul class="timeline">
+        {% for e in cobranca.eventos.all %}
+          <li><strong>{{ e.get_tipo_display }}</strong> <small>{{ e.origem }} · {{ e.criado_em|date:"d/m H:i" }}</small></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </section>
+</div>
+{% endblock %}

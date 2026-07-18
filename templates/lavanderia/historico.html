@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block titulo %}Histórico — Lavanderia{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'lavanderia:painel' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Lavanderia
+</a>
+<p class="pagina-eyebrow letreiro">Lavanderia</p>
+<h1>Histórico de ordens</h1>
+<p class="subtitulo">Ordens entregues e canceladas.</p>
+
+<table class="tabela">
+  <thead>
+    <tr><th>#</th><th>Cliente</th><th>Situação</th><th class="num">Total</th><th>Fecho</th><th>Quando</th></tr>
+  </thead>
+  <tbody>
+    {% for o in ordens %}
+      <tr class="linha-clique" onclick="location.href='{% url 'lavanderia:ordem' o.pk %}'">
+        <td>{{ o.pk }}</td>
+        <td>{{ o.titulo }}</td>
+        <td><span class="selo {% if o.status == 'cancelada' %}selo-alerta{% else %}selo-limpa{% endif %}">{{ o.get_status_display }}</span></td>
+        <td class="num">R$ {{ o.total }}</td>
+        <td>{% if o.status == 'cancelada' %}Cancelada{% elif o.conta_ref %}Conta: {{ o.conta_ref }}{% elif o.forma_pagamento %}{{ o.forma_pagamento.nome }}{% else %}—{% endif %}</td>
+        <td>{{ o.entregue_em|default:o.recebida_em|date:"d/m H:i" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vazio">Nenhuma ordem encerrada ainda.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

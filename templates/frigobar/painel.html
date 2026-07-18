@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block titulo %}Frigobar — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<div class="pagina-cabecalho">
+  <h1>Frigobar</h1>
+  <div class="pagina-acoes">
+    <a href="{% url 'frigobar:composicoes' %}" class="botao-neutro">Composições</a>
+  </div>
+</div>
+<p class="subtitulo">Conferência do frigobar na arrumação e no check-out: o consumo vai para a conta do quarto e gera a lista de reposição.</p>
+
+{% if sem_reservas %}
+  <p class="bloco-vazio">O Frigobar precisa do módulo Reservas ativo (conta do quarto).</p>
+{% else %}
+
+<div class="colunas colunas-2-1">
+  <section>
+    <div class="painel-bloco" style="max-width:560px;margin-bottom:1.4rem">
+      <h2 style="margin-top:0">Nova conferência</h2>
+      {% if contas %}
+        <form method="get" action="{% url 'frigobar:conferir' %}" class="abrir-comanda">
+          <label class="select-wrap" style="flex:1">
+            <select name="conta"><option value="">Quarto / hóspede…</option>
+              {% for c in contas %}<option value="{{ c.id }}">{{ c.rotulo }}</option>{% endfor %}
+            </select>
+          </label>
+          <button type="submit" class="botao-primario">Conferir</button>
+        </form>
+      {% else %}
+        <p class="vazio">Nenhuma conta de hospedagem aberta no momento.</p>
+      {% endif %}
+    </div>
+
+    <h2>Conferências recentes</h2>
+    <table class="tabela">
+      <thead><tr><th>#</th><th>Quarto</th><th>Momento</th><th class="num">Total</th><th>Situação</th><th>Quando</th></tr></thead>
+      <tbody>
+        {% for c in recentes %}
+          <tr class="linha-clique" onclick="location.href='{% url 'frigobar:conferencia' c.pk %}'">
+            <td>{{ c.pk }}</td>
+            <td>{{ c.uh.numero }}</td>
+            <td>{{ c.get_momento_display }}</td>
+            <td class="num">R$ {{ c.total }}</td>
+            <td><span class="selo {% if c.status == 'reposta' %}selo-limpa{% else %}selo-em_andamento{% endif %}">{{ c.get_status_display }}</span></td>
+            <td>{{ c.criado_em|date:"d/m H:i" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="vazio">Nenhuma conferência ainda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="painel-bloco">
+    <h2 style="margin-top:0">Lista de reposição</h2>
+    <p class="subtitulo">Consumido e ainda não reposto ao central.</p>
+    <table class="tabela">
+      <thead><tr><th>Produto</th><th class="num">Repor</th></tr></thead>
+      <tbody>
+        {% for r in reposicao %}
+          <tr><td>{{ r.produto__nome }}</td><td class="num"><strong>{{ r.total }}</strong></td></tr>
+        {% empty %}
+          <tr><td colspan="2" class="vazio">Nada pendente. 🎉</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endif %}
+{% endblock %}

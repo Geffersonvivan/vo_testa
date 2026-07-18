@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block titulo %}Locais de estoque — Estoque{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<h1>Locais de estoque</h1>
+{% include "estoque/partials/nav.html" %}
+<p class="subtitulo">Depósitos: almoxarifado central e um por área que usa estoque (loja, restaurante, frigobar, rouparia).</p>
+
+<div class="colunas">
+  <section>
+    <h2>Locais</h2>
+    <table class="tabela">
+      <thead><tr><th>Nome</th><th>Vínculo</th><th>Situação</th></tr></thead>
+      <tbody>
+        {% for l in locais %}
+          <tr>
+            <td>{{ l.nome }}</td>
+            <td>{{ l.get_modulo_display }}</td>
+            <td>{% if l.ativo %}Ativo{% else %}Inativo{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="3" class="vazio">Nenhum local ainda.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <section>
+    <h2>Novo local</h2>
+    <form method="post" class="form-cartao">
+      {% csrf_token %}
+      {% include "nucleo/partials/campos.html" %}
+      <div class="acoes"><button type="submit" class="botao-primario">Salvar</button></div>
+    </form>
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block titulo %}Lançamentos — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Financeiro</p>
+<div class="pagina-cabecalho">
+  <h1>Lançamentos</h1>
+  <a href="{% url 'lancamento_novo' %}" class="botao-primario">Novo lançamento</a>
+</div>
+<p class="subtitulo">Receitas e despesas por categoria e centro (módulo).</p>
+
+<div class="cartoes cartoes-indicadores">
+  <div class="cartao">
+    <span class="indicador-rotulo letreiro">Receitas</span>
+    <span class="indicador-valor">R$ {{ totais.receitas }}</span>
+  </div>
+  <div class="cartao">
+    <span class="indicador-rotulo letreiro">Despesas</span>
+    <span class="indicador-valor">R$ {{ totais.despesas }}</span>
+  </div>
+</div>
+
+<div class="filtros">
+  <a href="{% url 'lancamentos' %}" class="selo {% if not tipo %}selo-ativo{% endif %}">Todos</a>
+  <a href="?tipo=receita" class="selo {% if tipo == 'receita' %}selo-ativo{% endif %}">Receitas</a>
+  <a href="?tipo=despesa" class="selo {% if tipo == 'despesa' %}selo-ativo{% endif %}">Despesas</a>
+</div>
+
+<table class="tabela">
+  <thead>
+    <tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Centro</th><th>Descrição</th><th>Valor</th></tr>
+  </thead>
+  <tbody>
+    {% for l in lancamentos %}
+      <tr>
+        <td>{{ l.data|date:"d/m/Y" }}</td>
+        <td>{{ l.get_tipo_display }}</td>
+        <td>{{ l.categoria.nome }}</td>
+        <td>{{ l.get_centro_display }}</td>
+        <td>{{ l.descricao }}</td>
+        <td>R$ {{ l.valor }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vazio">Nenhum lançamento. Cadastre categorias no admin e registre o primeiro.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

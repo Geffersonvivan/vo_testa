@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block titulo %}Quartos & tipos — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Cadastros</p>
+<h1>Quartos &amp; tipos</h1>
+<p class="subtitulo">A estrutura física da pousada: os tipos de quarto e os 24 quartos.</p>
+
+<div class="pagina-cabecalho">
+  <h2>Tipos de quarto</h2>
+  <a href="{% url 'tipo_uh_novo' %}" class="botao-primario">Novo tipo</a>
+</div>
+<table class="tabela">
+  <thead>
+    <tr><th>Nome</th><th>Capacidade</th><th>Tarifa base</th><th>Quartos</th><th>Situação</th></tr>
+  </thead>
+  <tbody>
+    {% for t in tipos %}
+      <tr>
+        <td><a href="{% url 'tipo_uh_editar' t.pk %}">{{ t.nome }}</a></td>
+        <td>{{ t.capacidade }} pessoas</td>
+        <td>R$ {{ t.tarifa_base }}</td>
+        <td>{{ t.uhs.count }}</td>
+        <td>{% if t.ativo %}Ativo{% else %}Inativo{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="vazio">Cadastre o primeiro tipo de quarto — ele define capacidade e tarifa base.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<div class="pagina-cabecalho">
+  <h2>Quartos</h2>
+  <a href="{% url 'uh_nova' %}" class="botao-primario">Novo quarto</a>
+</div>
+<table class="tabela">
+  <thead>
+    <tr><th>Número/nome</th><th>Tipo</th><th>Bloco</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    {% for uh in uhs %}
+      <tr>
+        <td><a href="{% url 'uh_editar' uh.pk %}">{{ uh.numero }}</a></td>
+        <td>{{ uh.tipo.nome }}</td>
+        <td>{{ uh.bloco|default:"—" }}</td>
+        <td>{{ uh.get_status_display }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="4" class="vazio">Nenhum quarto cadastrado — crie um tipo primeiro, depois os quartos.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

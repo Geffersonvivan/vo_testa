@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block titulo %}Venda #{{ venda.pk }} — Loja{% endblock %}
+
+{% block conteudo %}
+<a href="#" class="voltar" onclick="history.back(); return false;">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Voltar
+</a>
+<p class="pagina-eyebrow letreiro">Vendas & Estoque</p>
+<div class="pagina-cabecalho">
+  <h1>Venda #{{ venda.pk }}</h1>
+  <span class="selo {% if venda.status == 'cancelada' %}selo-alerta{% else %}selo-ativo{% endif %}">{{ venda.get_status_display }}</span>
+</div>
+<p class="subtitulo">
+  {{ venda.criado_em|date:"d/m/Y H:i" }} · operador {{ venda.criado_por }} ·
+  {% if venda.destino == 'conta' %}lançado na conta: <strong>{{ venda.conta_ref }}</strong>{% else %}pago com <strong>{{ venda.forma_pagamento.nome }}</strong>{% endif %}
+  · cliente {{ venda.cliente.nome|default:"avulso" }}
+</p>
+{% if venda.motivo_cancelamento %}
+  <div class="mensagem error"><strong>Cancelada:</strong> {{ venda.motivo_cancelamento }}</div>
+{% endif %}
+
+<table class="tabela" style="max-width:640px">
+  <thead>
+    <tr><th>Produto</th><th>Natureza</th><th>Qtd</th><th>Preço</th><th>Subtotal</th></tr>
+  </thead>
+  <tbody>
+    {% for i in itens %}
+      <tr>
+        <td>{{ i.descricao }}</td>
+        <td>{{ i.natureza|capfirst }}</td>
+        <td>{{ i.quantidade }}</td>
+        <td>R$ {{ i.preco_unitario }}</td>
+        <td>R$ {{ i.subtotal }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    {% if venda.desconto %}<tr><td colspan="4">Desconto</td><td>− R$ {{ venda.desconto }}</td></tr>{% endif %}
+    <tr><td colspan="4"><strong>Total</strong></td><td><strong>R$ {{ venda.total }}</strong></td></tr>
+  </tfoot>
+</table>
+
+{% if eh_gerente and venda.status == 'fechada' and venda.destino == 'caixa' %}
+  <details class="acao-sensivel">
+    <summary>Cancelar venda (gerência)</summary>
+    <form method="post" action="{% url 'loja:cancelar' venda.pk %}" class="form-cartao">
+      {% csrf_token %}
+      <div class="campo">
+        <label>Motivo do cancelamento</label>
+        <textarea name="motivo" rows="2" required></textarea>
+      </div>
+      <div class="acoes">
+        <button type="submit" class="botao-perigo"
+                onclick="return confirm('Cancelar a venda? Estoque volta e o recebimento é estornado (caixa precisa estar aberto).')">
+          Cancelar venda
+        </button>
+      </div>
+    </form>
+  </details>
+{% endif %}
+{% endblock %}

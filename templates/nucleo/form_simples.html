@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ titulo }} — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Núcleo</p>
+<h1>{{ titulo }}</h1>
+
+<form method="post" class="form-cartao">
+  {% csrf_token %}
+  {% include "nucleo/partials/campos.html" %}
+  <div class="acoes">
+    <button type="submit" class="botao-primario">Salvar</button>
+    <a href="{% url voltar %}" class="botao-neutro">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

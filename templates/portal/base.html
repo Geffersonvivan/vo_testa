@@ -1,0 +1,63 @@
+{% load static %}
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Sua estadia — Pousada Vô Testa{% endblock %}</title>
+  <link rel="icon" href="{% static 'img/simbolo-dourado.png' %}" type="image/png">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <style>
+    body { background: var(--canvas); margin: 0; padding: 0 0 3rem; }
+    .pt-topo { background: var(--noturno); padding: 1.1rem 1rem; text-align: center; }
+    .pt-topo img { height: 62px; width: auto; }
+    .pt-wrap { max-width: 560px; margin: 0 auto; padding: 1rem; }
+    .pt-card { background: var(--superficie); border-radius: var(--raio-g); box-shadow: var(--sombra-1);
+               padding: 1.2rem; margin-bottom: 1rem; }
+    .pt-card h2 { margin: 0 0 .8rem; font-family: var(--fonte-titulo); font-size: 1.15rem; }
+    .pt-saldo { font-family: var(--fonte-titulo); font-size: 2.2rem; color: var(--musgo); }
+    .pt-linha { display: flex; justify-content: space-between; gap: 1rem; padding: .4rem 0;
+                border-bottom: 1px solid var(--fio); font-size: .92rem; }
+    .pt-linha:last-child { border-bottom: none; }
+    .pt-msg { padding: .7rem 1rem; border-radius: var(--raio-p); margin-bottom: .8rem; font-weight: 600; font-size: .9rem; }
+    .pt-msg.success { background: rgba(46,125,91,.14); color: var(--sucesso); }
+    .pt-msg.error { background: rgba(166,64,44,.14); color: var(--perigo); }
+    .pt-cardapio-item { display: flex; align-items: center; gap: .6rem; padding: .5rem 0; border-bottom: 1px solid var(--fio); }
+    .pt-cardapio-item:last-child { border-bottom: none; }
+    .pt-cardapio-item .nome { flex: 1; }
+    .pt-cardapio-item .preco { color: var(--tinta-suave); font-size: .85rem; }
+    .pt-cardapio-item input { width: 56px; text-align: center; }
+    .pt-acoes { display: grid; gap: .6rem; }
+    .pt-atalhos { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-top: 1rem; }
+    .pt-atalho {
+      display: flex; flex-direction: column; align-items: center; gap: .35rem;
+      padding: .85rem .4rem; text-decoration: none; color: var(--tinta);
+      background: var(--superficie); border-radius: var(--raio);
+      box-shadow: var(--sombra-1); font-size: .78rem; font-weight: 600; text-align: center;
+    }
+    .pt-atalho .pt-ico {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: grid; place-items: center;
+      background: rgba(46,125,91,.12); color: var(--musgo);
+    }
+    .pt-atalho .pt-ico svg { width: 22px; height: 22px; fill: currentColor; stroke: none; }
+    .pt-atalho.destaque .pt-ico { background: rgba(196,140,58,.18); color: var(--brasa, #b8742a); }
+    .pt-nps-escala { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .8rem; }
+    .pt-nps-nota {
+      width: 2rem; height: 2rem; border-radius: var(--raio-p);
+      display: grid; place-items: center; font-size: .85rem; font-weight: 700;
+      background: rgba(46,125,91,.1); color: var(--musgo);
+    }
+    .pt-nps-nota.desabilitada { opacity: .45; }
+  </style>
+</head>
+<body>
+  <header class="pt-topo">
+    <img src="{% static 'img/logotipo-pergaminho-limpo.png' %}" alt="Pousada Vô Testa">
+  </header>
+  <div class="pt-wrap">
+    {% if messages %}{% for m in messages %}<div class="pt-msg {{ m.tags }}">{{ m }}</div>{% endfor %}{% endif %}
+    {% block conteudo %}{% endblock %}
+  </div>
+</body>
+</html>

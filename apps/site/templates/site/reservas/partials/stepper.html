@@ -1,0 +1,23 @@
+{% load static %}
+<div class="reserva-stepper bg-pergaminho/95 backdrop-blur-sm border-b border-madeira/10">
+    <div class="max-w-4xl mx-auto px-4 py-4">
+        <div class="flex items-center w-full">
+            {% for num, label in reserva_passos %}
+            <div class="flex flex-col items-center relative z-10">
+                <div class="w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold
+                    {% if num < passo %}bg-musgo border-musgo text-pergaminho
+                    {% elif num == passo %}bg-madeira border-madeira text-pergaminho
+                    {% else %}border-madeira/30 text-madeira/40{% endif %}">
+                    {% if num < passo %}
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                    {% else %}{{ num }}{% endif %}
+                </div>
+                <span class="text-[9px] mt-1 hidden sm:block {% if num == passo %}text-madeira font-semibold{% else %}text-madeira/40{% endif %}">{{ label }}</span>
+            </div>
+            {% if not forloop.last %}
+            <div class="flex-1 h-0.5 mx-1 {% if num < passo %}bg-musgo{% else %}bg-madeira/20{% endif %}"></div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+</div>

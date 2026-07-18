@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block titulo %}Reservas — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Reservas</p>
+<div class="pagina-cabecalho">
+  <h1>Reservas</h1>
+  <button type="button" class="botao-primario"
+          hx-get="{% url 'reservas:nova' %}" hx-target="#modal-conteudo">Nova reserva</button>
+</div>
+
+<form method="get" class="barra-busca">
+  <input type="search" name="q" value="{{ busca }}" placeholder="Buscar por hóspede ou quarto">
+  <select name="status">
+    <option value="">Todos os status</option>
+    {% for valor, rotulo in status_choices %}
+      <option value="{{ valor }}" {% if status == valor %}selected{% endif %}>{{ rotulo }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="botao-neutro">Filtrar</button>
+</form>
+
+<table class="tabela">
+  <thead>
+    <tr><th>#</th><th>Hóspede</th><th>Quarto</th><th>Período</th><th>Noites</th><th>Diária</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    {% for r in reservas %}
+      <tr>
+        <td><a href="{% url 'reservas:detalhe' r.pk %}">#{{ r.pk }}</a></td>
+        <td>{{ r.hospede.nome }}</td>
+        <td>{{ r.uh.numero }}</td>
+        <td>{{ r.checkin|date:"d/m/Y" }} → {{ r.checkout|date:"d/m/Y" }}</td>
+        <td>{{ r.noites }}</td>
+        <td>R$ {{ r.valor_diaria }}</td>
+        <td><span class="selo mapa-cor-{{ r.status }} dica" data-dica="{{ r.status_ajuda }}">{{ r.get_status_display }}</span></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="vazio">Nenhuma reserva encontrada.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

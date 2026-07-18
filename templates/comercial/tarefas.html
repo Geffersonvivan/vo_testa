@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block titulo %}Minhas tarefas — Comercial{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Comercial</p>
+<div class="pagina-cabecalho">
+  <h1>Tarefas do dia</h1>
+  <a href="{% url 'comercial:funil' %}" class="botao-mini">Voltar ao funil</a>
+</div>
+<div class="pdv-seg" style="margin:.6rem 0 1rem">
+  <a href="?" class="{% if minhas %}ativo{% endif %}">Minhas</a>
+  <a href="?todas=1" class="{% if not minhas %}ativo{% endif %}">Da equipe</a>
+</div>
+
+<table class="tabela">
+  <thead><tr><th>Quando</th><th>Oportunidade</th><th>Lead</th><th>Tarefa</th><th>Responsável</th><th></th></tr></thead>
+  <tbody>
+    {% for at in tarefas %}
+      <tr class="linha-pendente">
+        <td>{{ at.quando|date:"d/m H:i" }}</td>
+        <td><a href="{% url 'comercial:oportunidade' at.oportunidade_id %}">{{ at.oportunidade.titulo }}</a></td>
+        <td>{{ at.oportunidade.pessoa.nome }}</td>
+        <td>{{ at.get_tipo_display }} — {{ at.descricao }}</td>
+        <td>{% if at.responsavel %}{{ at.responsavel.get_full_name|default:at.responsavel.username }}{% else %}—{% endif %}</td>
+        <td class="num"><form method="post" action="{% url 'comercial:concluir_tarefa' at.pk %}">{% csrf_token %}<button class="botao-mini">Concluir</button></form></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vazio">Nenhuma tarefa pendente. 🎉</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

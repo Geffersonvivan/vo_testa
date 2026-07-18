@@ -1,0 +1,157 @@
+{% extends 'site/reservas/base_reserva.html' %}
+{% load static %}
+
+{% block title %}{% if eh_day_use %}Dia na Pousada{% else %}Reservar{% endif %} — Datas | Pousada Vô Testa{% endblock %}
+
+{% block reserva_content %}
+<div class="text-center mb-8">
+    <p class="text-madeira/50 text-xs tracking-[0.3em] uppercase mb-3">
+        {% if eh_day_use %}Sem pernoite{% else %}Planeje sua estadia{% endif %}
+    </p>
+    <h2 class="font-display text-3xl sm:text-4xl font-bold text-madeira">
+        {% if eh_day_use %}Qual dia você quer vir?{% else %}Quando você quer vir?{% endif %}
+    </h2>
+    <div class="mt-4 flex flex-wrap justify-center gap-2 text-sm">
+        <a href="{% url 'core:reservar' %}"
+           class="px-4 py-1.5 rounded-full border {% if not eh_day_use %}bg-madeira text-pergaminho border-madeira{% else %}border-madeira/20 text-madeira/60 hover:border-madeira{% endif %}">
+            Hospedagem
+        </a>
+        <a href="{% url 'core:reservar' %}?modalidade=day_use"
+           class="px-4 py-1.5 rounded-full border {% if eh_day_use %}bg-madeira text-pergaminho border-madeira{% else %}border-madeira/20 text-madeira/60 hover:border-madeira{% endif %}">
+            Dia na Pousada
+        </a>
+    </div>
+</div>
+
+<form method="get" action="{% url 'core:reservar' %}" id="form-datas" class="grid md:grid-cols-2 gap-6">
+    <input type="hidden" name="checkin" id="f-checkin">
+    <input type="hidden" name="checkout" id="f-checkout">
+    <input type="hidden" name="hospedes" id="f-hospedes" value="2">
+    <input type="hidden" name="modalidade" id="f-modalidade" value="{{ modalidade }}">
+
+    <div class="bg-white rounded-2xl p-5 shadow-sm border border-madeira/5">
+        <div id="calendario-inline" data-info-url="{% url 'core:info_datas' %}" data-day-use="{% if eh_day_use %}1{% else %}0{% endif %}"></div>
+        <div class="mt-3 flex gap-4 text-[10px] text-madeira/40">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-madeira rounded"></span> Selecionado</span>
+            {% if not eh_day_use %}
+            <span class="flex items-center gap-1"><span class="w-3 h-3 bg-madeira/10 rounded border border-madeira/10"></span> Período</span>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-5 shadow-sm border border-madeira/5 flex flex-col justify-between">
+        <div>
+            <h3 class="font-display text-lg font-bold text-madeira mb-6">Sua seleção</h3>
+            <div class="space-y-4">
+                <div class="flex justify-between items-center py-3 border-b border-pergaminho">
+                    <div>
+                        <p class="text-madeira/40 text-xs uppercase tracking-wider">{% if eh_day_use %}Data{% else %}Check-in{% endif %}</p>
+                        <p class="text-madeira font-semibold" id="lbl-checkin">Selecione no calendário</p>
+                    </div>
+                    <svg class="w-5 h-5 text-madeira/30" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                {% if not eh_day_use %}
+                <div class="flex justify-between items-center py-3 border-b border-pergaminho">
+                    <div>
+                        <p class="text-madeira/40 text-xs uppercase tracking-wider">Check-out</p>
+                        <p class="text-madeira font-semibold" id="lbl-checkout">—</p>
+                    </div>
+                    <svg class="w-5 h-5 text-madeira/30" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                {% else %}
+                <input type="hidden" id="lbl-checkout" value="">
+                <p class="text-madeira/40 text-xs py-2">Um dia na estrutura — piscina, mirantes e passeio (sem pernoite).</p>
+                {% endif %}
+                <div class="flex justify-between items-center py-3 border-b border-pergaminho">
+                    <div>
+                        <p class="text-madeira/40 text-xs uppercase tracking-wider">Pessoas</p>
+                        <p class="text-madeira font-semibold"><span id="lbl-hospedes">2</span> pessoa(s)</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="hosp-menos" class="w-7 h-7 rounded-full border border-madeira/15 text-madeira/50 flex items-center justify-center hover:border-madeira hover:text-madeira transition">−</button>
+                        <span class="text-madeira font-bold w-6 text-center" id="cnt-hospedes">2</span>
+                        <button type="button" id="hosp-mais" class="w-7 h-7 rounded-full border border-madeira/15 text-madeira/50 flex items-center justify-center hover:border-madeira hover:text-madeira transition">+</button>
+                    </div>
+                </div>
+                <div id="info-datas"></div>
+            </div>
+        </div>
+
+        <button type="submit" id="btn-ver-quartos" disabled
+                class="mt-6 bg-madeira text-pergaminho font-bold px-8 py-3 rounded-xl hover:bg-madeira/90 transition flex items-center justify-center gap-2 shadow-lg shadow-madeira/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none">
+            {% if eh_day_use %}Ver disponibilidade{% else %}Ver Quartos Disponíveis{% endif %}
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ block.super }}
+<script>
+(function () {
+    var el = document.getElementById('calendario-inline');
+    if (!el || typeof flatpickr === 'undefined') return;
+    if (flatpickr.l10ns && flatpickr.l10ns.pt) flatpickr.localize(flatpickr.l10ns.pt);
+
+    var dayUse = el.dataset.dayUse === '1';
+    var fCheckin = document.getElementById('f-checkin');
+    var fCheckout = document.getElementById('f-checkout');
+    var fHospedes = document.getElementById('f-hospedes');
+    var fModalidade = document.getElementById('f-modalidade');
+    var lblCheckin = document.getElementById('lbl-checkin');
+    var lblCheckout = document.getElementById('lbl-checkout');
+    var lblHospedes = document.getElementById('lbl-hospedes');
+    var cntHospedes = document.getElementById('cnt-hospedes');
+    var btn = document.getElementById('btn-ver-quartos');
+    var infoUrl = el.dataset.infoUrl;
+
+    function fmtBR(d) { return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }); }
+    function ymd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+    function addDay(d) { var x = new Date(d.getTime()); x.setDate(x.getDate() + 1); return x; }
+
+    function atualizarInfo() {
+        var pronto = fCheckin.value && fCheckout.value;
+        btn.disabled = !pronto;
+        if (pronto && typeof htmx !== 'undefined') {
+            var q = '?checkin=' + fCheckin.value + '&checkout=' + fCheckout.value + '&hospedes=' + fHospedes.value;
+            if (fModalidade.value) q += '&modalidade=' + fModalidade.value;
+            htmx.ajax('GET', infoUrl + q, { target: '#info-datas', swap: 'innerHTML' });
+        }
+    }
+
+    flatpickr(el, {
+        inline: true,
+        mode: dayUse ? 'single' : 'range',
+        minDate: 'today',
+        dateFormat: 'Y-m-d',
+        showMonths: 1,
+        onChange: function (dates) {
+            if (dayUse) {
+                if (dates.length >= 1) {
+                    fCheckin.value = ymd(dates[0]);
+                    fCheckout.value = ymd(addDay(dates[0]));
+                    lblCheckin.textContent = fmtBR(dates[0]);
+                } else {
+                    fCheckin.value = ''; fCheckout.value = '';
+                    lblCheckin.textContent = 'Selecione no calendário';
+                }
+            } else {
+                if (dates.length >= 1) { fCheckin.value = ymd(dates[0]); lblCheckin.textContent = fmtBR(dates[0]); }
+                if (dates.length >= 2) { fCheckout.value = ymd(dates[1]); lblCheckout.textContent = fmtBR(dates[1]); }
+                else { fCheckout.value = ''; if (lblCheckout) lblCheckout.textContent = '—'; }
+            }
+            atualizarInfo();
+        }
+    });
+
+    function setHospedes(v) {
+        v = Math.min(dayUse ? 20 : 10, Math.max(1, v));
+        fHospedes.value = v; lblHospedes.textContent = v; cntHospedes.textContent = v;
+        atualizarInfo();
+    }
+    document.getElementById('hosp-menos').addEventListener('click', function () { setHospedes(parseInt(fHospedes.value, 10) - 1); });
+    document.getElementById('hosp-mais').addEventListener('click', function () { setHospedes(parseInt(fHospedes.value, 10) + 1); });
+})();
+</script>
+{% endblock %}

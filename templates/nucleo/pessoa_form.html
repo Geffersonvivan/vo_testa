@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block titulo %}{% if pessoa %}{{ pessoa.nome }}{% else %}Nova pessoa{% endif %} — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Cadastros</p>
+<h1>{% if pessoa %}Editar {{ pessoa.nome }}{% else %}Nova pessoa{% endif %}</h1>
+
+<form method="post" class="form-cartao"
+      x-data='{ hospede: {{ eh_hospede|yesno:"true,false" }}, agencia: {{ eh_agencia|yesno:"true,false" }}, funcionario: {{ eh_funcionario|yesno:"true,false" }}, fornecedor: {{ eh_fornecedor|yesno:"true,false" }} }'>
+  {% csrf_token %}
+  {% include "nucleo/partials/campos.html" %}
+
+  <fieldset class="papeis">
+    <legend class="letreiro">Papéis desta pessoa</legend>
+
+    <label class="marcador">
+      <input type="checkbox" name="eh_hospede" x-model="hospede"> Hóspede
+    </label>
+    <div class="subform" x-show="hospede" x-cloak>
+      {% include "nucleo/partials/campos.html" with form=form_hospede %}
+    </div>
+
+    <label class="marcador">
+      <input type="checkbox" name="eh_agencia" x-model="agencia"> Agência/Empresa
+    </label>
+    <div class="subform" x-show="agencia" x-cloak>
+      {% include "nucleo/partials/campos.html" with form=form_agencia %}
+    </div>
+
+    <label class="marcador">
+      <input type="checkbox" name="eh_funcionario" x-model="funcionario"> Funcionário
+    </label>
+    <div class="subform" x-show="funcionario" x-cloak>
+      {% include "nucleo/partials/campos.html" with form=form_funcionario %}
+    </div>
+
+    <label class="marcador">
+      <input type="checkbox" name="eh_fornecedor" x-model="fornecedor"> Fornecedor
+    </label>
+    <div class="subform" x-show="fornecedor" x-cloak>
+      {% include "nucleo/partials/campos.html" with form=form_fornecedor %}
+    </div>
+  </fieldset>
+
+  <div class="acoes">
+    <button type="submit" class="botao-primario">Salvar</button>
+    <a href="{% url 'pessoas' %}" class="botao-neutro">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

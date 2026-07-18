@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Protótipo — A Engrenagem do Tempo | Pousada Vô Testa</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { colors: {
+  noturno:'#051C2C', madeira:'#4F2C1D', lampiao:'#D7A048', pergaminho:'#EFDBB2', musgo:'#2E483E'
+}, fontFamily: { display:['Georgia','serif'], body:['system-ui','sans-serif'] } } } };
+</script>
+<style>
+  body { background: linear-gradient(180deg,#FBF7EE 0%, #EFDBB2 100%); }
+  .roda { transition: transform 1.1s cubic-bezier(.2,.8,.25,1); transform-origin:50% 50%; }
+  .gear-spin { animation: spin 14s linear infinite; transform-origin:50% 50%; }
+  .gear-spin-rev { animation: spin 10s linear infinite reverse; transform-origin:50% 50%; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .float-up { animation: floatUp 1.5s ease-out forwards; }
+  @keyframes floatUp { 0%{opacity:0;transform:translateY(10px) scale(.8)} 20%{opacity:1} 100%{opacity:0;transform:translateY(-60px) scale(1.1)} }
+  .perk-unlock { animation: pop .5s ease-out; }
+  @keyframes pop { 0%{transform:scale(.6);opacity:0} 60%{transform:scale(1.08)} 100%{transform:scale(1);opacity:1} }
+  .pulse-btn { animation: pulse 2.6s infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(46,72,62,.3)} 50%{box-shadow:0 0 24px 5px rgba(46,72,62,.12)} }
+  .drop { animation: drop 1.3s ease-in infinite; }
+  @keyframes drop { 0%{opacity:0;transform:translateY(-6px)} 30%{opacity:1} 100%{opacity:0;transform:translateY(26px)} }
+</style>
+</head>
+<body class="font-body text-madeira min-h-screen">
+
+<header class="border-b border-madeira/10 bg-white/80 backdrop-blur sticky top-0 z-40">
+  <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <svg class="w-7 h-7 text-madeira gear-spin" viewBox="0 0 100 100"><circle cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="6"/><g fill="currentColor"><rect x="44" y="12" width="12" height="16" rx="3"/><rect x="44" y="72" width="12" height="16" rx="3"/><rect x="12" y="44" width="16" height="12" rx="3"/><rect x="72" y="44" width="16" height="12" rx="3"/></g></svg>
+      <div><span class="font-display text-lg font-bold">Pousada Vô Testa</span>
+      <span class="block text-madeira/40 text-[11px]">Protótipo — A Engrenagem do Tempo (#2) · claro + musgo</span></div>
+    </div>
+    <span class="text-madeira/30 text-xs hidden sm:block">demonstração interativa</span>
+  </div>
+</header>
+
+<main class="max-w-4xl mx-auto px-4 py-8 sm:py-12">
+
+  <div class="text-center mb-8">
+    <p class="text-musgo text-xs tracking-[0.35em] uppercase mb-2 font-semibold">Reserva confirmada · Cabine do Navegador</p>
+    <h1 class="font-display text-3xl sm:text-4xl font-bold mb-2 text-madeira">Sua jornada já começou, <span class="text-musgo">Maria</span></h1>
+    <p class="text-madeira/60 text-sm max-w-xl mx-auto">As engrenagens do tempo estão a postos. A cada dia até sua chegada, gire a roda d'água do Vô Testa — desperte mimos e ajude a plantar a mata que você vai respirar.</p>
+  </div>
+
+  <div class="flex items-center justify-center gap-2 mb-8 text-madeira/60 text-sm">
+    <svg class="w-4 h-4 text-musgo" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    faltam <span id="dias" class="font-bold text-madeira">21</span> dias para o check-in
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-6">
+    <!-- A roda -->
+    <div class="bg-white border border-madeira/5 shadow-sm rounded-3xl p-6 flex flex-col items-center justify-between relative overflow-hidden">
+      <div id="floatHost" class="absolute top-16 left-1/2 -translate-x-1/2 text-musgo font-bold text-lg pointer-events-none"></div>
+
+      <div class="absolute top-6 left-1/2 -translate-x-1/2 flex gap-3 opacity-40">
+        <span class="w-1 h-6 bg-musgo/50 rounded drop" style="animation-delay:0s"></span>
+        <span class="w-1 h-6 bg-musgo/50 rounded drop" style="animation-delay:.4s"></span>
+        <span class="w-1 h-6 bg-musgo/50 rounded drop" style="animation-delay:.8s"></span>
+      </div>
+
+      <svg id="roda" class="roda w-52 h-52 my-4 text-lampiao" viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="92" fill="none" stroke="currentColor" stroke-width="3" opacity=".7"/>
+        <circle cx="100" cy="100" r="64" fill="none" stroke="currentColor" stroke-width="2" opacity=".4"/>
+        <circle cx="100" cy="100" r="16" fill="currentColor"/>
+        <g stroke="currentColor" stroke-width="6">
+          <line x1="100" y1="100" x2="100" y2="12"/><line x1="100" y1="100" x2="100" y2="188"/>
+          <line x1="100" y1="100" x2="12" y2="100"/><line x1="100" y1="100" x2="188" y2="100"/>
+          <line x1="100" y1="100" x2="38" y2="38"/><line x1="100" y1="100" x2="162" y2="162"/>
+          <line x1="100" y1="100" x2="162" y2="38"/><line x1="100" y1="100" x2="38" y2="162"/>
+        </g>
+        <g fill="currentColor">
+          <rect x="92" y="6" width="16" height="20" rx="2"/><rect x="92" y="174" width="16" height="20" rx="2"/>
+          <rect x="6" y="92" width="20" height="16" rx="2"/><rect x="174" y="92" width="20" height="16" rx="2"/>
+        </g>
+      </svg>
+
+      <div class="w-full">
+        <div class="flex items-center justify-between text-xs text-madeira/50 mb-2">
+          <span>giros até agora</span><span><span id="giros">0</span> / 21</span>
+        </div>
+        <div class="h-2 bg-madeira/10 rounded-full overflow-hidden mb-4">
+          <div id="barra" class="h-full bg-musgo transition-all duration-700" style="width:0%"></div>
+        </div>
+        <button id="btnGirar" onclick="girar()" class="w-full bg-madeira text-pergaminho font-bold py-3 rounded-xl hover:bg-madeira/90 transition pulse-btn flex items-center justify-center gap-2 shadow-lg shadow-madeira/20">
+          <svg class="w-5 h-5" viewBox="0 0 100 100" fill="currentColor"><circle cx="50" cy="50" r="18" fill="none" stroke="currentColor" stroke-width="8"/><rect x="44" y="14" width="12" height="14" rx="3"/><rect x="44" y="72" width="12" height="14" rx="3"/><rect x="14" y="44" width="14" height="12" rx="3"/><rect x="72" y="44" width="14" height="12" rx="3"/></svg>
+          Girar a roda hoje
+        </button>
+        <p id="aviso" class="text-center text-madeira/40 text-xs mt-2 h-4"></p>
+      </div>
+    </div>
+
+    <!-- Conquistas + árvore -->
+    <div class="flex flex-col gap-6">
+      <div class="bg-white border border-madeira/5 shadow-sm rounded-3xl p-6">
+        <h3 class="font-display text-lg font-bold mb-4 flex items-center gap-2 text-madeira">
+          <svg class="w-4 h-4 text-lampiao gear-spin-rev" viewBox="0 0 100 100" fill="currentColor"><circle cx="50" cy="50" r="16" fill="none" stroke="currentColor" stroke-width="8"/><rect x="44" y="14" width="12" height="14" rx="3"/><rect x="44" y="72" width="12" height="14" rx="3"/><rect x="14" y="44" width="14" height="12" rx="3"/><rect x="72" y="44" width="14" height="12" rx="3"/></svg>
+          Mimos que você desperta
+        </h3>
+        <ul id="conquistas" class="space-y-3 text-sm"></ul>
+      </div>
+
+      <div class="bg-musgo rounded-3xl p-6 text-center text-pergaminho">
+        <div class="text-4xl mb-1">🌳</div>
+        <p class="font-display text-2xl font-bold" id="arvores">1.248</p>
+        <p class="text-pergaminho/80 text-xs">árvores giradas pela comunidade do Vô Testa</p>
+        <p class="text-pergaminho/50 text-[11px] mt-2">cada giro acumula para o plantio real na região do Lago Azul</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-10 text-center">
+    <button onclick="amanha()" class="text-madeira/50 hover:text-musgo text-xs border border-madeira/15 rounded-full px-4 py-2 transition">
+      ⏩ simular “amanhã” (libera o giro do dia — só na demo)
+    </button>
+    <button onclick="reset()" class="text-madeira/30 hover:text-madeira/60 text-xs ml-2">↺ reiniciar</button>
+  </div>
+</main>
+
+<script>
+const marcos = [
+  { giros:1,  texto:'Carta de boas-vindas do Vô Testa',  icone:'✉️' },
+  { giros:3,  texto:'Drink de chegada na varanda',        icone:'🍹' },
+  { giros:7,  texto:'Chance de upgrade de cabana',         icone:'🗝️' },
+  { giros:14, texto:'Café da manhã especial no 1º dia',    icone:'🥐' },
+  { giros:21, texto:'Lembrança secreta do inventor',       icone:'🎁' },
+];
+let giros = 0, dias = 21, arvores = 1248, giradoHoje = false, rot = 0;
+
+function render() {
+  document.getElementById('giros').textContent = giros;
+  document.getElementById('dias').textContent = dias;
+  document.getElementById('barra').style.width = Math.min(100, giros/21*100) + '%';
+  document.getElementById('arvores').textContent = arvores.toLocaleString('pt-BR');
+  const ul = document.getElementById('conquistas');
+  ul.innerHTML = marcos.map(m => {
+    const ok = giros >= m.giros;
+    return `<li class="flex items-center gap-3 ${ok?'perk-unlock':''}">
+      <span class="w-8 h-8 rounded-lg flex items-center justify-center text-base ${ok?'bg-musgo/15':'bg-madeira/5'}">${ok?m.icone:'🔒'}</span>
+      <span class="${ok?'text-madeira':'text-madeira/40'}">${m.texto}</span>
+      <span class="ml-auto text-[11px] ${ok?'text-musgo font-semibold':'text-madeira/30'}">${ok?'liberado':m.giros+' giros'}</span>
+    </li>`;
+  }).join('');
+  const btn = document.getElementById('btnGirar');
+  const aviso = document.getElementById('aviso');
+  if (giradoHoje) {
+    btn.disabled = true; btn.classList.add('opacity-40','cursor-not-allowed'); btn.classList.remove('pulse-btn');
+    aviso.textContent = 'Você já girou hoje. A roda descansa até amanhã. 🌙';
+  } else {
+    btn.disabled = false; btn.classList.remove('opacity-40','cursor-not-allowed'); btn.classList.add('pulse-btn');
+    aviso.textContent = '';
+  }
+}
+function girar() {
+  if (giradoHoje) return;
+  giros++; arvores++; giradoHoje = true;
+  rot += 132; document.getElementById('roda').style.transform = `rotate(${rot}deg)`;
+  const f = document.getElementById('floatHost');
+  f.innerHTML = '<span class="float-up inline-block">+1 🌳</span>';
+  setTimeout(()=>f.innerHTML='', 1500);
+  render();
+}
+function amanha() { if (dias>0) dias--; giradoHoje = false; render(); }
+function reset() { giros=0; dias=21; arvores=1248; giradoHoje=false; rot=0; document.getElementById('roda').style.transform='rotate(0deg)'; render(); }
+render();
+</script>
+</body>
+</html>

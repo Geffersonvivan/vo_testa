@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block titulo %}Governança — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Hospedagem</p>
+<h1>Governança</h1>
+<p class="subtitulo">Fila de faxinas (gerada no check-out e na troca de quarto) e a situação de limpeza de cada quarto.</p>
+
+<h2>Fila de faxina</h2>
+<table class="tabela">
+  <thead>
+    <tr><th>Quarto</th><th>Tipo</th><th>Camareira</th><th>Situação</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for t in tarefas %}
+      <tr>
+        <td><strong>{{ t.uh.numero }}</strong> <small class="ajuda">{{ t.uh.tipo.nome }}</small></td>
+        <td>{{ t.get_tipo_display }}</td>
+        <td>
+          <form method="post" action="{% url 'governanca:tarefa_acao' t.pk %}" class="form-inline">
+            {% csrf_token %}<input type="hidden" name="acao" value="atribuir">
+            <select name="camareira">
+              <option value="">— camareira —</option>
+              {% for u in camareiras %}<option value="{{ u.pk }}" {% if t.camareira_id == u.pk %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="botao-neutro">Atribuir</button>
+          </form>
+        </td>
+        <td><span class="selo selo-{{ t.status }}">{{ t.get_status_display }}</span></td>
+        <td>
+          {% if t.status == 'pendente' %}
+            <form method="post" action="{% url 'governanca:tarefa_acao' t.pk %}" style="display:inline">
+              {% csrf_token %}<input type="hidden" name="acao" value="iniciar">
+              <button type="submit" class="botao-neutro">Iniciar</button>
+            </form>
+          {% elif t.status == 'em_andamento' %}
+            <form method="post" action="{% url 'governanca:tarefa_acao' t.pk %}" style="display:inline">
+              {% csrf_token %}<input type="hidden" name="acao" value="concluir">
+              <button type="submit" class="botao-primario">Concluir</button>
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="vazio">Nenhuma faxina na fila. Tudo em dia. ✨</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Situação dos quartos</h2>
+<table class="tabela">
+  <thead>
+    <tr><th>Quarto</th><th>Tipo</th><th>Limpeza</th><th>Ações</th></tr>
+  </thead>
+  <tbody>
+    {% for q in quartos %}
+      <tr>
+        <td><strong>{{ q.uh.numero }}</strong></td>
+        <td>{{ q.uh.tipo.nome }}</td>
+        <td><span class="selo selo-{{ q.status.situacao }}">{{ q.status.get_situacao_display }}</span></td>
+        <td class="acoes-limpeza">
+          {% if q.status.situacao != 'limpa' and q.status.situacao != 'inspecionada' %}
+            <form method="post" action="{% url 'governanca:status_marcar' q.uh.pk %}" style="display:inline">
+              {% csrf_token %}<input type="hidden" name="situacao" value="limpa">
+              <button type="submit" class="botao-neutro">Marcar limpo</button>
+            </form>
+          {% endif %}
+          {% if q.status.situacao == 'limpa' %}
+            <form method="post" action="{% url 'governanca:status_marcar' q.uh.pk %}" style="display:inline">
+              {% csrf_token %}<input type="hidden" name="situacao" value="inspecionada">
+              <button type="submit" class="botao-neutro">Inspecionar</button>
+            </form>
+          {% endif %}
+          <form method="post" action="{% url 'governanca:nova_tarefa' %}" style="display:inline">
+            {% csrf_token %}<input type="hidden" name="uh" value="{{ q.uh.pk }}"><input type="hidden" name="tipo" value="faxina_completa">
+            <button type="submit" class="botao-neutro">Nova faxina</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

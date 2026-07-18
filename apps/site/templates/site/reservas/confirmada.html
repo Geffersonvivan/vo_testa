@@ -1,0 +1,87 @@
+{% extends 'site/reservas/base_reserva.html' %}
+{% load static %}
+
+{% block title %}Reserva {{ reserva.codigo }} | Pousada Vô Testa{% endblock %}
+
+{% block reserva_content %}
+<div class="max-w-2xl mx-auto text-center">
+    <div class="mb-8">
+        <div class="w-20 h-20 bg-musgo rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-musgo/20" style="view-transition-name: confirma-check">
+            <svg class="w-10 h-10 text-pergaminho" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+        </div>
+        <h2 class="font-display text-3xl font-bold text-madeira mb-2">Reserva Registrada!</h2>
+        <p class="text-madeira/50">Sua aventura no tempo está quase garantida — falta só confirmar o pagamento.</p>
+    </div>
+
+    <!-- Código -->
+    <div class="bg-white rounded-2xl p-6 mb-6 shadow-sm border border-madeira/5">
+        <p class="text-madeira/40 text-xs uppercase tracking-wider mb-2">Código da Reserva</p>
+        <p class="font-display text-3xl font-black text-madeira tracking-widest">{{ reserva.codigo }}</p>
+    </div>
+
+    <!-- Status -->
+    <div class="bg-white rounded-2xl p-6 mb-6 shadow-sm border border-madeira/5">
+        <p class="text-madeira/40 text-xs uppercase tracking-wider mb-4">Status da Reserva</p>
+        <div class="flex items-center justify-center gap-2 flex-wrap text-xs">
+            {% for chave, rotulo in reserva.STATUS_CHOICES %}
+            {% if chave == 'aguardando' or chave == 'confirmada' or chave == 'checkin' or chave == 'finalizada' %}
+            <span class="px-3 py-1.5 rounded-full {% if chave == reserva.status %}bg-madeira text-pergaminho font-semibold{% else %}bg-madeira/5 text-madeira/30{% endif %}">{{ rotulo }}</span>
+            {% if not forloop.last and chave != 'finalizada' %}
+            <svg class="w-4 h-4 text-madeira/15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+            {% endif %}
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Resumo final -->
+    <div class="bg-white rounded-2xl p-5 text-left text-sm shadow-sm border border-madeira/5 mb-8">
+        <div class="grid grid-cols-2 gap-3">
+            <div><span class="text-madeira/40">Quarto:</span> <span class="text-madeira">{{ reserva.quarto.nome }}</span></div>
+            <div><span class="text-madeira/40">Hóspedes:</span> <span class="text-madeira">{{ reserva.num_hospedes }}</span></div>
+            <div><span class="text-madeira/40">Check-in:</span> <span class="text-madeira">{{ reserva.data_checkin|date:'d/m/Y' }}</span></div>
+            <div><span class="text-madeira/40">Check-out:</span> <span class="text-madeira">{{ reserva.data_checkout|date:'d/m/Y' }}</span></div>
+            <div><span class="text-madeira/40">Noites:</span> <span class="text-madeira">{{ reserva.noites }}</span></div>
+            <div><span class="text-madeira/40">Total ({{ reserva.get_metodo_pagamento_display }}):</span> <span class="text-madeira font-bold">R$ {{ reserva.valor_total|floatformat:2 }}</span></div>
+        </div>
+    </div>
+
+    {% if cobranca and cobranca.pendente %}
+    <p class="text-madeira/50 text-sm mb-5">
+        Pague online para confirmar a reserva ({{ reserva.get_metodo_pagamento_display }}). O quarto fica reservado até o prazo de retenção.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="{% url 'pagamentos:pagar' cobranca.token %}"
+           class="bg-madeira text-pergaminho font-bold px-6 py-3 rounded-xl hover:bg-madeira/90 transition shadow-lg shadow-madeira/20">
+            Pagar agora — R$ {{ cobranca.valor|floatformat:2 }}
+        </a>
+        <a href="https://wa.me/{{ config.whatsapp }}?text=Olá!%20Quero%20confirmar%20a%20reserva%20{{ reserva.codigo }}"
+           class="text-madeira border border-madeira/20 px-6 py-3 rounded-xl hover:bg-madeira hover:text-pergaminho transition font-semibold">
+            Falar no WhatsApp
+        </a>
+    </div>
+    {% elif cobranca and cobranca.paga or reserva.status == 'confirmada' %}
+    <p class="text-musgo text-sm mb-5 font-semibold">Pagamento confirmado. Até breve na pousada!</p>
+    <div class="flex justify-center">
+        <a href="{% url 'core:home' %}"
+           class="bg-madeira text-pergaminho font-bold px-6 py-3 rounded-xl hover:bg-madeira/90 transition">
+            Voltar ao início
+        </a>
+    </div>
+    {% else %}
+    <p class="text-madeira/50 text-sm mb-5">
+        Para confirmar, fale conosco pelo WhatsApp informando seu código.
+    </p>
+    <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="https://wa.me/{{ config.whatsapp }}?text=Olá!%20Quero%20confirmar%20a%20reserva%20{{ reserva.codigo }}"
+           class="bg-madeira text-pergaminho font-bold px-6 py-3 rounded-xl hover:bg-madeira/90 transition shadow-lg shadow-madeira/20">
+            Confirmar pelo WhatsApp
+        </a>
+        <a href="{% url 'core:home' %}"
+           class="text-madeira border border-madeira/20 px-6 py-3 rounded-xl hover:bg-madeira hover:text-pergaminho transition font-semibold">
+            Voltar ao início
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

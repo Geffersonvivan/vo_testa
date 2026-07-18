@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block titulo %}Conferir frigobar — {{ rotulo }}{% endblock %}
+
+{% block conteudo %}
+<a href="{% url 'frigobar:painel' %}" class="voltar">
+  <svg viewBox="0 0 24 24" class="ico"><path d="M15 6l-6 6 6 6"/></svg> Frigobar
+</a>
+<p class="pagina-eyebrow letreiro">Frigobar</p>
+<h1>Conferência — {{ rotulo }}</h1>
+<p class="subtitulo">Tipo {{ tipo.nome }}. Informe quanto foi <strong>consumido</strong> de cada item do kit.</p>
+
+<form method="post" action="{% url 'frigobar:conferir' %}" class="painel-bloco" style="max-width:640px">
+  {% csrf_token %}
+  <input type="hidden" name="conta" value="{{ conta.pk }}">
+
+  <div class="campo">
+    <label>Momento</label>
+    <select name="momento">{% for v, r in momentos %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
+  </div>
+
+  <table class="tabela">
+    <thead><tr><th>Produto</th><th class="num">Kit padrão</th><th class="num">Central</th><th class="num">Consumido</th></tr></thead>
+    <tbody>
+      {% for l in linhas %}
+        <tr>
+          <td>{{ l.item.produto.nome }} <small class="opcional">R$ {{ l.item.produto.preco_venda }}</small></td>
+          <td class="num">{{ l.item.quantidade }}</td>
+          <td class="num">{{ l.saldo_central|floatformat:"-3" }}</td>
+          <td class="num"><input type="number" name="consumo_{{ l.item.produto_id }}" min="0" value="0" style="width:70px;text-align:right"></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="vazio">Este tipo de quarto não tem composição. Defina em <a href="{% url 'frigobar:composicoes' %}">Composições</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="acoes">
+    <button type="submit" class="botao-primario">Registrar conferência</button>
+    <a href="{% url 'frigobar:painel' %}" class="botao-neutro">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Pousada Vô Testa{% endblock %}</title>
+
+    <!-- Fontes — Neco (display + corpo) -->
+    <style>
+        @font-face {
+            font-family: 'Neco';
+            src: url('{% static "site/fonts/Neco-Regular.woff2" %}') format('woff2'),
+                 url('{% static "site/fonts/Neco-Regular.woff" %}') format('woff');
+            font-weight: 400;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Neco';
+            src: url('{% static "site/fonts/Neco-Medium.woff2" %}') format('woff2'),
+                 url('{% static "site/fonts/Neco-Medium.woff" %}') format('woff');
+            font-weight: 500;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Neco';
+            src: url('{% static "site/fonts/Neco-Bold.woff2" %}') format('woff2'),
+                 url('{% static "site/fonts/Neco-Bold.woff" %}') format('woff');
+            font-weight: 700;
+            font-display: swap;
+        }
+        @font-face {
+            font-family: 'Neco';
+            src: url('{% static "site/fonts/Neco-Black.woff2" %}') format('woff2'),
+                 url('{% static "site/fonts/Neco-Black.woff" %}') format('woff');
+            font-weight: 900;
+            font-display: swap;
+        }
+    </style>
+
+    <!-- Tailwind CSS (CDN para desenvolvimento) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        noturno: '#051C2C',
+                        madeira: '#4F2C1D',
+                        lampiao: '#D7A048',
+                        pergaminho: '#EFDBB2',
+                        musgo: '#2E483E',
+                    },
+                    fontFamily: {
+                        display: ['Neco', 'serif'],
+                        body: ['Neco', 'serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Animações -->
+    <link rel="stylesheet" href="{% static 'site/css/animations.css' %}">
+
+    <!-- HTMX (disponibilidade e preço dinâmico das reservas) -->
+    <script src="{% static 'site/vendor/htmx.min.js' %}"></script>
+
+    <!-- Flatpickr (calendário das datas de reserva) -->
+    <link rel="stylesheet" href="{% static 'site/vendor/flatpickr.min.css' %}">
+    <link rel="stylesheet" href="{% static 'site/css/datepicker.css' %}">
+    <script src="{% static 'site/vendor/flatpickr.min.js' %}"></script>
+    <script src="{% static 'site/vendor/flatpickr-pt.js' %}"></script>
+    <script src="{% static 'site/js/datepicker.js' %}"></script>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="font-body bg-pergaminho text-noturno"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+
+    {% include 'site/partials/header.html' %}
+
+    {% block content %}{% endblock %}
+
+    {% include 'site/partials/footer.html' %}
+    {% include 'site/partials/whatsapp.html' %}
+    {% include 'site/partials/social_proof.html' %}
+
+    <!-- Scripts -->
+    <script src="{% static 'site/js/main.js' %}"></script>
+    {% block extra_scripts %}{% endblock %}
+
+</body>
+</html>
