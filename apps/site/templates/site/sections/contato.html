@@ -43,6 +43,15 @@
                 <p class="text-lampiao text-xs tracking-[0.25em] uppercase mb-2">Comercial</p>
                 <h3 class="font-display text-2xl font-black text-madeira mb-2">Pedir proposta</h3>
                 <p class="text-madeira/60 text-sm mb-6">Datas flexíveis, grupo ou orçamento personalizado — a gente responde pelo funil comercial.</p>
+                {% if request.GET.proposta == 'ok' %}
+                <div class="mb-4 rounded-xl bg-musgo/10 border border-musgo/30 text-musgo text-sm px-4 py-3">
+                    Pedido enviado! Em breve falamos com você pelo WhatsApp ou e-mail.
+                </div>
+                {% elif request.GET.proposta == 'erro' %}
+                <div class="mb-4 rounded-xl bg-red-50 border border-red-200 text-red-900 text-sm px-4 py-3">
+                    Não deu para enviar. Confira os campos obrigatórios e tente de novo.
+                </div>
+                {% endif %}
                 <form method="post" action="{% url 'core:pedir_proposta' %}" class="space-y-4">
                     {% csrf_token %}
                     <div>

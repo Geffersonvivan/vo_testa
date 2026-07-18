@@ -356,6 +356,8 @@ class EventosEHomeTests(TestCase):
             'mensagem': 'Confraternização de fim de ano',
         })
         self.assertEqual(r.status_code, 302)
+        self.assertIn('proposta=ok', r['Location'])
+        self.assertIn('#eventos', r['Location'])
         op = Oportunidade.objects.get(pessoa__email='evento@xpto.com')
         self.assertEqual(op.tipo_interesse, 'evento')
         self.assertIn('Evento', op.titulo)

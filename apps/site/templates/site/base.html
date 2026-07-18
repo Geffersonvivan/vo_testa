@@ -80,6 +80,19 @@
 
     {% include 'site/partials/header.html' %}
 
+    {% if messages %}
+    <div class="fixed top-20 left-1/2 -translate-x-1/2 z-[60] w-[min(92vw,32rem)] space-y-2 pointer-events-none" role="status">
+        {% for message in messages %}
+        <div class="pointer-events-auto rounded-xl px-4 py-3 text-sm shadow-lg border
+            {% if message.tags == 'error' %}bg-red-50 border-red-200 text-red-900
+            {% elif message.tags == 'warning' %}bg-amber-50 border-amber-200 text-amber-950
+            {% else %}bg-pergaminho border-lampiao/40 text-madeira{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     {% block content %}{% endblock %}
 
     {% include 'site/partials/footer.html' %}

@@ -30,6 +30,15 @@
             <div class="bg-pergaminho rounded-2xl p-6 sm:p-8 border border-lampiao/20">
                 <h3 class="font-display text-xl font-bold text-madeira mb-1">Pedir proposta de evento</h3>
                 <p class="text-madeira/50 text-sm mb-5">Entra no funil comercial — a equipe retorna pelo WhatsApp ou e-mail.</p>
+                {% if request.GET.proposta == 'ok' %}
+                <div class="mb-4 rounded-xl bg-musgo/10 border border-musgo/30 text-musgo text-sm px-4 py-3">
+                    Pedido enviado! Em breve falamos com você pelo WhatsApp ou e-mail.
+                </div>
+                {% elif request.GET.proposta == 'erro' %}
+                <div class="mb-4 rounded-xl bg-red-50 border border-red-200 text-red-900 text-sm px-4 py-3">
+                    Não deu para enviar. Confira os campos obrigatórios e tente de novo.
+                </div>
+                {% endif %}
                 <form method="post" action="{% url 'core:pedir_proposta' %}" class="space-y-4">
                     {% csrf_token %}
                     <input type="hidden" name="tipo_interesse" value="evento">

@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 
 from django.contrib import messages
@@ -5,6 +6,8 @@ from django.core.cache import cache
 from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+
+logger = logging.getLogger(__name__)
 
 from apps.site.forms import (
     BuscaDisponibilidadeForm,
@@ -88,18 +91,23 @@ def pedir_proposta(request):
     """Formulário #contato / #eventos → Comercial. Degrada se módulo off."""
     if request.method != 'POST':
         return redirect(reverse('core:home') + '#contato')
+    ancora = '#eventos' if request.POST.get('tipo_interesse') == 'evento' else '#contato'
+
+    def _voltar(flag):
+        # Query string antes do hash — senão o browser descarta o ?proposta=
+        return redirect(reverse('core:home') + f'?proposta={flag}' + ancora)
+
     if _limite_excedido(request, 'proposta', 8, 3600):
         messages.error(request, 'Muitas tentativas. Tente novamente mais tarde.')
-        return redirect(reverse('core:home') + '#contato')
+        return _voltar('erro')
     form = PropostaSiteForm(request.POST)
-    ancora = '#eventos' if request.POST.get('tipo_interesse') == 'evento' else '#contato'
     if not form.is_valid():
-        messages.error(request, 'Confira os dados do formulário.')
-        return redirect(reverse('core:home') + ancora)
+        messages.error(request, 'Confira os dados do formulário (nome e WhatsApp ou e-mail).')
+        return _voltar('erro')
     dados = form.cleaned_data
     try:
         from apps.comercial import services as comercial
-        comercial.capturar_lead_site(
+        op = comercial.capturar_lead_site(
             nome=dados['nome'],
             email=dados.get('email') or '',
             telefone=dados.get('telefone') or '',
@@ -110,12 +118,24 @@ def pedir_proposta(request):
             tipo_interesse=dados.get('tipo_interesse') or 'hospedagem',
         )
     except Exception:
-        pass
+        logger.exception('Falha ao capturar lead do site')
+        messages.error(
+            request,
+            'Não foi possível registrar o pedido agora. Tente de novo ou fale pelo WhatsApp.',
+        )
+        return _voltar('erro')
+    if op is None:
+        messages.warning(
+            request,
+            'Recebemos sua mensagem, mas o funil comercial está temporariamente indisponível. '
+            'Retornaremos pelo WhatsApp ou e-mail.',
+        )
+        return _voltar('aviso')
     messages.success(
         request,
         'Recebemos seu pedido! Em breve entraremos em contato pelo WhatsApp ou e-mail.',
     )
-    return redirect(reverse('core:home') + ancora)
+    return _voltar('ok')
 
 
 # --------------------------------------------------------------------------- #
