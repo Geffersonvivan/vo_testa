@@ -40,10 +40,28 @@ class OrdemServicoTests(ManutencaoBase):
             self.op, uh=self.uh, titulo="Vazamento", bloquear=True
         )
         self.uh.refresh_from_db()
-        self.assertEqual(self.uh.status, UH.Status.BLOQUEADA)
+        # Bloqueio é POR DATAS: o quarto segue ATIVA, mas sai da disponibilidade
+        # pela janela da OS.
+        self.assertEqual(self.uh.status, UH.Status.ATIVA)
         self.assertTrue(os.bloqueia_uh)
+        self.assertEqual(os.bloqueio_inicio, hoje)
         self.assertNotIn(self.uh, reservas_services.uhs_disponiveis(hoje, hoje + timedelta(days=1)))
         self.assertTrue(TrilhaAuditoria.objects.filter(acao="bloqueio_uh").exists())
+
+    def test_bloqueio_por_datas_so_no_periodo(self):
+        hoje = timezone.localdate()
+        fim = hoje + timedelta(days=2)
+        services.abrir_os(self.op, uh=self.uh, titulo="Pintura", bloquear=True,
+                          bloqueio_inicio=hoje, bloqueio_fim=fim)
+        # Dentro da janela: indisponível.
+        self.assertNotIn(
+            self.uh, reservas_services.uhs_disponiveis(hoje, hoje + timedelta(days=1))
+        )
+        # Depois da janela: disponível de novo (é o "por datas").
+        depois = fim + timedelta(days=1)
+        self.assertIn(
+            self.uh, reservas_services.uhs_disponiveis(depois, depois + timedelta(days=1))
+        )
 
     def test_nao_bloqueia_quarto_ocupado(self):
         from apps.reservas.models import Reserva
@@ -131,7 +149,10 @@ class PermissaoTests(ManutencaoBase):
         })
         self.assertEqual(r.status_code, 302)
         self.uh.refresh_from_db()
-        self.assertEqual(self.uh.status, UH.Status.BLOQUEADA)
+        # Bloqueio por datas: quarto segue ATIVA, mas fora da disponibilidade.
+        self.assertEqual(self.uh.status, UH.Status.ATIVA)
+        hoje = timezone.localdate()
+        self.assertNotIn(self.uh, reservas_services.uhs_disponiveis(hoje, hoje + timedelta(days=1)))
 
     def test_modulo_inativo_da_404(self):
         ModuloContratado.objects.filter(codigo=Modulo.MANUTENCAO).update(ativo=False)

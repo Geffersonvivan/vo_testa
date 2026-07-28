@@ -62,7 +62,14 @@ class OrdemServico(models.Model):
     previsto_para = models.DateField("previsto para", null=True, blank=True)
     bloqueia_uh = models.BooleanField(
         "bloquear o quarto durante o reparo", default=False,
-        help_text="O quarto sai da disponibilidade até a OS ser concluída.",
+        help_text="O quarto sai da disponibilidade no período do bloqueio.",
+    )
+    # Janela do bloqueio (por datas): o quarto fica indisponível para reserva de
+    # `bloqueio_inicio` até `bloqueio_fim` (inclusive). Fim vazio = até concluir.
+    bloqueio_inicio = models.DateField("bloqueio de", null=True, blank=True)
+    bloqueio_fim = models.DateField(
+        "bloqueio até", null=True, blank=True,
+        help_text="Vazio = bloqueado até a OS ser concluída.",
     )
     custo_maodeobra = models.DecimalField(
         "mão de obra (R$)", max_digits=10, decimal_places=2, default=Decimal("0.00")

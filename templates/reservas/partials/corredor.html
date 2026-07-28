@@ -4,7 +4,7 @@
       <a href="{% url 'reservas:detalhe' q.reserva.pk %}"
          class="porta sit-{{ q.situacao }} dica"
          data-dica="{{ q.label }} · {{ q.uh.tipo.nome }} · {{ q.reserva.hospede.nome }}{% if q.pcd %} · PCD{% endif %}{% if q.periodo %} · {{ q.periodo }}{% endif %}{% if q.saldo is not None %} · saldo R$ {{ q.saldo }}{% endif %}{% if q.limpeza_label %} · {{ q.limpeza_label }}{% endif %}{% if arrastar %}{% if q.situacao == 'ocupada' or q.situacao == 'chegada' %} — arraste para trocar{% endif %}{% endif %}"
-         {% if arrastar %}{% if q.situacao == 'ocupada' or q.situacao == 'chegada' %}draggable="true" data-reserva="{{ q.reserva.pk }}" data-nome="{{ q.reserva.hospede.nome }}" data-num="{{ q.uh.numero|cut:'Quarto ' }}"{% endif %}{% endif %}
+         {% if arrastar %}{% if q.situacao == 'ocupada' or q.situacao == 'chegada' %}data-reserva="{{ q.reserva.pk }}" data-nome="{{ q.reserva.hospede.nome }}" data-num="{{ q.uh.numero|cut:'Quarto ' }}"{% endif %}{% endif %}
          {% if filtravel %}x-show="(tipos.length===0 || tipos.includes('{{ q.uh.tipo.pk }}')) && (sits.length===0 || sits.includes('{{ q.situacao }}'))"{% endif %}>
         <span class="porta-topo">
           <span class="porta-num">{{ q.uh.numero|cut:"Quarto " }}</span>
@@ -19,7 +19,7 @@
             <span class="porta-saldo {% if q.saldo > 0 %}devendo{% else %}ok{% endif %}">R$ {{ q.saldo }}</span>
           {% endif %}
           {% if q.limpeza_label %}<span class="porta-limp limpeza-{{ q.limpeza_cod }}">{{ q.limpeza_label }}</span>{% endif %}
-          {% if q.badge %}<span class="porta-flag">{{ q.badge }}</span>{% endif %}
+          {% if q.badge %}<span class="porta-flag{% if q.badge_alerta %} alerta{% endif %}">{{ q.badge }}</span>{% endif %}
           {% if q.frigobar_pendente %}<span class="porta-flag frigobar">frigobar</span>{% endif %}
         </span>
       </a>
@@ -44,7 +44,7 @@
       </button>
     {% else %}
       <div class="porta sit-{{ q.situacao }} dica"
-           data-dica="{{ q.label }} · {{ q.uh.tipo.nome }}{% if q.pcd %} · PCD{% endif %}{% if q.limpeza_label %} · {{ q.limpeza_label }}{% endif %}"
+           data-dica="{{ q.label }} · {{ q.uh.tipo.nome }}{% if q.motivo_bloqueio %} · Manutenção: {{ q.motivo_bloqueio }}{% endif %}{% if q.pcd %} · PCD{% endif %}{% if q.limpeza_label %} · {{ q.limpeza_label }}{% endif %}"
            {% if filtravel %}x-show="(tipos.length===0 || tipos.includes('{{ q.uh.tipo.pk }}')) && (sits.length===0 || sits.includes('{{ q.situacao }}'))"{% endif %}>
         <span class="porta-topo">
           <span class="porta-num">{{ q.uh.numero|cut:"Quarto " }}</span>

@@ -4,7 +4,8 @@
    Assinatura: o corredor de portas como herói da recepção.
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+/* Fontes carregadas via <link> no <head> (base.html) — em paralelo, não por
+   @import (que seria em série, bloqueando a renderização no hard reload). */
 
 @font-face {
   font-family: 'Rosaline';
@@ -234,7 +235,7 @@ body {
   color: var(--pergaminho);
   background:
     radial-gradient(ellipse 120% 16% at 50% 0%, rgba(215, 160, 72, .16), transparent 70%),
-    linear-gradient(180deg, var(--noturno-2), var(--noturno) 42%);
+    var(--noturno-2);
   border-right: 1px solid rgba(215, 160, 72, .15);
 }
 
@@ -853,6 +854,30 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--lampiao); }
 
 .mapa-ocupada { padding: .18rem .1rem !important; }
 
+/* Quarto bloqueado (manutenção): indisponível, não reservável (hachura) */
+.mapa-bloqueada {
+  cursor: not-allowed;
+  background:
+    repeating-linear-gradient(45deg,
+      rgba(42, 107, 120, .13) 0 5px, transparent 5px 10px),
+    var(--superficie-2);
+}
+.mapa-linha-bloqueada .mapa-uh strong { color: var(--info); }
+
+/* Limpeza é estado de HOJE (giro de quarto): overlay reservável, mas sinalizado.
+   Ainda dá para reservar (estará limpo na chegada); o check-in é que exige limpo. */
+.mapa-limpeza-hoje { font-weight: 800; }
+.mapa-limpeza-hoje.limpeza-suja { color: var(--alerta); background: rgba(176, 116, 28, .16); }
+.mapa-limpeza-hoje.limpeza-em_limpeza { color: #B5591C; background: rgba(200, 98, 30, .16); }
+.mapa-tag-bloq {
+  display: inline-block; margin-left: .35rem;
+  padding: .02rem .35rem;
+  font-size: .58rem; font-weight: 800; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--info); background: var(--info-bg);
+  border: 1px solid rgba(42, 107, 120, .35); border-radius: 4px;
+  vertical-align: middle;
+}
+
 /* Barra da reserva: paralelogramo (entra ao meio-dia, sai ao meio-dia) */
 .mapa-barra {
   display: block;
@@ -909,7 +934,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--lampiao); }
   border-radius: var(--raio-g);
   box-shadow: var(--sombra-3);
   overflow: hidden;
-  animation: modal-entra .18s cubic-bezier(.2, .8, .2, 1);
+  will-change: transform, opacity, filter;   /* materializado por JS (§12) */
 }
 
 @keyframes modal-entra {
@@ -1534,6 +1559,7 @@ div.porta { cursor: default; }
   color: var(--lampiao-claro);
 }
 .porta-flag.frigobar { color: #F0A090; }
+.porta-flag.alerta { color: #F28B6A; font-weight: 800; }   /* saída atrasada = alerta */
 
 /* Dica do corredor: abaixo da porta (não cobre a fileira de cima), fundo opaco */
 .porta.dica::after {
@@ -2120,3 +2146,87 @@ div.porta { cursor: default; }
   background-repeat: no-repeat; background-position: right .65rem center;
 }
 .op-acoes .campo label { display: block; font-size: .78rem; color: var(--tinta-suave); margin-bottom: .25rem; }
+
+/* ============================================================
+   RESERVAS — camada Apple "Fluid Interfaces" (escopo .tela-reservas)
+   Manipulação direta, feedback de toque, tipografia óptica, a11y.
+   ============================================================ */
+
+/* ---- §15 Tipografia: óptica + tracking/leading por tamanho ---- */
+.tela-reservas h1 {
+  font-optical-sizing: auto;      /* Fraunces tem eixo opsz — usar de fato */
+  line-height: 1.04;              /* leading apertado no display (§15) */
+  letter-spacing: -.021em;        /* tracking negativo cresce com o tamanho */
+}
+.tela-reservas h2 { font-optical-sizing: auto; line-height: 1.12; letter-spacing: -.012em; }
+.tela-reservas .subtitulo { text-wrap: pretty; }
+
+/* ---- §1/§10 Feedback de toque: responde no pointer-down ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .tela-reservas .botao-primario:active,
+  .tela-reservas .botao-neutro:active { transform: scale(.975); }
+}
+/* A porta é arrastável no touch — impede o scroll de brigar com o gesto */
+.porta[data-reserva], .mapa-barra[data-reserva] { touch-action: none; }
+
+/* Toque preme a célula de noite antes de virar seleção (§1) */
+.mapa-livre.mapa-pressed {
+  color: var(--madeira);
+  background: rgba(215, 160, 72, .28) !important;
+}
+
+/* ---- §2/§4 Porta em arraste: levanta (não some), segue o dedo ---- */
+.porta.arrastando {
+  opacity: 1;
+  z-index: 60;
+  cursor: grabbing;
+  box-shadow: var(--sombra-3), 0 0 0 1px rgba(226, 168, 74, .5);
+  will-change: transform;
+  /* sem transition: o transform vem do JS 1:1 / do spring */
+  transition: none;
+}
+.mapa-barra.arrastando {
+  opacity: 1; cursor: grabbing;
+  box-shadow: var(--sombra-2); filter: brightness(1.05);
+  transition: none;
+}
+
+/* Alvo de drop mais físico (cresce um tico na direção do gesto, §8) */
+.porta.drop-alvo {
+  border-color: var(--sucesso) !important;
+  box-shadow: 0 0 0 3px rgba(42, 122, 88, .38), 0 10px 26px rgba(42, 122, 88, .28);
+  transform: translateY(-3px) scale(1.02);
+}
+
+/* ---- §12 Timeline: coluna e cabeçalho translúcidos que ancoram a leitura ---- */
+.tela-reservas .mapa-rolagem { position: relative; }
+.tela-reservas .mapa th.mapa-uh,
+.tela-reservas .mapa td.mapa-uh {
+  position: sticky; left: 0; z-index: 3;
+  background: rgba(250, 252, 252, .86);
+  backdrop-filter: saturate(160%) blur(6px);
+  box-shadow: 1px 0 0 var(--fio);
+}
+.tela-reservas .mapa-grupo td.mapa-uh { background: rgba(238, 242, 243, .92); }
+/* Scroll-edge: o conteúdo esmaece ao passar sob a coluna fixa, sem borda dura */
+.tela-reservas .mapa-rolagem::before {
+  content: ""; position: sticky; left: 110px; top: 0; z-index: 2;
+  display: block; width: 18px; height: 0;
+  box-shadow: -12px 0 12px -12px rgba(4, 21, 31, .28);
+  pointer-events: none;
+}
+
+/* ---- §14 Acessibilidade: transparência e contraste ---- */
+@media (prefers-reduced-transparency: reduce) {
+  .topbar { background: var(--canvas); backdrop-filter: none; }
+  .modal-overlay, .paleta-overlay { backdrop-filter: none; background: rgba(5, 28, 44, .72); }
+  .tela-reservas .mapa th.mapa-uh,
+  .tela-reservas .mapa td.mapa-uh { background: var(--superficie); backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .porta { border-color: rgba(255, 255, 255, .45); }
+  .tela-reservas .cartao,
+  .tela-reservas .tabela,
+  .tela-reservas .form-cartao { border-color: var(--fio-forte); }
+  .tela-reservas .selo { border-width: 1.5px; }
+}

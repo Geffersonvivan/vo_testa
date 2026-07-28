@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block titulo %}Mapa de quartos — CRM Vô Testa{% endblock %}
+{% block conteudo_classe %}tela-reservas{% endblock %}
 
 {% block conteudo %}
 <p class="pagina-eyebrow letreiro">Reservas</p>
@@ -39,35 +40,98 @@
 
 <form style="display:none">{% csrf_token %}</form>
 <script>
+// Troca de quarto por manipulação direta (Apple "Fluid Interfaces"):
+// a porta segue o dedo 1:1 respeitando onde foi pega (§2), o alvo se ilumina
+// no caminho (§8), e ao soltar ela assenta na vaga com um spring (§4). Toque
+// (sem arrastar) ainda abre o detalhe. confirm() mantido antes de efetivar.
 (function () {
-  let reserva = null, nome = "", de = "";
-  document.querySelectorAll('.porta[data-reserva]').forEach(el => {
-    el.addEventListener('dragstart', e => {
-      reserva = el.dataset.reserva; nome = el.dataset.nome; de = el.dataset.num;
-      el.classList.add('arrastando'); e.dataTransfer.effectAllowed = 'move';
+  const TROCA = "{% url 'reservas:trocar_quarto' 0 %}";
+  const LIMIAR = 10;               // histerese antes de virar arraste (§10)
+  const csrfEl = () => document.querySelector('[name=csrfmiddlewaretoken]');
+
+  async function enviarTroca(rid, uh, num) {
+    const fd = new FormData();
+    fd.append('novo_uh', uh); fd.append('motivo', 'Troca pelo mapa de quartos');
+    try {
+      const r = await fetch(TROCA.replace('/0/', '/' + rid + '/'), {
+        method: 'POST', headers: { 'X-CSRFToken': csrfEl().value, 'X-Requested-With': 'fetch' }, body: fd,
+      });
+      const d = await r.json();
+      if (d.ok) { toast('Quarto trocado para o ' + num + '. A conta foi junto.', 'success'); setTimeout(() => location.reload(), 420); }
+      else { toast(d.erro || 'Não foi possível trocar.', 'error'); location.reload(); }
+    } catch (err) { toast('Falha de conexão.', 'error'); location.reload(); }
+  }
+
+  document.querySelectorAll('.porta[data-reserva]').forEach(porta => {
+    let ativo = false, moveu = false, pid = null, suprimirClique = false;
+    let x0 = 0, y0 = 0, alvo = null;
+    const track = Fluid.velocityTracker();
+
+    const alvoSob = (cx, cy) => {
+      porta.style.pointerEvents = 'none';
+      const el = document.elementFromPoint(cx, cy);
+      porta.style.pointerEvents = '';
+      return el && el.closest ? el.closest('.porta[data-uh-livre]') : null;
+    };
+    const limparAlvo = () => { if (alvo) { alvo.classList.remove('drop-alvo'); alvo = null; } };
+
+    porta.addEventListener('pointerdown', e => {
+      if (e.button != null && e.button !== 0) return;
+      ativo = true; moveu = false; pid = e.pointerId;
+      x0 = e.clientX; y0 = e.clientY;
+      track.reset(); track.push(e.clientX, e.clientY, e.timeStamp);
     });
-    el.addEventListener('dragend', () => el.classList.remove('arrastando'));
-  });
-  document.querySelectorAll('.porta[data-uh-livre]').forEach(el => {
-    el.addEventListener('dragover', e => { if (reserva) { e.preventDefault(); el.classList.add('drop-alvo'); } });
-    el.addEventListener('dragleave', () => el.classList.remove('drop-alvo'));
-    el.addEventListener('drop', async e => {
-      e.preventDefault(); el.classList.remove('drop-alvo');
-      if (!reserva) return;
-      const uh = el.dataset.uhLivre, num = el.dataset.num, rid = reserva;
-      reserva = null;
-      if (!confirm(`Mover ${nome} do Quarto ${de} para o Quarto ${num}? A conta (diárias, consumo, pagamentos) vai junto.`)) return;
-      const fd = new FormData();
-      fd.append('novo_uh', uh); fd.append('motivo', 'Troca pelo mapa de quartos');
-      const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
-      try {
-        const r = await fetch(`{% url 'reservas:trocar_quarto' 0 %}`.replace('/0/', `/${rid}/`), {
-          method: 'POST', headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'fetch' }, body: fd,
-        });
-        const d = await r.json();
-        if (d.ok) { toast(`Quarto trocado para o ${num}. A conta foi junto.`, 'success'); setTimeout(() => location.reload(), 700); }
-        else toast(d.erro || 'Não foi possível trocar.', 'error');
-      } catch (err) { toast('Falha de conexão.', 'error'); }
+
+    porta.addEventListener('pointermove', e => {
+      if (!ativo || e.pointerId !== pid) return;
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      if (!moveu && Math.hypot(dx, dy) < LIMIAR) return;
+      if (!moveu) { moveu = true; porta.setPointerCapture(pid); porta.classList.add('arrastando'); }
+      e.preventDefault();
+      track.push(e.clientX, e.clientY, e.timeStamp);
+      porta.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+      const novo = alvoSob(e.clientX, e.clientY);
+      if (novo !== alvo) {
+        limparAlvo();
+        if (novo) { novo.classList.add('drop-alvo'); alvo = novo; Fluid.haptic(6); }
+      }
+    });
+
+    porta.addEventListener('pointerup', e => {
+      if (!ativo || e.pointerId !== pid) return;
+      ativo = false;
+      try { porta.releasePointerCapture(pid); } catch (_) {}
+      if (!moveu) return;                       // toque → o link abre o detalhe
+      suprimirClique = true;
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      const destino = alvo; limparAlvo();
+      const vel = track.velocity();
+
+      const voltar = () => Fluid.spring2d({
+        fromX: dx, fromY: dy, toX: 0, toY: 0, velocityX: vel.x, velocityY: vel.y,
+        response: 0.4, bounce: 0.28,
+        onUpdate: (x, y) => { porta.style.transform = 'translate(' + x + 'px,' + y + 'px)'; },
+        onComplete: () => { porta.style.transform = ''; porta.classList.remove('arrastando'); }
+      });
+
+      if (!destino) { voltar(); return; }
+      const num = destino.dataset.num, uh = destino.dataset.uhLivre;
+      const de = porta.dataset.num, nome = porta.dataset.nome;
+      if (!confirm('Mover ' + nome + ' do Quarto ' + de + ' para o Quarto ' + num + '? A conta (diárias, consumo, pagamentos) vai junto.')) { voltar(); return; }
+
+      const rP = porta.getBoundingClientRect(), rD = destino.getBoundingClientRect();
+      Fluid.haptic(14);
+      Fluid.spring2d({                          // assenta na vaga e então efetiva
+        fromX: dx, fromY: dy,
+        toX: dx + (rD.left - rP.left), toY: dy + (rD.top - rP.top),
+        velocityX: vel.x, velocityY: vel.y, response: 0.35, bounce: 0.12,
+        onUpdate: (x, y) => { porta.style.transform = 'translate(' + x + 'px,' + y + 'px)'; },
+        onComplete: () => enviarTroca(porta.dataset.reserva, uh, num)
+      });
+    });
+
+    porta.addEventListener('click', e => {
+      if (suprimirClique) { e.preventDefault(); suprimirClique = false; }
     });
   });
 })();

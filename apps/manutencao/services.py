@@ -18,26 +18,31 @@ from .models import OrdemServico
 from .signals import reparo_concluido
 
 
-def _bloquear_uh(uh, usuario, ordem):
+def _registrar_bloqueio(uh, usuario, ordem):
+    """Valida e audita o bloqueio POR DATAS. A indisponibilidade em si vem da
+    janela [bloqueio_inicio, bloqueio_fim] da OS (a disponibilidade é dona do
+    Reservas) — aqui não se mexe em UH.status."""
     if uh.status == UH.Status.INATIVA:
         raise ValidationError(f"O quarto {uh.numero} está inativo.")
-    if uh.status == UH.Status.BLOQUEADA:
-        raise ValidationError(f"O quarto {uh.numero} já está bloqueado.")
-    # Não bloquear um quarto com hóspede em casa (consulta a fonte: Reservas).
+    # A janela do bloqueio não pode colidir com reserva ativa (consulta a fonte).
     if modulo_ativo(Modulo.RESERVAS):
-        from apps.reservas.services import uh_ocupada
+        from apps.reservas.services import reserva_conflita
 
-        if uh_ocupada(uh):
+        if reserva_conflita(uh, ordem.bloqueio_inicio, ordem.bloqueio_fim):
             raise ValidationError(
-                f"O quarto {uh.numero} está ocupado — faça o check-out antes de bloquear."
+                f"O quarto {uh.numero} tem reserva no período do bloqueio — "
+                "ajuste as datas ou realoje o hóspede antes."
             )
-    uh.status = UH.Status.BLOQUEADA
-    uh.save(update_fields=["status"])
-    registrar_auditoria(usuario, "bloqueio_uh", ordem,
-                        {"uh": uh.numero, "motivo": ordem.titulo})
+    registrar_auditoria(usuario, "bloqueio_uh", ordem, {
+        "uh": uh.numero, "motivo": ordem.titulo,
+        "de": str(ordem.bloqueio_inicio),
+        "ate": str(ordem.bloqueio_fim) if ordem.bloqueio_fim else "até concluir",
+    })
 
 
 def _liberar_uh(uh, usuario, ordem):
+    # O bloqueio por datas cessa ao encerrar a OS (deixa de contar em `bloqueios`).
+    # Mantido por segurança: solta um UH.status legado que tenha ficado BLOQUEADA.
     if uh.status == UH.Status.BLOQUEADA:
         uh.status = UH.Status.ATIVA
         uh.save(update_fields=["status"])
@@ -49,7 +54,8 @@ def abrir_os(operador, *, uh=None, area="", titulo, descricao="",
              tipo=OrdemServico.Tipo.CORRETIVA,
              prioridade=OrdemServico.Prioridade.MEDIA,
              responsavel=None, prestador=None, previsto_para=None,
-             bloquear=False, recorrencia_meses=None, agendada_para=None):
+             bloquear=False, recorrencia_meses=None, agendada_para=None,
+             bloqueio_inicio=None, bloqueio_fim=None):
     titulo = (titulo or "").strip()
     area = (area or "").strip()
     if not titulo:
@@ -61,17 +67,26 @@ def abrir_os(operador, *, uh=None, area="", titulo, descricao="",
     if bloquear and not uh:
         raise ValidationError("Só é possível bloquear um quarto (não uma área).")
 
+    # Janela do bloqueio (por datas): início = agendada/hoje; fim = previsto ou aberto.
+    b_ini = b_fim = None
+    if bloquear and uh:
+        b_ini = bloqueio_inicio or agendada_para or timezone.localdate()
+        b_fim = bloqueio_fim or previsto_para or None
+        if b_fim and b_fim < b_ini:
+            raise ValidationError("O fim do bloqueio não pode ser antes do início.")
+
     ordem = OrdemServico.objects.create(
         uh=uh, area=area, titulo=titulo, descricao=descricao or "",
         tipo=tipo, prioridade=prioridade, responsavel=responsavel,
         prestador=prestador, previsto_para=previsto_para,
         bloqueia_uh=bool(bloquear and uh),
+        bloqueio_inicio=b_ini, bloqueio_fim=b_fim,
         recorrencia_meses=recorrencia_meses or None,
         agendada_para=agendada_para,
         criado_por=operador,
     )
     if ordem.bloqueia_uh:
-        _bloquear_uh(uh, operador, ordem)
+        _registrar_bloqueio(uh, operador, ordem)
     return ordem
 
 
@@ -126,6 +141,51 @@ def concluir_os(ordem, usuario, *, resolucao="",
             criado_por=usuario,
         )
     return proxima
+
+
+def _os_bloqueadoras():
+    """OS abertas/em andamento que bloqueiam um quarto (com janela de datas)."""
+    return OrdemServico.objects.filter(
+        bloqueia_uh=True,
+        uh__isnull=False,
+        bloqueio_inicio__isnull=False,
+        status__in=[OrdemServico.Status.ABERTA, OrdemServico.Status.EM_ANDAMENTO],
+    )
+
+
+def uhs_bloqueadas(checkin, checkout) -> set:
+    """IDs de UHs com bloqueio de manutenção nas noites [checkin, checkout).
+
+    Interface pública para o Reservas (disponibilidade central). Uma reserva de
+    noites [checkin, checkout) colide com o bloqueio [ini, fim] se
+    ini < checkout e (fim vazio ou fim >= checkin)."""
+    return {
+        o.uh_id
+        for o in _os_bloqueadoras()
+        if o.bloqueio_inicio < checkout
+        and (o.bloqueio_fim is None or o.bloqueio_fim >= checkin)
+    }
+
+
+def bloqueios(inicio, fim) -> list:
+    """Bloqueios de manutenção que tocam a janela de datas [inicio, fim] (inclusive).
+
+    Interface pública para o mapa de reservas desenhar por célula.
+    Cada item: {uh_id, inicio (date), fim (date|None), motivo}."""
+    return [
+        {"uh_id": o.uh_id, "inicio": o.bloqueio_inicio,
+         "fim": o.bloqueio_fim, "motivo": o.titulo}
+        for o in _os_bloqueadoras()
+        if o.bloqueio_inicio <= fim
+        and (o.bloqueio_fim is None or o.bloqueio_fim >= inicio)
+    ]
+
+
+def motivos_bloqueio():
+    """{uh_id: motivo} dos quartos bloqueados por manutenção HOJE — para o
+    corredor (mapa de quartos), que é a visão operacional do dia."""
+    hoje = timezone.localdate()
+    return {b["uh_id"]: b["motivo"] for b in bloqueios(hoje, hoje)}
 
 
 def pendencias_auditoria():

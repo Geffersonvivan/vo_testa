@@ -107,18 +107,42 @@ def expirar_vencidas() -> int:
     return n
 
 
+def _uhs_bloqueio_manutencao(checkin: date, checkout: date) -> set:
+    """IDs de UHs bloqueadas por Manutenção (por datas) que colidem com as noites
+    [checkin, checkout). Vazio se o módulo estiver inativo — degradação graciosa."""
+    from apps.nucleo.models import modulo_ativo
+    from apps.nucleo.modulos import Modulo
+
+    if not modulo_ativo(Modulo.MANUTENCAO):
+        return set()
+    from apps.manutencao.services import uhs_bloqueadas
+    return set(uhs_bloqueadas(checkin, checkout))
+
+
+def reserva_conflita(uh: UH, inicio: date, fim: date | None = None) -> bool:
+    """Há reserva ativa nas noites [inicio, fim] (fim inclusive; None = em aberto)?
+    Interface pública para a Manutenção validar a janela de bloqueio."""
+    qs = reservas_ativas_qs().filter(uh=uh, checkout__gt=inicio)
+    if fim is not None:
+        qs = qs.filter(checkin__lte=fim)
+    return qs.exists()
+
+
 def uh_disponivel(uh: UH, checkin: date, checkout: date) -> bool:
     return (
         uh.status == UH.Status.ATIVA
         and not reservas_no_periodo(uh, checkin, checkout).exists()
+        and uh.pk not in _uhs_bloqueio_manutencao(checkin, checkout)
     )
 
 
 def uhs_disponiveis(checkin: date, checkout: date):
-    """UHs ativas livres no período — consulta central de disponibilidade."""
-    ocupadas = reservas_ativas_qs().filter(
+    """UHs ativas livres no período — consulta central de disponibilidade
+    (reservas ativas + bloqueios de manutenção por datas)."""
+    ocupadas = set(reservas_ativas_qs().filter(
         checkin__lt=checkout, checkout__gt=checkin,
-    ).values_list("uh_id", flat=True)
+    ).values_list("uh_id", flat=True))
+    ocupadas |= _uhs_bloqueio_manutencao(checkin, checkout)
     return UH.objects.filter(status=UH.Status.ATIVA).exclude(pk__in=ocupadas)
 
 
@@ -488,6 +512,10 @@ def trocar_quarto(reserva, novo_uh, usuario, motivo=""):
         raise ValidationError(
             f"O quarto {novo_uh.numero} está {novo_uh.get_status_display().lower()}."
         )
+    if novo_uh.pk in _uhs_bloqueio_manutencao(reserva.checkin, reserva.checkout):
+        raise ValidationError(
+            f"O quarto {novo_uh.numero} está em manutenção no período desta reserva."
+        )
     antigo = reserva.uh
     reserva.uh = novo_uh
     try:
@@ -639,6 +667,13 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
 
         limpeza = status_por_uh()
 
+    # Manutenção bloqueia por datas; aqui interessa quem está bloqueado HOJE.
+    manutencao_hoje = {}
+    if modulo_ativo(Modulo.MANUTENCAO):
+        from apps.manutencao.services import motivos_bloqueio
+
+        manutencao_hoje = motivos_bloqueio()
+
     frigobar_on = (
         modulo_ativo(Modulo.FRIGOBAR)
         and getattr(dj_settings, "FRIGOBAR_BLOQUEAR_CHECKOUT", True)
@@ -654,15 +689,20 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
         .exclude(tipo__modalidade=TipoUH.Modalidade.DAY_USE)
         .order_by("numero")
     ):
-        reserva, badge = None, ""
+        reserva, badge, badge_alerta = None, "", False
+        motivo_bloqueio = ""
         if uh.status == UH.Status.INATIVA:
             situacao = "inativa"
-        elif uh.status == UH.Status.BLOQUEADA:
+        elif uh.status == UH.Status.BLOQUEADA or uh.pk in manutencao_hoje:
             situacao = "bloqueada"
+            motivo_bloqueio = manutencao_hoje.get(uh.pk, "")
         elif uh.pk in hospedadas:
             situacao, reserva = "ocupada", hospedadas[uh.pk]
-            if reserva.checkout <= hoje:
+            if reserva.checkout == hoje:
                 badge = "saída hoje"
+            elif reserva.checkout < hoje:
+                # Check-out vencido e ninguém deu baixa — vira alerta operacional.
+                badge, badge_alerta = "saída atrasada", True
         elif uh.pk in chegadas:
             situacao, reserva = "chegada", chegadas[uh.pk]
         elif uh.pk in a_limpar:
@@ -699,6 +739,8 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
             "label": SITUACOES_QUARTO[situacao],
             "reserva": reserva,
             "badge": badge,
+            "badge_alerta": badge_alerta,
+            "motivo_bloqueio": motivo_bloqueio,
             "pcd": uh.pcd,
             "periodo": periodo,
             "saldo": saldo,

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block titulo %}Mapa de reservas — CRM Vô Testa{% endblock %}
+{% block conteudo_classe %}tela-reservas{% endblock %}
 
 {% block conteudo %}
 <p class="pagina-eyebrow letreiro">Reservas</p>
@@ -55,9 +56,14 @@
         {% endfor %}
       </tr>
       {% for linha in grupo.linhas %}
-        <tr class="mapa-linha" data-uh="{{ linha.uh.pk }}" data-numero="{{ linha.uh.numero }}">
+        <tr class="mapa-linha {% if linha.bloqueada %}mapa-linha-bloqueada{% endif %}"
+            data-uh="{{ linha.uh.pk }}" data-numero="{{ linha.uh.numero }}"
+            {% if linha.bloqueada %}data-bloqueada="1"{% endif %}>
           <td class="mapa-uh">
             <strong>{{ linha.uh.numero }}</strong>
+            {% if linha.bloqueada %}
+              <span class="mapa-tag-bloq dica" data-dica="Quarto bloqueado — indisponível para reserva">bloqueado</span>
+            {% endif %}
           </td>
           {% for c in linha.celulas %}
             {% if c.reserva %}
@@ -65,11 +71,23 @@
                   data-dica="{{ c.reserva.hospede.nome }} · {{ c.reserva.checkin|date:'d/m' }} → {{ c.reserva.checkout|date:'d/m' }} · {{ c.reserva.get_status_display }} — arraste para outra linha para trocar de quarto">
                 <a href="{% url 'reservas:detalhe' c.reserva.pk %}"
                    class="mapa-barra mapa-cor-{{ c.reserva.status }}"
-                   draggable="true" data-reserva="{{ c.reserva.pk }}"
+                   data-reserva="{{ c.reserva.pk }}"
                    data-nome="{{ c.reserva.hospede.nome }}" data-de="{{ linha.uh.numero }}">
                   {{ c.reserva.hospede.nome|truncatechars:16 }}
                 </a>
               </td>
+            {% elif linha.bloqueada %}
+              <td class="mapa-bloqueada dica {% if c.hoje %}mapa-hoje{% endif %}"
+                  data-dica="Bloqueado — não reservável"
+                  aria-label="{{ linha.uh.numero }} bloqueado"></td>
+            {% elif c.bloqueio %}
+              <td class="mapa-bloqueada dica {% if c.hoje %}mapa-hoje{% endif %}"
+                  data-dica="Manutenção: {{ c.bloqueio }} — não reservável em {{ c.dia|date:'d/m' }}"
+                  aria-label="{{ linha.uh.numero }} em manutenção {{ c.dia|date:'d/m' }}"></td>
+            {% elif c.limpeza %}
+              <td class="mapa-livre mapa-limpeza-hoje dica limpeza-{{ c.limpeza }} {% if c.hoje %}mapa-hoje{% endif %}"
+                  data-uh="{{ linha.uh.pk }}" data-dia="{{ c.dia|date:'Y-m-d' }}"
+                  data-dica="{% if c.limpeza == 'em_limpeza' %}Em limpeza{% else %}A limpar{% endif %} hoje — libere na Governança antes do check-in">{% if c.limpeza == 'em_limpeza' %}⟳{% else %}!{% endif %}</td>
             {% else %}
               <td class="mapa-livre {% if c.fim_de_semana %}mapa-fds{% endif %} {% if c.hoje %}mapa-hoje{% endif %}"
                   data-uh="{{ linha.uh.pk }}" data-dia="{{ c.dia|date:'Y-m-d' }}"
@@ -89,6 +107,7 @@
   if (!tabela) return;
   const urlNova = tabela.dataset.urlNova;
   let arrastando = false, uhAtual = null, ancora = null, ini = null, fim = null, moveu = false;
+  let px0 = 0, py0 = 0, celAncora = null;
 
   const seletorLivres = uh => tabela.querySelectorAll('.mapa-livre[data-uh="' + uh + '"]');
   const datasLivres = uh => new Set(Array.from(seletorLivres(uh)).map(c => c.dataset.dia));
@@ -134,13 +153,16 @@
     if (!cel) return;
     e.preventDefault();
     arrastando = true; moveu = false;
+    px0 = e.clientX; py0 = e.clientY;
     uhAtual = cel.dataset.uh;
     ancora = ini = fim = cel.dataset.dia;
+    celAncora = cel; cel.classList.add('mapa-pressed');   // feedback no toque (§1)
     pintar(uhAtual, ini, fim);
   });
 
   document.addEventListener('pointermove', e => {
     if (!arrastando) return;
+    if (!moveu && Math.hypot(e.clientX - px0, e.clientY - py0) < 8) return;  // histerese (§10)
     const cel = celulaEm(e.clientX, e.clientY);
     if (!cel || cel.dataset.uh !== uhAtual) return;
     moveu = true;
@@ -151,6 +173,7 @@
   document.addEventListener('pointerup', () => {
     if (!arrastando) return;
     arrastando = false;
+    if (celAncora) { celAncora.classList.remove('mapa-pressed'); celAncora = null; }
     // O último dia selecionado é a data de saída (check-out). Clique único
     // (1 célula) vira 1 diária: entrada no dia, saída no dia seguinte.
     const uh = uhAtual, checkin = ini;
@@ -161,38 +184,79 @@
               '#modal-conteudo');
   });
 
-  // ---- Arrastar uma reserva para outra linha = trocar de quarto ----
-  let dReserva = null, dNome = '', dDe = '';
+  // ---- Arrastar uma reserva para outra linha = trocar de quarto (manip. direta) ----
+  // A barra segue o dedo 1:1 (§2); a linha-alvo se ilumina (§8); ao soltar,
+  // assenta na linha com um spring (§4). Toque abre o detalhe. confirm() mantido.
+  const TROCA = "{% url 'reservas:trocar_quarto' 0 %}";
+  const LIMIAR = 10;
+  async function enviarTroca(rid, uh, num) {
+    const fd = new FormData(); fd.append('novo_uh', uh); fd.append('motivo', 'Troca pelo mapa de reservas');
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    try {
+      const r = await fetch(TROCA.replace('/0/', '/' + rid + '/'), {
+        method: 'POST', headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'fetch' }, body: fd,
+      });
+      const d = await r.json();
+      if (d.ok) { toast('Reserva movida para o ' + num + '. A conta foi junto.', 'success'); setTimeout(() => location.reload(), 420); }
+      else { toast(d.erro || 'Não foi possível trocar.', 'error'); location.reload(); }
+    } catch (err) { toast('Falha de conexão.', 'error'); location.reload(); }
+  }
+
   tabela.querySelectorAll('.mapa-barra[data-reserva]').forEach(bar => {
-    bar.addEventListener('dragstart', e => {
-      dReserva = bar.dataset.reserva; dNome = bar.dataset.nome; dDe = bar.dataset.de;
-      bar.classList.add('arrastando'); e.dataTransfer.effectAllowed = 'move';
+    let ativo = false, moveu = false, pid = null, suprimir = false, x0 = 0, y0 = 0, alvo = null;
+    const track = Fluid.velocityTracker();
+    const linhaSob = (cx, cy) => {
+      bar.style.pointerEvents = 'none';
+      const el = document.elementFromPoint(cx, cy);
+      bar.style.pointerEvents = '';
+      const row = el && el.closest ? el.closest('.mapa-linha') : null;
+      return (row && row.dataset.numero !== bar.dataset.de && !row.dataset.bloqueada) ? row : null;
+    };
+    const limpar = () => { if (alvo) { alvo.classList.remove('linha-alvo'); alvo = null; } };
+
+    bar.addEventListener('pointerdown', e => {
+      if (e.button != null && e.button !== 0) return;
+      ativo = true; moveu = false; pid = e.pointerId; x0 = e.clientX; y0 = e.clientY;
+      track.reset(); track.push(e.clientX, e.clientY, e.timeStamp);
+      e.stopPropagation();                     // não dispara a seleção de noites
     });
-    bar.addEventListener('dragend', () => bar.classList.remove('arrastando'));
-  });
-  tabela.querySelectorAll('.mapa-linha').forEach(row => {
-    row.addEventListener('dragover', e => {
-      if (dReserva && row.dataset.numero !== dDe) { e.preventDefault(); row.classList.add('linha-alvo'); }
+    bar.addEventListener('pointermove', e => {
+      if (!ativo || e.pointerId !== pid) return;
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      if (!moveu && Math.hypot(dx, dy) < LIMIAR) return;
+      if (!moveu) { moveu = true; bar.setPointerCapture(pid); bar.classList.add('arrastando'); }
+      e.preventDefault();
+      track.push(e.clientX, e.clientY, e.timeStamp);
+      bar.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; bar.style.zIndex = 50;
+      const nova = linhaSob(e.clientX, e.clientY);
+      if (nova !== alvo) { limpar(); if (nova) { nova.classList.add('linha-alvo'); alvo = nova; Fluid.haptic(6); } }
     });
-    row.addEventListener('dragleave', () => row.classList.remove('linha-alvo'));
-    row.addEventListener('drop', async e => {
-      e.preventDefault(); row.classList.remove('linha-alvo');
-      if (!dReserva || row.dataset.numero === dDe) return;
-      const uh = row.dataset.uh, num = row.dataset.numero, rid = dReserva;
-      dReserva = null;
-      if (!confirm(`Mover ${dNome} do ${dDe} para o ${num}? A conta vai junto.`)) return;
-      const fd = new FormData(); fd.append('novo_uh', uh); fd.append('motivo', 'Troca pelo mapa de reservas');
-      const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
-      try {
-        const trocarUrl = "{% url 'reservas:trocar_quarto' 0 %}".replace('/0/', '/' + rid + '/');
-        const r = await fetch(trocarUrl, {
-          method: 'POST', headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'fetch' }, body: fd,
-        });
-        const d = await r.json();
-        if (d.ok) { toast('Reserva movida para o ' + num + '. A conta foi junto.', 'success'); setTimeout(() => location.reload(), 700); }
-        else toast(d.erro || 'Não foi possível trocar.', 'error');
-      } catch (err) { toast('Falha de conexão.', 'error'); }
+    bar.addEventListener('pointerup', e => {
+      if (!ativo || e.pointerId !== pid) return;
+      ativo = false;
+      try { bar.releasePointerCapture(pid); } catch (_) {}
+      if (!moveu) return;                        // toque → abre o detalhe
+      suprimir = true;
+      const dx = e.clientX - x0, dy = e.clientY - y0, vel = track.velocity();
+      const destino = alvo; limpar();
+      const encerra = () => { bar.style.transform = ''; bar.style.zIndex = ''; bar.classList.remove('arrastando'); };
+      const voltar = () => Fluid.spring2d({
+        fromX: dx, fromY: dy, toX: 0, toY: 0, velocityX: vel.x, velocityY: vel.y, response: 0.4, bounce: 0.28,
+        onUpdate: (x, y) => { bar.style.transform = 'translate(' + x + 'px,' + y + 'px)'; }, onComplete: encerra
+      });
+      if (!destino) { voltar(); return; }
+      const num = destino.dataset.numero, uh = destino.dataset.uh, de = bar.dataset.de, nome = bar.dataset.nome;
+      if (!confirm('Mover ' + nome + ' do ' + de + ' para o ' + num + '? A conta vai junto.')) { voltar(); return; }
+      const rB = bar.getBoundingClientRect(), rL = destino.getBoundingClientRect();
+      Fluid.haptic(14);
+      Fluid.spring2d({
+        fromX: dx, fromY: dy, toX: dx, toY: dy + (rL.top + rL.height / 2 - (rB.top + rB.height / 2)),
+        velocityX: vel.x, velocityY: vel.y, response: 0.35, bounce: 0.12,
+        onUpdate: (x, y) => { bar.style.transform = 'translate(' + x + 'px,' + y + 'px)'; },
+        onComplete: () => enviarTroca(bar.dataset.reserva, uh, num)
+      });
     });
+    bar.addEventListener('click', e => { if (suprimir) { e.preventDefault(); suprimir = false; } });
   });
 })();
 </script>

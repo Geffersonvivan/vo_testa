@@ -6,7 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}CRM Vô Testa{% endblock %}</title>
   <link rel="icon" href="{% static 'img/simbolo-dourado.png' %}" type="image/png">
+  {# Fontes em paralelo (preconnect + link), não em série via @import do CSS #}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="{% static 'js/fluid.js' %}"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <script>
     // Combobox de pessoa com busca + agrupamento (componentes/combo_pessoa.html).
@@ -186,7 +191,7 @@
       </div>
     </header>
 
-    <main class="conteudo">
+    <main class="conteudo {% block conteudo_classe %}{% endblock %}">
       {% block conteudo %}{% endblock %}
     </main>
   </div>
@@ -238,10 +243,49 @@
   function fecharSidebarMobile() { APP.classList.remove('sidebar-aberta'); }
 
   // ---------- Modal ----------
-  function abrirModal() { document.getElementById('modal-reserva').style.display = 'flex'; }
+  // Origem do modal ancorada no último ponto de clique (§7 spatial consistency).
+  let ultimoPonteiro = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  document.addEventListener('pointerdown', e => {
+    ultimoPonteiro = { x: e.clientX, y: e.clientY };
+  }, true);
+
+  function abrirModal() {
+    const ov = document.getElementById('modal-reserva');
+    const cx = document.getElementById('modal-conteudo');
+    ov.style.display = 'flex';
+    const r = cx.getBoundingClientRect();
+    const ox = Math.max(0, Math.min(1, (ultimoPonteiro.x - r.left) / (r.width || 1))) * 100;
+    const oy = Math.max(0, Math.min(1, (ultimoPonteiro.y - r.top) / (r.height || 1))) * 100;
+    cx.style.transformOrigin = ox + '% ' + oy + '%';
+    if (Fluid.reducedMotion()) { ov.style.opacity = 1; cx.style.opacity = 1; cx.style.transform = 'none'; cx.style.filter = 'none'; return; }
+    // Materializar: escala + blur juntos, emergindo da origem (§12).
+    Fluid.spring({
+      from: 0, to: 1, response: 0.34, bounce: 0,
+      onUpdate: t => {
+        ov.style.opacity = t;
+        cx.style.opacity = t;
+        cx.style.transform = 'scale(' + (0.92 + 0.08 * t) + ')';
+        cx.style.filter = 'blur(' + (6 * (1 - t)) + 'px)';
+      },
+      onComplete: () => { cx.style.transform = 'none'; cx.style.filter = 'none'; }
+    });
+  }
   function fecharModal() {
-    document.getElementById('modal-reserva').style.display = 'none';
-    document.getElementById('modal-conteudo').innerHTML = '';
+    const ov = document.getElementById('modal-reserva');
+    const cx = document.getElementById('modal-conteudo');
+    const finish = () => { ov.style.display = 'none'; cx.innerHTML = ''; ov.style.opacity = ''; cx.removeAttribute('style'); };
+    if (Fluid.reducedMotion() || ov.style.display === 'none') { finish(); return; }
+    // Sai pelo mesmo caminho que entrou (§7).
+    Fluid.spring({
+      from: 1, to: 0, response: 0.22, bounce: 0,
+      onUpdate: t => {
+        ov.style.opacity = t;
+        cx.style.opacity = t;
+        cx.style.transform = 'scale(' + (0.92 + 0.08 * t) + ')';
+        cx.style.filter = 'blur(' + (6 * (1 - t)) + 'px)';
+      },
+      onComplete: finish
+    });
   }
   function abrirNovaReserva() {
     fecharPaleta();

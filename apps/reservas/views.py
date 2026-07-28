@@ -73,6 +73,32 @@ def mapa(request):
     for r in reservas:
         por_uh.setdefault(r.uh_id, []).append(r)
 
+    from apps.nucleo.models import modulo_ativo
+
+    ultimo_dia = dias[-1]["data"]
+
+    # Bloqueio de Manutenção POR DATAS → mapa (uh_id, dia) → motivo. Assim o quarto
+    # fica indisponível só no período, e o atendente não reserva por cima.
+    bloqueio_dia: dict[tuple, str] = {}
+    if modulo_ativo(Modulo.MANUTENCAO):
+        from apps.manutencao.services import bloqueios as _bloqueios
+        for b in _bloqueios(inicio, ultimo_dia):
+            d = max(b["inicio"], inicio)
+            ate = min(b["fim"] or ultimo_dia, ultimo_dia)
+            while d <= ate:
+                bloqueio_dia[(b["uh_id"], d)] = b["motivo"]
+                d += timedelta(days=1)
+
+    # Limpeza é estado de HOJE (giro de quarto), não de datas futuras: overlay só
+    # na coluna de hoje. {uh_id: 'suja'|'em_limpeza'} via Governança.
+    limpeza_hoje: dict[int, str] = {}
+    if modulo_ativo(Modulo.GOVERNANCA):
+        from apps.governanca.services import status_por_uh
+        limpeza_hoje = {
+            uh_id: cod for uh_id, cod in status_por_uh().items()
+            if cod in ("suja", "em_limpeza")
+        }
+
     def linha_da_uh(uh):
         celulas = []
         dia_atual = inicio
@@ -90,15 +116,23 @@ def mapa(request):
                 dia_atual += timedelta(days=span)
                 indice += 1
             else:
+                limp = limpeza_hoje.get(uh.pk) if dia_atual == hoje else None
                 celulas.append(
                     {
                         "dia": dia_atual,
                         "fim_de_semana": dia_atual.weekday() >= 5,
                         "hoje": dia_atual == hoje,
+                        "bloqueio": bloqueio_dia.get((uh.pk, dia_atual)),
+                        "limpeza": limp,
                     }
                 )
                 dia_atual += timedelta(days=1)
-        return {"uh": uh, "celulas": celulas}
+        return {
+            "uh": uh,
+            "celulas": celulas,
+            # Bloqueio manual do quarto inteiro (UH.status), sem janela de datas.
+            "bloqueada": uh.status == UH.Status.BLOQUEADA,
+        }
 
     # Agrupado por tipo de UH, com disponibilidade por dia no cabeçalho do
     # grupo (modelo Desbravador: LX (9) + contagem de livres por data).
@@ -110,16 +144,21 @@ def mapa(request):
         )["uhs"].append(uh)
     grupos = list(por_tipo.values())
 
+    manual_ids = {u.pk for u in uhs if u.status == UH.Status.BLOQUEADA}
     for grupo in grupos:
         ids = {u.pk for u in grupo["uhs"]}
+        manual = ids & manual_ids                    # bloqueio do quarto inteiro
         disponibilidade = []
         for d in dias:
-            ocupadas = sum(
-                1
+            dt = d["data"]
+            reservadas = {
+                r.uh_id
                 for r in reservas
-                if r.uh_id in ids and r.checkin <= d["data"] < r.checkout
-            )
-            livres = len(ids) - ocupadas
+                if r.uh_id in ids and r.checkin <= dt < r.checkout
+            }
+            bloqueadas = {u for u in ids if (u, dt) in bloqueio_dia}   # manutenção por data
+            indisponiveis = manual | reservadas | bloqueadas          # sem contar 2x
+            livres = len(ids) - len(indisponiveis)
             disponibilidade.append({**d, "livres": livres})
         grupo["disponibilidade"] = disponibilidade
         grupo["linhas"] = [linha_da_uh(u) for u in grupo["uhs"]]
