@@ -66,7 +66,7 @@ def payloads_api_hml(*, valor_pix="10.00", valor_cartao="10.00", valor_boleto="1
                     "charge": {
                         "merchantChargeId": "VT-HML-PIX-DEMO",
                         "customer": customer,
-                        "transactions": [{"amount": _centavos(valor_pix), "paymentType": "Pix"}],
+                        "transactions": [{"amount": _centavos(valor_pix), "paymentType": 8}],  # 8 = Pix
                         "metadata": [
                             {"key": "finalidade", "value": "sinal_reserva"},
                             {"key": "origem", "value": "evidencia_homologacao"},
@@ -90,6 +90,7 @@ def payloads_api_hml(*, valor_pix="10.00", valor_cartao="10.00", valor_boleto="1
                                 "expirationMonth": 12,
                                 "expirationYear": 2030,
                                 "securityCode": "123",
+                                "cardholderDocument": "11144477735",  # HML exige CPF do titular
                             },
                             "paymentType": 2,
                             "amount": _centavos(valor_cartao),
@@ -113,10 +114,16 @@ def payloads_api_hml(*, valor_pix="10.00", valor_cartao="10.00", valor_boleto="1
                 "body": {
                     "charge": {
                         "merchantChargeId": "VT-HML-BOL-DEMO",
-                        "customer": customer,
+                        # Boleto exige telefone + endereço (com country) do sacado.
+                        "customer": {**customer, "address": {
+                            "street": "Rota do Sol", "number": "S/N",
+                            "neighborhood": "Centro", "city": "Itá", "state": "SC",
+                            "zipCode": "89760000", "complement": "", "country": "BR",
+                        }},
+                        "deadline": "<YYYY-MM-DD vencimento, ex.: now+3 dias>",
                         "transactions": [{
                             "amount": _centavos(valor_boleto),
-                            "paymentType": "Boleto",
+                            "paymentType": 4,  # 4 = Boleto
                         }],
                         "metadata": [
                             {"key": "finalidade", "value": "sinal_reserva"},

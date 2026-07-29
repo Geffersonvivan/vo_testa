@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
@@ -191,13 +192,21 @@ def _url_recibo_site(cobranca):
     return reverse("core:reserva_confirmada", args=[recibo.token])
 
 
-# Status que confirmam pagamento (doc SafraPay + sandbox sem status).
+# Mapa de status do webhook — alinhado à enum TransactionStatus da Aditum/SafraPay:
+#   1=PreAuthorized · 2=Captured · 3=Denied · 4=Pending · 5=Canceled · 8=Paid
+# Conservador por segurança: só confirmamos em estados inequívocos de pago
+# (Captured/Paid). Negado/cancelado/desconhecido NÃO confirma (fail-safe) —
+# fica pendente p/ conciliação. Confirmar o campo/valores exatos na homologação.
+# Sandbox envia sem status → confirma (st = None).
 _STATUS_PAGO = {
-    "paid", "pago", "captured", "authorized", "consolidated",
-    "2", "3", "4",
+    "paid", "pago", "captured", "consolidated",
+    "2", "8",
 }
 _STATUS_PENDENTE = {
-    "pending", "pendente", "ordered", "created", "1",
+    "pending", "pendente", "ordered", "created",
+    "preauthorized", "pre_authorized", "authorized",
+    "pendingpayment", "pending_payment",
+    "1", "4",
 }
 
 
@@ -216,8 +225,13 @@ def webhook(request):
     st = str(status_gw).lower() if status_gw is not None else None
     if st in _STATUS_PENDENTE:
         return _json({"ok": True, "status": cobranca.status, "ignorado": "ainda pendente"})
-    # Sem status (sandbox) ou status pago → confirma.
-    if st is not None and st not in _STATUS_PAGO:
+    # Fail-safe: só confirma em status inequívoco de pago. "Sem status" confirma
+    # apenas no sandbox (simulado não envia status); um webhook real sem status
+    # reconhecido fica pendente p/ conciliação — nunca confirma no escuro.
+    if st is None:
+        if getattr(settings, "PAGAMENTOS_GATEWAY", "simulado") != "simulado":
+            return _json({"ok": True, "status": cobranca.status, "ignorado": "status ausente (não confirma fora do sandbox)"})
+    elif st not in _STATUS_PAGO:
         return _json({"ok": True, "status": cobranca.status, "ignorado": f"status={status_gw}"})
     try:
         services.confirmar_pagamento(cobranca, cobranca.criado_por, origem="webhook")
@@ -249,7 +263,15 @@ def _extrair_webhook(request):
             gid = gid or str(
                 charge.get("id") or body.get("gateway_id") or body.get("id") or ""
             )
-            status_gw = status_gw or charge.get("status") or body.get("status")
+            # Safrapay real usa chargeStatus/transactionStatus (não "status").
+            tx0 = (charge.get("transactions") or [{}])[0] if isinstance(charge.get("transactions"), list) else {}
+            status_gw = (
+                status_gw
+                or charge.get("status")
+                or charge.get("chargeStatus")
+                or tx0.get("transactionStatus")
+                or body.get("status")
+            )
             if isinstance(status_gw, dict):
                 status_gw = status_gw.get("name") or status_gw.get("value")
     return gid or None, status_gw, body

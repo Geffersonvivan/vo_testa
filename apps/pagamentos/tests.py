@@ -180,6 +180,78 @@ class SafrapayGatewayTests(PagamentosBase):
         c.refresh_from_db()
         self.assertEqual(c.status, Cobranca.Status.PAGO)
 
+    def test_webhook_paid_8_confirma(self):
+        import json
+        c = self.cobranca()
+        r = self.client.post(
+            reverse("pagamentos:webhook"),
+            data=json.dumps({"charge": {"id": c.gateway_id, "status": 8}}),  # 8 = Paid
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PAGO)
+
+    def test_webhook_negado_nao_confirma(self):
+        import json
+        c = self.cobranca()
+        r = self.client.post(
+            reverse("pagamentos:webhook"),
+            data=json.dumps({"charge": {"id": c.gateway_id, "status": 3}}),  # 3 = Denied
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PENDENTE)  # fail-safe: NÃO confirma
+
+    def test_webhook_safrapay_preautorizado_nao_confirma(self):
+        """Shape REAL do Safrapay: chargeStatus=PreAuthorized + transactionStatus=
+        PendingPayment (Pix criado, ainda não pago) NÃO pode confirmar a cobrança."""
+        import json
+        from django.test import override_settings
+        c = self.cobranca()
+        with override_settings(PAGAMENTOS_GATEWAY="safrapay"):
+            r = self.client.post(
+                reverse("pagamentos:webhook"),
+                data=json.dumps({"charge": {
+                    "id": c.gateway_id,
+                    "chargeStatus": "PreAuthorized",
+                    "transactions": [{"transactionStatus": "PendingPayment"}],
+                }}),
+                content_type="application/json",
+            )
+        self.assertEqual(r.status_code, 200)
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PENDENTE)  # fail-safe
+
+    def test_webhook_safrapay_sem_status_fora_do_sandbox_nao_confirma(self):
+        """Webhook real (gateway=safrapay) sem status reconhecível não confirma no escuro."""
+        import json
+        from django.test import override_settings
+        c = self.cobranca()
+        with override_settings(PAGAMENTOS_GATEWAY="safrapay"):
+            r = self.client.post(
+                reverse("pagamentos:webhook"),
+                data=json.dumps({"charge": {"id": c.gateway_id}}),
+                content_type="application/json",
+            )
+        self.assertEqual(r.status_code, 200)
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PENDENTE)
+
+    def test_webhook_safrapay_chargestatus_captured_confirma(self):
+        """chargeStatus de pago (Captured) confirma via o campo real do Safrapay."""
+        import json
+        c = self.cobranca()
+        r = self.client.post(
+            reverse("pagamentos:webhook"),
+            data=json.dumps({"charge": {"id": c.gateway_id, "chargeStatus": "Captured"}}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PAGO)
+
     def test_sinal_pago_sincroniza_recibo_site(self):
         from apps.reservas.models import Reserva
         from apps.site.models import CategoriaQuarto, Hospede, Quarto

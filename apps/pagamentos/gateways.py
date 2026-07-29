@@ -120,7 +120,9 @@ class GatewaySafrapay:
         if cached:
             return cached
         cred = self._exigir_token()
-        status, data = self._http(
+        # Autenticação: Merchant Token cru no header Authorization → accessToken.
+        # (Testado 200 em HML; o esquema bcrypt+CNPJ da doc não é o usado.)
+        _status, data = self._http(
             "POST", "/v2/merchant/auth",
             headers={"Authorization": cred["token"]},
         )
@@ -128,7 +130,7 @@ class GatewaySafrapay:
         if not token:
             raise ValidationError(
                 "Safrapay: autenticação sem accessToken na resposta. "
-                "Confira o Merchant Token (mk_…) no portal /keys."
+                "Confira o Merchant Token no portal HML."
             )
         # JWT típico ~ hours; cache conservador 50 min
         cache.set(self.CACHE_TOKEN, token, timeout=50 * 60)
@@ -137,25 +139,52 @@ class GatewaySafrapay:
     def _centavos(self, valor) -> int:
         return int((Decimal(str(valor)) * 100).quantize(Decimal("1")))
 
-    def _customer(self, cobranca) -> dict:
+    def _documento(self, cobranca) -> str:
+        pagador = cobranca.pagador
+        doc = "".join(
+            c for c in (getattr(pagador, "documento", "") or "") if c.isdigit()
+        )
+        return doc[:14] or "11144477735"  # CPF válido de teste p/ HML
+
+    def _telefone(self, cobranca) -> dict:
+        """Telefone no formato Safrapay; fallback de HML se o pagador não tiver."""
+        phone = "".join(c for c in (getattr(cobranca.pagador, "telefone", "") or "") if c.isdigit())
+        if len(phone) < 10:
+            phone = "49991438813"  # fallback demo (área 49)
+        return {
+            "countryCode": "55",
+            "areaCode": phone[-11:-9] if len(phone) >= 11 else phone[:2],
+            "number": phone[-9:] if len(phone) >= 11 else phone[2:],
+            "type": 5,
+        }
+
+    def _customer(self, cobranca, *, exigir_contato=False) -> dict:
         pagador = cobranca.pagador
         customer = {
             "name": (pagador.nome if pagador else "Cliente")[:120],
             "email": (getattr(pagador, "email", None) or "nao-informado@pousadavotesta.com.br"),
             "documentType": 1,  # CPF
-            "document": "".join(
-                c for c in (getattr(pagador, "documento", "") or "00000000000") if c.isdigit()
-            )[:14] or "00000000000",
+            "document": self._documento(cobranca),
         }
         phone = "".join(c for c in (getattr(pagador, "telefone", "") or "") if c.isdigit())
-        if len(phone) >= 10:
-            customer["phone"] = {
-                "countryCode": "55",
-                "areaCode": phone[-11:-9] if len(phone) >= 11 else phone[:2],
-                "number": phone[-9:] if len(phone) >= 11 else phone[2:],
-                "type": 5,
-            }
+        if len(phone) >= 10 or exigir_contato:
+            customer["phone"] = self._telefone(cobranca)
         return customer
+
+    def _endereco(self, cobranca) -> dict:
+        """Endereço do pagador p/ boleto; fallback da pousada se ausente."""
+        pagador = cobranca.pagador
+        cep = "".join(c for c in (getattr(pagador, "cep", "") or "") if c.isdigit())
+        return {
+            "street": (getattr(pagador, "logradouro", "") or "Rota do Sol")[:120],
+            "number": (getattr(pagador, "numero", "") or "S/N")[:10],
+            "neighborhood": (getattr(pagador, "bairro", "") or "Centro")[:60],
+            "city": (getattr(pagador, "cidade", "") or "Itá")[:60],
+            "state": (getattr(pagador, "uf", "") or "SC")[:2],
+            "zipCode": (cep or "89760000")[:8],
+            "complement": (getattr(pagador, "complemento", "") or "")[:60],
+            "country": "BR",
+        }
 
     def _metadata(self, cobranca) -> list:
         return [
@@ -192,7 +221,7 @@ class GatewaySafrapay:
                 "merchantChargeId": merchant_charge_id,
                 "customer": self._customer(cobranca),
                 "transactions": [
-                    {"amount": self._centavos(cobranca.valor), "paymentType": "Pix"},
+                    {"amount": self._centavos(cobranca.valor), "paymentType": 8},  # 8 = Pix
                 ],
                 "metadata": self._metadata(cobranca),
                 "source": 1,
@@ -229,6 +258,8 @@ class GatewaySafrapay:
             "expirationYear": 2030,
             "securityCode": "123",
         }
+        # HML exige o CPF do titular no objeto do cartão.
+        card.setdefault("cardholderDocument", self._documento(cobranca))
         body = {
             "charge": {
                 "merchantChargeId": merchant_charge_id,
@@ -267,13 +298,18 @@ class GatewaySafrapay:
     def _criar_boleto(self, cobranca) -> dict:
         access = self._access_token()
         merchant_charge_id = f"VT-{cobranca.pk or uuid.uuid4().hex[:8]}"
+        # Boleto exige vencimento, telefone, e endereço do sacado.
+        vencimento = (timezone.now() + timezone.timedelta(days=3)).date().isoformat()
+        customer = self._customer(cobranca, exigir_contato=True)
+        customer["address"] = self._endereco(cobranca)
         body = {
             "charge": {
                 "merchantChargeId": merchant_charge_id,
-                "customer": self._customer(cobranca),
+                "customer": customer,
+                "deadline": vencimento,
                 "transactions": [{
                     "amount": self._centavos(cobranca.valor),
-                    "paymentType": "Boleto",
+                    "paymentType": 4,  # 4 = Boleto
                 }],
                 "metadata": self._metadata(cobranca),
                 "source": 1,
@@ -285,15 +321,13 @@ class GatewaySafrapay:
             body=body,
         )
         gid, charge = self._parse_charge(data, merchant_charge_id=merchant_charge_id)
-        linha = (
-            charge.get("digitableLine")
-            or charge.get("linhaDigitavel")
-            or data.get("digitableLine")
-            or ""
-        )
-        if not linha:
-            for tx in charge.get("transactions") or []:
-                linha = tx.get("digitableLine") or tx.get("linhaDigitavel") or linha
+        # Safrapay real: digitalLine (linha digitável), barcode, bankSlipUrl (PDF).
+        linha = barcode = url_pdf = ""
+        for tx in charge.get("transactions") or []:
+            linha = linha or tx.get("digitalLine") or tx.get("digitableLine") or tx.get("linhaDigitavel") or ""
+            barcode = barcode or tx.get("barcode") or ""
+            url_pdf = url_pdf or tx.get("bankSlipUrl") or tx.get("boletoUrl") or ""
+        linha = linha or charge.get("digitalLine") or charge.get("digitableLine") or ""
         return {
             "gateway": self.nome,
             "gateway_id": gid,
@@ -302,6 +336,8 @@ class GatewaySafrapay:
                 "safrapay": data,
                 "merchantChargeId": merchant_charge_id,
                 "linha_digitavel": linha,
+                "barcode": barcode,
+                "boleto_url": url_pdf,
             },
         }
 
