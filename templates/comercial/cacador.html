@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% load nucleo_extras %}
+
+{% block titulo %}Caçador — Comercial{% endblock %}
+
+{% block conteudo %}
+<style>
+  .cac-hero { max-width: 70ch; }
+  .cac-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .9rem; margin: 1.2rem 0 1.6rem; }
+  .cac-kpi { padding: 1rem 1.1rem; background: var(--superficie); border: 1px solid var(--fio); border-radius: var(--raio); box-shadow: var(--sombra-1); }
+  .cac-kpi .v { font-family: var(--fonte-titulo); font-size: 1.9rem; font-weight: 600; line-height: 1; color: var(--noturno); }
+  .cac-kpi .r { font-size: .66rem; text-transform: uppercase; letter-spacing: .1em; color: var(--tinta-suave); margin-top: .35rem; }
+  .cac-kpi.quente .v { color: var(--perigo); }
+
+  .cac-fila { display: flex; flex-direction: column; gap: .8rem; }
+  .cac-lead { display: grid; grid-template-columns: 92px 1fr; gap: 1rem; padding: 1rem 1.1rem; background: var(--superficie); border: 1px solid var(--fio); border-radius: var(--raio); box-shadow: var(--sombra-1); transition: box-shadow .15s, border-color .15s; }
+  .cac-lead:hover { box-shadow: var(--sombra-2); border-color: var(--fio-forte); }
+  .cac-lead.t-quente { border-left: 3px solid var(--perigo); }
+  .cac-lead.t-morno { border-left: 3px solid var(--alerta); }
+  .cac-lead.t-frio { border-left: 3px solid var(--fio-forte); }
+
+  .cac-score { text-align: center; }
+  .cac-score .n { font-family: var(--fonte-titulo); font-size: 2rem; font-weight: 600; line-height: 1; color: var(--noturno); }
+  .cac-score .n small { font-size: .8rem; color: var(--tinta-suave); }
+  .cac-temp { display: inline-block; margin-top: .4rem; padding: .1rem .5rem; font-size: .6rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; border-radius: 99px; }
+  .cac-temp.quente { color: var(--perigo); background: var(--perigo-bg); }
+  .cac-temp.morno { color: var(--alerta); background: var(--alerta-bg); }
+  .cac-temp.frio { color: var(--tinta-suave); background: var(--superficie-2); }
+  .cac-flama { width: 11px; height: 11px; fill: var(--perigo); vertical-align: -1px; margin-right: 2px; }
+  /* Lead quente ganha um respiro extra de destaque */
+  .cac-lead.t-quente { box-shadow: var(--sombra-1), inset 3px 0 0 var(--perigo); border-left-color: transparent; }
+
+  .cac-etapa { font-size: .7rem; font-weight: 600; color: var(--madeira); background: rgba(79,44,29,.07); border: 1px solid rgba(79,44,29,.18); border-radius: 6px; padding: .1rem .45rem; }
+  .cac-novo { font-size: .62rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--noturno); background: var(--lampiao-claro); border: 1px solid var(--lampiao); border-radius: 99px; padding: .08rem .45rem; }
+
+  .cac-corpo { min-width: 0; }
+  .cac-topo { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+  .cac-nome { font-family: var(--fonte-titulo); font-size: 1.1rem; font-weight: 600; color: var(--noturno); }
+  .cac-sub { font-size: .8rem; color: var(--tinta-suave); }
+  .cac-motivos { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0; }
+  .cac-motivo { font-size: .72rem; font-weight: 600; color: var(--musgo); background: rgba(46,72,62,.09); border: 1px solid rgba(46,72,62,.2); border-radius: 6px; padding: .12rem .45rem; }
+  .cac-rascunho { position: relative; margin: .5rem 0 .2rem; padding: .7rem .85rem; padding-right: 5.2rem; font-size: .86rem; line-height: 1.5; color: var(--tinta); background: rgba(215,160,72,.08); border: 1px solid rgba(215,160,72,.4); border-radius: 8px; }
+  .cac-rascunho .rot { display: block; font-size: .6rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--madeira); margin-bottom: .25rem; }
+  .cac-copiar { position: absolute; top: .55rem; right: .55rem; font-family: var(--fonte-ui); font-size: .72rem; font-weight: 700; color: var(--madeira); background: rgba(215,160,72,.16); border: 1px solid rgba(215,160,72,.5); border-radius: 6px; padding: .2rem .5rem; cursor: pointer; }
+  .cac-copiar:hover { background: rgba(215,160,72,.26); }
+  .cac-acoes { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-top: .5rem; }
+  .cac-acoes form { display: inline; }
+  .cac-fb { font-family: var(--fonte-ui); font-size: .78rem; font-weight: 600; padding: .3rem .6rem; border-radius: 7px; cursor: pointer; border: 1px solid var(--fio-forte); background: var(--superficie); color: var(--tinta); }
+  .cac-fb.sim:hover { border-color: var(--sucesso); color: var(--sucesso); }
+  .cac-fb.nao:hover { border-color: var(--perigo); color: var(--perigo); }
+  .cac-revisado { font-size: .72rem; font-weight: 700; color: var(--sucesso); }
+
+  .cac-filtros { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin: 0 0 .7rem; }
+  .cac-chip { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .7rem; font-size: .8rem; font-weight: 600; color: var(--tinta); background: var(--superficie); border: 1px solid var(--fio-forte); border-radius: 99px; text-decoration: none; }
+  .cac-chip span { font-size: .68rem; color: var(--tinta-suave); }
+  .cac-chip:hover { border-color: var(--madeira); }
+  .cac-chip.on { color: var(--noturno); background: var(--lampiao-claro); border-color: var(--lampiao); }
+  .cac-chip.on span { color: var(--madeira); }
+  .cac-ordem { font-size: .76rem; color: var(--tinta-suave); margin: 0 0 1rem; }
+
+  .cac-plano { margin-top: 2.2rem; }
+  .cac-plano summary { cursor: pointer; font-family: var(--fonte-titulo); font-size: 1.05rem; font-weight: 600; color: var(--noturno); padding: .3rem 0; }
+  .cac-plano ol { margin: .6rem 0 0; padding-left: 1.2rem; line-height: 1.7; color: var(--tinta-suave); font-size: .9rem; }
+  .cac-plano code { font-family: var(--fonte-mono); font-size: .82rem; color: var(--madeira); }
+</style>
+
+<p class="pagina-eyebrow letreiro">Comercial · Máquina de Vendas</p>
+<div class="pagina-cabecalho">
+  <h1>Caçador</h1>
+  <span class="selo selo-ativo">Fase 1 · regras</span>
+</div>
+<p class="subtitulo cac-hero">
+  Fila de triagem: todo lead aberto do funil, <strong>pontuado e com o próximo passo já rascunhado</strong>,
+  do mais quente ao mais frio. Você revisa, copia e dispara — e o seu retorno ensina o Caçador.
+</p>
+
+<div class="cac-kpis">
+  <div class="cac-kpi"><div class="v">{{ kpi.total }}</div><div class="r">leads na fila</div></div>
+  <div class="cac-kpi quente"><div class="v">{{ kpi.quentes }}</div><div class="r">quentes</div></div>
+  <div class="cac-kpi"><div class="v">{{ kpi.a_revisar }}</div><div class="r">a revisar</div></div>
+</div>
+
+{% if origens %}
+<div class="cac-filtros">
+  <a href="?" class="cac-chip {% if not origem_sel %}on{% endif %}">Todas <span>{{ total_geral }}</span></a>
+  {% for o in origens %}
+    <a href="?origem={{ o.cod }}" class="cac-chip {% if origem_sel == o.cod %}on{% endif %}">{{ o.label }} <span>{{ o.n }}</span></a>
+  {% endfor %}
+</div>
+{% endif %}
+<p class="cac-ordem">Ordenado por: <strong>a revisar primeiro</strong>, depois pelo score.</p>
+
+<div class="cac-fila">
+  {% for f in fila %}
+    <article class="cac-lead t-{{ f.analise.temperatura }}">
+      <div class="cac-score">
+        <div class="n">{{ f.op.score }}<small>/100</small></div>
+        <span class="cac-temp {{ f.analise.temperatura }}">{% if f.analise.temperatura == 'quente' %}<svg class="cac-flama" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.6 1.4c.7 3.4-1.2 5-2.8 6.4C9 9.3 7.4 10.8 7.4 13.4a5.6 5.6 0 0 0 11.2 0c0-2.4-1-4-2.1-5.4-.3 1.1-1 1.9-1.9 2.2.7-1.8.2-4.5-1-9z"/></svg>{% endif %}{{ f.analise.get_temperatura_display }}</span>
+      </div>
+      <div class="cac-corpo">
+        <div class="cac-topo">
+          <span class="cac-nome">{{ f.op.pessoa.nome }}</span>
+          {% if f.novo %}<span class="cac-novo">novo</span>{% endif %}
+          <span class="selo selo-neutro">{{ f.op.get_tipo_interesse_display }}</span>
+          <span class="cac-etapa dica" data-dica="No funil, etapa: {{ f.op.etapa.nome }}">no funil · {{ f.op.etapa.nome }}</span>
+          <span class="cac-sub">
+            {{ f.op.get_origem_display }}
+            {% if f.analise.sinais.tem_datas %}· {{ f.op.checkin_previsto|date:"d/m" }}→{{ f.op.checkout_previsto|date:"d/m" }}{% endif %}
+            · {{ f.op.hospedes }} pax
+          </span>
+        </div>
+
+        <div class="cac-motivos">
+          {% for m in f.analise.motivos %}<span class="cac-motivo">{{ m }}</span>{% endfor %}
+        </div>
+
+        <div class="cac-rascunho">
+          <span class="rot">Rascunho do próximo passo</span>
+          <button type="button" class="cac-copiar" onclick="copiarRascunho(this)">Copiar</button>
+          <span class="cac-txt">{{ f.analise.rascunho }}</span>
+        </div>
+
+        <div class="cac-acoes">
+          <a href="{% url 'comercial:oportunidade' f.op.pk %}" class="botao-neutro" style="padding:.35rem .7rem;font-size:.8rem">Abrir no funil</a>
+          {% if f.analise.revisado_em %}
+            <span class="cac-revisado">✓ revisado{% if f.analise.util is True %} · útil{% elif f.analise.util is False %} · ajustar{% endif %}</span>
+          {% else %}
+            <span class="cac-sub">Este rascunho ajudou?</span>
+            <form method="post" action="{% url 'comercial:cacador_feedback' f.op.pk %}">
+              {% csrf_token %}<input type="hidden" name="util" value="1">
+              <button type="submit" class="cac-fb sim">👍 Útil</button>
+            </form>
+            <form method="post" action="{% url 'comercial:cacador_feedback' f.op.pk %}">
+              {% csrf_token %}<input type="hidden" name="util" value="0">
+              <button type="submit" class="cac-fb nao">👎 Ajustar</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+  {% empty %}
+    <div class="vazio" style="padding:2.4rem 1.4rem;background:var(--superficie);border:1px solid var(--fio);border-radius:var(--raio)">
+      Nenhum lead aberto no funil. Quando um lead entrar (site, Instagram ou manual),
+      ele aparece aqui já pontuado e com o rascunho pronto.
+    </div>
+  {% endfor %}
+</div>
+
+<details class="cac-plano">
+  <summary>Como o Caçador funciona (e o que vem por aí)</summary>
+  <p style="color:var(--tinta-suave);font-size:.9rem;margin:.6rem 0 0">
+    Hoje a análise é por <strong>regras</strong> (temperatura por faixa de score, sinais extraídos do
+    lead e rascunho com a disponibilidade real do Reservas). Roteiro:
+  </p>
+  <ol>
+    <li><strong>Hub + fila (esta tela)</strong> — feito.</li>
+    <li><strong>Model de análise</strong> (score, motivos, rascunho, feedback) — feito.</li>
+    <li><strong>Enriquecedor por regras</strong> plugado em <code>capturar_lead_site</code> e <code>lead_novo</code> — feito.</li>
+    <li><strong>Camada de IA (Claude)</strong> — enriquecer o texto livre e melhorar o rascunho (a construir).</li>
+    <li><strong>Fechar o loop</strong> — o feedback 👍/👎 + o desfecho (ganhou/perdeu) reforçam o score (a construir).</li>
+  </ol>
+</details>
+
+<script>
+  function copiarRascunho(btn) {
+    var txt = btn.parentElement.querySelector('.cac-txt').textContent.trim();
+    navigator.clipboard.writeText(txt).then(function () {
+      var o = btn.textContent; btn.textContent = 'Copiado!';
+      setTimeout(function () { btn.textContent = o; }, 1400);
+    });
+  }
+</script>
+{% endblock %}

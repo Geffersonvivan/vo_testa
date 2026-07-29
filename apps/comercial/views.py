@@ -1,10 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db.models import Count, Sum
+from django.db.models import Count, F, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -17,7 +17,7 @@ from apps.nucleo.seletores import pessoas_agrupadas
 
 from . import services
 from .forms import ConversaoForm, CotacaoForm, MetaForm, PerdaForm
-from .models import AtividadeComercial, EtapaFunil, MotivoPerda, Oportunidade
+from .models import AnaliseLead, AtividadeComercial, EtapaFunil, MotivoPerda, Oportunidade
 from .proposta_instagram import PROPOSTA as PROPOSTA_INSTAGRAM
 
 Usuario = get_user_model()
@@ -117,6 +117,66 @@ def instagram(request):
         "comercial/instagram.html",
         {"proposta": PROPOSTA_INSTAGRAM},
     )
+
+
+@never_cache
+@requer_modulo(Modulo.COMERCIAL)
+def cacador(request):
+    """Fila do Caçador — leads abertos analisados, do mais quente ao mais frio.
+
+    A análise é por regras (services.analisar_lead); a camada de IA entra depois
+    alimentando os mesmos campos. Leads antigos ainda sem análise são preenchidos
+    de forma preguiçosa aqui."""
+    base = Oportunidade.objects.filter(status=Oportunidade.Status.ABERTA)
+
+    # Filtros por origem (com contagem) — só as origens que têm lead aberto.
+    contagem = {r["origem"]: r["n"] for r in base.values("origem").annotate(n=Count("id"))}
+    origens = [
+        {"cod": cod, "label": label, "n": contagem.get(cod, 0)}
+        for cod, label in Oportunidade.Origem.choices if contagem.get(cod)
+    ]
+    origem_sel = request.GET.get("origem", "")
+
+    leads = base.filter(origem=origem_sel) if origem_sel else base
+    # Ordenação: "a revisar" primeiro (revisado_em nulo), depois score, depois recência.
+    leads = (
+        leads.select_related("pessoa", "etapa", "responsavel", "analise")
+        .order_by(F("analise__revisado_em").asc(nulls_first=True), "-score", "-criado_em")
+    )
+
+    limite_novo = timezone.now() - timedelta(hours=24)
+    fila = []
+    for op in leads:
+        try:
+            analise = op.analise
+        except AnaliseLead.DoesNotExist:
+            analise = services.analisar_lead(op)  # backfill preguiçoso
+        fila.append({"op": op, "analise": analise, "novo": op.criado_em >= limite_novo})
+    kpi = {
+        "total": len(fila),
+        "quentes": sum(1 for f in fila if f["analise"].temperatura == "quente"),
+        "a_revisar": sum(1 for f in fila if f["analise"].revisado_em is None),
+    }
+    return render(request, "comercial/cacador.html", {
+        "fila": fila, "kpi": kpi,
+        "origens": origens, "origem_sel": origem_sel, "total_geral": base.count(),
+    })
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def cacador_feedback(request, pk):
+    """Atendente marca a análise como útil ou não — semente do loop de aprendizado."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    if request.method != "POST":
+        return redirect("comercial:cacador")
+    analise = services.analisar_lead(op)  # garante que existe
+    util = request.POST.get("util")
+    analise.util = True if util == "1" else (False if util == "0" else None)
+    analise.revisado_por = request.user
+    analise.revisado_em = timezone.now()
+    analise.save(update_fields=["util", "revisado_por", "revisado_em"])
+    messages.success(request, "Feedback registrado — o Caçador aprende com isso.")
+    return redirect("comercial:cacador")
 
 
 @requer_modulo(Modulo.COMERCIAL)

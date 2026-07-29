@@ -282,3 +282,46 @@ class AtividadeComercial(models.Model):
 
     def __str__(self):
         return f"{self.get_tipo_display()} — {self.descricao[:40]}"
+
+
+class AnaliseLead(models.Model):
+    """Análise do Caçador sobre um lead (Fase 1 da Máquina de Vendas).
+
+    Não duplica o `score` numérico da Oportunidade — guarda a leitura
+    qualitativa: temperatura, os motivos, os sinais extraídos, o rascunho do
+    próximo passo e o feedback do atendente (que semeia o loop de aprendizado).
+    Por enquanto é preenchida por REGRAS (`services.analisar_lead`); a camada de
+    IA entra depois, alimentando os mesmos campos.
+    """
+
+    class Temperatura(models.TextChoices):
+        QUENTE = "quente", "Quente"
+        MORNO = "morno", "Morno"
+        FRIO = "frio", "Frio"
+
+    oportunidade = models.OneToOneField(
+        Oportunidade, on_delete=models.CASCADE,
+        related_name="analise", verbose_name="oportunidade",
+    )
+    temperatura = models.CharField(
+        "temperatura", max_length=6, choices=Temperatura.choices,
+        default=Temperatura.FRIO,
+    )
+    motivos = models.JSONField("motivos do score", default=list, blank=True)
+    sinais = models.JSONField("sinais extraídos", default=dict, blank=True)
+    rascunho = models.TextField("rascunho do próximo passo", blank=True)
+    # Feedback do atendente — base do loop de aprendizado.
+    util = models.BooleanField("útil?", null=True, blank=True)
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="analises_revisadas", verbose_name="revisado por",
+    )
+    revisado_em = models.DateTimeField("revisado em", null=True, blank=True)
+    gerado_em = models.DateTimeField("analisado em", auto_now=True)
+
+    class Meta:
+        verbose_name = "análise de lead"
+        verbose_name_plural = "análises de leads"
+
+    def __str__(self):
+        return f"Análise {self.get_temperatura_display()} — {self.oportunidade.pessoa.nome}"

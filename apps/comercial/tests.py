@@ -10,7 +10,7 @@ from django.utils import timezone
 from apps.nucleo.models import UH, Pessoa, Prospecto, TipoUH
 
 from . import services
-from .models import Cotacao, EtapaFunil, MotivoPerda, Oportunidade
+from .models import AnaliseLead, Cotacao, EtapaFunil, MotivoPerda, Oportunidade
 
 Usuario = get_user_model()
 
@@ -99,6 +99,127 @@ class CapturaSiteTests(TestCase):
         )
         self.assertEqual(a.pk, b.pk)
         self.assertEqual(Oportunidade.objects.filter(origem="site").count(), 1)
+
+
+class CacadorTests(TestCase):
+    def setUp(self):
+        self.user = Usuario.objects.create_superuser(username="cac", password="senha-forte-123")
+
+    def test_capturar_lead_gera_analise(self):
+        ci = timezone.localdate() + timedelta(days=10)
+        op = services.capturar_lead_site(
+            nome="Ana Lead", email="ana@ex.com", telefone="4899",
+            checkin=ci, checkout=ci + timedelta(days=3), hospedes=2,
+        )
+        analise = AnaliseLead.objects.get(oportunidade=op)
+        self.assertIn(analise.temperatura, AnaliseLead.Temperatura.values)
+        self.assertTrue(analise.rascunho)
+        self.assertTrue(analise.motivos)
+        self.assertTrue(analise.sinais["tem_datas"])
+
+    def test_analise_sem_datas_pede_datas(self):
+        op = services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Sem Data"),
+            titulo="Lead sem datas",
+        )
+        analise = AnaliseLead.objects.get(oportunidade=op)
+        self.assertFalse(analise.sinais["tem_datas"])
+        self.assertIn("as datas", analise.sinais["faltando"])
+
+    def test_feedback_marca_revisado(self):
+        op = services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Fb Lead"), titulo="Fb",
+        )
+        self.client.force_login(self.user)
+        r = self.client.post(reverse("comercial:cacador_feedback", args=[op.pk]), {"util": "1"})
+        self.assertEqual(r.status_code, 302)
+        analise = AnaliseLead.objects.get(oportunidade=op)
+        self.assertTrue(analise.util)
+        self.assertIsNotNone(analise.revisado_em)
+
+    def test_fila_renderiza_lead(self):
+        services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Fila Lead"), titulo="Fila",
+        )
+        self.client.force_login(self.user)
+        r = self.client.get(reverse("comercial:cacador"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Fila Lead")
+
+    def test_rascunho_por_tipo_de_interesse(self):
+        ci = timezone.localdate() + timedelta(days=8)
+        co = ci + timedelta(days=1)
+        ev = services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Ev"), titulo="e",
+            tipo_interesse=Oportunidade.TipoInteresse.EVENTO,
+            checkin_previsto=ci, checkout_previsto=co,
+        )
+        du = services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Du"), titulo="d",
+            tipo_interesse=Oportunidade.TipoInteresse.DAY_USE,
+            checkin_previsto=ci, checkout_previsto=co,
+        )
+        hosp = services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Ho"), titulo="h",
+            tipo_interesse=Oportunidade.TipoInteresse.HOSPEDAGEM,
+            checkin_previsto=ci, checkout_previsto=co,
+        )
+        self.assertIn("evento", ev.analise.rascunho.lower())
+        self.assertIn("dia na pousada", du.analise.rascunho.lower())
+        self.assertIn("hospedagem", hosp.analise.rascunho.lower())
+
+    def test_badge_novo_no_lead_recente(self):
+        services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Recentíssimo"), titulo="r",
+        )
+        self.client.force_login(self.user)
+        r = self.client.get(reverse("comercial:cacador"))
+        self.assertContains(r, "cac-novo")
+
+    def test_lead_quente_mostra_chama_e_etapa(self):
+        ci = timezone.localdate() + timedelta(days=5)
+        op = services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Bem Quente"),
+            titulo="q", valor_estimado=Decimal("5000"),
+            origem=Oportunidade.Origem.INDICACAO,
+            checkin_previsto=ci, checkout_previsto=ci + timedelta(days=2),
+        )
+        analise = AnaliseLead.objects.get(oportunidade=op)
+        self.assertEqual(analise.temperatura, AnaliseLead.Temperatura.QUENTE)
+        self.client.force_login(self.user)
+        r = self.client.get(reverse("comercial:cacador"))
+        self.assertContains(r, "cac-flama")     # chama no lead quente
+        self.assertContains(r, "no funil ·")    # etapa do funil visível no card
+
+    def test_fila_filtra_por_origem(self):
+        services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Lead Site"),
+            titulo="s", origem=Oportunidade.Origem.SITE,
+        )
+        services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Lead Telefone"),
+            titulo="t", origem=Oportunidade.Origem.TELEFONE,
+        )
+        self.client.force_login(self.user)
+        r = self.client.get(reverse("comercial:cacador") + "?origem=site")
+        self.assertContains(r, "Lead Site")
+        self.assertNotContains(r, "Lead Telefone")
+
+    def test_fila_prioriza_a_revisar(self):
+        # Quente (score alto) mas já revisado deve ficar ABAIXO de um novo a revisar.
+        quente = services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Quente Revisado"),
+            titulo="q", valor_estimado=Decimal("3000"), origem=Oportunidade.Origem.INDICACAO,
+        )
+        an = quente.analise
+        an.revisado_em = timezone.now()
+        an.save(update_fields=["revisado_em"])
+        services.criar_oportunidade(
+            usuario=self.user, pessoa=Pessoa.objects.create(nome="Frio Novo"), titulo="f",
+        )
+        self.client.force_login(self.user)
+        body = self.client.get(reverse("comercial:cacador")).content.decode()
+        self.assertLess(body.index("Frio Novo"), body.index("Quente Revisado"))
 
 
 class CotacaoTests(TestCase):

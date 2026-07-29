@@ -17,6 +17,7 @@ from apps.nucleo.models import Hospede, Prospecto, modulo_ativo, registrar_audit
 from apps.nucleo.modulos import Modulo
 
 from .models import (
+    AnaliseLead,
     AtividadeComercial,
     Cotacao,
     EtapaFunil,
@@ -86,6 +87,120 @@ def atualizar_score(oportunidade):
     return score
 
 
+# ───────── Caçador (Máquina de Vendas, Fase 1): análise do lead por regras ─────────
+
+URGENCIA_KW = (
+    "hoje", "amanhã", "amanha", "urgente", "essa semana", "esta semana",
+    "o quanto antes", "agora", "feriado", "última", "ultima", "last minute",
+)
+
+
+def _temperatura(score: int) -> str:
+    if score >= 60:
+        return AnaliseLead.Temperatura.QUENTE
+    if score >= 35:
+        return AnaliseLead.Temperatura.MORNO
+    return AnaliseLead.Temperatura.FRIO
+
+
+def _sinais_lead(op) -> dict:
+    obs = (op.observacao or "").lower()
+    tem_datas = bool(op.checkin_previsto and op.checkout_previsto)
+    noites = (op.checkout_previsto - op.checkin_previsto).days if tem_datas else 0
+    tem_contato = bool(op.pessoa.telefone or op.pessoa.email)
+    faltando = []
+    if not tem_datas:
+        faltando.append("as datas")
+    if not tem_contato:
+        faltando.append("um contato (telefone/e-mail)")
+    return {
+        "tem_datas": tem_datas,
+        "noites": noites,
+        "pax": op.hospedes,
+        "tem_contato": tem_contato,
+        "tem_orcamento": (op.valor_estimado or Decimal("0")) > 0,
+        "urgencia": any(k in obs for k in URGENCIA_KW),
+        "faltando": faltando,
+    }
+
+
+def _motivos_lead(op, sinais) -> list:
+    m = [f"Origem: {op.get_origem_display()}"]
+    m.append(f"Datas definidas ({sinais['noites']} noite{'s' if sinais['noites'] != 1 else ''})"
+             if sinais["tem_datas"] else "Sem datas ainda")
+    if sinais["tem_orcamento"]:
+        m.append("Valor estimado informado")
+    n_atv = op.atividades.count()
+    if n_atv > 1:
+        m.append(f"{n_atv} interações")
+    if sinais["urgencia"]:
+        m.append("Sinais de urgência")
+    if not sinais["tem_contato"]:
+        m.append("Falta contato")
+    return m
+
+
+def _disponibilidade_snippet(op) -> str:
+    """Trecho de disponibilidade REAL do Reservas, conforme o tipo de interesse
+    (hospedagem exclui as UHs de day-use; day-use conta só as de day-use)."""
+    if not modulo_ativo(Modulo.RESERVAS):
+        return ""
+    ci, co = op.checkin_previsto, op.checkout_previsto
+    if not (ci and co):
+        return ""
+    try:
+        from apps.reservas.services import uhs_disponiveis
+        if op.tipo_interesse == Oportunidade.TipoInteresse.DAY_USE:
+            fim = co if co > ci else ci + timedelta(days=1)
+            n = uhs_disponiveis(ci, fim).filter(tipo__modalidade="day_use").count()
+            return (f" Temos {n} vaga(s) de day-use na data." if n
+                    else " O day-use nessa data está cheio — posso ver outra data.")
+        if op.tipo_interesse == Oportunidade.TipoInteresse.HOSPEDAGEM:
+            n = uhs_disponiveis(ci, co).exclude(tipo__modalidade="day_use").count()
+            return (f" Temos {n} quarto(s) livre(s) no período." if n
+                    else " No período não há quarto livre — posso sugerir datas próximas.")
+    except Exception:
+        return ""
+    return ""
+
+
+def _rascunho_lead(op, sinais) -> str:
+    nome = op.pessoa.nome.split()[0] if op.pessoa.nome else ""
+    saud = f"Olá, {nome}!" if nome else "Olá!"
+    tipo_lbl = op.get_tipo_interesse_display().lower()
+    if not sinais["tem_datas"]:
+        faltam = " e ".join(sinais["faltando"]) or "as datas"
+        return (f"{saud} Para montar sua proposta de {tipo_lbl}, me confirma {faltam}? "
+                "Assim já garanto a disponibilidade e a melhor tarifa.")
+    ci = op.checkin_previsto.strftime("%d/%m")
+    co = op.checkout_previsto.strftime("%d/%m")
+    if op.tipo_interesse == Oportunidade.TipoInteresse.EVENTO:
+        return (f"{saud} Sobre seu evento previsto para {ci}: vou verificar o espaço e "
+                "montar uma proposta com os valores. Podemos falar rapidinho por telefone/WhatsApp?")
+    if op.tipo_interesse == Oportunidade.TipoInteresse.DAY_USE:
+        return (f"{saud} Sobre o Dia na Pousada em {ci} para {sinais['pax']} pessoa(s):"
+                f"{_disponibilidade_snippet(op)} Quer que eu reserve e envie os valores?")
+    return (f"{saud} Sobre seu interesse em {tipo_lbl} de {ci} a {co} para "
+            f"{sinais['pax']} pessoa(s):{_disponibilidade_snippet(op)} "
+            "Quer que eu segure e já envie a proposta?")
+
+
+def analisar_lead(op):
+    """Preenche/atualiza a análise do Caçador (por regras). Idempotente."""
+    atualizar_score(op)
+    sinais = _sinais_lead(op)
+    analise, _ = AnaliseLead.objects.update_or_create(
+        oportunidade=op,
+        defaults={
+            "temperatura": _temperatura(op.score),
+            "sinais": sinais,
+            "motivos": _motivos_lead(op, sinais),
+            "rascunho": _rascunho_lead(op, sinais),
+        },
+    )
+    return analise
+
+
 def _abrir_permanencia(oportunidade, etapa, quando=None):
     PermanenciaEtapa.objects.create(
         oportunidade=oportunidade, etapa=etapa,
@@ -133,7 +248,7 @@ def criar_oportunidade(*, usuario, pessoa, titulo, etapa=None, **campos):
         responsavel=campos.pop("responsavel", usuario), **campos,
     )
     _abrir_permanencia(op, etapa)
-    atualizar_score(op)
+    analisar_lead(op)  # Caçador analisa o lead na entrada (score + rascunho)
     return op
 
 
@@ -207,7 +322,7 @@ def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
                 oportunidade=existente, usuario=usuario, tipo=AtividadeComercial.Tipo.NOTA,
                 descricao=f"Atualização do site: {mensagem[:200]}",
             )
-        atualizar_score(existente)
+        analisar_lead(existente)  # reanalisa com a nova mensagem
         return existente
 
     rotulos = {
