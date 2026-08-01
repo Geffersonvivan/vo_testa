@@ -389,3 +389,55 @@ class EventosEHomeTests(TestCase):
         })
         self.assertEqual(r.status_code, 302)
         self.assertIn('proposta=erro', r['Location'])
+
+
+class MinhaReservaTests(TestCase):
+    def setUp(self):
+        self.quarto = criar_quarto()
+        ci = date.today() + timedelta(days=10)
+        self.reserva = criar_reserva(self.quarto, ci, ci + timedelta(days=2))  # hóspede "Fulano Teste"
+
+    def test_pagina_abre(self):
+        r = self.client.get(reverse('core:minha_reserva'))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Minha reserva')
+
+    def test_sobrenome_e_codigo_corretos_levam_a_area_do_hospede(self):
+        r = self.client.post(reverse('core:minha_reserva'), {
+            'sobrenome': 'Teste', 'codigo': self.reserva.codigo,
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r['Location'], reverse('core:minha_reserva_detalhe', args=[self.reserva.token]))
+
+    def test_area_do_hospede_mostra_a_reserva(self):
+        r = self.client.get(reverse('core:minha_reserva_detalhe', args=[self.reserva.token]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, self.reserva.codigo)
+        self.assertContains(r, self.reserva.quarto.nome)
+
+    def test_codigo_minusculo_normaliza(self):
+        r = self.client.post(reverse('core:minha_reserva'), {
+            'sobrenome': 'teste', 'codigo': self.reserva.codigo.lower(),
+        })
+        self.assertEqual(r.status_code, 302)
+
+    def test_sobrenome_errado_nao_acessa(self):
+        r = self.client.post(reverse('core:minha_reserva'), {
+            'sobrenome': 'Outro', 'codigo': self.reserva.codigo,
+        })
+        self.assertEqual(r.status_code, 200)  # sem redirect
+        self.assertContains(r, 'Não encontramos')
+
+    def test_codigo_inexistente_nao_vaza(self):
+        r = self.client.post(reverse('core:minha_reserva'), {
+            'sobrenome': 'Teste', 'codigo': 'VT-000000-0000',
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'Não encontramos')
+
+    def test_logins_tem_voltar_ao_site(self):
+        # Ambos os logins têm apenas «Voltar ao site» (sem cross-links).
+        for nome in ('login', 'core:minha_reserva'):
+            r = self.client.get(reverse(nome))
+            self.assertContains(r, 'Voltar ao site')
+            self.assertContains(r, reverse('core:home'))

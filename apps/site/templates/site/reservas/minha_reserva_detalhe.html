@@ -1,0 +1,70 @@
+{% extends 'site/reservas/base_hospede.html' %}
+{% load static %}
+
+{% block title %}Reserva {{ reserva.codigo }} | Pousada Vô Testa{% endblock %}
+
+{% block hospede_card %}
+<div class="w-full max-w-md rounded-[10px] border border-lampiao/45 p-7 md:p-8"
+     style="background: linear-gradient(180deg,#FBF6E9,#F8F0DD); box-shadow: 0 0 0 6px rgba(215,160,72,.07), 0 30px 60px rgba(2,10,16,.55);">
+  <p class="text-[11px] uppercase tracking-wider font-semibold text-madeira/75 mb-1">Área do hóspede</p>
+  <h1 class="font-display text-2xl font-bold text-noturno mb-5">Olá, {{ reserva.hospede.nome.split.0 }}!</h1>
+
+  <!-- Código -->
+  <div class="bg-white rounded-xl border border-madeira/10 p-4 text-center mb-4">
+    <p class="text-madeira/40 text-[11px] uppercase tracking-wider mb-1">Código da reserva</p>
+    <p class="font-display text-2xl font-black text-noturno tracking-widest">{{ reserva.codigo }}</p>
+  </div>
+
+  <!-- Status -->
+  <div class="mb-4">
+    <p class="text-madeira/40 text-[11px] uppercase tracking-wider mb-2">Status</p>
+    <div class="flex items-center justify-center gap-1.5 flex-wrap text-[11px]">
+      {% for chave, rotulo in reserva.STATUS_CHOICES %}
+        {% if chave == 'aguardando' or chave == 'confirmada' or chave == 'checkin' or chave == 'finalizada' %}
+          <span class="px-2.5 py-1 rounded-full {% if chave == reserva.status %}bg-madeira text-pergaminho font-semibold{% else %}bg-madeira/5 text-madeira/30{% endif %}">{{ rotulo }}</span>
+          {% if not forloop.last and chave != 'finalizada' %}
+            <svg class="w-3.5 h-3.5 text-madeira/15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg>
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Resumo -->
+  <div class="bg-white rounded-xl border border-madeira/10 p-4 text-sm mb-5">
+    <div class="grid grid-cols-2 gap-3">
+      <div><span class="text-madeira/40 block text-xs">Quarto</span><span class="text-noturno">{{ reserva.quarto.nome }}</span></div>
+      <div><span class="text-madeira/40 block text-xs">Hóspedes</span><span class="text-noturno">{{ reserva.num_hospedes }}</span></div>
+      <div><span class="text-madeira/40 block text-xs">Check-in</span><span class="text-noturno">{{ reserva.data_checkin|date:'d/m/Y' }}</span></div>
+      <div><span class="text-madeira/40 block text-xs">Check-out</span><span class="text-noturno">{{ reserva.data_checkout|date:'d/m/Y' }}</span></div>
+      <div><span class="text-madeira/40 block text-xs">Noites</span><span class="text-noturno">{{ reserva.noites }}</span></div>
+      <div><span class="text-madeira/40 block text-xs">Total ({{ reserva.get_metodo_pagamento_display }})</span><span class="text-noturno font-bold">R$ {{ reserva.valor_total|floatformat:2 }}</span></div>
+    </div>
+  </div>
+
+  <!-- Ação -->
+  {% if cobranca and cobranca.pendente %}
+    <p class="text-madeira/60 text-sm text-center mb-4">Pague online para confirmar a reserva. O quarto fica reservado até o prazo de retenção.</p>
+    <a href="{% url 'pagamentos:pagar' cobranca.token %}"
+       class="block w-full text-center bg-lampiao text-noturno font-bold px-6 py-3 rounded-lg hover:bg-lampiao/90 active:scale-[.99] transition">
+      Pagar agora — R$ {{ cobranca.valor|floatformat:2 }}
+    </a>
+  {% elif cobranca and cobranca.paga or reserva.status == 'confirmada' %}
+    <div class="flex items-center justify-center gap-2 text-musgo text-sm font-semibold mb-1">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+      Pagamento confirmado. Até breve na pousada!
+    </div>
+  {% else %}
+    <a href="https://wa.me/{{ config.whatsapp }}?text=Ol%C3%A1%21%20Sobre%20a%20reserva%20{{ reserva.codigo }}" target="_blank" rel="noopener"
+       class="block w-full text-center bg-lampiao text-noturno font-bold px-6 py-3 rounded-lg hover:bg-lampiao/90 transition">
+      Falar no WhatsApp
+    </a>
+  {% endif %}
+
+  <div class="flex items-center justify-center gap-4 mt-5 text-xs text-madeira/50">
+    <a href="{% url 'core:minha_reserva' %}" class="hover:text-lampiao transition">Sair</a>
+    <span class="text-madeira/20">·</span>
+    <a href="{% url 'core:home' %}" class="hover:text-lampiao transition">Voltar ao site</a>
+  </div>
+</div>
+{% endblock %}

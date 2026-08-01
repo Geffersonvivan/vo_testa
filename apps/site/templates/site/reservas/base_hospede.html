@@ -1,0 +1,22 @@
+{% extends 'site/base.html' %}
+{% load static %}
+
+{% comment %}Área do hóspede — mesma proposta do «Acesso da equipe» do CRM:
+tela isolada (sem header/footer do site), fundo escuro com brilho radial, logo
+em cima e cartão claro/creme. {% endcomment %}
+
+{% block site_chrome_header %}{% endblock %}
+{% block site_chrome_footer %}{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex flex-col items-center justify-center gap-8 md:gap-9 px-4 py-12"
+     style="background:
+        radial-gradient(ellipse 62% 46% at 50% 30%, rgba(215,160,72,.22), transparent 70%),
+        radial-gradient(ellipse 120% 90% at 50% 110%, rgba(11,41,64,.9), transparent 60%),
+        #051C2C;">
+  <img src="{% static 'site/img/logo-header.png' %}" alt="Pousada Vô Testa"
+       class="w-[min(210px,58vw)] h-auto drop-shadow-[0_0_34px_rgba(215,160,72,0.35)]">
+
+  {% block hospede_card %}{% endblock %}
+</div>
+{% endblock %}

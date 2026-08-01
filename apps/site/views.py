@@ -559,3 +559,50 @@ def reserva_confirmada(request, token):
         'config': ConfiguracaoSite.load(),
         'cobranca': cobranca,
     })
+
+
+def minha_reserva(request):
+    """Acesso do hóspede à própria reserva — sem senha, por sobrenome + código.
+
+    O código (VT-…) é previsível, então o sobrenome é o 2º fator: só leva ao
+    recibo quem acerta os dois. Em caso de erro, mensagem genérica (não revela
+    se o código existe)."""
+    erro = None
+    sobrenome = codigo = ''
+    if request.method == 'POST':
+        sobrenome = (request.POST.get('sobrenome') or '').strip()
+        codigo = (request.POST.get('codigo') or '').strip().upper()
+        if sobrenome and codigo:
+            reserva = (
+                Reserva.objects.select_related('hospede')
+                .filter(codigo__iexact=codigo).first()
+            )
+            if reserva and sobrenome.lower() in (reserva.hospede.nome or '').lower():
+                return redirect('core:minha_reserva_detalhe', token=reserva.token)
+        erro = ('Não encontramos uma reserva com esse sobrenome e código. '
+                'Confira e tente novamente.')
+    return render(request, 'site/reservas/minha_reserva.html', {
+        'erro': erro, 'sobrenome': sobrenome, 'codigo': codigo,
+        'config': ConfiguracaoSite.load(),
+    })
+
+
+def minha_reserva_detalhe(request, token):
+    """Área do hóspede — a reserva no visual dark (acesso pelo token, o segredo).
+
+    Mesma proposta do login «Minha reserva»: código, status, datas, quarto,
+    valores e pagamento se pendente. Separada do recibo do fluxo de compra."""
+    reserva = get_object_or_404(
+        Reserva.objects.select_related('hospede', 'quarto'), token=token
+    )
+    cobranca = None
+    if reserva.pagamento_id:
+        try:
+            from apps.pagamentos.models import Cobranca
+            cobranca = Cobranca.objects.filter(token=reserva.pagamento_id).first()
+        except Exception:
+            cobranca = None
+    return render(request, 'site/reservas/minha_reserva_detalhe.html', {
+        'reserva': reserva, 'cobranca': cobranca,
+        'config': ConfiguracaoSite.load(),
+    })

@@ -78,7 +78,7 @@
 <body class="font-body bg-pergaminho text-noturno"
       hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
-    {% include 'site/partials/header.html' %}
+    {% block site_chrome_header %}{% include 'site/partials/header.html' %}{% endblock %}
 
     {% if messages %}
     <div class="fixed top-20 left-1/2 -translate-x-1/2 z-[60] w-[min(92vw,32rem)] space-y-2 pointer-events-none" role="status">
@@ -95,9 +95,11 @@
 
     {% block content %}{% endblock %}
 
+    {% block site_chrome_footer %}
     {% include 'site/partials/footer.html' %}
     {% include 'site/partials/whatsapp.html' %}
     {% include 'site/partials/social_proof.html' %}
+    {% endblock %}
 
     <!-- Scripts -->
     <script src="{% static 'site/js/main.js' %}"></script>

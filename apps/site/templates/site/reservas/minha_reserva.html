@@ -1,0 +1,52 @@
+{% extends 'site/reservas/base_hospede.html' %}
+{% load static %}
+
+{% block title %}Minha reserva | Pousada Vô Testa{% endblock %}
+
+{% block hospede_card %}
+<div class="w-full max-w-sm rounded-[10px] border border-lampiao/45 p-7 md:p-8"
+     style="background: linear-gradient(180deg,#FBF6E9,#F8F0DD); box-shadow: 0 0 0 6px rgba(215,160,72,.07), 0 30px 60px rgba(2,10,16,.55);">
+  <p class="text-[11px] uppercase tracking-wider font-semibold text-madeira/75 mb-1">Área do hóspede</p>
+  <h1 class="font-display text-2xl font-bold text-noturno mb-2">Minha reserva</h1>
+  <p class="text-madeira/70 text-sm mb-6">Sem senha: use o sobrenome e o código que chegou no seu e-mail ou WhatsApp.</p>
+
+  {% if erro %}
+    <div class="flex items-start gap-2 bg-red-50 border border-red-200 text-red-800 text-sm rounded-lg px-3 py-2.5 mb-5">
+      <svg class="w-4 h-4 mt-0.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+      <span>{{ erro }}</span>
+    </div>
+  {% endif %}
+
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    <div>
+      <label for="sobrenome" class="block text-sm font-semibold text-madeira mb-1.5">Sobrenome</label>
+      <input type="text" name="sobrenome" id="sobrenome" value="{{ sobrenome }}" autofocus required
+             placeholder="Ex.: Klein"
+             class="w-full bg-white border border-madeira/20 rounded-lg px-4 py-2.5 text-noturno placeholder-madeira/35 focus:outline-none focus:border-lampiao focus:ring-2 focus:ring-lampiao/30 transition">
+    </div>
+    <div>
+      <label for="codigo" class="block text-sm font-semibold text-madeira mb-1.5">Código da reserva</label>
+      <input type="text" name="codigo" id="codigo" value="{{ codigo }}" required
+             placeholder="VT-000000-0000"
+             class="w-full bg-white border border-madeira/20 rounded-lg px-4 py-2.5 text-noturno placeholder-madeira/35 uppercase tracking-wider focus:outline-none focus:border-lampiao focus:ring-2 focus:ring-lampiao/30 transition">
+    </div>
+    <button type="submit"
+            class="w-full bg-lampiao text-noturno font-bold px-5 py-3 rounded-lg hover:bg-lampiao/90 active:scale-[.99] transition">
+      Ver minha reserva
+    </button>
+  </form>
+
+  <a href="https://wa.me/{{ config.whatsapp }}?text=Ol%C3%A1%21%20Perdi%20o%20c%C3%B3digo%20da%20minha%20reserva%20na%20Pousada%20V%C3%B4%20Testa." target="_blank" rel="noopener"
+     class="mt-5 flex items-center gap-2 bg-noturno/[.04] border border-madeira/15 rounded-lg px-4 py-3 text-sm text-madeira/80 hover:border-lampiao/50 transition">
+    <svg class="w-4 h-4 shrink-0 text-madeira/60" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+    <span>Perdeu o código? <strong class="text-madeira font-semibold">Receber por WhatsApp</strong></span>
+  </a>
+
+</div>
+
+<a href="{% url 'core:home' %}" class="flex items-center gap-1.5 text-pergaminho/60 text-sm hover:text-lampiao transition">
+  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+  Voltar ao site
+</a>
+{% endblock %}
