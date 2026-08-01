@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -16,7 +16,12 @@ from .models import Cobranca, EventoPagamento
 Usuario = get_user_model()
 
 
+@override_settings(PAGAMENTOS_GATEWAY="simulado")
 class PagamentosBase(TestCase):
+    """Base fixa no sandbox — a suíte não pode depender do .env do dev nem bater
+    na API real do Safrapay. Testes de provider trocam o gateway com override
+    inline (criam a cobrança no simulado e só então apontam p/ safrapay)."""
+
     def setUp(self):
         self.op = Usuario.objects.create_superuser(username="cx", password="senha-forte-123")
 
@@ -55,6 +60,68 @@ class CobrancaTests(PagamentosBase):
         c.refresh_from_db()
         self.assertEqual(c.status, Cobranca.Status.ESTORNADO)
         self.assertTrue(TrilhaAuditoria.objects.filter(acao="estorno_pagamento").exists())
+
+
+class ConciliacaoTests(PagamentosBase):
+    def test_liquidar_exige_pago_e_calcula_taxa(self):
+        c = self.cobranca(valor=Decimal("100.00"))
+        with self.assertRaises(ValidationError):
+            services.registrar_liquidacao(c, valor_liquido=Decimal("98"))  # pendente
+        services.confirmar_pagamento(c, self.op)
+        services.registrar_liquidacao(c, valor_liquido=Decimal("98.00"),
+                                      data_liquidacao=timezone.localdate(), id_liquidacao="DEP-1")
+        c.refresh_from_db()
+        self.assertTrue(c.liquidado)
+        self.assertEqual(c.valor_liquido, Decimal("98.00"))
+        self.assertEqual(c.taxa, Decimal("2.00"))  # bruto − líquido
+        self.assertEqual(c.id_liquidacao, "DEP-1")
+        self.assertEqual(
+            EventoPagamento.objects.filter(cobranca=c, tipo="liquidada").count(), 1)
+
+    def test_liquidar_idempotente(self):
+        c = self.cobranca()
+        services.confirmar_pagamento(c, self.op)
+        services.registrar_liquidacao(c, valor_liquido=Decimal("95"))
+        services.registrar_liquidacao(c, valor_liquido=Decimal("95"))  # 2ª vez
+        self.assertEqual(
+            EventoPagamento.objects.filter(cobranca=c, tipo="liquidada").count(), 1)
+
+    def test_webhook_captura_liquidacao(self):
+        import json
+        c = self.cobranca()
+        services.confirmar_pagamento(c, self.op)  # já paga
+        r = self.client.post(
+            reverse("pagamentos:webhook"),
+            data=json.dumps({"charge": {
+                "id": c.gateway_id, "chargeStatus": "Paid",
+                "netAmount": 9550, "feeAmount": 450,  # centavos → 95,50 / 4,50
+                "settlementDate": "2026-08-01", "settlementId": "LOTE-9",
+            }}),
+            content_type="application/json",
+        )
+        self.assertEqual(r.status_code, 200)
+        c.refresh_from_db()
+        self.assertTrue(c.liquidado)
+        self.assertEqual(c.valor_liquido, Decimal("95.50"))
+        self.assertEqual(c.taxa, Decimal("4.50"))
+        self.assertEqual(c.id_liquidacao, "LOTE-9")
+
+    def test_recebimentos_totais(self):
+        c1 = self.cobranca(valor=Decimal("100"))
+        services.confirmar_pagamento(c1, self.op)
+        services.registrar_liquidacao(c1, valor_liquido=Decimal("97"))
+        c2 = self.cobranca(valor=Decimal("50"))
+        services.confirmar_pagamento(c2, self.op)  # pago, não liquidado
+        _lista, totais = services.recebimentos(status=Cobranca.Status.PAGO)
+        self.assertEqual(totais["recebido"], Decimal("150"))
+        self.assertEqual(totais["liquidado_qtd"], 1)
+        self.assertEqual(totais["a_liquidar_qtd"], 1)
+
+    def test_tela_conciliacao_abre(self):
+        self.client.login(username="cx", password="senha-forte-123")
+        r = self.client.get(reverse("pagamentos:conciliacao"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Conciliação")
 
 
 class IntegracaoReservaTests(PagamentosBase):
@@ -203,6 +270,31 @@ class SafrapayGatewayTests(PagamentosBase):
         self.assertEqual(r.status_code, 200)
         c.refresh_from_db()
         self.assertEqual(c.status, Cobranca.Status.PENDENTE)  # fail-safe: NÃO confirma
+
+    def test_ja_paguei_gateway_real_nao_confirma_se_pendente(self):
+        """No gateway real, 'Já paguei' consulta o status verdadeiro; se ainda
+        pendente (ex.: Pix não pago), NÃO confirma — sem confirmar no escuro."""
+        from unittest.mock import patch
+        c = self.cobranca()  # criada no simulado
+        with override_settings(PAGAMENTOS_GATEWAY="safrapay"), patch(
+            "apps.pagamentos.gateways.GatewaySafrapay.consultar_status",
+            return_value={"status_raw": "PreAuthorized"},
+        ):
+            self.client.post(reverse("pagamentos:pagar_simular", args=[c.token]))
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PENDENTE)
+
+    def test_ja_paguei_gateway_real_confirma_se_pago(self):
+        """No gateway real, 'Já paguei' confirma quando o status verdadeiro é pago."""
+        from unittest.mock import patch
+        c = self.cobranca()
+        with override_settings(PAGAMENTOS_GATEWAY="safrapay"), patch(
+            "apps.pagamentos.gateways.GatewaySafrapay.consultar_status",
+            return_value={"status_raw": "Captured"},
+        ):
+            self.client.post(reverse("pagamentos:pagar_simular", args=[c.token]))
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PAGO)
 
     def test_webhook_safrapay_preautorizado_nao_confirma(self):
         """Shape REAL do Safrapay: chargeStatus=PreAuthorized + transactionStatus=

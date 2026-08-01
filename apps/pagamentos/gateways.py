@@ -341,6 +341,25 @@ class GatewaySafrapay:
             },
         }
 
+    def consultar_status(self, cobranca) -> dict:
+        """Consulta o status real da cobrança (GET /v2/charge/{id}).
+
+        Devolve o status bruto do Safrapay (chargeStatus ou transactionStatus da
+        1ª transação) — usado p/ confirmar pagamento sem depender do webhook
+        (útil em localhost, onde o webhook do gateway não chega)."""
+        access = self._access_token()
+        if not cobranca.gateway_id:
+            raise ValidationError("Cobrança sem id no gateway para consultar.")
+        _status, data = self._http(
+            "GET", f"/v2/charge/{cobranca.gateway_id}",
+            headers={"Authorization": f"Bearer {access}"},
+        )
+        charge = data.get("charge") or data
+        txs = charge.get("transactions") if isinstance(charge.get("transactions"), list) else []
+        tx0 = txs[0] if txs else {}
+        status_raw = charge.get("chargeStatus") or tx0.get("transactionStatus") or ""
+        return {"status_raw": status_raw, "charge": charge, "raw": data}
+
     def estornar(self, cobranca) -> dict:
         access = self._access_token()
         if not cobranca.gateway_id:

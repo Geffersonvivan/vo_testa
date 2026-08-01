@@ -6,6 +6,8 @@ app_name = "pagamentos"
 
 urlpatterns = [
     path("", views.painel, name="painel"),
+    path("conciliacao/", views.conciliacao, name="conciliacao"),
+    path("<int:pk>/liquidar/", views.liquidar, name="liquidar"),
     path("safrapay/", views.safrapay, name="safrapay"),
     path("safrapay/evidencias/", views.safrapay_evidencias, name="safrapay_evidencias"),
     path("criar/", views.criar, name="criar"),

@@ -56,6 +56,18 @@ class Cobranca(models.Model):
     criado_em = models.DateTimeField("criada em", auto_now_add=True)
     pago_em = models.DateTimeField("paga em", null=True, blank=True)
 
+    # ── Liquidação (o dinheiro caiu na conta) — para conciliar com o extrato ──
+    # Confirmar o pagamento (cliente pagou) é diferente de liquidar (o banco
+    # depositou, já descontada a taxa da adquirente, em D+n). Preenchidos quando
+    # o gateway informa a liquidação (webhook/relatório de vendas).
+    liquidado = models.BooleanField("liquidado no banco", default=False)
+    valor_liquido = models.DecimalField("valor líquido (R$)", max_digits=10, decimal_places=2,
+                                        null=True, blank=True)
+    taxa = models.DecimalField("taxa da adquirente (R$)", max_digits=10, decimal_places=2,
+                               null=True, blank=True)
+    data_liquidacao = models.DateField("data de liquidação", null=True, blank=True)
+    id_liquidacao = models.CharField("id do depósito/lote", max_length=80, blank=True)
+
     class Meta:
         verbose_name = "cobrança"
         verbose_name_plural = "cobranças"
@@ -78,6 +90,7 @@ class EventoPagamento(models.Model):
     class Tipo(models.TextChoices):
         CRIADA = "criada", "Criada"
         PAGA = "paga", "Paga"
+        LIQUIDADA = "liquidada", "Liquidada"
         ESTORNADA = "estornada", "Estornada"
         CANCELADA = "cancelada", "Cancelada"
         WEBHOOK = "webhook", "Webhook"

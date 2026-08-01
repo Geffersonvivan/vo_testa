@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -14,7 +15,7 @@ from apps.nucleo.permissoes import eh_gerente, requer_gerencia, requer_modulo
 from apps.nucleo.seletores import pessoas_agrupadas
 
 from . import services
-from .gateways import status_credenciais
+from .gateways import get_gateway, status_credenciais
 from .models import Cobranca, EventoPagamento
 
 
@@ -37,6 +38,66 @@ def painel(request):
         "conciliacao": services.conciliacao(),
         "safrapay": status_credenciais(),
     })
+
+
+@never_cache
+@requer_modulo(Modulo.PAGAMENTOS)
+def conciliacao(request):
+    """Recebimentos × banco: o que entrou, quanto o banco liquidou (líquido/taxa)
+    e o que ainda falta cair na conta — base pra bater com o extrato."""
+    from datetime import date, datetime
+
+    def _data(param):
+        v = (request.GET.get(param) or "").strip()
+        try:
+            return datetime.strptime(v, "%Y-%m-%d").date() if v else None
+        except ValueError:
+            return None
+
+    hoje = timezone.localdate()
+    inicio = _data("inicio") or hoje.replace(day=1)
+    fim = _data("fim") or hoje
+    metodo = request.GET.get("metodo", "")
+    status = request.GET.get("status", Cobranca.Status.PAGO)
+    liquidacao = request.GET.get("liquidacao", "")
+
+    cobrancas, totais = services.recebimentos(
+        inicio=inicio, fim=fim, metodo=metodo, status=status, liquidacao=liquidacao,
+    )
+    return render(request, "pagamentos/conciliacao.html", {
+        "cobrancas": cobrancas, "totais": totais,
+        "inicio": inicio.isoformat(), "fim": fim.isoformat(),
+        "metodo": metodo, "status": status, "liquidacao": liquidacao,
+        "metodos": Cobranca.Metodo.choices, "status_choices": Cobranca.Status.choices,
+        "eh_gerente": eh_gerente(request.user),
+    })
+
+
+@requer_modulo(Modulo.PAGAMENTOS)
+@require_POST
+def liquidar(request, pk):
+    """Marca uma cobrança paga como liquidada no banco (conferência do extrato)."""
+    cobranca = get_object_or_404(Cobranca, pk=pk)
+    valor_liquido = (request.POST.get("valor_liquido") or "").replace(",", ".").strip() or None
+    data_raw = (request.POST.get("data_liquidacao") or "").strip() or None
+    from datetime import date
+    data_liq = None
+    if data_raw:
+        try:
+            data_liq = date.fromisoformat(data_raw)
+        except ValueError:
+            data_liq = None
+    try:
+        services.registrar_liquidacao(
+            cobranca, valor_liquido=valor_liquido,
+            data_liquidacao=data_liq or timezone.localdate(),
+            id_liquidacao=(request.POST.get("id_liquidacao") or "").strip(),
+            origem="conferencia_manual",
+        )
+        messages.success(request, "Cobrança marcada como liquidada.")
+    except ValidationError as erro:
+        messages.error(request, " ".join(erro.messages))
+    return redirect("pagamentos:conciliacao")
 
 
 @never_cache
@@ -151,20 +212,47 @@ def estornar(request, pk):
 def pagar(request, token):
     """Página pública do link de pagamento (sem login)."""
     cobranca = get_object_or_404(Cobranca, token=token)
+    sandbox = getattr(settings, "PAGAMENTOS_GATEWAY", "simulado") == "simulado"
     return render(request, "pagamentos/pagar.html", {
         "cobranca": cobranca,
         "url_recibo_site": _url_recibo_site(cobranca),
+        "sandbox": sandbox,
     })
 
 
 @require_POST
 def pagar_simular(request, token):
-    """Botão 'já paguei' da página pública (sandbox = dispara o webhook)."""
+    """Botão 'já paguei' da página pública.
+
+    Sandbox (gateway simulado): confirma direto. Gateway REAL: consulta o status
+    verdadeiro no provedor e só confirma se estiver pago de fato — nunca confirma
+    no escuro (o webhook não chega em localhost, daí a consulta ativa)."""
     cobranca = get_object_or_404(Cobranca, token=token)
-    try:
-        services.confirmar_pagamento(cobranca, cobranca.criado_por, origem="link_publico")
-    except ValidationError:
-        pass
+    gateway = getattr(settings, "PAGAMENTOS_GATEWAY", "simulado")
+    if gateway == "simulado":
+        try:
+            services.confirmar_pagamento(cobranca, cobranca.criado_por, origem="link_publico")
+        except ValidationError:
+            pass
+    elif cobranca.status == Cobranca.Status.PENDENTE:
+        try:
+            gw = get_gateway()
+            info = gw.consultar_status(cobranca) if hasattr(gw, "consultar_status") else {}
+            status_raw = info.get("status_raw")
+            EventoPagamento.objects.create(
+                cobranca=cobranca, tipo=EventoPagamento.Tipo.WEBHOOK,
+                origem="consulta", detalhe={"status_raw": status_raw},
+            )
+            if _status_pago(status_raw) is True:
+                services.confirmar_pagamento(cobranca, cobranca.criado_por, origem="link_publico")
+            else:
+                messages.info(
+                    request,
+                    "Ainda não identificamos seu pagamento. Assim que o banco "
+                    "confirmar, a reserva é atualizada automaticamente.",
+                )
+        except ValidationError as erro:
+            messages.error(request, " ".join(erro.messages))
     cobranca.refresh_from_db()
     # Sinal do site: leva o hóspede de volta ao recibo da reserva.
     destino = _url_recibo_site(cobranca)
@@ -210,6 +298,18 @@ _STATUS_PENDENTE = {
 }
 
 
+def _status_pago(status_raw):
+    """True = pago, False = pendente, None = desconhecido (fail-safe: não confirma)."""
+    if status_raw is None or status_raw == "":
+        return None
+    st = str(status_raw).lower()
+    if st in _STATUS_PAGO:
+        return True
+    if st in _STATUS_PENDENTE:
+        return False
+    return None
+
+
 @csrf_exempt
 @require_POST
 def webhook(request):
@@ -222,6 +322,18 @@ def webhook(request):
         cobranca=cobranca, tipo=EventoPagamento.Tipo.WEBHOOK,
         origem="webhook", detalhe={"gateway_id": gid, "status": status_gw, "body": body},
     )
+    # Notificação de liquidação (o dinheiro caiu na conta) pode vir junto do
+    # pagamento ou num webhook próprio, depois. Se a cobrança já está paga,
+    # registramos a liquidação e encerramos.
+    liq = _extrair_liquidacao(body)
+    if liq and cobranca.status == Cobranca.Status.PAGO:
+        try:
+            services.registrar_liquidacao(cobranca, origem="webhook", **liq)
+        except ValidationError as erro:
+            return _json({"erro": " ".join(erro.messages)}, 400)
+        cobranca.refresh_from_db()
+        return _json({"ok": True, "status": cobranca.status, "liquidado": cobranca.liquidado})
+
     st = str(status_gw).lower() if status_gw is not None else None
     if st in _STATUS_PENDENTE:
         return _json({"ok": True, "status": cobranca.status, "ignorado": "ainda pendente"})
@@ -235,10 +347,71 @@ def webhook(request):
         return _json({"ok": True, "status": cobranca.status, "ignorado": f"status={status_gw}"})
     try:
         services.confirmar_pagamento(cobranca, cobranca.criado_por, origem="webhook")
+        # Pix liquida na hora: se a mesma notificação já traz os dados, registra.
+        if liq:
+            services.registrar_liquidacao(cobranca, origem="webhook", **liq)
     except ValidationError as erro:
         return _json({"erro": " ".join(erro.messages)}, 400)
     cobranca.refresh_from_db()
-    return _json({"ok": True, "status": cobranca.status})
+    return _json({"ok": True, "status": cobranca.status, "liquidado": cobranca.liquidado})
+
+
+def _extrair_liquidacao(body):
+    """Extrai dados de liquidação bancária do payload, se houver.
+
+    Os nomes exatos dos campos do Safrapay/Aditum são confirmados na homologação
+    (settlement/relatório de vendas). Aqui aceitamos os candidatos mais comuns e
+    normalizamos valores em centavos → reais. Devolve dict pronto p/
+    registrar_liquidacao, ou None se o payload não trouxer liquidação."""
+    from datetime import date
+    from decimal import Decimal, InvalidOperation
+
+    if not isinstance(body, dict):
+        return None
+    charge = body.get("charge") if isinstance(body.get("charge"), dict) else {}
+    txs = charge.get("transactions") if isinstance(charge.get("transactions"), list) else []
+    tx0 = txs[0] if txs else {}
+    fontes = [body, charge, tx0]
+
+    def _busca(*chaves):
+        for fonte in fontes:
+            for ch in chaves:
+                if isinstance(fonte, dict) and fonte.get(ch) not in (None, ""):
+                    return fonte[ch]
+        return None
+
+    def _dinheiro(v):
+        # Safrapay usa centavos inteiros (como no amount que enviamos). Regra:
+        # inteiro ou string só-dígitos → centavos (÷100); com ponto → já em reais.
+        if v is None:
+            return None
+        try:
+            if isinstance(v, int) or (isinstance(v, str) and v.strip().lstrip("-").isdigit()):
+                return (Decimal(str(v)) / 100).quantize(Decimal("0.01"))
+            return Decimal(str(v))
+        except (InvalidOperation, ValueError):
+            return None
+
+    liquido = _dinheiro(_busca("netAmount", "settlementAmount", "liquidAmount", "valorLiquido"))
+    taxa = _dinheiro(_busca("feeAmount", "mdrAmount", "fee", "taxa", "valorTaxa"))
+    id_liq = _busca("settlementId", "batchId", "liquidationId", "idLiquidacao")
+    data_raw = _busca("settlementDate", "liquidationDate", "paymentDate", "dataLiquidacao")
+
+    if liquido is None and taxa is None and not id_liq and not data_raw:
+        return None  # payload não fala de liquidação
+
+    data_liq = None
+    if data_raw:
+        try:
+            data_liq = date.fromisoformat(str(data_raw)[:10])
+        except ValueError:
+            data_liq = None
+    return {
+        "valor_liquido": liquido,
+        "taxa": taxa,
+        "data_liquidacao": data_liq,
+        "id_liquidacao": str(id_liq) if id_liq else "",
+    }
 
 
 def _extrair_webhook(request):

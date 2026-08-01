@@ -113,3 +113,81 @@ def conciliacao():
         .annotate(qtd=Count("id"), total=Sum("valor"))
         .order_by("status")
     )
+
+
+@transaction.atomic
+def registrar_liquidacao(cobranca, *, valor_liquido=None, taxa=None,
+                         data_liquidacao=None, id_liquidacao="", origem="webhook"):
+    """Marca o dinheiro como caído na conta (liquidação bancária).
+
+    Idempotente: rechamar com os mesmos dados não duplica. Só cobranças pagas
+    liquidam. `valor_liquido`/`taxa` são o depósito real (bruto − taxa da
+    adquirente); `data_liquidacao`/`id_liquidacao` amarram na linha do extrato."""
+    if cobranca.status != Cobranca.Status.PAGO:
+        raise ValidationError("Só uma cobrança paga pode ser liquidada.")
+    valor_liquido = Decimal(str(valor_liquido)) if valor_liquido is not None else None
+    taxa = Decimal(str(taxa)) if taxa is not None else None
+    if valor_liquido is not None and taxa is None:
+        taxa = (cobranca.valor - valor_liquido)
+    if taxa is not None and valor_liquido is None:
+        valor_liquido = (cobranca.valor - taxa)
+    ja_liquidada = cobranca.liquidado
+    cobranca.liquidado = True
+    cobranca.valor_liquido = valor_liquido
+    cobranca.taxa = taxa
+    cobranca.data_liquidacao = data_liquidacao
+    cobranca.id_liquidacao = id_liquidacao or cobranca.id_liquidacao
+    cobranca.save(update_fields=[
+        "liquidado", "valor_liquido", "taxa", "data_liquidacao", "id_liquidacao",
+    ])
+    if not ja_liquidada:
+        EventoPagamento.objects.create(
+            cobranca=cobranca, tipo=EventoPagamento.Tipo.LIQUIDADA, origem=origem,
+            detalhe={
+                "valor_liquido": str(valor_liquido) if valor_liquido is not None else None,
+                "taxa": str(taxa) if taxa is not None else None,
+                "data_liquidacao": data_liquidacao.isoformat() if data_liquidacao else None,
+                "id_liquidacao": id_liquidacao,
+            },
+        )
+    return cobranca
+
+
+def recebimentos(*, inicio=None, fim=None, metodo="", status="", liquidacao=""):
+    """Lista de cobranças para a tela de conciliação (recebimentos × banco).
+
+    Filtra por período de pagamento, método, status e situação de liquidação;
+    devolve as cobranças + totais (bruto, taxa, líquido, quantidade)."""
+    from django.db.models import Count, Sum
+
+    qs = Cobranca.objects.select_related("pagador")
+    # Recebimentos pagos → filtra pela data de pagamento; senão pela de criação.
+    campo_data = "pago_em__date" if status == Cobranca.Status.PAGO else "criado_em__date"
+    if inicio:
+        qs = qs.filter(**{f"{campo_data}__gte": inicio})
+    if fim:
+        qs = qs.filter(**{f"{campo_data}__lte": fim})
+    if metodo:
+        qs = qs.filter(metodo=metodo)
+    if status:
+        qs = qs.filter(status=status)
+    if liquidacao == "liquidado":
+        qs = qs.filter(liquidado=True)
+    elif liquidacao == "a_liquidar":
+        qs = qs.filter(status=Cobranca.Status.PAGO, liquidado=False)
+
+    agg = qs.aggregate(
+        qtd=Count("id"), bruto=Sum("valor"),
+        taxa=Sum("taxa"), liquido=Sum("valor_liquido"),
+    )
+    pagas = qs.filter(status=Cobranca.Status.PAGO)
+    totais = {
+        "qtd": agg["qtd"] or 0,
+        "bruto": agg["bruto"] or Decimal("0"),
+        "taxa": agg["taxa"] or Decimal("0"),
+        "liquido": agg["liquido"] or Decimal("0"),
+        "recebido": pagas.aggregate(t=Sum("valor"))["t"] or Decimal("0"),
+        "liquidado_qtd": pagas.filter(liquidado=True).count(),
+        "a_liquidar_qtd": pagas.filter(liquidado=False).count(),
+    }
+    return list(qs[:300]), totais

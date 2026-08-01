@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block titulo %}Conciliação — Pagamentos{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Financeiro</p>
+<div class="pagina-cabecalho">
+  <h1>Conciliação</h1>
+  <a href="{% url 'pagamentos:painel' %}" class="botao-neutro">Voltar</a>
+</div>
+<p class="subtitulo">
+  O que entrou de pagamentos e o que o banco já liquidou (líquido, já descontada a
+  taxa da adquirente). Use para bater com o extrato — o líquido é o que cai na conta.
+</p>
+
+<div class="kpi-grade" style="margin:1rem 0">
+  <div class="kpi"><span class="kpi-rotulo">Recebido (bruto)</span><strong class="kpi-valor">R$ {{ totais.recebido }}</strong></div>
+  <div class="kpi"><span class="kpi-rotulo">Taxa</span><strong class="kpi-valor">R$ {{ totais.taxa }}</strong></div>
+  <div class="kpi kpi-destaque"><span class="kpi-rotulo">Líquido (banco)</span><strong class="kpi-valor">R$ {{ totais.liquido }}</strong></div>
+  <div class="kpi"><span class="kpi-rotulo">A liquidar</span><strong class="kpi-valor">{{ totais.a_liquidar_qtd }}</strong></div>
+</div>
+
+<form method="get" class="filtro-barra">
+  <div class="filtro-campo">
+    <label>Período</label>
+    <div class="filtro-periodo">
+      <input type="date" name="inicio" value="{{ inicio }}" aria-label="De" onchange="this.form.submit()">
+      <span class="sep">→</span>
+      <input type="date" name="fim" value="{{ fim }}" aria-label="Até" onchange="this.form.submit()">
+    </div>
+  </div>
+  <div class="filtro-campo">
+    <label>Método</label>
+    <select name="metodo" onchange="this.form.submit()"><option value="">Todos</option>
+      {% for v, r in metodos %}<option value="{{ v }}" {% if v == metodo %}selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="filtro-campo">
+    <label>Situação</label>
+    <select name="status" onchange="this.form.submit()"><option value="">Todas</option>
+      {% for v, r in status_choices %}<option value="{{ v }}" {% if v == status %}selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="filtro-campo">
+    <label>Liquidação</label>
+    <select name="liquidacao" onchange="this.form.submit()"><option value="">Todas</option>
+      <option value="liquidado" {% if liquidacao == 'liquidado' %}selected{% endif %}>Liquidado no banco</option>
+      <option value="a_liquidar" {% if liquidacao == 'a_liquidar' %}selected{% endif %}>A liquidar</option>
+    </select>
+  </div>
+  <button type="submit" class="botao-primario filtro-aplicar">Filtrar</button>
+</form>
+
+<table class="tabela">
+  <thead><tr>
+    <th>#</th><th>Método</th><th>Descrição</th><th class="num">Bruto</th>
+    <th class="num">Taxa</th><th class="num">Líquido</th><th>Liquidação</th><th>Situação</th>
+    {% if eh_gerente %}<th></th>{% endif %}
+  </tr></thead>
+  <tbody>
+    {% for c in cobrancas %}
+      <tr>
+        <td><a href="{% url 'pagamentos:detalhe' c.pk %}">{{ c.pk }}</a></td>
+        <td>{{ c.get_metodo_display }}</td>
+        <td>{{ c.descricao }}</td>
+        <td class="num">R$ {{ c.valor }}</td>
+        <td class="num">{% if c.taxa != None %}R$ {{ c.taxa }}{% else %}—{% endif %}</td>
+        <td class="num">{% if c.valor_liquido != None %}R$ {{ c.valor_liquido }}{% else %}—{% endif %}</td>
+        <td>
+          {% if c.liquidado %}
+            <span class="selo selo-pg-pago">✓ {{ c.data_liquidacao|date:"d/m/y" }}</span>
+            {% if c.id_liquidacao %}<br><small class="subtitulo">{{ c.id_liquidacao }}</small>{% endif %}
+          {% elif c.status == 'pago' %}
+            <span class="selo selo-pg-pendente">A liquidar</span>
+          {% else %}—{% endif %}
+        </td>
+        <td><span class="selo selo-pg-{{ c.status }}">{{ c.get_status_display }}</span></td>
+        {% if eh_gerente %}
+          <td>
+            {% if c.status == 'pago' and not c.liquidado %}
+              <div x-data="{ aberto: false }">
+                <button type="button" class="botao-neutro" @click="aberto = !aberto"
+                        :aria-expanded="aberto" style="cursor:pointer">Liquidar</button>
+                <div class="reveal-liquidar" x-ref="painel" x-cloak
+                     :style="aberto ? 'max-height:' + $refs.painel.scrollHeight + 'px;opacity:1' : 'max-height:0;opacity:0'">
+                  <form method="post" action="{% url 'pagamentos:liquidar' c.pk %}" style="margin-top:.5rem;display:grid;gap:.4rem;min-width:180px">
+                    {% csrf_token %}
+                    <input type="number" name="valor_liquido" step="0.01" placeholder="Líquido (R$)">
+                    <input type="date" name="data_liquidacao">
+                    <input type="text" name="id_liquidacao" placeholder="ID do depósito">
+                    <button type="submit" class="botao-primario">Confirmar</button>
+                  </form>
+                </div>
+              </div>
+            {% endif %}
+          </td>
+        {% endif %}
+      </tr>
+    {% empty %}
+      <tr><td colspan="{% if eh_gerente %}9{% else %}8{% endif %}" class="vazio">Nenhum recebimento no período.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

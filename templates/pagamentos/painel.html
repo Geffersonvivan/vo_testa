@@ -6,7 +6,10 @@
 <p class="pagina-eyebrow letreiro">Financeiro</p>
 <div class="pagina-cabecalho">
   <h1>Pagamentos Online</h1>
-  <a href="{% url 'pagamentos:safrapay' %}" class="botao-neutro">Safrapay · chaves</a>
+  <div style="display:flex;gap:.5rem">
+    <a href="{% url 'pagamentos:conciliacao' %}" class="botao-neutro">Conciliação</a>
+    <a href="{% url 'pagamentos:safrapay' %}" class="botao-neutro">Safrapay · chaves</a>
+  </div>
 </div>
 <p class="subtitulo">
   Cobranças por Pix, cartão, boleto ou link.
