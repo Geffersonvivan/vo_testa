@@ -20,15 +20,24 @@
     </div>
   </div>
 
-  <form method="get" class="rel-filtro" style="display:flex; gap:.6rem; align-items:end; flex-wrap:wrap; margin:.8rem 0 1.2rem">
-    <div class="segmentado">
-      <a href="?preset=hoje" class="chip {% if rotulo == 'hoje' %}chip-ativo{% endif %}">Hoje</a>
-      <a href="?preset=semana" class="chip {% if rotulo == 'semana' %}chip-ativo{% endif %}">Semana</a>
-      <a href="?preset=mes" class="chip {% if rotulo == 'mês' %}chip-ativo{% endif %}">Mês</a>
+  <form method="get" class="filtro-barra rel-filtro">
+    <div class="filtro-campo">
+      <label>Atalhos</label>
+      <div class="segmentado">
+        <a href="?preset=hoje" class="chip {% if rotulo == 'hoje' %}chip-ativo{% endif %}">Hoje</a>
+        <a href="?preset=semana" class="chip {% if rotulo == 'semana' %}chip-ativo{% endif %}">Semana</a>
+        <a href="?preset=mes" class="chip {% if rotulo == 'mês' %}chip-ativo{% endif %}">Mês</a>
+      </div>
     </div>
-    <label>De <input type="date" name="de" value="{{ f.de }}"></label>
-    <label>Até <input type="date" name="ate" value="{{ f.ate }}"></label>
-    <button type="submit" class="botao-mini">Aplicar</button>
+    <div class="filtro-campo">
+      <label>Período</label>
+      <div class="filtro-periodo">
+        <input type="date" name="de" value="{{ f.de }}" aria-label="De" onchange="this.form.submit()">
+        <span class="sep">→</span>
+        <input type="date" name="ate" value="{{ f.ate }}" aria-label="Até" onchange="this.form.submit()">
+      </div>
+    </div>
+    <button type="submit" class="botao-primario filtro-aplicar">Aplicar</button>
   </form>
 </div>
 

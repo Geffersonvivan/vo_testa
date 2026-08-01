@@ -12,19 +12,29 @@
 </div>
 <p class="subtitulo">Quem fez o quê, quando e por quê — operações sensíveis de todos os módulos.</p>
 
-<form method="get" class="filtros" style="align-items:flex-end;gap:.6rem">
-  <label class="select-wrap"><span class="opcional">Ação</span>
-    <select name="acao"><option value="">Todas</option>
+<form method="get" class="filtro-barra">
+  <div class="filtro-campo">
+    <label>Ação</label>
+    <select name="acao" onchange="this.form.submit()"><option value="">Todas</option>
       {% for a in acoes %}<option value="{{ a }}" {% if f.acao == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
-    </select></label>
-  <label class="select-wrap"><span class="opcional">Usuário</span>
-    <select name="usuario"><option value="">Todos</option>
+    </select>
+  </div>
+  <div class="filtro-campo">
+    <label>Usuário</label>
+    <select name="usuario" onchange="this.form.submit()"><option value="">Todos</option>
       {% for u in usuarios %}<option value="{{ u.pk }}" {% if f.usuario == u.pk|stringformat:'s' %}selected{% endif %}>{{ u.get_short_name|default:u.username }}</option>{% endfor %}
-    </select></label>
-  <label><span class="opcional">De</span><input type="date" name="de" value="{{ f.de }}"></label>
-  <label><span class="opcional">Até</span><input type="date" name="ate" value="{{ f.ate }}"></label>
-  <button type="submit" class="botao-primario">Filtrar</button>
-  <a href="{% url 'auditoria:trilha' %}" class="botao-neutro">Limpar</a>
+    </select>
+  </div>
+  <div class="filtro-campo">
+    <label>Período</label>
+    <div class="filtro-periodo">
+      <input type="date" name="de" value="{{ f.de }}" aria-label="De" onchange="this.form.submit()">
+      <span class="sep">→</span>
+      <input type="date" name="ate" value="{{ f.ate }}" aria-label="Até" onchange="this.form.submit()">
+    </div>
+  </div>
+  <button type="submit" class="botao-primario filtro-aplicar">Filtrar</button>
+  <a href="{% url 'auditoria:trilha' %}" class="botao-neutro" style="align-self:flex-end;height:40px;display:inline-flex;align-items:center">Limpar</a>
 </form>
 
 <table class="tabela">

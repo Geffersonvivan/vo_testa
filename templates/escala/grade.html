@@ -18,12 +18,15 @@
   <a href="?inicio={{ anterior|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro">‹ Semana anterior</a>
   <strong>{{ inicio|date:"d/m" }} – {{ grade.dias|last|date:"d/m/Y" }}</strong>
   <a href="?inicio={{ proximo|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro">Próxima semana ›</a>
-  <form method="get" style="margin-left:auto">
+  <form method="get" class="filtro-barra filtro-inline" style="margin-left:auto">
     <input type="hidden" name="inicio" value="{{ inicio|date:'Y-m-d' }}">
-    <select name="setor" onchange="this.form.submit()">
-      <option value="">Todos os setores</option>
-      {% for v, r in setores %}<option value="{{ v }}" {% if setor == v %}selected{% endif %}>{{ r }}</option>{% endfor %}
-    </select>
+    <div class="filtro-campo">
+      <label>Setor</label>
+      <select name="setor" onchange="this.form.submit()">
+        <option value="">Todos os setores</option>
+        {% for v, r in setores %}<option value="{{ v }}" {% if setor == v %}selected{% endif %}>{{ r }}</option>{% endfor %}
+      </select>
+    </div>
   </form>
 </div>
 

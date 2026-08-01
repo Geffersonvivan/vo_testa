@@ -1372,10 +1372,12 @@ a.modulo-ativo:hover {
 .atencao-seta { width: 16px; height: 16px; color: var(--tinta-suave); flex-shrink: 0; }
 
 /* ---------- Mapa de quartos (situação ao vivo) ---------- */
+/* Filtros do mapa na mesma superfície-cartão da família de filtros (§12). */
 .quartos-filtros {
   display: flex; flex-wrap: wrap; gap: 1rem 2.4rem;
-  padding: 0 0 1.1rem; margin-bottom: 1.6rem;
-  border-bottom: 1px solid var(--fio);
+  padding: .9rem 1.1rem; margin-bottom: 1.4rem;
+  background: var(--superficie); border: 1px solid var(--fio);
+  border-radius: var(--raio); box-shadow: var(--sombra-1);
 }
 .quartos-filtro-grupo { display: flex; align-items: center; flex-wrap: wrap; gap: .35rem .8rem; }
 .quartos-filtro-grupo .letreiro { color: var(--madeira); margin-right: .3rem; }
@@ -1836,6 +1838,135 @@ div.porta { cursor: default; }
 .timeline li { padding: .4rem 0 .4rem .9rem; border-left: 2px solid var(--fio); font-size: .9rem; }
 .timeline li small { color: var(--tinta-suave); }
 
+/* ── Polimento estilo Apple: pagamento + conciliação ────────────────────────
+   Curva "spring" da casa: cubic-bezier(.2,.8,.2,1). Números tabulares p/ valores
+   monetários; feedback no toque; reveal contínuo; materialização na entrada. */
+.num, .kpi-valor, .valor, .pay code { font-variant-numeric: tabular-nums; }
+
+/* Tap-to-copy do Pix — botão, não bloco morto. Resposta no toque (§1, §13). */
+.pix-copia {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  word-break: break-all; background: var(--pergaminho); color: var(--tinta);
+  border: 1px solid var(--fio); border-radius: var(--raio-p);
+  padding: .8rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .78rem; line-height: 1.5; position: relative;
+  transition: transform .12s cubic-bezier(.2,.8,.2,1), box-shadow .12s, border-color .12s;
+}
+.pix-copia:hover { border-color: var(--madeira); }
+.pix-copia:active { transform: scale(.985); }
+.pix-copia:focus-visible { outline: 3px solid rgba(215,160,72,.5); outline-offset: 2px; }
+.pix-copia .pix-dica {
+  display: block; margin-top: .5rem; font-family: var(--fonte-ui);
+  font-size: .72rem; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--tinta-suave); transition: color .15s;
+}
+.pix-copia.copiado { border-color: rgba(46,125,91,.5); }
+.pix-copia.copiado .pix-dica { color: var(--sucesso); font-weight: 700; }
+
+/* Botão que "faz algo": estado de carregamento com ponto pulsante (§1). */
+.btn-carregando { pointer-events: none; opacity: .85; }
+.btn-carregando .btn-label::after {
+  content: "…"; display: inline-block;
+}
+.btn-spin {
+  display: none; width: 1em; height: 1em; margin-left: .1rem;
+  border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%;
+  vertical-align: -.15em;
+}
+.btn-carregando .btn-spin { display: inline-block; }
+
+/* Confirmação de pagamento: pop com leve overshoot (momentum → bounce, §4). */
+.pay-ok-ico { display: inline-block; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .pay { animation: pay-materializa .5s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes pay-materializa {
+    from { opacity: 0; transform: scale(.96) translateY(12px); filter: blur(6px); }
+    to   { opacity: 1; transform: none; filter: none; }
+  }
+  .btn-carregando .btn-spin { animation: btn-gira .7s linear infinite; }
+  @keyframes btn-gira { to { transform: rotate(360deg); } }
+  .pay-ok-ico { animation: pay-pop .45s cubic-bezier(.2,1.5,.35,1) both; }
+  @keyframes pay-pop { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+}
+
+/* Reveal do "Liquidar" na conciliação — cresce em direção à ação (§8). */
+.reveal-liquidar {
+  overflow: hidden;
+  transition: max-height .32s cubic-bezier(.2,.8,.2,1), opacity .2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-liquidar { transition: opacity .2s ease; }
+}
+
+/* KPIs da conciliação: hierarquia por peso+leading (§15), material leve (§12). */
+.kpi-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .7rem; }
+.kpi {
+  background: var(--superficie); border: 1px solid var(--fio);
+  border-radius: var(--raio); padding: .8rem 1rem; box-shadow: var(--sombra-1);
+}
+.kpi-rotulo { display: block; font-size: .72rem; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--tinta-suave); }
+.kpi-valor { display: block; margin-top: .2rem; font-family: var(--fonte-titulo);
+  font-size: 1.5rem; line-height: 1.05; letter-spacing: -.01em; }
+.kpi-destaque .kpi-valor { color: var(--sucesso); }
+
+/* Toolbar de filtros coeso e CANÔNICO — uma camada funcional, não controles
+   soltos (§12,§16). `.filtro-barra` é o padrão; `form.filtros` (menos a subnav)
+   herda o mesmo, padronizando as telas antigas sem mexer no markup. Controles com
+   altura/borda/foco uniformes; o par de datas vira um "Período" só. */
+.filtro-barra,
+form.filtros:not(.subnav) {
+  display: flex; flex-wrap: wrap; align-items: flex-end; gap: .85rem;
+  background: var(--superficie); border: 1px solid var(--fio);
+  border-radius: var(--raio); padding: .9rem 1rem; box-shadow: var(--sombra-1);
+  margin: 1rem 0;
+}
+/* Modificador inline: controle solto (ex.: seletor de setor num cabeçalho) —
+   estilo dos campos sem a moldura de cartão. */
+.filtro-barra.filtro-inline {
+  background: none; border: none; box-shadow: none; padding: 0; margin: 0;
+}
+.filtro-campo { display: flex; flex-direction: column; gap: .35rem; }
+.filtro-campo > label {
+  font-size: .68rem; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--tinta-suave);
+}
+.filtro-barra input[type="date"],
+.filtro-barra select,
+form.filtros:not(.subnav) input[type="date"],
+form.filtros:not(.subnav) select {
+  appearance: none; -webkit-appearance: none;
+  height: 40px; padding: 0 .75rem; font-size: .9rem; font-family: var(--fonte-ui);
+  color: var(--tinta); background: var(--superficie);
+  border: 1px solid var(--fio-forte); border-radius: var(--raio-p);
+  transition: border-color .15s, box-shadow .15s, transform .1s;
+}
+.filtro-barra select,
+form.filtros:not(.subnav) select {
+  padding-right: 2.1rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364717B' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right .7rem center;
+}
+.filtro-barra input[type="date"]:focus,
+.filtro-barra select:focus,
+form.filtros:not(.subnav) input[type="date"]:focus,
+form.filtros:not(.subnav) select:focus {
+  outline: none; border-color: var(--lampiao);
+  box-shadow: 0 0 0 3px rgba(215, 160, 72, .22);
+}
+/* Período: dois date encostados num pill único, com foco no grupo (§16 mapping). */
+.filtro-periodo {
+  display: flex; align-items: stretch; background: var(--superficie);
+  border: 1px solid var(--fio-forte); border-radius: var(--raio-p); overflow: hidden;
+  transition: border-color .15s, box-shadow .15s;
+}
+.filtro-periodo:focus-within { border-color: var(--lampiao); box-shadow: 0 0 0 3px rgba(215, 160, 72, .22); }
+.filtro-periodo input[type="date"] { border: none; border-radius: 0; box-shadow: none !important; }
+.filtro-periodo .sep { display: flex; align-items: center; color: var(--tinta-suave); font-size: .9rem; padding: 0 .1rem; }
+.filtro-aplicar { margin-left: auto; align-self: flex-end; height: 40px; }
+.filtro-aplicar:active { transform: scale(.98); }
+
 /* Escala — grade semanal */
 .escala-grade td, .escala-grade th { vertical-align: top; }
 .escala-grade .col-hoje { background: var(--pergaminho); }
@@ -1937,18 +2068,19 @@ div.porta { cursor: default; }
   color: var(--tinta-suave);
 }
 
-/* filtro segmentado (links) */
-.seg-filtro {
+/* Controle segmentado CANÔNICO (links) — usado no funil, relatórios, etc. */
+.seg-filtro, .segmentado {
   display: inline-flex; gap: .15rem; background: var(--superficie-2);
   border: 1px solid var(--fio); border-radius: 999px; padding: .25rem;
 }
-.seg-filtro a {
+.seg-filtro a, .segmentado .chip {
   padding: .34rem .9rem; border-radius: 999px; font-size: .84rem;
   font-weight: 500; color: var(--tinta-suave); text-decoration: none;
-  white-space: nowrap; transition: color .12s, background .12s, box-shadow .12s;
+  white-space: nowrap; transition: color .12s, background .12s, box-shadow .12s, transform .1s;
 }
-.seg-filtro a:hover { color: var(--tinta); }
-.seg-filtro a.ativo {
+.seg-filtro a:hover, .segmentado .chip:hover { color: var(--tinta); }
+.seg-filtro a:active, .segmentado .chip:active { transform: scale(.97); }  /* resposta no toque (§1) */
+.seg-filtro a.ativo, .segmentado .chip.chip-ativo {
   background: var(--superficie); color: var(--noturno); box-shadow: var(--sombra-1);
 }
 
