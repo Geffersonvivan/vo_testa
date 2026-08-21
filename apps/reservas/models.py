@@ -86,6 +86,12 @@ class Reserva(models.Model):
         AGENCIA = "agencia", "Agência"
         EMPRESA = "empresa", "Empresa"
 
+    class SincFNRH(models.TextChoices):
+        NAO_ENVIADA = "nao_enviada", "Não enviada"
+        PENDENTE = "pendente", "Pendente de envio"
+        ENVIADA = "enviada", "Enviada à FNRH"
+        ERRO = "erro", "Erro no envio"
+
     uh = models.ForeignKey(
         "nucleo.UH", on_delete=models.PROTECT,
         related_name="reservas", verbose_name="quarto",
@@ -102,6 +108,12 @@ class Reserva(models.Model):
         "nucleo.Pessoa", on_delete=models.PROTECT, null=True, blank=True,
         related_name="reservas_faturadas", verbose_name="titular do faturamento",
         help_text="Quem paga a conta, quando não é o próprio hóspede (agência/empresa).",
+    )
+    grupo = models.ForeignKey(
+        "GrupoReserva", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="filhas", verbose_name="grupo (reserva-mãe)",
+        help_text="Bloco de quartos: as diárias vão ao folio do grupo; o consumo "
+                  "fica na conta do quarto. Vazio = reserva avulsa.",
     )
     checkin = models.DateField("entrada (check-in)")
     checkout = models.DateField("saída (check-out)")
@@ -125,6 +137,14 @@ class Reserva(models.Model):
     )
     checkin_real = models.DateTimeField("entrada realizada em", null=True, blank=True)
     checkout_real = models.DateTimeField("saída realizada em", null=True, blank=True)
+    # Sincronização com a FNRH Digital (Embratur/Serpro) — ver fnrh_gateway.py
+    fnrh_reserva_id = models.UUIDField("ID da reserva na FNRH", null=True, blank=True)
+    fnrh_status = models.CharField(
+        "situação FNRH", max_length=12,
+        choices=SincFNRH.choices, default=SincFNRH.NAO_ENVIADA,
+    )
+    fnrh_sincronizada_em = models.DateTimeField("sincronizada com a FNRH em", null=True, blank=True)
+    fnrh_erro = models.TextField("último erro FNRH", blank=True)
     criado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         related_name="reservas_criadas", verbose_name="criada por",
@@ -181,6 +201,19 @@ class Reserva(models.Model):
         return self.titular or self.hospede
 
     @property
+    def total_hospedes(self) -> int:
+        return self.adultos + self.criancas
+
+    @property
+    def fnrh_pronta(self) -> bool:
+        """FNRH em ordem para check-in: uma ficha completa por hóspede, com o
+        titular entre elas."""
+        fichas = list(self.fichas_fnrh.all())
+        completas = [f for f in fichas if f.completa]
+        tem_titular = any(f.titular and f.completa for f in fichas)
+        return tem_titular and len(completas) >= self.total_hospedes
+
+    @property
     def status_ajuda(self) -> str:
         """Explicação do status, para dica ao passar o mouse."""
         return {
@@ -224,6 +257,11 @@ class Reserva(models.Model):
 
     def fazer_checkin(self, usuario):
         self._exige_status(self.Status.CONFIRMADA, self.Status.PRE_RESERVA)
+        # FNRH obrigatória: ficha completa de cada hóspede antes de hospedar.
+        if getattr(settings, "FNRH_BLOQUEAR_CHECKIN", True) and not self.fnrh_pronta:
+            raise ValidationError(
+                "FNRH pendente — registre a ficha de cada hóspede antes do check-in."
+            )
         if self.uh.status != self.uh.Status.ATIVA:
             raise ValidationError(
                 f"O quarto {self.uh.numero} está {self.uh.get_status_display().lower()}."
@@ -242,9 +280,16 @@ class Reserva(models.Model):
                 )
         self.status = self.Status.HOSPEDADA
         self.checkin_real = timezone.now()
+        # Marca para envio à FNRH (o push real é best-effort, fora da transação).
+        if self.fnrh_status == self.SincFNRH.NAO_ENVIADA:
+            self.fnrh_status = self.SincFNRH.PENDENTE
         self.save()
         conta = ContaHospedagem.objects.create(reserva=self)
-        conta.lancar_diarias(usuario)
+        # Grupo (folio híbrido): diária + colchão vão ao folio-mãe; o consumo fica
+        # nesta conta do quarto. Reserva avulsa: tudo na própria conta.
+        acomodacao = self.grupo.folio if self.grupo_id else conta
+        acomodacao.lancar_diarias(usuario, reserva=self)
+        acomodacao.lancar_colchoes_extras(usuario, reserva=self)
         return conta
 
     def fazer_checkout(self, usuario):
@@ -315,7 +360,94 @@ class Reserva(models.Model):
         )
 
 
+class GrupoReserva(models.Model):
+    """Reserva-mãe: bloco de quartos com um titular e um folio compartilhado.
+
+    Não ocupa quarto — cada quarto é uma `Reserva` (filha) com FK `grupo`. As
+    diárias de todas as filhas caem no folio-mãe (`folio`), pago pelo titular; o
+    consumo fica na conta de cada quarto. O status é derivado das filhas.
+    """
+
+    rotulo = models.CharField(
+        "identificação do grupo", max_length=120,
+        help_text="Ex.: «Grupo Ribeiro», «Casamento Ana & João».",
+    )
+    titular = models.ForeignKey(
+        "nucleo.Pessoa", on_delete=models.PROTECT,
+        related_name="grupos_titular", verbose_name="titular (paga o folio)",
+    )
+    faturamento = models.CharField(
+        "faturamento", max_length=12, choices=Reserva.Faturamento.choices,
+        default=Reserva.Faturamento.PARTICULAR,
+    )
+    canal = models.CharField(
+        "canal", max_length=10, choices=Reserva.Canal.choices,
+        default=Reserva.Canal.BALCAO,
+    )
+    checkin = models.DateField("entrada (check-in)")
+    checkout = models.DateField("saída (check-out)")
+    observacoes = models.TextField("observações", blank=True)
+    motivo_cancelamento = models.TextField("motivo do cancelamento", blank=True)
+    expira_em = models.DateTimeField(
+        "retenção até", null=True, blank=True,
+        help_text="Pré-reserva do grupo: segura os quartos só até aqui; depois expira.",
+    )
+    encerrado_em = models.DateTimeField("encerrado em", null=True, blank=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="grupos_criados", verbose_name="criado por",
+    )
+    criado_em = models.DateTimeField("criado em", auto_now_add=True)
+    atualizado_em = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        verbose_name = "reserva de grupo"
+        verbose_name_plural = "reservas de grupo"
+        ordering = ["-checkin"]
+
+    def __str__(self):
+        return f"Grupo #{self.pk} — {self.rotulo}"
+
+    @property
+    def filhas_ativas(self):
+        return self.filhas.filter(status__in=Reserva.STATUS_ATIVOS)
+
+    @property
+    def pagador(self):
+        return self.titular
+
+    def situacao(self) -> str:
+        """Status derivado das filhas (não é gravado — evita divergir da verdade).
+
+        Ordem de precedência do bloco inteiro: cancelado (nada ativo) → hospedado
+        (algum quarto em casa) → check-out (todas as ativas saíram) → confirmado
+        (todas confirmadas) → pré-reserva.
+        """
+        filhas = list(self.filhas.all())
+        if not filhas:
+            return "vazio"
+        ativas = [f for f in filhas if f.status in Reserva.STATUS_ATIVOS]
+        if not ativas and any(f.status == Reserva.Status.CHECKOUT for f in filhas):
+            return Reserva.Status.CHECKOUT
+        if not ativas:
+            return Reserva.Status.CANCELADA
+        if any(f.status == Reserva.Status.HOSPEDADA for f in ativas):
+            return Reserva.Status.HOSPEDADA
+        if all(f.status == Reserva.Status.CONFIRMADA for f in ativas):
+            return Reserva.Status.CONFIRMADA
+        return Reserva.Status.PRE_RESERVA
+
+    def situacao_display(self) -> str:
+        cod = self.situacao()
+        if cod == "vazio":
+            return "Sem quartos"
+        return Reserva.Status(cod).label
+
+
 class Acompanhante(models.Model):
+    """Lista simples de acompanhantes (legado). Superada pela FichaFNRH, que é o
+    registro legal por hóspede. Mantida para não perder dados históricos."""
+
     reserva = models.ForeignKey(
         Reserva, on_delete=models.CASCADE,
         related_name="acompanhantes", verbose_name="reserva",
@@ -331,6 +463,134 @@ class Acompanhante(models.Model):
         return self.nome
 
 
+class FichaFNRH(models.Model):
+    """Ficha Nacional de Registro de Hóspedes (Min. do Turismo/Embratur, Lei
+    11.771/2008). Um registro por pessoa hospedada — snapshot da estadia, não
+    espelho editável do cadastro. Alimenta o BOH (Boletim de Ocupação Hoteleira).
+    Enquanto incompleta, bloqueia o check-in (uma ficha completa por hóspede:
+    titular + acompanhantes)."""
+
+    # Domínios alinhados 1:1 com os códigos oficiais da FNRH Digital (GET /dominios/…);
+    # o valor É o id aceito pela API — sem de-para.
+    class Sexo(models.TextChoices):
+        HOMEM = "HOMEM", "Masculino"
+        MULHER = "MULHER", "Feminino"
+        OUTRO = "OUTRO", "Outro"
+        NAOINFORMADO = "NAOINFORMADO", "Prefiro não informar"
+
+    class Documento(models.TextChoices):
+        CPF = "CPF", "CPF"
+        PASSAPORTE = "PASSAPORTE", "Passaporte"
+
+    class MotivoViagem(models.TextChoices):
+        LAZER_FERIAS = "LAZER_FERIAS", "Turismo / lazer / férias"
+        NEGOCIOS = "NEGOCIOS", "Negócios / trabalho"
+        CONGRESSO_FEIRA = "CONGRESSO_FEIRA", "Congresso / feira / evento"
+        PARENTES_AMIGOS = "PARENTES_AMIGOS", "Visita a parentes / amigos"
+        SAUDE = "SAUDE", "Saúde"
+        ESTUDOS_CURSOS = "ESTUDOS_CURSOS", "Estudos / cursos"
+        RELIGIAO = "RELIGIAO", "Religião"
+        COMPRAS = "COMPRAS", "Compras"
+
+    class Transporte(models.TextChoices):
+        AUTOMOVEL = "AUTOMOVEL", "Automóvel"
+        ONIBUS = "ONIBUS", "Ônibus"
+        AVIAO = "AVIAO", "Avião"
+        MOTO = "MOTO", "Motocicleta"
+        NAVIO_BARCO = "NAVIO_BARCO", "Navio / barco"
+        TREM = "TREM", "Trem"
+        BICICLETA = "BICICLETA", "Bicicleta"
+        PE = "PE", "A pé"
+
+    class Origem(models.TextChoices):
+        RECEPCAO = "recepcao", "Recepção"
+        PORTAL = "portal", "Portal do hóspede"
+
+    # Campos mínimos para a ficha valer (usados na trava de check-in).
+    CAMPOS_OBRIGATORIOS = ("nome", "nascimento", "documento_numero", "cidade", "motivo_viagem")
+
+    reserva = models.ForeignKey(
+        Reserva, on_delete=models.CASCADE,
+        related_name="fichas_fnrh", verbose_name="reserva",
+    )
+    titular = models.BooleanField("hóspede responsável", default=False)
+    pessoa = models.ForeignKey(
+        "nucleo.Pessoa", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="fichas_fnrh", verbose_name="pessoa (cadastro)",
+    )
+
+    # Identificação
+    nome = models.CharField("nome completo", max_length=150)
+    nascimento = models.DateField("data de nascimento", null=True, blank=True)
+    sexo = models.CharField("sexo", max_length=12, choices=Sexo.choices, blank=True)
+    nacionalidade = models.CharField(
+        "nacionalidade", max_length=60, blank=True, default="Brasileira"
+    )
+    profissao = models.CharField("profissão", max_length=80, blank=True)
+
+    # Documento
+    documento_tipo = models.CharField(
+        "tipo de documento", max_length=12,
+        choices=Documento.choices, default=Documento.CPF,
+    )
+    documento_numero = models.CharField("nº do documento", max_length=30, blank=True)
+    documento_emissor = models.CharField("órgão emissor / país", max_length=40, blank=True)
+    cpf = models.CharField("CPF", max_length=14, blank=True)
+
+    # Endereço residencial
+    pais = models.CharField("país", max_length=40, blank=True, default="Brasil")
+    cep = models.CharField("CEP", max_length=9, blank=True)
+    endereco = models.CharField("endereço", max_length=200, blank=True)
+    cidade = models.CharField("cidade", max_length=80, blank=True)
+    uf = models.CharField("UF", max_length=2, blank=True)
+    telefone = models.CharField("telefone", max_length=20, blank=True)
+    email = models.EmailField("e-mail", blank=True)
+
+    # Viagem — dimensões do BOH
+    motivo_viagem = models.CharField(
+        "motivo da viagem", max_length=20, choices=MotivoViagem.choices, blank=True,
+    )
+    meio_transporte = models.CharField(
+        "meio de transporte", max_length=15, choices=Transporte.choices, blank=True,
+    )
+    procedencia = models.CharField(
+        "procedência", max_length=120, blank=True,
+        help_text="Cidade/UF/país de onde o hóspede veio nesta viagem.",
+    )
+    proximo_destino = models.CharField("próximo destino", max_length=120, blank=True)
+
+    origem = models.CharField(
+        "preenchida via", max_length=8, choices=Origem.choices, default=Origem.RECEPCAO,
+    )
+    # IDs devolvidos pela FNRH Digital ao empurrar a ficha (ver fnrh_gateway.py)
+    fnrh_pessoa_id = models.UUIDField("ID da pessoa na FNRH", null=True, blank=True)
+    fnrh_hospede_id = models.UUIDField("ID do hóspede na FNRH", null=True, blank=True)
+    preenchida_em = models.DateTimeField("preenchida em", null=True, blank=True)
+    preenchida_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="fichas_fnrh_preenchidas", verbose_name="preenchida por",
+    )
+    criado_em = models.DateTimeField("criada em", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "ficha FNRH"
+        verbose_name_plural = "fichas FNRH"
+        ordering = ["-titular", "nome"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["reserva"], condition=Q(titular=True),
+                name="fnrh_um_titular_por_reserva",
+            ),
+        ]
+
+    def __str__(self):
+        return f"FNRH — {self.nome} (reserva #{self.reserva_id})"
+
+    @property
+    def completa(self) -> bool:
+        return all(getattr(self, campo) for campo in self.CAMPOS_OBRIGATORIOS)
+
+
 class ContaHospedagem(models.Model):
     """Folio: diárias, consumos, serviços e descontos; crédito de adiantamentos."""
 
@@ -339,7 +599,13 @@ class ContaHospedagem(models.Model):
         FECHADA = "fechada", "Fechada"
 
     reserva = models.OneToOneField(
-        Reserva, on_delete=models.PROTECT, related_name="conta", verbose_name="reserva"
+        Reserva, on_delete=models.PROTECT, related_name="conta", verbose_name="reserva",
+        null=True, blank=True,
+    )
+    grupo = models.OneToOneField(
+        "GrupoReserva", on_delete=models.PROTECT, related_name="folio",
+        verbose_name="grupo (folio-mãe)", null=True, blank=True,
+        help_text="Folio do grupo: as diárias de todos os quartos do bloco.",
     )
     status = models.CharField(
         "status", max_length=10, choices=Status.choices, default=Status.ABERTA
@@ -348,19 +614,35 @@ class ContaHospedagem(models.Model):
     fechada_em = models.DateTimeField("fechada em", null=True, blank=True)
 
     class Meta:
-        verbose_name = "conta do quarto"
-        verbose_name_plural = "contas de quarto"
+        verbose_name = "conta de hospedagem"
+        verbose_name_plural = "contas de hospedagem"
+        constraints = [
+            # Uma conta é OU de um quarto OU o folio de um grupo, nunca os dois.
+            models.CheckConstraint(
+                condition=(
+                    Q(reserva__isnull=False, grupo__isnull=True)
+                    | Q(reserva__isnull=True, grupo__isnull=False)
+                ),
+                name="conta_reserva_xor_grupo",
+            ),
+        ]
 
     def __str__(self):
+        if self.grupo_id:
+            return f"Folio do grupo #{self.grupo_id} ({self.get_status_display()})"
         return f"Conta da reserva #{self.reserva_id} ({self.get_status_display()})"
 
     @property
     def aberta(self) -> bool:
         return self.status == self.Status.ABERTA
 
-    def lancar_diarias(self, usuario):
-        """Lança uma diária (SERVIÇO) por noite, pela diária acordada da reserva."""
-        reserva = self.reserva
+    def lancar_diarias(self, usuario, reserva=None):
+        """Lança uma diária (SERVIÇO) por noite, pela diária acordada da reserva.
+
+        `reserva` permite lançar a diária de um quarto do grupo neste folio-mãe;
+        omitido, usa a reserva desta conta (reserva avulsa).
+        """
+        reserva = reserva or self.reserva
         for n in range(reserva.noites):
             dia = reserva.checkin + timezone.timedelta(days=n)
             LancamentoConta.objects.create(
@@ -371,6 +653,36 @@ class ContaHospedagem(models.Model):
                 valor=reserva.valor_diaria,
                 criado_por=usuario,
             )
+
+    def lancar_colchoes_extras(self, usuario, reserva=None):
+        """Lança o colchão extra da estadia (SERVIÇO), itemizado à parte da diária.
+
+        Quantidade derivada da lotação (adultos + crianças) sobre a estrutura do
+        quarto — o sofá-cama está incluído; só o colchão extra cobra. Retorna o
+        lançamento criado ou None quando não há colchão a cobrar. `reserva` permite
+        lançar no folio-mãe o colchão de um quarto do grupo.
+        """
+        from apps.nucleo.estrutura import extras_para
+
+        reserva = reserva or self.reserva
+        qtd = extras_para(reserva.uh, reserva.adultos + reserva.criancas)
+        if qtd <= 0:
+            return None
+        config = getattr(reserva.uh, "config", None)
+        tarifa = config.tarifa_colchao_extra if config else Decimal("0.00")
+        if tarifa <= 0:
+            return None
+        noites = reserva.noites
+        unidades = "unidade" if qtd == 1 else "unidades"
+        rotulo_noites = "noite" if noites == 1 else "noites"
+        return LancamentoConta.objects.create(
+            conta=self,
+            tipo=LancamentoConta.Tipo.SERVICO,
+            natureza=NaturezaFiscal.SERVICO,
+            descricao=f"Colchão extra · {qtd} {unidades} · {noites} {rotulo_noites}",
+            valor=tarifa * qtd * noites,
+            criado_por=usuario,
+        )
 
     # ---- Totais ----
 
@@ -402,6 +714,8 @@ class ContaHospedagem(models.Model):
         return self.pagamentos.aggregate(t=Sum("valor"))["t"] or Decimal("0.00")
 
     def total_adiantamentos(self) -> Decimal:
+        if not self.reserva_id:
+            return Decimal("0.00")  # folio-mãe do grupo não tem adiantamento próprio
         return self.reserva.adiantamentos.aggregate(t=Sum("valor"))["t"] or Decimal(
             "0.00"
         )

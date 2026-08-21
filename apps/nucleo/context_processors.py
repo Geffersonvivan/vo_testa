@@ -2,6 +2,7 @@ from django.urls import NoReverseMatch, reverse
 
 from .models import modulos_ativos
 from .modulos import APRESENTACAO, Modulo
+from .permissoes import eh_gerente
 
 
 def _url_do_modulo(apres: dict) -> str | None:
@@ -42,5 +43,6 @@ def menu_modulos(request):
     return {
         "menu_modulos": [
             {"titulo": titulo, "itens": itens} for titulo, itens in grupos.items()
-        ]
+        ],
+        "eh_gerente": eh_gerente(request.user),
     }

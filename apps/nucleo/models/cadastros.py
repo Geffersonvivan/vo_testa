@@ -7,6 +7,8 @@ Pessoa é a base única. Hóspede, Funcionário e Fornecedor são especializaç�
 Pessoa diretamente, opcional.
 """
 
+from decimal import Decimal
+
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -235,6 +237,12 @@ class UH(models.Model):
         default=False,
         help_text="Quarto adaptado para pessoa com deficiência.",
     )
+    tarifa_override = models.DecimalField(
+        "tarifa própria (R$)", max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        help_text="Diária fixa desta unidade; vence o cálculo por tipo/temporada. "
+                  "Em branco = usa a tarifa do tipo (com acréscimo se for de dois cômodos).",
+    )
     observacoes = models.TextField("observações", blank=True)
 
     class Meta:
@@ -244,6 +252,72 @@ class UH(models.Model):
 
     def __str__(self):
         return f"{self.numero} — {self.tipo.nome}"
+
+
+class PosicaoCama(models.Model):
+    """Espaço físico de cama dentro de um quarto (uma posição = 2 pessoas).
+
+    A montagem (casal ou dois solteiros) muda para quem o quarto serve, não a
+    lotação: qualquer montagem acomoda 2 pessoas. Não modele a montagem como se
+    afetasse capacidade.
+    """
+
+    class Montagem(models.TextChoices):
+        CASAL = "casal", "1 cama de casal"
+        DOIS_SOLTEIROS = "dois_solteiros", "2 camas de solteiro"
+
+    uh = models.ForeignKey(
+        UH, on_delete=models.CASCADE, related_name="posicoes_cama",
+        verbose_name="quarto",
+    )
+    nome = models.CharField(
+        "nome", max_length=40,
+        help_text="Ex.: «Quarto 1», «Quarto 2», «Suíte».",
+    )
+    montagem_padrao = models.CharField(
+        "montagem padrão", max_length=14, choices=Montagem.choices,
+        default=Montagem.CASAL,
+    )
+    ordem = models.PositiveSmallIntegerField("ordem", default=0)
+
+    class Meta:
+        verbose_name = "posição de cama"
+        verbose_name_plural = "posições de cama"
+        ordering = ["uh", "ordem"]
+
+    def __str__(self):
+        return f"{self.uh.numero} · {self.nome}"
+
+
+class ConfiguracaoUH(models.Model):
+    """Composição de camas de um quarto além das posições fixas: sofá-cama e
+    colchões extras. A capacidade e a frase de camas são derivadas daqui —
+    ver `apps/nucleo/estrutura.py`. Nada digita capacidade à mão."""
+
+    uh = models.OneToOneField(
+        UH, on_delete=models.CASCADE, related_name="config",
+        verbose_name="quarto",
+    )
+    tem_sofa_cama = models.BooleanField("tem sofá-cama", default=False)
+    sofa_adultos = models.PositiveSmallIntegerField("sofá: adultos", default=1)
+    sofa_criancas = models.PositiveSmallIntegerField("sofá: crianças", default=2)
+    sofa_idade_maxima = models.PositiveSmallIntegerField(
+        "sofá: idade máxima das crianças", default=15
+    )
+    max_colchoes_extras = models.PositiveSmallIntegerField(
+        "máximo de colchões extras", default=0
+    )
+    tarifa_colchao_extra = models.DecimalField(
+        "tarifa do colchão extra (R$)", max_digits=10, decimal_places=2,
+        default=Decimal("80.00"),
+    )
+
+    class Meta:
+        verbose_name = "configuração do quarto"
+        verbose_name_plural = "configurações dos quartos"
+
+    def __str__(self):
+        return f"Configuração — {self.uh.numero}"
 
 
 class Temporada(models.Model):

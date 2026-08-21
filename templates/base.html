@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
-  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=fnrh3">
   <script src="{% static 'js/fluid.js' %}"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <script>
@@ -40,6 +40,18 @@
         },
         escolher(it) { this.sel = it.id; this.q = it.nome; this.open = false; },
         adicionar(it) { this.itens.push(it); this.escolher(it); },
+      }));
+      Alpine.data("blocoQuartos", () => ({
+        total: 0, quantidade: 0,
+        init() { this.quantidade = this.caixas().length; this.atualizar(); },
+        caixas() { return Array.from(this.$root.querySelectorAll('input[name=quartos]')); },
+        atualizar() { this.total = this.caixas().filter((c) => c.checked).length; },
+        alternarTodos() {
+          const marcar = this.total !== this.quantidade;
+          this.caixas().forEach((c) => { c.checked = marcar; });
+          this.atualizar();
+        },
+        rotulo() { return this.total + (this.total === 1 ? " quarto" : " quartos"); },
       }));
     });
   </script>

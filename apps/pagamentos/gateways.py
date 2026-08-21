@@ -48,6 +48,15 @@ class GatewaySimulado:
             dados["payload"]["instrucao"] = "Sandbox: boleto simulado — use «Já paguei»."
         return dados
 
+    def autorizar_cartao(self, cobranca, card: dict) -> dict:
+        """Sandbox: 'aprova' o cartão digitado sem tocar em rede."""
+        gid = cobranca.gateway_id or f"SIM-{uuid.uuid4().hex[:16].upper()}"
+        return {
+            "gateway": self.nome,
+            "gateway_id": gid,
+            "payload": {**(cobranca.payload or {}), "sandbox": True, "cartao_ok": True},
+        }
+
     def estornar(self, cobranca) -> dict:
         return {"estornado": True, "gateway_id": cobranca.gateway_id}
 
@@ -205,13 +214,35 @@ class GatewaySafrapay:
         if cobranca.metodo == cobranca.Metodo.PIX:
             return self._criar_pix(cobranca)
         if cobranca.metodo == cobranca.Metodo.CARTAO:
-            return self._criar_cartao(cobranca)
+            # Sem cartão ainda: cria pendente e espera o hóspede digitar na página
+            # pública (autorizar_cartao). Com cartão no payload (evidência HML),
+            # autoriza direto.
+            if (cobranca.payload or {}).get("card"):
+                return self._criar_cartao(cobranca)
+            return {
+                "gateway": self.nome,
+                "gateway_id": "",
+                "expira_em": timezone.now() + timezone.timedelta(hours=24),
+                "payload": {
+                    "aguardando_cartao": True,
+                    "checkout_url": f"/crm/pagamentos/pagar/{cobranca.token}/",
+                },
+            }
         if cobranca.metodo == cobranca.Metodo.BOLETO:
             return self._criar_boleto(cobranca)
         if cobranca.metodo == cobranca.Metodo.LINK:
             # Link = checkout hospedado; usa autorização com redirecionamento quando Token existir.
             return self._criar_cartao(cobranca, como_link=True)
         raise ValidationError(f"Safrapay: método '{cobranca.metodo}' não suportado.")
+
+    def autorizar_cartao(self, cobranca, card: dict) -> dict:
+        """Autoriza o crédito à vista com o cartão digitado pelo hóspede na página
+        pública. `card` = {cardholderName, cardNumber, expirationMonth,
+        expirationYear, securityCode[, cardholderDocument]}."""
+        payload = dict(cobranca.payload or {})
+        payload["card"] = card
+        cobranca.payload = payload
+        return self._criar_cartao(cobranca)
 
     def _criar_pix(self, cobranca) -> dict:
         access = self._access_token()

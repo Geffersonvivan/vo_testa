@@ -8,6 +8,7 @@ Uso: manage.py sincronizar_quartos
 from django.core.management.base import BaseCommand
 
 from apps.nucleo.models import TipoUH
+from apps.reservas.services import tarifa_minima_do_tipo
 from apps.site.models import CategoriaQuarto, Quarto
 
 
@@ -31,6 +32,9 @@ class Command(BaseCommand):
         for i, tipo in enumerate(TipoUH.objects.filter(ativo=True).order_by("tarifa_base")):
             day = tipo.modalidade == TipoUH.Modalidade.DAY_USE
             categoria = cat_day if day else cat_hosp
+            # "A partir de" honesto: menor tarifa real entre as unidades do tipo
+            # (quarto de dois cômodos custa mais que o de um).
+            preco_min = tarifa_minima_do_tipo(tipo) or tipo.tarifa_base
             if day:
                 defaults = {
                     "nome": "Dia na Pousada",
@@ -45,7 +49,7 @@ class Command(BaseCommand):
                     ),
                     "capacidade": tipo.capacidade or 10,
                     "metragem": 0,
-                    "preco_base": tipo.tarifa_base,
+                    "preco_base": preco_min,
                     "status": "disponivel",
                     "destaque": True,
                     "ordem": 100 + i,
@@ -60,7 +64,7 @@ class Command(BaseCommand):
                     "descricao_curta": f"Quarto {tipo.nome} — conforto e charme.",
                     "capacidade": cap,
                     "metragem": 25,
-                    "preco_base": tipo.tarifa_base,
+                    "preco_base": preco_min,
                     "status": "disponivel",
                     "destaque": True,
                     "ordem": i,
@@ -68,7 +72,7 @@ class Command(BaseCommand):
                 }
             quarto, novo = Quarto.objects.get_or_create(tipo_uh=tipo, defaults=defaults)
             if not novo:
-                quarto.preco_base = tipo.tarifa_base
+                quarto.preco_base = preco_min
                 quarto.categoria = categoria
                 if day:
                     quarto.nome = "Dia na Pousada"

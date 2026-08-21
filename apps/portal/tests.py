@@ -2,7 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -24,6 +24,7 @@ from .models import SolicitacaoPortal
 Usuario = get_user_model()
 
 
+@override_settings(FNRH_BLOQUEAR_CHECKIN=False)
 class PortalBase(TestCase):
     def setUp(self):
         self.op = Usuario.objects.create_superuser(username="rec", password="senha-forte-123")
@@ -123,3 +124,106 @@ class RecepcaoTests(PortalBase):
         r = self.client.get(reverse("portal:qr", args=[self.reserva.pk]))
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "svg")
+
+
+@override_settings(FNRH_BLOQUEAR_CHECKIN=True)
+class FNRHPortalTests(TestCase):
+    """Pré check-in: o hóspede responsável preenche a FNRH de todos por um token."""
+
+    def setUp(self):
+        from apps.reservas.models import Reserva
+        ModuloContratado.objects.update_or_create(
+            codigo=Modulo.APPSITE, defaults={"ativo": True}
+        )
+        self.op = Usuario.objects.create_superuser(username="rec2", password="senha-forte-123")
+        self.tipo = TipoUH.objects.create(nome="Std2", tarifa_base=Decimal("200"))
+        self.uh = UH.objects.create(numero="Quarto 09", tipo=self.tipo)
+        self.hospede = Pessoa.objects.create(nome="João Viajante")
+        hoje = timezone.localdate()
+        self.reserva = Reserva.objects.create(
+            uh=self.uh, hospede=self.hospede,
+            checkin=hoje + timedelta(days=1), checkout=hoje + timedelta(days=3),
+            status=Reserva.Status.CONFIRMADA, valor_diaria=Decimal("200"),
+            criado_por=self.op,
+        )
+        self.token = services.get_acesso(self.reserva.pk).token
+
+    def _post_data(self):
+        fichas = list(self.reserva.fichas_fnrh.all())
+        data = {
+            "form-TOTAL_FORMS": str(len(fichas)),
+            "form-INITIAL_FORMS": str(len(fichas)),
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+        }
+        for i, f in enumerate(fichas):
+            data.update({
+                f"form-{i}-id": str(f.pk),
+                f"form-{i}-nome": f.nome or f"Acompanhante {i}",
+                f"form-{i}-nascimento": "1990-01-01",
+                f"form-{i}-documento_tipo": "CPF",
+                f"form-{i}-documento_numero": "123456",
+                f"form-{i}-cidade": "Itá",
+                f"form-{i}-motivo_viagem": "LAZER_FERIAS",
+                f"form-{i}-nacionalidade": "Brasileira",
+            })
+        return data
+
+    def test_pagina_abre_e_cria_fichas(self):
+        resp = self.client.get(reverse("portal:checkin", args=[self.token]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(self.reserva.fichas_fnrh.count(), 2)  # titular + 1 acompanhante
+
+    def test_envio_completa_fnrh_e_libera_checkin(self):
+        from apps.reservas.models import Reserva
+        from apps.reservas.services import garantir_fichas_fnrh
+        garantir_fichas_fnrh(self.reserva)
+        resp = self.client.post(
+            reverse("portal:checkin", args=[self.token]), self._post_data()
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.reserva.refresh_from_db()
+        self.assertTrue(self.reserva.fnrh_pronta)
+        # preenchida via portal
+        self.assertTrue(
+            self.reserva.fichas_fnrh.filter(origem="portal").exists()
+        )
+        # e o check-in agora passa
+        self.reserva.fazer_checkin(self.op)
+        self.reserva.refresh_from_db()
+        self.assertEqual(self.reserva.status, Reserva.Status.HOSPEDADA)
+
+
+@override_settings(FNRH_BLOQUEAR_CHECKIN=False, FRIGOBAR_BLOQUEAR_CHECKOUT=False)
+class TokenPosCheckoutTests(PortalBase):
+    """TM-003: o token do portal deixa de dar acesso após o check-out."""
+
+    def _checkout(self):
+        from apps.nucleo.models import FormaPagamento, SessaoCaixa
+        from apps.reservas import services as rsv
+        conta = self.reserva.conta
+        if conta.saldo():
+            SessaoCaixa.objects.create(operador=self.op, modulo="nucleo",
+                                       fundo_troco=Decimal("0"))
+            dinheiro = FormaPagamento.objects.get(tipo="dinheiro")
+            rsv.receber_pagamento(conta, self.op, dinheiro, conta.saldo())
+        self.reserva.fazer_checkout(self.op)
+
+    def test_home_404_apos_checkout(self):
+        token = services.get_acesso(self.reserva.pk).token
+        self.assertEqual(self.client.get(reverse("portal:home", args=[token]),
+                                         SERVER_NAME="localhost").status_code, 200)
+        self._checkout()
+        self.assertEqual(self.client.get(reverse("portal:home", args=[token]),
+                                         SERVER_NAME="localhost").status_code, 404)
+
+    def test_fnrh_checkin_404_apos_checkout(self):
+        self._checkout()
+        token = services.get_acesso(self.reserva.pk).token
+        self.assertEqual(self.client.get(reverse("portal:checkin", args=[token]),
+                                         SERVER_NAME="localhost").status_code, 404)
+
+    def test_referrer_policy_header(self):
+        token = services.get_acesso(self.reserva.pk).token
+        r = self.client.get(reverse("portal:home", args=[token]), SERVER_NAME="localhost")
+        self.assertEqual(r.headers.get("Referrer-Policy"), "same-origin")

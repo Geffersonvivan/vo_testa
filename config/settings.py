@@ -6,9 +6,13 @@ desenvolvimento, painel do Railway em produção). Ver .env.example.
 """
 
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
+
+# True quando rodando a suíte de testes (manage.py test).
+TESTING = "test" in sys.argv
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -52,6 +56,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.postgres",  # ExclusionConstraint (antioverbooking)
+    "django.contrib.sitemaps",  # sitemap.xml do site público
     # Módulos do sistema
     "apps.nucleo",
     "apps.reservas",
@@ -99,6 +104,7 @@ TEMPLATES = [
                 "apps.nucleo.context_processors.menu_modulos",
                 "apps.site.context_processors.reserva_passos",
                 "apps.site.context_processors.prova_social",
+                "apps.site.context_processors.analytics",
             ],
         },
     },
@@ -151,6 +157,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 SESSION_COOKIE_NAME = "vo_testa_sessionid"
 CSRF_COOKIE_NAME = "vo_testa_csrftoken"
 
+# Referer nunca vaza para outra origem — protege tokens que ficam na URL
+# (portal do hóspede /hospede/<token>, link de pagamento /pagar/<token>). TM-003.
+SECURE_REFERRER_POLICY = "same-origin"
+
 # Segurança em produção (atrás do proxy do Railway)
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -184,8 +194,33 @@ SAFRAPAY_GATEWAY_URL = os.environ.get(
 # antes de expirar automaticamente sem confirmação/pagamento.
 RESERVA_RETENCAO_MINUTOS = int(os.environ.get("RESERVA_RETENCAO_MINUTOS", "30"))
 
+# Acréscimo da diária para quartos de dois cômodos (mais de uma posição de cama),
+# aplicado sobre a tarifa do tipo e arredondado à dezena. Ex.: 250 → 400 (× 1.6).
+# `tarifa_override` na unidade vence este cálculo.
+ACRESCIMO_TARIFA_DUPLO = float(os.environ.get("ACRESCIMO_TARIFA_DUPLO", "1.6"))
+
 # Frigobar: bloquear check-out até haver conferência (mesmo consumo zero). §5.9
 FRIGOBAR_BLOQUEAR_CHECKOUT = os.environ.get("FRIGOBAR_BLOQUEAR_CHECKOUT", "1") == "1"
+
+# FNRH: bloquear check-in até haver ficha completa de cada hóspede (Embratur). §5.1
+# Nos testes fica desligado por padrão; as classes de teste da FNRH religam
+# explicitamente (@override_settings) para exercitar a trava.
+FNRH_BLOQUEAR_CHECKIN = (
+    not TESTING and os.environ.get("FNRH_BLOQUEAR_CHECKIN", "1") == "1"
+)
+
+# SEO / analytics do site público. GA4 só carrega se o ID estiver setado.
+GA_MEASUREMENT_ID = os.environ.get("GA_MEASUREMENT_ID", "")
+
+# FNRH Digital — gateway plugável de envio à API oficial (Embratur/Serpro).
+# "simulado" (sandbox, default) ou "serpro" (real; exige credenciais). Ver
+# apps/reservas/fnrh_gateway.py e a documentação da API v2.
+FNRH_GATEWAY = os.environ.get("FNRH_GATEWAY", "simulado")
+FNRH_API_URL = os.environ.get(
+    "FNRH_API_URL", "https://hom-lowcode.serpro.gov.br/FNRH_API/rest/v2"
+)
+FNRH_API_USER = os.environ.get("FNRH_API_USER", "")
+FNRH_API_SENHA = os.environ.get("FNRH_API_SENHA", "")
 
 # Fiscal — gateway plugável: "simulado" (sandbox), "focus" (Focus NFe) ou "governo".
 # Ver docs/Implementar_fiscal.md. Focus/Governo são stubs até ter credenciais/certificado.

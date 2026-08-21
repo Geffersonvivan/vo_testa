@@ -1,0 +1,68 @@
+{# Modal de nova reserva de grupo (bloco inteiro num submit só). #}
+<form hx-post="{% url 'reservas:grupo_novo' %}" hx-target="this" hx-swap="outerHTML" class="modal-form">
+  {% csrf_token %}
+  <header class="modal-cabecalho">
+    <h2>Nova reserva de grupo</h2>
+    <button type="button" class="modal-fechar" onclick="fecharModal()" aria-label="Fechar">&times;</button>
+  </header>
+
+  <div class="modal-corpo">
+    {% if form.non_field_errors %}
+      <div class="mensagem error">{{ form.non_field_errors|join:" " }}</div>
+    {% endif %}
+    <div class="form-grade">
+      {% include "reservas/partials/campo.html" with campo=form.rotulo classe="col-2" %}
+
+      <div class="campo col-2">
+        <label>Titular (quem paga o folio)</label>
+        {% include "componentes/combo_pessoa.html" with dados=titulares_data dados_id="grupo-titular-data" campo="titular" placeholder="Buscar pessoa/empresa…" %}
+      </div>
+
+      {% include "reservas/partials/campo.html" with campo=form.checkin %}
+      {% include "reservas/partials/campo.html" with campo=form.checkout %}
+
+      <div class="campo">
+        <label for="grupo-adultos">Adultos por quarto</label>
+        <input type="number" id="grupo-adultos" name="adultos" min="1" value="2">
+      </div>
+      <div class="campo">
+        <label for="grupo-criancas">Crianças por quarto</label>
+        <input type="number" id="grupo-criancas" name="criancas" min="0" value="0">
+      </div>
+
+      {% include "reservas/partials/campo.html" with campo=form.faturamento %}
+      {% include "reservas/partials/campo.html" with campo=form.canal %}
+
+      <div class="campo col-2" x-data="blocoQuartos()">
+        <div class="bloco-quartos-cabecalho">
+          <label>Quartos do bloco <small class="ajuda">(marque os quartos livres no período)</small></label>
+          <div class="bloco-quartos-status">
+            <span class="bloco-quartos-contador" x-show="total" x-cloak x-text="rotulo()"></span>
+            <button type="button" class="botao-texto" @click="alternarTodos()"
+                    x-text="total === quantidade ? 'Limpar' : 'Todos'"></button>
+          </div>
+        </div>
+        <div class="quartos-scroll">
+          {% for uh in quartos %}
+            <label class="quarto-card">
+              <input type="checkbox" name="quartos" value="{{ uh.pk }}" @change="atualizar()">
+              <span class="quarto-card-num">{{ uh.numero }}</span>
+              <span class="quarto-card-tipo">{{ uh.tipo.nome }}</span>
+              <svg class="quarto-card-check" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+                <path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.5"
+                      stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% include "reservas/partials/campo.html" with campo=form.observacoes classe="col-2" %}
+    </div>
+  </div>
+
+  <footer class="modal-acoes">
+    <button type="submit" class="botao-primario">Criar grupo</button>
+    <button type="button" class="botao-neutro" onclick="fecharModal()">Cancelar</button>
+  </footer>
+</form>

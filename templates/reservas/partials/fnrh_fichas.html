@@ -1,0 +1,38 @@
+{% comment %}Fichas FNRH de uma reserva, editadas juntas (formset). Reusado pela
+recepção e pelo portal do hóspede — um único aparelho preenche todas.{% endcomment %}
+{{ formset.management_form }}
+{% if formset.non_form_errors %}
+  <div class="mensagem error">{{ formset.non_form_errors|join:" " }}</div>
+{% endif %}
+{% for form in formset %}
+  <section class="fnrh-ficha">
+    <header class="fnrh-ficha-cab">
+      <h3>
+        <span class="fnrh-ficha-ico" aria-hidden="true">
+          {% if form.instance.titular %}★{% else %}{{ forloop.counter }}{% endif %}
+        </span>
+        {% if form.instance.titular %}Hóspede responsável{% else %}Acompanhante {{ forloop.counter0 }}{% endif %}
+      </h3>
+      {% if form.instance.completa %}
+        <span class="selo selo-ok">completa</span>
+      {% else %}
+        <span class="selo selo-alerta">pendente</span>
+      {% endif %}
+    </header>
+    {{ form.id }}
+    {% for titulo, campos in form.grupos %}
+      <fieldset class="fnrh-grupo">
+        <legend class="letreiro">{{ titulo }}</legend>
+        <div class="form-grade">
+          {% for field in campos %}
+            <div class="campo{% if field.errors %} campo-erro{% endif %}{% if field.name == 'endereco' or field.name == 'procedencia' or field.name == 'proximo_destino' %} col-2{% endif %}">
+              {{ field.label_tag }}
+              {{ field }}
+              {% if field.errors %}<small class="erro">{{ field.errors|join:" " }}</small>{% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      </fieldset>
+    {% endfor %}
+  </section>
+{% endfor %}

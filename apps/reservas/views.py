@@ -9,20 +9,22 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from apps.nucleo.models import UH, Pessoa, Temporada, TipoUH
+from apps.nucleo.models import UH, FormaPagamento, Pessoa, Temporada, TipoUH
 from apps.nucleo.modulos import Modulo
-from apps.nucleo.permissoes import eh_gerente, requer_modulo
+from apps.nucleo.permissoes import eh_gerente, requer_gerencia, requer_modulo
 from apps.nucleo.seletores import pessoas_agrupadas
 
 from . import services
 from .forms import (
     AcompanhanteForm,
     CancelamentoForm,
+    FichaFNRHFormSet,
+    GrupoForm,
     LancamentoContaForm,
     RecebimentoForm,
     ReservaForm,
 )
-from .models import Reserva
+from .models import GrupoReserva, Reserva
 
 DIAS_MAPA = 14
 
@@ -366,6 +368,9 @@ def detalhe(request, pk):
             "eh_gerente": eh_gerente(request.user),
             "aviso_checkin": aviso_checkin,
             "frigobar_pendente": frigobar_pendente,
+            "fnrh_pronta": reserva.fnrh_pronta,
+            "fnrh_total": reserva.total_hospedes,
+            "fnrh_completas": sum(1 for f in reserva.fichas_fnrh.all() if f.completa),
         },
     )
 
@@ -423,6 +428,8 @@ def fazer_checkin(request, pk):
 
     def acao(reserva):
         reserva.fazer_checkin(request.user)
+        # Push à FNRH Digital (best-effort; não trava o check-in se a API falhar).
+        services.enviar_fnrh(reserva)
         messages.success(
             request,
             "Entrada registrada — conta do quarto aberta com as diárias lançadas.",
@@ -569,3 +576,351 @@ def acompanhante_novo(request, pk):
     else:
         messages.error(request, "Informe o nome do acompanhante.")
     return redirect("reservas:detalhe", pk=pk)
+
+
+@requer_modulo(Modulo.RESERVAS)
+def fnrh(request, pk):
+    """Recepção: preenche/edita a FNRH de todos os hóspedes da reserva."""
+    reserva = get_object_or_404(Reserva, pk=pk)
+    services.garantir_fichas_fnrh(reserva)
+    queryset = reserva.fichas_fnrh.all()
+
+    if request.method == "POST":
+        formset = FichaFNRHFormSet(request.POST, queryset=queryset)
+        if formset.is_valid():
+            fichas = formset.save()
+            services.marcar_fichas_preenchidas(
+                fichas or queryset, origem="recepcao", usuario=request.user
+            )
+            if reserva.fnrh_pronta:
+                messages.success(request, "FNRH completa — check-in liberado.")
+            else:
+                messages.success(
+                    request, "Fichas salvas. Ainda falta completar alguma."
+                )
+            return redirect("reservas:detalhe", pk=pk)
+        messages.error(request, "Revise os campos destacados.")
+    else:
+        formset = FichaFNRHFormSet(queryset=queryset)
+
+    fichas = list(reserva.fichas_fnrh.all())
+    return render(request, "reservas/fnrh.html", {
+        "reserva": reserva,
+        "formset": formset,
+        "modo": "recepcao",
+        "fnrh_total": len(fichas),
+        "fnrh_completas": sum(1 for f in fichas if f.completa),
+        "fnrh_pronta": reserva.fnrh_pronta,
+    })
+
+
+@requer_modulo(Modulo.RESERVAS)
+def fnrh_reenviar(request, pk):
+    """Reenvia a reserva à FNRH Digital (após corrigir dados ou queda da API)."""
+    if request.method != "POST":
+        return redirect("reservas:detalhe", pk=pk)
+    reserva = get_object_or_404(Reserva, pk=pk)
+    if services.enviar_fnrh(reserva):
+        messages.success(request, "Reserva enviada à FNRH Digital.")
+    else:
+        messages.error(request, f"Falha no envio à FNRH: {reserva.fnrh_erro}")
+    return redirect("reservas:detalhe", pk=pk)
+
+
+MESES_PT = [
+    (1, "Janeiro"), (2, "Fevereiro"), (3, "Março"), (4, "Abril"),
+    (5, "Maio"), (6, "Junho"), (7, "Julho"), (8, "Agosto"),
+    (9, "Setembro"), (10, "Outubro"), (11, "Novembro"), (12, "Dezembro"),
+]
+
+
+@requer_modulo(Modulo.RESERVAS)
+@requer_gerencia
+def boh(request):
+    """Boletim de Ocupação Hoteleira (Embratur) — agregado mensal da FNRH.
+    Página com os quadros + exportação CSV (?formato=csv)."""
+    hoje = timezone.localdate()
+    try:
+        ano = int(request.GET.get("ano", hoje.year))
+        mes = int(request.GET.get("mes", hoje.month))
+    except (TypeError, ValueError):
+        ano, mes = hoje.year, hoje.month
+    mes = min(12, max(1, mes))
+    dados = services.boh_mensal(ano, mes)
+
+    if request.GET.get("formato") == "csv":
+        return _boh_csv(dados)
+
+    return render(request, "reservas/boh.html", {
+        "boh": dados,
+        "meses": MESES_PT,
+        "anos": range(hoje.year, hoje.year - 4, -1),
+        "ano": ano, "mes": mes,
+    })
+
+
+def _boh_csv(dados):
+    import csv
+
+    resp = HttpResponse(content_type="text/csv; charset=utf-8")
+    resp["Content-Disposition"] = (
+        f'attachment; filename="BOH_{dados["ano"]}_{dados["mes"]:02d}.csv"'
+    )
+    resp.write("﻿")  # BOM: Excel abre com acentos corretos
+    w = csv.writer(resp, delimiter=";")
+    w.writerow(["Boletim de Ocupação Hoteleira", f'{dados["mes"]:02d}/{dados["ano"]}'])
+    w.writerow(["Pousada Vô Testa — Itá/SC"])
+    w.writerow([])
+    w.writerow(["Indicador", "Valor"])
+    w.writerow(["Total de hóspedes (entradas)", dados["total_hospedes"]])
+    w.writerow(["Chegadas (reservas)", dados["total_chegadas"]])
+    w.writerow(["UH-noites disponíveis", dados["uh_noites_disponiveis"]])
+    w.writerow(["UH-noites ocupadas", dados["uh_noites_ocupadas"]])
+    w.writerow(["Taxa de ocupação (%)", dados["taxa_ocupacao"]])
+    w.writerow(["Permanência média (noites)", dados["permanencia_media"]])
+
+    def bloco(titulo, itens):
+        w.writerow([])
+        w.writerow([titulo, "Hóspedes"])
+        for nome, n in itens:
+            w.writerow([nome, n])
+        if not itens:
+            w.writerow(["(sem dados)", 0])
+
+    bloco("Procedência nacional (UF)", dados["nacional"])
+    bloco("Procedência internacional (país)", dados["internacional"])
+    bloco("Motivo da viagem", dados["motivo"])
+    bloco("Meio de transporte", dados["transporte"])
+    bloco("Sexo", dados["sexo"])
+    return resp
+
+
+# ---------- Reserva de grupo (reserva-mãe + filhas por quarto) ----------
+
+
+@requer_modulo(Modulo.RESERVAS)
+def grupos(request):
+    grupos_qs = GrupoReserva.objects.select_related("titular").prefetch_related("filhas")
+    return render(request, "reservas/grupos.html", {"grupos": grupos_qs[:200]})
+
+
+@requer_modulo(Modulo.RESERVAS)
+def grupo_novo(request):
+    """Cria o bloco inteiro num modal só: titular + período + vários quartos.
+    Cada quarto marcado vira uma filha (hóspede = titular; a recepção ajusta depois).
+    """
+    em_modal = request.headers.get("HX-Request") == "true"
+    template = (
+        "reservas/partials/grupo_form_modal.html" if em_modal
+        else "reservas/grupo_form.html"
+    )
+    form = GrupoForm(request.POST or None)
+    contexto = {
+        "form": form,
+        "titulares_data": pessoas_agrupadas(),
+        "quartos": (
+            UH.objects.filter(status=UH.Status.ATIVA)
+            .exclude(tipo__modalidade=TipoUH.Modalidade.DAY_USE)
+            .select_related("tipo").order_by("numero")
+        ),
+    }
+    if request.method == "POST":
+        titular = Pessoa.objects.filter(pk=request.POST.get("titular") or None).first()
+        uh_ids = request.POST.getlist("quartos")
+        valido = form.is_valid()
+        if not titular:
+            form.add_error(None, "Escolha o titular (quem paga o folio).")
+            valido = False
+        if not uh_ids:
+            form.add_error(None, "Marque ao menos um quarto para o grupo.")
+            valido = False
+        if valido:
+            grupo = services.criar_grupo(
+                rotulo=form.cleaned_data["rotulo"], titular=titular,
+                checkin=form.cleaned_data["checkin"], checkout=form.cleaned_data["checkout"],
+                faturamento=form.cleaned_data["faturamento"], canal=form.cleaned_data["canal"],
+                observacoes=form.cleaned_data.get("observacoes", ""), usuario=request.user,
+            )
+            adultos = int(request.POST.get("adultos") or 2)
+            criancas = int(request.POST.get("criancas") or 0)
+            adicionados, conflitos = [], []
+            for uh in UH.objects.filter(pk__in=uh_ids):
+                try:
+                    services.adicionar_quarto(
+                        grupo, uh=uh, hospede=titular, usuario=request.user,
+                        adultos=adultos, criancas=criancas,
+                    )
+                    adicionados.append(uh.numero)
+                except ValidationError as erro:
+                    conflitos.append(f"{uh.numero}: {' '.join(erro.messages)}")
+            if adicionados:
+                messages.success(
+                    request,
+                    f"Grupo “{grupo.rotulo}” criado com {len(adicionados)} quarto(s): "
+                    f"{', '.join(adicionados)}.",
+                )
+            for c in conflitos:
+                messages.error(request, c)
+            if em_modal:
+                resposta = HttpResponse(status=204)
+                resposta["HX-Redirect"] = reverse("reservas:grupo_detalhe", args=[grupo.pk])
+                return resposta
+            return redirect("reservas:grupo_detalhe", pk=grupo.pk)
+    return render(request, template, contexto)
+
+
+@requer_modulo(Modulo.RESERVAS)
+def grupo_detalhe(request, pk):
+    grupo = get_object_or_404(GrupoReserva, pk=pk)
+    resumo = services.total_grupo(grupo)
+    ocupados = set(
+        grupo.filhas.filter(status__in=Reserva.STATUS_ATIVOS).values_list("uh_id", flat=True)
+    )
+    livres = [
+        uh for uh in services.uhs_disponiveis(grupo.checkin, grupo.checkout)
+        .exclude(tipo__modalidade=TipoUH.Modalidade.DAY_USE).select_related("tipo")
+        if uh.pk not in ocupados
+    ]
+    return render(
+        request,
+        "reservas/grupo_detalhe.html",
+        {
+            "grupo": grupo,
+            "resumo": resumo,
+            "quartos_livres": livres,
+            "hospedes_data": pessoas_agrupadas(),
+            "formas": FormaPagamento.objects.filter(ativo=True),
+            "eh_gerente": eh_gerente(request.user),
+        },
+    )
+
+
+def _grupo_redirect(pk):
+    return redirect("reservas:grupo_detalhe", pk=pk)
+
+
+@requer_modulo(Modulo.RESERVAS)
+def grupo_adicionar_quarto(request, pk):
+    grupo = get_object_or_404(GrupoReserva, pk=pk)
+    if request.method != "POST":
+        return _grupo_redirect(pk)
+    uh = get_object_or_404(UH, pk=request.POST.get("uh") or 0)
+    hospede = Pessoa.objects.filter(pk=request.POST.get("hospede") or None).first()
+    if not hospede:
+        messages.error(request, "Escolha o hóspede do quarto.")
+        return _grupo_redirect(pk)
+    try:
+        services.adicionar_quarto(
+            grupo, uh=uh, hospede=hospede, usuario=request.user,
+            adultos=int(request.POST.get("adultos") or 2),
+            criancas=int(request.POST.get("criancas") or 0),
+        )
+        messages.success(request, f"Quarto {uh.numero} adicionado ao grupo.")
+    except ValidationError as erro:
+        messages.error(request, " ".join(erro.messages))
+    return _grupo_redirect(pk)
+
+
+@requer_modulo(Modulo.RESERVAS)
+def grupo_confirmar(request, pk):
+    if request.method == "POST":
+        services.confirmar_grupo(pk, request.user)
+        messages.success(request, "Grupo confirmado.")
+    return _grupo_redirect(pk)
+
+
+@requer_modulo(Modulo.RESERVAS)
+def grupo_checkin(request, pk):
+    grupo = get_object_or_404(GrupoReserva, pk=pk)
+    if request.method == "POST":
+        r = services.checkin_grupo(grupo, request.user)
+        if r["entrou"]:
+            messages.success(request, f"Check-in feito: {', '.join(r['entrou'])}.")
+        for p in r["pendentes"]:
+            messages.error(request, p)
+        if not r["entrou"] and not r["pendentes"]:
+            messages.info(request, "Nenhum quarto confirmado pronto para entrar.")
+    return _grupo_redirect(pk)
+
+
+@requer_modulo(Modulo.RESERVAS)
+def grupo_cancelar(request, pk):
+    grupo = get_object_or_404(GrupoReserva, pk=pk)
+    if request.method == "POST":
+        try:
+            services.cancelar_grupo(grupo, request.user, request.POST.get("motivo", "").strip())
+            messages.success(request, "Grupo cancelado.")
+        except ValidationError as erro:
+            messages.error(request, " ".join(erro.messages))
+    return _grupo_redirect(pk)
+
+
+@requer_modulo(Modulo.RESERVAS)
+def grupo_remover_quarto(request, pk, reserva_pk):
+    if request.method == "POST":
+        reserva = get_object_or_404(Reserva, pk=reserva_pk, grupo_id=pk)
+        try:
+            services.remover_do_grupo(
+                reserva, request.user, request.POST.get("motivo", "").strip()
+            )
+            messages.success(request, f"Quarto {reserva.uh.numero} removido do grupo.")
+        except ValidationError as erro:
+            messages.error(request, " ".join(erro.messages))
+    return _grupo_redirect(pk)
+
+
+@requer_modulo(Modulo.RESERVAS)
+def grupo_receber_folio(request, pk):
+    grupo = get_object_or_404(GrupoReserva, pk=pk)
+    if request.method == "POST":
+        form = RecebimentoForm(request.POST)
+        if form.is_valid():
+            try:
+                services.receber_folio_grupo(
+                    grupo, request.user, form.cleaned_data["forma"],
+                    form.cleaned_data["valor"], form.cleaned_data.get("parcelas", 1),
+                    form.cleaned_data.get("observacao", ""),
+                )
+                messages.success(request, "Recebimento do folio registrado.")
+            except ValidationError as erro:
+                messages.error(request, " ".join(erro.messages))
+        else:
+            messages.error(request, "Confira forma e valor.")
+    return _grupo_redirect(pk)
+
+
+@requer_modulo(Modulo.RESERVAS)
+def grupo_encerrar(request, pk):
+    grupo = get_object_or_404(GrupoReserva, pk=pk)
+    if request.method == "POST":
+        try:
+            services.encerrar_grupo(grupo, request.user)
+            messages.success(request, "Grupo encerrado.")
+        except ValidationError as erro:
+            messages.error(request, " ".join(erro.messages))
+    return _grupo_redirect(pk)
+
+
+@requer_modulo(Modulo.RESERVAS)
+def grupo_sinal(request, pk):
+    """Gera o sinal único do grupo (folio-mãe) no módulo Pagamentos."""
+    grupo = get_object_or_404(GrupoReserva, pk=pk)
+    if request.method != "POST":
+        return _grupo_redirect(pk)
+    if not request.user.pode_acessar(Modulo.PAGAMENTOS):
+        messages.error(request, "Módulo Pagamentos não está disponível.")
+        return _grupo_redirect(pk)
+    from apps.pagamentos.models import Cobranca
+    from apps.pagamentos.services import criar_cobranca
+    try:
+        valor = request.POST.get("valor", "").replace(".", "").replace(",", ".")
+        cobranca = criar_cobranca(
+            request.user, valor=valor, metodo=request.POST.get("metodo", Cobranca.Metodo.PIX),
+            descricao=f"Sinal do grupo {grupo.rotulo}",
+            finalidade=Cobranca.Finalidade.SINAL, pagador=grupo.titular, grupo_id=grupo.pk,
+        )
+        messages.success(request, "Sinal do grupo gerado.")
+        return redirect("pagamentos:detalhe", pk=cobranca.pk)
+    except ValidationError as erro:
+        messages.error(request, " ".join(erro.messages))
+    return _grupo_redirect(pk)

@@ -7,12 +7,15 @@ Uso: manage.py expirar_reservas
 """
 from django.core.management.base import BaseCommand
 
-from apps.reservas.services import expirar_vencidas
+from apps.reservas.services import expirar_grupos_vencidos, expirar_vencidas
 
 
 class Command(BaseCommand):
-    help = "Cancela pré-reservas com retenção vencida, liberando os quartos."
+    help = "Cancela pré-reservas (avulsas e de grupo) com retenção vencida."
 
     def handle(self, *args, **opts):
         n = expirar_vencidas()
-        self.stdout.write(self.style.SUCCESS(f"{n} pré-reserva(s) expirada(s)."))
+        g = expirar_grupos_vencidos()
+        self.stdout.write(self.style.SUCCESS(
+            f"{n} pré-reserva(s) e {g} grupo(s) expirado(s)."
+        ))

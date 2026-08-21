@@ -6,6 +6,7 @@ from .models import (
     UH,
     Agencia,
     CategoriaFinanceira,
+    ConfiguracaoUH,
     ContaPagarReceber,
     EntradaLogbook,
     FormaPagamento,
@@ -15,6 +16,7 @@ from .models import (
     LancamentoFinanceiro,
     MovimentoCaixa,
     Pessoa,
+    PosicaoCama,
     Temporada,
     TipoUH,
     centro_choices,
@@ -87,6 +89,27 @@ class UHForm(forms.ModelForm):
         model = UH
         fields = ["numero", "tipo", "bloco", "andar", "status", "pcd", "observacoes"]
         widgets = {"observacoes": forms.Textarea(attrs={"rows": 3})}
+
+
+class ConfiguracaoUHForm(forms.ModelForm):
+    """Sofá-cama e colchões extras do quarto. A capacidade é derivada disto
+    (ver `apps/nucleo/estrutura.py`) — nada aqui digita capacidade."""
+
+    class Meta:
+        model = ConfiguracaoUH
+        fields = [
+            "tem_sofa_cama", "sofa_adultos", "sofa_criancas",
+            "sofa_idade_maxima", "max_colchoes_extras", "tarifa_colchao_extra",
+        ]
+
+
+# Posições de cama do quarto: adicionar/remover e escolher a montagem padrão.
+PosicaoCamaFormSet = forms.inlineformset_factory(
+    UH, PosicaoCama,
+    fields=["nome", "montagem_padrao", "ordem"],
+    extra=1, can_delete=True,
+    widgets={"nome": forms.TextInput(attrs={"placeholder": "Ex.: Quarto 1"})},
+)
 
 
 class TemporadaForm(forms.ModelForm):

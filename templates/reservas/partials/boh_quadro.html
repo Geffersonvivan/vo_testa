@@ -1,0 +1,14 @@
+{# Um quadro do BOH: título + tabela nome→hóspedes. #}
+<div class="boh-quadro">
+  <h2>{{ titulo }}</h2>
+  <table class="tabela">
+    <thead><tr><th>{{ titulo }}</th><th class="num">Hóspedes</th></tr></thead>
+    <tbody>
+      {% for nome, n in itens %}
+        <tr><td>{{ nome }}</td><td class="num">{{ n }}</td></tr>
+      {% empty %}
+        <tr><td colspan="2" class="vazio">Sem dados no período.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

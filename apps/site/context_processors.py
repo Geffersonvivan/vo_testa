@@ -1,4 +1,11 @@
+from django.conf import settings
+
 from apps.site.models import Reserva
+
+
+def analytics(request):
+    """Expõe o ID do GA4 aos templates do site (vazio = tag não carrega)."""
+    return {"ga_measurement_id": getattr(settings, "GA_MEASUREMENT_ID", "")}
 
 
 def reserva_passos(request):

@@ -23,6 +23,10 @@ class PagamentosBase(TestCase):
     inline (criam a cobrança no simulado e só então apontam p/ safrapay)."""
 
     def setUp(self):
+        # Rate limit usa cache (LocMemCache persiste no processo) — zera para os
+        # testes não contaminarem uns aos outros.
+        from django.core.cache import cache
+        cache.clear()
         self.op = Usuario.objects.create_superuser(username="cx", password="senha-forte-123")
 
     def cobranca(self, **kw):
@@ -373,3 +377,144 @@ class SafrapayGatewayTests(PagamentosBase):
         services.confirmar_pagamento(c, self.op)
         site.refresh_from_db()
         self.assertEqual(site.status, "confirmada")
+
+
+@override_settings(PAGAMENTOS_GATEWAY="simulado")
+class CartaoOnlineTests(PagamentosBase):
+    """Captura e autorização de cartão na página pública (crédito à vista)."""
+
+    def test_autorizar_cartao_aprova_e_confirma(self):
+        cb = self.cobranca(metodo="cartao")
+        card = {
+            "cardholderName": "FULANO TESTE", "cardNumber": "4111111111111111",
+            "expirationMonth": 12, "expirationYear": 2030, "securityCode": "123",
+        }
+        ok, _ = services.autorizar_cartao_online(cb, card, usuario=self.op)
+        cb.refresh_from_db()
+        self.assertTrue(ok)
+        self.assertEqual(cb.status, Cobranca.Status.PAGO)
+
+    def test_pan_nunca_persistido(self):
+        cb = self.cobranca(metodo="cartao")
+        services.autorizar_cartao_online(
+            cb, {"cardholderName": "X", "cardNumber": "4111111111111111",
+                 "expirationMonth": 1, "expirationYear": 2031, "securityCode": "999"},
+            usuario=self.op,
+        )
+        cb.refresh_from_db()
+        self.assertNotIn("card", cb.payload)
+        self.assertNotIn("4111111111111111", str(cb.payload))
+
+    def test_view_pagar_cartao_fluxo_completo(self):
+        cb = self.cobranca(metodo="cartao")
+        resp = self.client.post(
+            reverse("pagamentos:pagar_cartao", args=[cb.token]),
+            {"nome": "Fulano Teste", "numero": "4111 1111 1111 1111",
+             "validade": "12/30", "cvv": "123", "documento": "111.444.777-35"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        cb.refresh_from_db()
+        self.assertEqual(cb.status, Cobranca.Status.PAGO)
+
+    def test_validade_invalida_nao_cobra(self):
+        cb = self.cobranca(metodo="cartao")
+        self.client.post(
+            reverse("pagamentos:pagar_cartao", args=[cb.token]),
+            {"nome": "X", "numero": "4111111111111111", "validade": "xx", "cvv": "123"},
+        )
+        cb.refresh_from_db()
+        self.assertEqual(cb.status, Cobranca.Status.PENDENTE)
+
+
+class WebhookSegurancaTests(PagamentosBase):
+    """TM-001: fora do sandbox, o webhook não confia no corpo — consulta a fonte."""
+
+    def test_webhook_forjado_nao_confirma_no_gateway_real(self):
+        from unittest.mock import patch
+        c = self.cobranca()
+        c.gateway_id = "VT-REAL-1"
+        c.save(update_fields=["gateway_id"])
+        # Atacante manda status=paid; o provedor diz que está pendente.
+        with override_settings(PAGAMENTOS_GATEWAY="safrapay"), patch(
+            "apps.pagamentos.gateways.GatewaySafrapay.consultar_status",
+            return_value={"status_raw": "pending"},
+        ):
+            r = self.client.post(
+                reverse("pagamentos:webhook"),
+                {"gateway_id": "VT-REAL-1", "status": "paid"},
+            )
+        self.assertEqual(r.status_code, 200)
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PENDENTE)  # NÃO confirmou
+
+    def test_webhook_confirma_quando_provedor_confirma(self):
+        from unittest.mock import patch
+        c = self.cobranca()
+        c.gateway_id = "VT-REAL-2"
+        c.save(update_fields=["gateway_id"])
+        with override_settings(PAGAMENTOS_GATEWAY="safrapay"), patch(
+            "apps.pagamentos.gateways.GatewaySafrapay.consultar_status",
+            return_value={"status_raw": "paid"},
+        ):
+            r = self.client.post(
+                reverse("pagamentos:webhook"),
+                {"gateway_id": "VT-REAL-2", "status": "whatever"},
+            )
+        self.assertEqual(r.status_code, 200)
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PAGO)
+
+
+class RateLimitTests(PagamentosBase):
+    def setUp(self):
+        super().setUp()
+        from django.core.cache import cache
+        cache.clear()
+
+    def test_cartao_bloqueia_apos_tentativas(self):
+        c = self.cobranca(metodo="cartao")
+        url = reverse("pagamentos:pagar_cartao", args=[c.token])
+        dados = {"nome": "X", "numero": "1", "validade": "xx", "cvv": "1"}  # inválido de propósito
+        # 5 permitidas; a 6ª é barrada pelo rate limit por token.
+        for _ in range(5):
+            self.client.post(url, dados)
+        r = self.client.post(url, dados, follow=True)
+        self.assertContains(r, "Muitas tentativas")
+
+    def test_webhook_bloqueia_flood(self):
+        c = self.cobranca()
+        url = reverse("pagamentos:webhook")
+        codigo = 200
+        for _ in range(61):
+            codigo = self.client.post(url, {"gateway_id": c.gateway_id}).status_code
+        self.assertEqual(codigo, 429)  # passou de 60/min
+
+
+class RedacaoWebhookTests(PagamentosBase):
+    """TM-004: o corpo do webhook é redigido antes de virar trilha (sem PAN/PII)."""
+
+    def test_cartao_e_pii_redigidos_no_evento(self):
+        import json as _json
+        c = self.cobranca()
+        corpo = {
+            "charge": {
+                "id": c.gateway_id, "chargeStatus": "paid",
+                "customer": {"name": "Fulano", "document": "11144477735"},
+                "transactions": [{
+                    "transactionStatus": "captured",
+                    "card": {"cardNumber": "4111111111111111", "securityCode": "123"},
+                }],
+            }
+        }
+        self.client.post(
+            reverse("pagamentos:webhook"), data=_json.dumps(corpo),
+            content_type="application/json",
+        )
+        ev = EventoPagamento.objects.filter(cobranca=c, tipo="webhook").latest("id")
+        blob = _json.dumps(ev.detalhe)
+        # PAN, CVV e documento não podem aparecer em lugar nenhum da trilha.
+        self.assertNotIn("4111111111111111", blob)
+        self.assertNotIn("11144477735", blob)
+        self.assertIn("[REDACTED]", blob)
+        # Dados de reconciliação (id/status) permanecem.
+        self.assertIn("paid", blob)

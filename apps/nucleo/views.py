@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 from .forms import (
     AbrirCaixaForm,
     AgenciaForm,
+    ConfiguracaoUHForm,
     ContaPagarReceberForm,
     EntradaLogbookForm,
     EstornoForm,
@@ -23,6 +24,7 @@ from .forms import (
     LancamentoFinanceiroForm,
     MovimentoCaixaForm,
     PessoaForm,
+    PosicaoCamaFormSet,
     TemporadaForm,
     TipoUHForm,
     UHForm,
@@ -492,10 +494,23 @@ def pessoa_form(request, pk=None):
 
 @login_required
 def estrutura(request):
+    from apps.reservas.services import tarifa_minima_do_tipo
+
+    from .estrutura import faixa_do_tipo
+
+    tipos = list(TipoUH.objects.prefetch_related("uhs__posicoes_cama", "uhs__config"))
+    for tipo in tipos:
+        tipo.tarifa_min = tarifa_minima_do_tipo(tipo)
+        tipo.faixa_lotacao = faixa_do_tipo(tipo)
     return render(
         request,
         "nucleo/estrutura.html",
-        {"tipos": TipoUH.objects.all(), "uhs": UH.objects.select_related("tipo")},
+        {
+            "tipos": tipos,
+            "uhs": UH.objects.select_related("tipo").prefetch_related(
+                "posicoes_cama", "config"
+            ),
+        },
     )
 
 
@@ -516,17 +531,43 @@ def tipo_uh_form(request, pk=None):
 
 @login_required
 def uh_form(request, pk=None):
+    from .estrutura import capacidade, descricao_camas
+    from .models import ConfiguracaoUH
+
     uh = get_object_or_404(UH, pk=pk) if pk else None
+    config = None
+    if uh is not None:
+        config, _ = ConfiguracaoUH.objects.get_or_create(uh=uh)
+
     form = UHForm(request.POST or None, instance=uh)
-    if request.method == "POST" and form.is_valid():
-        uh = form.save()
-        messages.success(request, f"Quarto {uh.numero} salvo.")
-        return redirect("estrutura")
-    return render(
-        request,
-        "nucleo/form_simples.html",
-        {"form": form, "titulo": "Quarto", "voltar": "estrutura"},
-    )
+    config_form = ConfiguracaoUHForm(request.POST or None, instance=config)
+    formset = PosicaoCamaFormSet(request.POST or None, instance=uh)
+
+    if request.method == "POST":
+        # Quarto novo: grava o UH primeiro para ter instância às posições/config.
+        if form.is_valid():
+            uh = form.save()
+            config, _ = ConfiguracaoUH.objects.get_or_create(uh=uh)
+            config_form = ConfiguracaoUHForm(request.POST, instance=config)
+            formset = PosicaoCamaFormSet(request.POST, instance=uh)
+            if config_form.is_valid() and formset.is_valid():
+                config_form.save()
+                formset.save()
+                messages.success(request, f"Quarto {uh.numero} salvo.")
+                return redirect("estrutura")
+
+    contexto = {
+        "form": form,
+        "config_form": config_form,
+        "formset": formset,
+        "uh": uh,
+        "titulo": "Quarto",
+        "voltar": "estrutura",
+    }
+    if uh is not None:
+        contexto["capacidade"] = capacidade(uh)
+        contexto["descricao_camas"] = descricao_camas(uh)
+    return render(request, "nucleo/uh_form.html", contexto)
 
 
 # ---------- Cadastros: temporadas ----------

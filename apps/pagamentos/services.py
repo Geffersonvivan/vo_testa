@@ -23,7 +23,7 @@ FINALIDADE_AVULSO = Cobranca.Finalidade.AVULSO
 
 @transaction.atomic
 def criar_cobranca(operador, *, valor, metodo, descricao, finalidade=Cobranca.Finalidade.AVULSO,
-                   pagador=None, reserva_id=None, parcelas=1):
+                   pagador=None, reserva_id=None, grupo_id=None, parcelas=1):
     valor = Decimal(str(valor or 0))
     if valor <= 0:
         raise ValidationError("O valor deve ser positivo.")
@@ -32,7 +32,7 @@ def criar_cobranca(operador, *, valor, metodo, descricao, finalidade=Cobranca.Fi
     cobranca = Cobranca.objects.create(
         valor=valor, metodo=metodo, parcelas=int(parcelas or 1),
         descricao=descricao, finalidade=finalidade, pagador=pagador,
-        reserva_id=reserva_id or None, criado_por=operador,
+        reserva_id=reserva_id or None, grupo_id=grupo_id or None, criado_por=operador,
     )
     dados = get_gateway().criar_cobranca(cobranca)
     for campo in ("gateway", "gateway_id", "pix_copia_cola", "expira_em", "payload"):
@@ -56,12 +56,15 @@ def confirmar_pagamento(cobranca, usuario=None, origem="webhook"):
     cobranca.save(update_fields=["status", "pago_em"])
     EventoPagamento.objects.create(cobranca=cobranca, tipo="paga", origem=origem)
 
-    # Sinal de reserva pago → confirma a reserva (se o módulo estiver ativo).
-    if (cobranca.finalidade == Cobranca.Finalidade.SINAL and cobranca.reserva_id
-            and modulo_ativo(Modulo.RESERVAS)):
-        from apps.reservas.services import confirmar_reserva
-        confirmar_reserva(cobranca.reserva_id, usuario or cobranca.criado_por)
-        _sincronizar_recibo_site(cobranca)
+    # Sinal pago → confirma a reserva (ou o grupo inteiro), se Reservas ativo.
+    if cobranca.finalidade == Cobranca.Finalidade.SINAL and modulo_ativo(Modulo.RESERVAS):
+        if cobranca.reserva_id:
+            from apps.reservas.services import confirmar_reserva
+            confirmar_reserva(cobranca.reserva_id, usuario or cobranca.criado_por)
+            _sincronizar_recibo_site(cobranca)
+        elif cobranca.grupo_id:
+            from apps.reservas.services import confirmar_grupo
+            confirmar_grupo(cobranca.grupo_id, usuario or cobranca.criado_por)
     return cobranca
 
 
@@ -191,3 +194,34 @@ def recebimentos(*, inicio=None, fim=None, metodo="", status="", liquidacao=""):
         "a_liquidar_qtd": pagas.filter(liquidado=False).count(),
     }
     return list(qs[:300]), totais
+
+
+def autorizar_cartao_online(cobranca, card: dict, usuario=None):
+    """Autoriza o cartão digitado pelo hóspede na página pública e, se aprovado,
+    confirma o pagamento. Retorna (ok: bool, mensagem: str). Nunca guarda o PAN:
+    o cartão só transita para o gateway — o payload persistido é o do provedor."""
+    if cobranca.metodo != Cobranca.Metodo.CARTAO:
+        return False, "Esta cobrança não é de cartão."
+    if cobranca.status != Cobranca.Status.PENDENTE:
+        return False, "Cobrança não está pendente."
+    gw = get_gateway()
+    if not hasattr(gw, "autorizar_cartao"):
+        return False, "Gateway não suporta autorização de cartão."
+    try:
+        dados = gw.autorizar_cartao(cobranca, card)
+    except ValidationError as erro:
+        EventoPagamento.objects.create(
+            cobranca=cobranca, tipo=EventoPagamento.Tipo.WEBHOOK,
+            origem="cartao", detalhe={"erro": " ".join(erro.messages)},
+        )
+        return False, " ".join(erro.messages)
+    # Persiste só o retorno do gateway (sem o cartão cru).
+    gid = dados.get("gateway_id")
+    if gid:
+        cobranca.gateway_id = gid
+    payload = dict(dados.get("payload") or {})
+    payload.pop("card", None)  # nunca persistir o PAN
+    cobranca.payload = payload
+    cobranca.save(update_fields=["gateway_id", "payload"])
+    confirmar_pagamento(cobranca, usuario or cobranca.criado_por, origem="cartao")
+    return True, "Pagamento aprovado."

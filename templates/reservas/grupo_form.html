@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block titulo %}Nova reserva de grupo — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Reservas</p>
+<h1>Nova reserva de grupo</h1>
+<p class="subtitulo">Escolha o titular, o período e marque os quartos do bloco — tudo de uma vez.</p>
+
+<form method="post" class="form-cartao">
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+    <div class="mensagem error">{{ form.non_field_errors|join:" " }}</div>
+  {% endif %}
+
+  {% include "nucleo/partials/campos.html" with form=form %}
+
+  <div class="campo">
+    <label>Titular (quem paga o folio)</label>
+    {% include "componentes/combo_pessoa.html" with dados=titulares_data dados_id="grupo-titular-data" campo="titular" placeholder="Buscar pessoa/empresa…" %}
+  </div>
+
+  <div class="campo">
+    <label for="grupo-adultos">Adultos por quarto</label>
+    <input type="number" id="grupo-adultos" name="adultos" min="1" value="2">
+  </div>
+  <div class="campo">
+    <label for="grupo-criancas">Crianças por quarto</label>
+    <input type="number" id="grupo-criancas" name="criancas" min="0" value="0">
+  </div>
+
+  <div class="campo">
+    <label>Quartos do bloco</label>
+    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:.4rem">
+      {% for uh in quartos %}
+        <label style="display:flex; align-items:center; gap:.4rem; cursor:pointer">
+          <input type="checkbox" name="quartos" value="{{ uh.pk }}">
+          <span>{{ uh.numero }} <small class="ajuda">{{ uh.tipo.nome }}</small></span>
+        </label>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="acoes">
+    <button type="submit" class="botao-primario">Criar grupo</button>
+    <a href="{% url 'reservas:grupos' %}" class="botao-neutro">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

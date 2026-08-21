@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -28,6 +28,7 @@ Usuario = get_user_model()
 HOJE = timezone.localdate()
 
 
+@override_settings(FNRH_BLOQUEAR_CHECKIN=False)
 class ReservasTestsBase(TestCase):
     def setUp(self):
         self.usuario = Usuario.objects.create_superuser(
@@ -176,6 +177,39 @@ class TarifaTests(ReservasTestsBase):
         # 1 noite a 500 + 1 noite a 300 = média 400
         media = services.diaria_media(self.tipo, HOJE, HOJE + timedelta(days=2))
         self.assertEqual(media, Decimal("400.00"))
+
+
+class TarifaUnidadeTests(ReservasTestsBase):
+    """Tarifa por unidade (Passo 3): duplo cobra mais, override vence, mínimo real."""
+
+    def setUp(self):
+        super().setUp()
+        from apps.nucleo.models import PosicaoCama
+        # self.uh (T1) é simples; cria um duplo do mesmo tipo (base 300 → 480).
+        self.duplo = UH.objects.create(numero="T-DUP", tipo=self.tipo)
+        PosicaoCama.objects.create(uh=self.duplo, nome="Quarto 1", ordem=0)
+        PosicaoCama.objects.create(uh=self.duplo, nome="Quarto 2", ordem=1)
+
+    def test_simples_fica_na_base_do_tipo(self):
+        self.assertEqual(services.tarifa_da_unidade(self.uh, HOJE), Decimal("300.00"))
+
+    def test_duplo_recebe_acrescimo_arredondado(self):
+        # 300 × 1.6 = 480, arredondado à dezena.
+        self.assertEqual(services.tarifa_da_unidade(self.duplo, HOJE), Decimal("480"))
+
+    def test_override_vence_o_calculo(self):
+        self.duplo.tarifa_override = Decimal("399.00")
+        self.duplo.save()
+        self.assertEqual(services.tarifa_da_unidade(self.duplo, HOJE), Decimal("399.00"))
+
+    def test_tarifa_minima_do_tipo_e_o_menor_real(self):
+        # Tipo tem o simples (300) e o duplo (480) → mínimo real = 300.
+        self.assertEqual(services.tarifa_minima_do_tipo(self.tipo), Decimal("300.00"))
+
+    def test_tarifa_minima_nunca_abaixo_de_qualquer_unidade(self):
+        # Se todas as unidades são duplas, o "a partir de" não pode ser a base 300.
+        self.uh.delete()  # sobra só o duplo
+        self.assertEqual(services.tarifa_minima_do_tipo(self.tipo), Decimal("480"))
 
 
 class CicloDeEstadosTests(ReservasTestsBase):
@@ -500,3 +534,445 @@ class RateioPagamentoTests(ReservasTestsBase):
             set(conta.pagamentos.values_list("observacao", flat=True)),
             {"Casal A", "Casal B"},
         )
+
+
+class ColchaoExtraTests(ReservasTestsBase):
+    """Colchão extra: quantidade, cotação itemizada e lançamento na conta (Passo 4)."""
+
+    def setUp(self):
+        super().setUp()
+        from apps.nucleo.models import ConfiguracaoUH, PosicaoCama
+        # Duplo com sofá e 2 colchões: incluído = 4 (fixa) + 1 (sofá) = 5.
+        self.duplo = UH.objects.create(numero="T-DUP", tipo=self.tipo)
+        PosicaoCama.objects.create(uh=self.duplo, nome="Quarto 1", ordem=0)
+        PosicaoCama.objects.create(uh=self.duplo, nome="Quarto 2", ordem=1)
+        ConfiguracaoUH.objects.create(
+            uh=self.duplo, tem_sofa_cama=True, max_colchoes_extras=2,
+            tarifa_colchao_extra=Decimal("80.00"),
+        )
+
+    def test_extras_para_dentro_da_capacidade_e_zero(self):
+        from apps.nucleo.estrutura import extras_para
+        self.assertEqual(extras_para(self.duplo, 5), 0)  # cabe nas camas incluídas
+
+    def test_extras_para_limitado_ao_maximo(self):
+        from apps.nucleo.estrutura import extras_para
+        self.assertEqual(extras_para(self.duplo, 7), 2)   # 7-5=2
+        self.assertEqual(extras_para(self.duplo, 12), 2)  # nunca acima do máximo
+
+    def test_extras_para_nunca_negativo(self):
+        from apps.nucleo.estrutura import extras_para
+        self.assertEqual(extras_para(self.duplo, 1), 0)
+
+    def test_cotacao_itemiza_colchao_separado_das_diarias(self):
+        cot = services.cotacao_unidade(
+            self.duplo, HOJE, HOJE + timedelta(days=2), pessoas=7
+        )
+        # duplo base 300 → diária 480; 2 noites = 960 de diárias.
+        self.assertEqual(cot["total_diarias"], Decimal("960"))
+        # 2 colchões × 80 × 2 noites = 320, em linha própria.
+        self.assertEqual(cot["colchoes_qtd"], 2)
+        self.assertEqual(cot["colchoes_total"], Decimal("320.00"))
+        self.assertEqual(cot["bruto"], Decimal("1280.00"))
+
+    def test_cotacao_cruzando_duas_temporadas(self):
+        from apps.nucleo.models import Temporada
+        Temporada.objects.create(
+            nome="Feriadão", classificacao="feriado", inicio=HOJE, fim=HOJE,
+        )
+        Tarifa.objects.create(
+            tipo_uh=self.tipo, classificacao="feriado", valor=Decimal("500.00")
+        )
+        # Noite 1: feriado 500 → duplo 800; noite 2: base 300 → duplo 480. = 1280.
+        cot = services.cotacao_unidade(
+            self.duplo, HOJE, HOJE + timedelta(days=2), pessoas=5
+        )
+        self.assertEqual(cot["total_diarias"], Decimal("1280"))
+        self.assertEqual(cot["colchoes_qtd"], 0)
+        self.assertEqual(cot["bruto"], Decimal("1280"))
+
+    def test_checkin_lanca_colchao_na_conta(self):
+        r = self.reserva(uh=self.duplo, dias=2)
+        r.adultos, r.criancas = 6, 1  # 7 pessoas → 2 colchões
+        r.save()
+        conta = r.fazer_checkin(self.usuario)
+        linha = conta.lancamentos.filter(descricao__startswith="Colchão extra").first()
+        self.assertIsNotNone(linha)
+        self.assertEqual(linha.descricao, "Colchão extra · 2 unidades · 2 noites")
+        self.assertEqual(linha.valor, Decimal("320.00"))
+        self.assertEqual(linha.tipo, LancamentoConta.Tipo.SERVICO)
+
+    def test_checkin_sem_excesso_nao_lanca_colchao(self):
+        r = self.reserva(uh=self.duplo, dias=2)
+        r.adultos, r.criancas = 4, 0  # cabe → sem colchão
+        r.save()
+        conta = r.fazer_checkin(self.usuario)
+        self.assertFalse(
+            conta.lancamentos.filter(descricao__startswith="Colchão extra").exists()
+        )
+
+    def test_colchoes_extras_service_para_governanca(self):
+        r = self.reserva(uh=self.duplo, dias=1)
+        r.adultos, r.criancas = 5, 2  # 7 → 2
+        r.save()
+        self.assertEqual(services.colchoes_extras(r), 2)
+
+
+class GrupoReservaTests(ReservasTestsBase):
+    """Reserva-mãe com filhas por quarto e folio híbrido (Passo 5)."""
+
+    def setUp(self):
+        super().setUp()
+        from apps.nucleo.models import ConfiguracaoUH, PosicaoCama
+        # Frigobar não é o foco aqui; desliga o bloqueio de check-out por conferência.
+        ModuloContratado.objects.filter(codigo=Modulo.FRIGOBAR).update(ativo=False)
+        self.qa = UH.objects.create(numero="G-A", tipo=self.tipo)
+        self.qb = UH.objects.create(numero="G-B", tipo=self.tipo)
+        # Duplo com sofá + 2 colchões para testar o colchão no folio-mãe.
+        self.duplo = UH.objects.create(numero="G-DUP", tipo=self.tipo)
+        PosicaoCama.objects.create(uh=self.duplo, nome="Quarto 1", ordem=0)
+        PosicaoCama.objects.create(uh=self.duplo, nome="Quarto 2", ordem=1)
+        ConfiguracaoUH.objects.create(
+            uh=self.duplo, tem_sofa_cama=True, max_colchoes_extras=2,
+            tarifa_colchao_extra=Decimal("80.00"),
+        )
+        self.h2 = Pessoa.objects.create(nome="João Bloco")
+        self.h3 = Pessoa.objects.create(nome="Ana Bloco")
+
+    def _grupo(self, dias=2):
+        return services.criar_grupo(
+            rotulo="Grupo Teste", titular=self.hospede,
+            checkin=HOJE, checkout=HOJE + timedelta(days=dias), usuario=self.usuario,
+        )
+
+    def test_criar_grupo_abre_folio(self):
+        grupo = self._grupo()
+        self.assertTrue(hasattr(grupo, "folio"))
+        self.assertIsNone(grupo.folio.reserva_id)
+
+    def test_contas_abertas_ignora_folio_de_grupo(self):
+        """O folio-mãe é conta aberta SEM reserva; não pode aparecer em
+        contas_abertas() — senão os PDVs quebram em c.reserva.uh (crash 500)."""
+        grupo = self._grupo()
+        pks = [c.pk for c in services.contas_abertas()]
+        self.assertNotIn(grupo.folio.pk, pks)
+        for c in services.contas_abertas():
+            self.assertIsNotNone(c.reserva)  # c.reserva.uh nunca estoura
+
+    def test_adicionar_quartos_e_antioverbooking(self):
+        grupo = self._grupo()
+        f1 = services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h2, usuario=self.usuario)
+        services.adicionar_quarto(grupo, uh=self.qb, hospede=self.h3, usuario=self.usuario)
+        self.assertEqual(grupo.filhas.count(), 2)
+        self.assertEqual(f1.grupo_id, grupo.pk)
+        # O mesmo quarto no mesmo período é recusado.
+        with self.assertRaises(ValidationError):
+            services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h3, usuario=self.usuario)
+
+    def test_diaria_no_folio_consumo_no_quarto(self):
+        grupo = self._grupo()
+        f1 = services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h2, usuario=self.usuario)
+        services.confirmar_grupo(grupo.pk, self.usuario)
+        f1.refresh_from_db()
+        f1.fazer_checkin(self.usuario)
+        grupo.refresh_from_db()
+        # 2 noites × 300 no folio-mãe; conta do quarto começa zerada.
+        self.assertEqual(grupo.folio.total_lancamentos(), Decimal("600.00"))
+        self.assertEqual(f1.conta.total_lancamentos(), Decimal("0.00"))
+        # Consumo vai para a conta do quarto, não para o folio.
+        from apps.nucleo.models import NaturezaFiscal
+        services.lancar_na_conta(
+            f1.conta, LancamentoConta.Tipo.CONSUMO, NaturezaFiscal.CONSUMO,
+            "Frigobar", Decimal("50.00"), self.usuario,
+        )
+        self.assertEqual(f1.conta.total_lancamentos(), Decimal("50.00"))
+        self.assertEqual(grupo.folio.total_lancamentos(), Decimal("600.00"))
+
+    def test_colchao_extra_vai_ao_folio_mae(self):
+        grupo = self._grupo()
+        f = services.adicionar_quarto(
+            grupo, uh=self.duplo, hospede=self.h2, usuario=self.usuario,
+            adultos=6, criancas=1,  # 7 pessoas → 2 colchões
+        )
+        services.confirmar_grupo(grupo.pk, self.usuario)
+        f.refresh_from_db()
+        f.fazer_checkin(self.usuario)
+        # duplo: diária 480 × 2 = 960; colchão 2×80×2 = 320 → folio 1280.
+        self.assertEqual(grupo.folio.total_lancamentos(), Decimal("1280.00"))
+        self.assertTrue(
+            grupo.folio.lancamentos.filter(descricao__startswith="Colchão extra").exists()
+        )
+        self.assertEqual(f.conta.total_lancamentos(), Decimal("0.00"))
+
+    def test_checkout_quarto_com_folio_aberto(self):
+        grupo = self._grupo()
+        f1 = services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h2, usuario=self.usuario)
+        services.confirmar_grupo(grupo.pk, self.usuario)
+        f1.refresh_from_db()
+        f1.fazer_checkin(self.usuario)
+        from apps.nucleo.models import NaturezaFiscal
+        services.lancar_na_conta(
+            f1.conta, LancamentoConta.Tipo.CONSUMO, NaturezaFiscal.CONSUMO,
+            "Frigobar", Decimal("50.00"), self.usuario,
+        )
+        self.abrir_caixa()
+        services.receber_pagamento(f1.conta, self.usuario, self.dinheiro, Decimal("50.00"))
+        # Check-out do quarto passa mesmo com o folio-mãe (diárias) aberto.
+        f1.fazer_checkout(self.usuario)
+        f1.refresh_from_db()
+        self.assertEqual(f1.status, Reserva.Status.CHECKOUT)
+        self.assertTrue(grupo.folio.aberta)
+
+    def test_confirmar_grupo_confirma_todas(self):
+        grupo = self._grupo()
+        services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h2, usuario=self.usuario)
+        services.adicionar_quarto(grupo, uh=self.qb, hospede=self.h3, usuario=self.usuario)
+        services.confirmar_grupo(grupo.pk, self.usuario)
+        self.assertEqual(
+            grupo.filhas.filter(status=Reserva.Status.CONFIRMADA).count(), 2
+        )
+        grupo.refresh_from_db()
+        self.assertIsNone(grupo.expira_em)
+
+    def test_cancelar_grupo_cascata(self):
+        grupo = self._grupo()
+        services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h2, usuario=self.usuario)
+        services.adicionar_quarto(grupo, uh=self.qb, hospede=self.h3, usuario=self.usuario)
+        services.cancelar_grupo(grupo, self.usuario, "Cliente desistiu")
+        self.assertEqual(
+            grupo.filhas.filter(status=Reserva.Status.CANCELADA).count(), 2
+        )
+
+    def test_remover_do_grupo_encolhe(self):
+        grupo = self._grupo()
+        f1 = services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h2, usuario=self.usuario)
+        services.adicionar_quarto(grupo, uh=self.qb, hospede=self.h3, usuario=self.usuario)
+        services.remover_do_grupo(f1, self.usuario, "Um quarto a menos")
+        f1.refresh_from_db()
+        self.assertEqual(f1.status, Reserva.Status.CANCELADA)
+        self.assertEqual(grupo.filhas_ativas.count(), 1)
+
+    def test_encerrar_grupo_exige_folio_zerado(self):
+        grupo = self._grupo()
+        f1 = services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h2, usuario=self.usuario)
+        services.confirmar_grupo(grupo.pk, self.usuario)
+        f1.refresh_from_db()
+        f1.fazer_checkin(self.usuario)
+        f1.fazer_checkout(self.usuario)  # sem consumo, conta do quarto zerada
+        # Folio tem as diárias em aberto → encerrar recusa.
+        with self.assertRaises(ValidationError):
+            services.encerrar_grupo(grupo, self.usuario)
+        # Recebe o folio e encerra.
+        self.abrir_caixa()
+        services.receber_folio_grupo(
+            grupo, self.usuario, self.dinheiro, grupo.folio.saldo()
+        )
+        services.encerrar_grupo(grupo, self.usuario)
+        grupo.refresh_from_db()
+        self.assertIsNotNone(grupo.encerrado_em)
+        self.assertFalse(grupo.folio.aberta)
+
+    def test_expirar_grupos_vencidos(self):
+        grupo = self._grupo()
+        services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h2, usuario=self.usuario)
+        grupo.expira_em = timezone.now() - timedelta(minutes=1)
+        grupo.save()
+        self.assertEqual(services.expirar_grupos_vencidos(), 1)
+        self.assertEqual(grupo.filhas_ativas.count(), 0)
+
+    @override_settings(PAGAMENTOS_GATEWAY="simulado")
+    def test_sinal_unico_confirma_grupo_via_pagamentos(self):
+        from apps.pagamentos.models import Cobranca
+        from apps.pagamentos.services import confirmar_pagamento, criar_cobranca
+        grupo = self._grupo()
+        services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h2, usuario=self.usuario)
+        services.adicionar_quarto(grupo, uh=self.qb, hospede=self.h3, usuario=self.usuario)
+        cobranca = criar_cobranca(
+            self.usuario, valor=Decimal("500.00"), metodo=Cobranca.Metodo.PIX,
+            descricao="Sinal do grupo", finalidade=Cobranca.Finalidade.SINAL,
+            pagador=self.hospede, grupo_id=grupo.pk,
+        )
+        confirmar_pagamento(cobranca, self.usuario, origem="teste")
+        self.assertEqual(
+            grupo.filhas.filter(status=Reserva.Status.CONFIRMADA).count(), 2
+        )
+
+
+@override_settings(FNRH_BLOQUEAR_CHECKIN=True)
+class FNRHTests(ReservasTestsBase):
+    """Ficha Nacional de Registro de Hóspedes: preparo, prefill e trava de check-in."""
+
+    def setUp(self):
+        super().setUp()
+        self.hospede.documento = "111.222.333-44"
+        self.hospede.cidade = "Itá"
+        self.hospede.uf = "SC"
+        self.hospede.save()
+
+    def _preencher_todas(self, r):
+        services.garantir_fichas_fnrh(r)
+        for f in r.fichas_fnrh.all():
+            f.nome = f.nome or "Hóspede Acompanhante"
+            f.nascimento = HOJE - timedelta(days=365 * 30)
+            f.documento_numero = "123456"
+            f.cidade = "Itá"
+            f.motivo_viagem = "LAZER_FERIAS"
+            f.save()
+
+    def test_garantir_cria_titular_pre_preenchido_e_slots(self):
+        r = self.reserva()  # adultos=2 → total_hospedes=2
+        services.garantir_fichas_fnrh(r)
+        self.assertEqual(r.fichas_fnrh.count(), 2)
+        titular = r.fichas_fnrh.get(titular=True)
+        self.assertEqual(titular.nome, self.hospede.nome)
+        self.assertEqual(titular.cidade, "Itá")  # veio do cadastro
+        # Idempotente: chamar de novo não duplica.
+        services.garantir_fichas_fnrh(r)
+        self.assertEqual(r.fichas_fnrh.count(), 2)
+
+    def test_checkin_bloqueado_sem_fnrh(self):
+        r = self.reserva()
+        with self.assertRaises(ValidationError):
+            r.fazer_checkin(self.usuario)
+        r.refresh_from_db()
+        self.assertEqual(r.status, Reserva.Status.CONFIRMADA)
+
+    def test_checkin_liberado_com_fnrh_completa(self):
+        r = self.reserva()
+        self._preencher_todas(r)
+        self.assertTrue(r.fnrh_pronta)
+        conta = r.fazer_checkin(self.usuario)
+        self.assertIsNotNone(conta)
+        r.refresh_from_db()
+        self.assertEqual(r.status, Reserva.Status.HOSPEDADA)
+
+    def test_falta_ficha_de_acompanhante_ainda_bloqueia(self):
+        r = self.reserva()  # 2 hóspedes
+        services.garantir_fichas_fnrh(r)
+        # Preenche só o titular; acompanhante fica pendente.
+        titular = r.fichas_fnrh.get(titular=True)
+        titular.nascimento = HOJE - timedelta(days=365 * 30)
+        titular.documento_numero = "999"
+        titular.motivo_viagem = "LAZER_FERIAS"
+        titular.save()
+        self.assertFalse(r.fnrh_pronta)
+        with self.assertRaises(ValidationError):
+            r.fazer_checkin(self.usuario)
+
+    def test_um_unico_titular_por_reserva(self):
+        from apps.reservas.models import FichaFNRH
+        r = self.reserva()
+        services.garantir_fichas_fnrh(r)
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                FichaFNRH.objects.create(reserva=r, titular=True, nome="Duplo")
+
+
+class BOHTests(ReservasTestsBase):
+    """Boletim de Ocupação Hoteleira — agregação da FNRH + ocupação e export CSV."""
+
+    def _hospeda_com_fnrh(self, uf="SC", motivo="LAZER_FERIAS", transporte="AUTOMOVEL"):
+        r = self.reserva()  # checkin=HOJE, adultos=2
+        services.garantir_fichas_fnrh(r)
+        for f in r.fichas_fnrh.all():
+            f.nome = f.nome or "Hóspede Y"
+            f.nascimento = HOJE - timedelta(days=365 * 25)
+            f.documento_numero = "555"
+            f.cidade = "Itá"
+            f.uf = uf
+            f.pais = "Brasil"
+            f.motivo_viagem = motivo
+            f.meio_transporte = transporte
+            f.save()
+        r.fazer_checkin(self.usuario)  # base tem a trava desligada
+        return r
+
+    def test_agrega_procedencia_motivo_transporte(self):
+        self._hospeda_com_fnrh()
+        boh = services.boh_mensal(HOJE.year, HOJE.month)
+        self.assertEqual(boh["total_hospedes"], 2)
+        self.assertEqual(boh["total_chegadas"], 1)
+        self.assertIn(("SC", 2), boh["nacional"])
+        self.assertEqual(dict(boh["motivo"]).get("Turismo / lazer / férias"), 2)
+        self.assertEqual(dict(boh["transporte"]).get("Automóvel"), 2)
+        self.assertGreater(boh["uh_noites_ocupadas"], 0)
+
+    def test_estrangeiro_vai_para_internacional(self):
+        r = self.reserva()
+        services.garantir_fichas_fnrh(r)
+        for f in r.fichas_fnrh.all():
+            f.nome, f.nascimento = "Tourist", HOJE - timedelta(days=365 * 40)
+            f.documento_numero, f.cidade = "P123", "Buenos Aires"
+            f.pais, f.motivo_viagem = "Argentina", "LAZER_FERIAS"
+            f.save()
+        r.fazer_checkin(self.usuario)
+        boh = services.boh_mensal(HOJE.year, HOJE.month)
+        self.assertIn(("Argentina", 2), boh["internacional"])
+
+    def test_export_csv(self):
+        self._hospeda_com_fnrh()
+        self.client.login(username="recepcao", password="senha-forte-123")
+        resp = self.client.get(
+            reverse("reservas:boh") + f"?ano={HOJE.year}&mes={HOJE.month}&formato=csv"
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/csv", resp["Content-Type"])
+        self.assertIn("attachment", resp["Content-Disposition"])
+        corpo = resp.content.decode("utf-8")
+        self.assertIn("Boletim de Ocupação Hoteleira", corpo)
+        self.assertIn("Motivo da viagem", corpo)
+
+
+class EnvioFNRHTests(ReservasTestsBase):
+    """Push à FNRH Digital via gateway simulado (estratégia B)."""
+
+    def _hospeda_completa(self):
+        r = self.reserva()
+        services.garantir_fichas_fnrh(r)
+        for f in r.fichas_fnrh.all():
+            f.nome = f.nome or "Hóspede Z"
+            f.nascimento = HOJE - timedelta(days=365 * 28)
+            f.documento_numero = "321"
+            f.cidade, f.uf, f.pais = "Itá", "SC", "Brasil"
+            f.motivo_viagem, f.meio_transporte = "LAZER_FERIAS", "AUTOMOVEL"
+            f.save()
+        r.fazer_checkin(self.usuario)
+        return r
+
+    def test_checkin_marca_pendente(self):
+        r = self._hospeda_completa()
+        self.assertEqual(r.fnrh_status, Reserva.SincFNRH.PENDENTE)
+
+    def test_envio_simulado_marca_enviada_com_ids(self):
+        r = self._hospeda_completa()
+        self.assertTrue(services.enviar_fnrh(r))
+        r.refresh_from_db()
+        self.assertEqual(r.fnrh_status, Reserva.SincFNRH.ENVIADA)
+        self.assertIsNotNone(r.fnrh_reserva_id)
+        for f in r.fichas_fnrh.all():
+            self.assertIsNotNone(f.fnrh_pessoa_id)
+            self.assertIsNotNone(f.fnrh_hospede_id)
+
+    def test_envio_idempotente(self):
+        r = self._hospeda_completa()
+        services.enviar_fnrh(r)
+        r.refresh_from_db()
+        rid = r.fnrh_reserva_id
+        self.assertTrue(services.enviar_fnrh(r))  # 2ª vez não refaz
+        r.refresh_from_db()
+        self.assertEqual(r.fnrh_reserva_id, rid)
+
+    def test_pendentes_qs_e_reenvio(self):
+        r = self._hospeda_completa()
+        self.assertIn(r, services.fnrh_pendentes_qs())
+        services.enviar_fnrh(r)
+        self.assertNotIn(r, services.fnrh_pendentes_qs())
+
+    def test_depara_dominios(self):
+        from apps.reservas import fnrh_gateway
+        r = self._hospeda_completa()
+        ficha = r.fichas_fnrh.first()
+        p = fnrh_gateway.payload_hospede(ficha, pessoa_id="x")
+        self.assertEqual(p["fnrh"]["motivo_viagem_id"], "LAZER_FERIAS")
+        self.assertEqual(p["fnrh"]["meio_transporte_id"], "AUTOMOVEL")
+        self.assertEqual(fnrh_gateway.payload_reserva(r)["origem_reserva_id"], "MEIOHOSPEDAGEM")

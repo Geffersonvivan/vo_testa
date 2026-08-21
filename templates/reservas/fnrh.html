@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block titulo %}FNRH — Reserva #{{ reserva.pk }} — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Reserva #{{ reserva.pk }} · {{ reserva.hospede.nome }} · {{ reserva.uh.numero }}</p>
+<div class="pagina-cabecalho">
+  <h1>FNRH — Ficha de hóspedes</h1>
+  <span class="fnrh-progresso {% if fnrh_pronta %}ok{% endif %}">
+    {{ fnrh_completas }}/{{ fnrh_total }} completa{{ fnrh_total|pluralize }}
+  </span>
+</div>
+<p class="subtitulo">Registro obrigatório (Embratur) de cada hóspede. Uma ficha completa
+  por pessoa libera o check-in.</p>
+
+<form method="post" action="{% url 'reservas:fnrh' reserva.pk %}" class="fnrh-form">
+  {% csrf_token %}
+  {% include "reservas/partials/fnrh_fichas.html" %}
+
+  <div class="barra-acao">
+    <a href="{% url 'reservas:detalhe' reserva.pk %}" class="botao-neutro">Voltar</a>
+    <button type="submit" class="botao-primario">Salvar fichas</button>
+  </div>
+</form>
+{% endblock %}

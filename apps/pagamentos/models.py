@@ -41,6 +41,8 @@ class Cobranca(models.Model):
                                 related_name="cobrancas", verbose_name="pagador")
     # Referência solta à reserva (sem import cruzado de model).
     reserva_id = models.PositiveIntegerField("reserva", null=True, blank=True)
+    # Referência solta à reserva-mãe (sinal único do grupo).
+    grupo_id = models.PositiveIntegerField("grupo (reserva-mãe)", null=True, blank=True)
 
     status = models.CharField("status", max_length=10, choices=Status.choices,
                               default=Status.PENDENTE)

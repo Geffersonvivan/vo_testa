@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% load moeda nucleo_extras %}
+
+{% block titulo %}{{ grupo.rotulo }} — Grupo — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Reservas · Grupo</p>
+<div class="pagina-cabecalho">
+  <h1>{{ grupo.rotulo }} <span class="selo">{{ grupo.situacao_display }}</span></h1>
+  <a href="{% url 'reservas:grupos' %}" class="botao-neutro">Voltar</a>
+</div>
+<p class="subtitulo">
+  Titular: <strong>{{ grupo.titular.nome }}</strong> ·
+  {{ grupo.checkin|date:"d/m/Y" }} → {{ grupo.checkout|date:"d/m/Y" }} ·
+  {{ grupo.get_faturamento_display }}
+  {% if grupo.encerrado_em %} · <strong>encerrado em {{ grupo.encerrado_em|date:"d/m/Y H:i" }}</strong>{% endif %}
+</p>
+
+{% if not grupo.encerrado_em %}
+<div class="acoes" style="margin-bottom:1rem">
+  <form method="post" action="{% url 'reservas:grupo_confirmar' grupo.pk %}">{% csrf_token %}
+    <button class="botao-neutro">Confirmar grupo</button></form>
+  <form method="post" action="{% url 'reservas:grupo_checkin' grupo.pk %}">{% csrf_token %}
+    <button class="botao-neutro">Check-in do grupo</button></form>
+  <form method="post" action="{% url 'reservas:grupo_encerrar' grupo.pk %}">{% csrf_token %}
+    <button class="botao-neutro">Encerrar grupo</button></form>
+</div>
+{% endif %}
+
+<!-- Folio-mãe: as diárias de todos os quartos -->
+<div class="cartao">
+  <h2>Folio do grupo (diárias)</h2>
+  <p>
+    Diárias + colchão: <strong>{{ resumo.diarias|intcomma_brl }}</strong> ·
+    pago: {{ resumo.folio_pago|intcomma_brl }} ·
+    saldo: <strong>{{ resumo.folio_saldo|intcomma_brl }}</strong>
+    · {{ resumo.folio.get_status_display }}
+  </p>
+  {% if resumo.folio.aberta and not grupo.encerrado_em %}
+    <form method="post" action="{% url 'reservas:grupo_receber_folio' grupo.pk %}" class="barra-busca">
+      {% csrf_token %}
+      <select name="forma" required>
+        {% for f in formas %}<option value="{{ f.pk }}">{{ f.nome }}</option>{% endfor %}
+      </select>
+      <input type="text" name="valor" class="mascara-reais" inputmode="numeric" placeholder="0,00" required>
+      <input type="text" name="observacao" placeholder="Observação (opcional)">
+      <button class="botao-primario">Receber no folio</button>
+    </form>
+    {% if grupo.titular %}
+    <form method="post" action="{% url 'reservas:grupo_sinal' grupo.pk %}" class="barra-busca">
+      {% csrf_token %}
+      <input type="text" name="valor" class="mascara-reais" inputmode="numeric" placeholder="Valor do sinal">
+      <select name="metodo">
+        <option value="pix">Pix</option>
+        <option value="cartao">Cartão</option>
+        <option value="boleto">Boleto</option>
+        <option value="link">Link</option>
+      </select>
+      <button class="botao-neutro">Gerar sinal (Pagamentos)</button>
+    </form>
+    {% endif %}
+  {% endif %}
+</div>
+
+<!-- Quartos do bloco -->
+<div class="pagina-cabecalho" style="margin-top:1.5rem">
+  <h2>Quartos do bloco</h2>
+</div>
+<table class="tabela">
+  <thead>
+    <tr><th>Quarto</th><th>Hóspede</th><th>Lotação</th><th>Status</th><th>Consumo</th><th>Saldo quarto</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for q in resumo.quartos %}
+      <tr>
+        <td><a href="{% url 'reservas:detalhe' q.reserva.pk %}">{{ q.uh.numero }}</a>
+            <small class="ajuda">{{ q.uh.tipo.nome }}</small></td>
+        <td>{{ q.reserva.hospede.nome }}</td>
+        <td>{{ q.reserva.adultos }}A{% if q.reserva.criancas %} + {{ q.reserva.criancas }}C{% endif %}</td>
+        <td><span class="selo mapa-cor-{{ q.reserva.status }}">{{ q.reserva.get_status_display }}</span></td>
+        <td>{{ q.consumo|intcomma_brl }}</td>
+        <td>{{ q.saldo|intcomma_brl }}</td>
+        <td>
+          {% if not grupo.encerrado_em %}{% if q.reserva.status == 'pre_reserva' or q.reserva.status == 'confirmada' %}
+          <form method="post" action="{% url 'reservas:grupo_remover_quarto' grupo.pk q.reserva.pk %}"
+                onsubmit="return confirm('Remover {{ q.uh.numero }} do grupo?')">
+            {% csrf_token %}
+            <input type="hidden" name="motivo" value="Quarto removido do grupo.">
+            <button class="botao-neutro">Remover</button>
+          </form>
+          {% endif %}{% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="vazio">Nenhum quarto no bloco ainda — adicione abaixo.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if not grupo.encerrado_em %}
+<div class="cartao" style="margin-top:1rem">
+  <h3>Adicionar quarto</h3>
+  {% if quartos_livres %}
+  <form method="post" action="{% url 'reservas:grupo_adicionar_quarto' grupo.pk %}" class="barra-busca">
+    {% csrf_token %}
+    <select name="uh" required>
+      <option value="">Quarto livre…</option>
+      {% for uh in quartos_livres %}
+        <option value="{{ uh.pk }}">{{ uh.numero }} — {{ uh.tipo.nome }} (acomoda {{ uh|lotacao_uh }})</option>
+      {% endfor %}
+    </select>
+    {% include "componentes/combo_pessoa.html" with dados=hospedes_data dados_id="hospede-grupo-data" campo="hospede" placeholder="Hóspede do quarto…" %}
+    <input type="number" name="adultos" min="1" value="2" title="Adultos" style="width:5rem">
+    <input type="number" name="criancas" min="0" value="0" title="Crianças" style="width:5rem">
+    <button class="botao-primario">Adicionar</button>
+  </form>
+  {% else %}
+  <p class="vazio">Nenhum quarto livre no período do grupo.</p>
+  {% endif %}
+</div>
+
+<div class="acoes" style="margin-top:1rem">
+  <form method="post" action="{% url 'reservas:grupo_cancelar' grupo.pk %}" class="barra-busca"
+        onsubmit="return confirm('Cancelar o grupo inteiro?')">
+    {% csrf_token %}
+    <input type="text" name="motivo" placeholder="Motivo do cancelamento" required>
+    <button class="botao-neutro">Cancelar grupo</button>
+  </form>
+</div>
+{% endif %}
+
+<p class="subtitulo" style="margin-top:1.5rem">
+  Total do grupo: <strong>{{ resumo.total_geral|intcomma_brl }}</strong>
+  (diárias {{ resumo.diarias|intcomma_brl }} + consumo {{ resumo.consumo_total|intcomma_brl }}).
+  Saldo de consumo em aberto nos quartos: {{ resumo.saldo_consumo_total|intcomma_brl }}.
+</p>
+{% endblock %}

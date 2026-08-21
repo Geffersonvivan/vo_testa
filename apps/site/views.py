@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.contrib import messages
 from django.core.cache import cache
 from django.db import transaction
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
@@ -606,3 +607,47 @@ def minha_reserva_detalhe(request, token):
         'reserva': reserva, 'cobranca': cobranca,
         'config': ConfiguracaoSite.load(),
     })
+
+
+# ─────────────────────────────── SEO / robôs ───────────────────────────────────
+
+def robots_txt(request):
+    """Guia os robôs: só o site público é indexável; o CRM interno fica de fora."""
+    linhas = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /crm/",
+        "Disallow: /hospede/",
+        "Disallow: /api/",
+        "Disallow: /reserva/",
+        "Disallow: /minha-reserva/",
+        "Disallow: /reservar/resumo/",
+        "Disallow: /lab/",
+        "",
+        f"Sitemap: {request.build_absolute_uri('/sitemap.xml')}",
+    ]
+    return HttpResponse("\n".join(linhas), content_type="text/plain")
+
+
+def llms_txt(request):
+    """Resumo do site para IAs de busca (padrão llms.txt)."""
+    base = request.build_absolute_uri("/").rstrip("/")
+    conteudo = f"""# Pousada Vô Testa
+
+> Pousada à beira do Lago de Itá, em Itá/SC (Alto Uruguai catarinense) — hospedagem,
+> day use com piscina e mirantes, pesca esportiva e eventos. Reserva direta pelo site,
+> com disponibilidade e preço em tempo real.
+
+## Reservar
+- [Reservar online]({base}/reservar/): escolha datas e tipo de quarto; reserva direta, sem comissão de OTA.
+- [Minha reserva]({base}/minha-reserva/): o hóspede acompanha a própria reserva.
+
+## Sobre
+- Localização: Itá, Santa Catarina — Lago de Itá (Rio Uruguai).
+- Acomodações: quartos Padrão e Intermediário, Cabanas, e "Dia na Pousada" (day use).
+- Estrutura: piscina, mirantes e acesso ao lago para pesca e passeios náuticos.
+
+## Contato
+- [Pedir proposta / eventos]({base}/#contato)
+"""
+    return HttpResponse(conteudo, content_type="text/plain; charset=utf-8")

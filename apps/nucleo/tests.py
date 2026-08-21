@@ -491,3 +491,123 @@ class CentralModulosTests(TestCase):
             {"codigo": Modulo.ESTOQUE, "acao": "desativar"},
         )
         self.assertTrue(modulo_ativo(Modulo.ESTOQUE))
+
+
+class MoedaFiltroTests(TestCase):
+    """Filtro de moeda único do sistema (apps/nucleo/templatetags/moeda.py)."""
+
+    def _fmt(self, valor):
+        from apps.nucleo.templatetags.moeda import intcomma_brl
+        return intcomma_brl(valor)
+
+    def test_zero(self):
+        self.assertEqual(self._fmt(0), "R$ 0,00")
+
+    def test_milhar(self):
+        self.assertEqual(self._fmt(1600), "R$ 1.600,00")
+
+    def test_milhao_com_centavos(self):
+        self.assertEqual(self._fmt(Decimal("1234567.5")), "R$ 1.234.567,50")
+
+    def test_negativo(self):
+        self.assertEqual(self._fmt(Decimal("-67.5")), "-R$ 67,50")
+
+    def test_none_e_vazio(self):
+        self.assertEqual(self._fmt(None), "R$ 0,00")
+        self.assertEqual(self._fmt(""), "R$ 0,00")
+
+    def test_invalido(self):
+        self.assertEqual(self._fmt("abc"), "R$ 0,00")
+
+
+class EstruturaCamasTests(TestCase):
+    """Capacidade derivada da unidade e frase de camas gerada (Passo 2).
+
+    Os 24 quartos vêm de um seed manual (não de migração), então o teste cria a
+    estrutura e roda o seeder de camas para valer sobre dados controlados.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        from decimal import Decimal
+
+        from apps.nucleo.management.commands.popular_camas import semear_camas
+        from apps.nucleo.models import UH, TipoUH
+
+        # As unidades day use (DAY-01..08) já vêm da migração 0015; aqui criamos
+        # só os 24 quartos de pernoite (que em produção vêm do seed manual).
+        hosp = TipoUH.objects.create(nome="Hospedagem Teste", tarifa_base=Decimal("250"))
+        for i in range(1, 25):
+            UH.objects.create(numero=f"Quarto {i:02d}", tipo=hosp)
+        semear_camas()
+
+    def _uh(self, numero):
+        from apps.nucleo.models import UH
+        return UH.objects.get(numero=numero)
+
+    def test_lotacao_total_bate_118_e_131(self):
+        from apps.nucleo.estrutura import capacidade
+        from apps.nucleo.models import UH
+        hosp = UH.objects.filter(tipo__modalidade="hospedagem")
+        self.assertEqual(sum(capacidade(u)["maxima"] for u in hosp), 118)
+        self.assertEqual(sum(capacidade(u)["maxima_criancas"] for u in hosp), 131)
+        self.assertEqual(sum(capacidade(u)["fixa"] for u in hosp), 70)
+        self.assertEqual(sum(capacidade(u)["extras"] for u in hosp), 35)
+
+    def test_dois_comodos_com_sofa(self):
+        from apps.nucleo.estrutura import capacidade
+        cap = capacidade(self._uh("Quarto 17"))
+        self.assertEqual(cap["maxima"], 7)
+        self.assertEqual(cap["maxima_criancas"], 8)
+
+    def test_um_comodo_com_sofa(self):
+        from apps.nucleo.estrutura import capacidade
+        cap = capacidade(self._uh("Quarto 09"))
+        self.assertEqual(cap["maxima"], 4)
+        self.assertEqual(cap["maxima_criancas"], 5)
+
+    def test_um_comodo_sem_sofa(self):
+        from apps.nucleo.estrutura import capacidade
+        cap = capacidade(self._uh("Quarto 03"))
+        self.assertEqual(cap["maxima"], 3)
+        self.assertEqual(cap["maxima_criancas"], 3)
+
+    def test_day_use_zero_e_sem_camas(self):
+        from apps.nucleo.estrutura import capacidade, descricao_camas
+        from apps.nucleo.models import UH
+        day = UH.objects.filter(tipo__modalidade="day_use").first()
+        self.assertEqual(capacidade(day)["maxima"], 0)
+        self.assertEqual(
+            descricao_camas(day), "Sem pernoite · acesso à estrutura no período"
+        )
+
+    def test_descricao_dois_comodos_exata(self):
+        from apps.nucleo.estrutura import descricao_camas
+        self.assertEqual(
+            descricao_camas(self._uh("Quarto 17")),
+            "Quarto 1 com 1 cama de casal · Quarto 2 com 1 cama de casal · "
+            "sofá-cama para 1 adulto ou 2 crianças até 15 anos · "
+            "até 2 colchões de solteiro extras",
+        )
+
+    def test_descricao_um_comodo_omite_prefixo(self):
+        from apps.nucleo.estrutura import descricao_camas
+        self.assertEqual(
+            descricao_camas(self._uh("Quarto 03")),
+            "1 cama de casal · até 1 colchão de solteiro extra",
+        )
+
+    def test_faixa_do_tipo_mostra_intervalo(self):
+        """Quando as unidades do tipo variam, a faixa é 'N a M', não 'até M'."""
+        from decimal import Decimal
+
+        from apps.nucleo.estrutura import faixa_do_tipo
+        from apps.nucleo.models import UH, ConfiguracaoUH, PosicaoCama, TipoUH
+        tipo = TipoUH.objects.create(nome="Teste Faixa", tarifa_base=Decimal("200"))
+        pequena = UH.objects.create(numero="TST-P", tipo=tipo)
+        PosicaoCama.objects.create(uh=pequena, nome="Quarto", ordem=0)
+        grande = UH.objects.create(numero="TST-G", tipo=tipo)
+        PosicaoCama.objects.create(uh=grande, nome="Quarto 1", ordem=0)
+        PosicaoCama.objects.create(uh=grande, nome="Quarto 2", ordem=1)
+        ConfiguracaoUH.objects.create(uh=grande, tem_sofa_cama=True, max_colchoes_extras=2)
+        self.assertEqual(faixa_do_tipo(tipo), "2 a 8 pessoas")

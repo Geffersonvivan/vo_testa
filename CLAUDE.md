@@ -85,8 +85,38 @@ desenhar o nosso.
   mapa UH×dias, conta da hospedagem (naturezas serviço×consumo), pagamento e
   adiantamento via caixa do operador, tarifas TipoUH×temporada (admin) com
   precedência de feriado. Interface pública em `apps/reservas/services.py`.
-  Pendente para iterações seguintes: FNRH, wait list, arrastar no mapa,
-  expiração automática de pré-reserva, auditoria diária.
+  Pendente para iterações seguintes: wait list, auditoria diária.
+- **FNRH implementada** (§5.1, Embratur/Lei 11.771): model `FichaFNRH` (uma por
+  hóspede — titular + acompanhantes; snapshot da estadia, campos do BOH: motivo
+  da viagem, meio de transporte, procedência/destino). **Trava de check-in**
+  (`fnrh_pronta` + `FNRH_BLOQUEAR_CHECKIN`, default on; off nos testes) exige ficha
+  completa de cada hóspede. Preenchimento em **dois caminhos**: recepção
+  (`reservas:fnrh`, formset de todas as fichas, titular pré-preenchido do cadastro)
+  e **pré check-in no portal** — o hóspede responsável lê **um QR** (`portal:qr_fnrh`)
+  e preenche a FNRH de todos **num único celular** (`portal:checkin`, público por
+  token, funciona antes da hospedagem). Services `garantir_fichas_fnrh`,
+  `preparar_fnrh`, `fnrh_formset`, `marcar_fichas_preenchidas`. `Acompanhante`
+  (legado leve) migrado para fichas e superado na UI. **BOH (Boletim de Ocupação
+  Hoteleira)**: `services.boh_mensal(ano, mes)` agrega os hóspedes que entraram no
+  mês por procedência (UF nacional / país estrangeiro), motivo da viagem, meio de
+  transporte e sexo + ocupação (UH-noites, taxa, permanência média); página
+  `reservas:boh` (gerência, seletor mês/ano) com **exportação CSV** (`?formato=csv`,
+  `;` + BOM p/ Excel). Link "BOH (Embratur)" no cabeçalho da lista de reservas;
+  `eh_gerente` agora vem por context processor. Testes: trava, prefill, unicidade do
+  titular, envio pelo portal, agregação do BOH (nacional/estrangeiro) e export CSV.
+- **Integração API FNRH Digital — scaffold** (Embratur/Serpro, API REST v2, Basic Auth;
+  estratégia B = empurrar os nossos dados). **Gateway plugável** `FNRH_GATEWAY`:
+  `simulado` (sandbox, default) / `serpro` (real, exige `FNRH_API_URL/USER/SENHA`).
+  `apps/reservas/fnrh_gateway.py` com o fluxo criar_reserva→criar_pessoa→
+  adicionar_hospede(bloco `fnrh`)→checkin. **Choices de FichaFNRH alinhados 1:1 aos
+  códigos oficiais** (motivo/transporte/sexo/doc = ids da API, sem de-para).
+  Campos de sincronização em Reserva (`fnrh_reserva_id/status/sincronizada_em/erro`) e
+  FichaFNRH (`fnrh_pessoa_id/hospede_id`). `services.enviar_fnrh` (idempotente,
+  best-effort — não trava a recepção); check-in marca `pendente` e a view empurra;
+  cron `manage.py enviar_fnrh_pendentes` reprocessa pendentes/erros. Status + botão
+  "Reenviar" no detalhe da reserva. **Pendente para produção:** credenciais SNRHos
+  (via Cadastur), país em ISO alpha-2 + cidade em código IBGE no cadastro, e teste em
+  homologação. Plano em `docs/Implementar_FNRH_API.md`.
 - **Pessoas evoluído**: campo `tipo` PF/PJ (com sigla), papel **Agência/Empresa**
   (`Agencia`, OneToOne), tabela com filtros por papel + contadores + coluna Tipo.
   Reserva agora tem `faturamento` (particular/agência/empresa) + `titular` — quem
@@ -265,9 +295,14 @@ desenhar o nosso.
     `expirar_vencidas()` cancela as vencidas (motivo registrado) e roda no
     `criar_reserva_site` (antes de alocar) + comando de cron
     `manage.py expirar_reservas` (backstop). `confirmar()` limpa `expira_em`.
-  - **Pendente (fase 2, cutover):** (1) **gateway de pagamento = Safrapay** no módulo
-    Pagamentos (o site hoje finaliza sem pagamento) — implementar provider Safrapay em
-    `pagamentos/gateways.py` e ligar o sinal ao `confirmar_reserva`; (2) reconciliar/
+  - **Safrapay: provider implementado** (Pix/cartão/boleto batem na API HML; webhook →
+    `confirmar_reserva`; site cria a cobrança e mostra "Pagar agora"). **UI de captura de
+    cartão** na página pública `pagar/<token>/` (crédito à vista, `autorizar_cartao_online`
+    — PAN só transita p/ o gateway, nunca persiste). Cartão sem token cria cobrança
+    pendente e só autoriza quando o hóspede digita. **Bloqueio real = processo, não
+    código:** falta gerar/enviar o pacote de evidências à Safrapay p/ liberar o Token
+    (Developers→Keys), depois `.env` + webhook público. Plano em `docs/Implementar_Safrapay.md`.
+  - **Pendente (fase 2, cutover):** (1) reconciliar/
     limpar os models duplicados do site (core.Reserva/Quarto/Hospede vs CRM) e telas de
     gestão do site no CRM; (3) apontar DNS `www.pousadavotesta.com.br` pro app unificado
     e aposentar o `Site_Vo_Testa`. Até o cutover, não tocar no site em produção.

@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 from apps.nucleo.models import Pessoa
 from apps.nucleo.modulos import Modulo
 from apps.nucleo.permissoes import eh_gerente, requer_gerencia, requer_modulo
+from apps.nucleo.ratelimit import limite_excedido
 from apps.nucleo.seletores import pessoas_agrupadas
 
 from . import services
@@ -221,6 +222,54 @@ def pagar(request, token):
 
 
 @require_POST
+def pagar_cartao(request, token):
+    """Recebe o cartão digitado na página pública e autoriza (crédito à vista).
+    O PAN só transita para o gateway — nunca é persistido."""
+    # TM-002: trava card testing — poucas tentativas por token e por IP.
+    if (
+        limite_excedido(request, "cartao_token", limite=5, janela_seg=900, sufixo=str(token))
+        or limite_excedido(request, "cartao_ip", limite=15, janela_seg=3600)
+    ):
+        messages.error(request, "Muitas tentativas. Aguarde alguns minutos e tente de novo.")
+        return redirect("pagamentos:pagar", token=token)
+    cobranca = get_object_or_404(Cobranca, token=token)
+    numero = "".join(ch for ch in request.POST.get("numero", "") if ch.isdigit())
+    validade = request.POST.get("validade", "").strip()  # MM/AA
+    nome = request.POST.get("nome", "").strip()
+    cvv = "".join(ch for ch in request.POST.get("cvv", "") if ch.isdigit())
+    doc = "".join(ch for ch in request.POST.get("documento", "") if ch.isdigit())
+    try:
+        mes, ano = validade.split("/")
+        mes_i = int(mes)
+        ano_i = 2000 + int(ano) if len(ano) == 2 else int(ano)
+    except (ValueError, AttributeError):
+        messages.error(request, "Validade inválida — use MM/AA.")
+        return redirect("pagamentos:pagar", token=token)
+    if len(numero) < 13 or len(cvv) < 3 or not nome:
+        messages.error(request, "Confira os dados do cartão.")
+        return redirect("pagamentos:pagar", token=token)
+    card = {
+        "cardholderName": nome[:100],
+        "cardNumber": numero,
+        "expirationMonth": mes_i,
+        "expirationYear": ano_i,
+        "securityCode": cvv,
+    }
+    if doc:
+        card["cardholderDocument"] = doc
+    ok, msg = services.autorizar_cartao_online(cobranca, card, usuario=cobranca.criado_por)
+    cobranca.refresh_from_db()
+    if ok and cobranca.status == Cobranca.Status.PAGO:
+        destino = _url_recibo_site(cobranca)
+        messages.success(request, "Pagamento aprovado!")
+        if destino:
+            return redirect(destino)
+    else:
+        messages.error(request, msg or "Não foi possível autorizar o cartão.")
+    return redirect("pagamentos:pagar", token=token)
+
+
+@require_POST
 def pagar_simular(request, token):
     """Botão 'já paguei' da página pública.
 
@@ -313,14 +362,22 @@ def _status_pago(status_raw):
 @csrf_exempt
 @require_POST
 def webhook(request):
-    """Endpoint do gateway (simulado form ou JSON SafraPay). Idempotente."""
+    """Endpoint do gateway (simulado form ou JSON SafraPay). Idempotente.
+
+    SEGURANÇA (TM-001): o webhook é apenas um GATILHO, não a fonte da verdade.
+    Fora do sandbox NÃO confiamos no status do corpo (forjável) — consultamos o
+    status real no provedor (`consultar_status`) e só confirmamos se ELE disser pago.
+    Rate limit por IP evita flood/amplificação da consulta ao provedor."""
+    if limite_excedido(request, "webhook", limite=60, janela_seg=60):
+        return _json({"erro": "rate limited"}, 429)
     gid, status_gw, body = _extrair_webhook(request)
     cobranca = Cobranca.objects.filter(gateway_id=gid).first() if gid else None
     if not cobranca:
         return _json({"erro": "cobrança não encontrada"}, 404)
     EventoPagamento.objects.create(
         cobranca=cobranca, tipo=EventoPagamento.Tipo.WEBHOOK,
-        origem="webhook", detalhe={"gateway_id": gid, "status": status_gw, "body": body},
+        origem="webhook",
+        detalhe={"gateway_id": gid, "status": status_gw, "body": _redigir(body)},
     )
     # Notificação de liquidação (o dinheiro caiu na conta) pode vir junto do
     # pagamento ou num webhook próprio, depois. Se a cobrança já está paga,
@@ -334,17 +391,22 @@ def webhook(request):
         cobranca.refresh_from_db()
         return _json({"ok": True, "status": cobranca.status, "liquidado": cobranca.liquidado})
 
-    st = str(status_gw).lower() if status_gw is not None else None
-    if st in _STATUS_PENDENTE:
-        return _json({"ok": True, "status": cobranca.status, "ignorado": "ainda pendente"})
-    # Fail-safe: só confirma em status inequívoco de pago. "Sem status" confirma
-    # apenas no sandbox (simulado não envia status); um webhook real sem status
-    # reconhecido fica pendente p/ conciliação — nunca confirma no escuro.
-    if st is None:
-        if getattr(settings, "PAGAMENTOS_GATEWAY", "simulado") != "simulado":
-            return _json({"ok": True, "status": cobranca.status, "ignorado": "status ausente (não confirma fora do sandbox)"})
-    elif st not in _STATUS_PAGO:
-        return _json({"ok": True, "status": cobranca.status, "ignorado": f"status={status_gw}"})
+    # Decisão de confirmar: sandbox confia no corpo (não há provedor); produção
+    # consulta a fonte da verdade e ignora o status do corpo.
+    gateway = getattr(settings, "PAGAMENTOS_GATEWAY", "simulado")
+    if gateway == "simulado":
+        # Sandbox não envia status: ausência = confirma; senão exige status pago.
+        pago = True if status_gw is None else (str(status_gw).lower() in _STATUS_PAGO)
+    else:
+        try:
+            gw = get_gateway()
+            info = gw.consultar_status(cobranca) if hasattr(gw, "consultar_status") else {}
+            pago = _status_pago(info.get("status_raw")) is True
+        except ValidationError:
+            pago = False  # não deu p/ verificar → não confirma
+    if not pago:
+        return _json({"ok": True, "status": cobranca.status,
+                      "ignorado": "não confirmado na fonte"})
     try:
         services.confirmar_pagamento(cobranca, cobranca.criado_por, origem="webhook")
         # Pix liquida na hora: se a mesma notificação já traz os dados, registra.
@@ -453,3 +515,25 @@ def _extrair_webhook(request):
 def _json(data, status=200):
     from django.http import JsonResponse
     return JsonResponse(data, status=status)
+
+
+# TM-004: chaves que carregam PII/PAN e nunca devem ser persistidas na trilha.
+# O valor sob essas chaves é redigido; ids/status/valores (reconciliação) ficam.
+_CHAVES_SENSIVEIS = {
+    "card", "cardnumber", "securitycode", "cvv", "cvc",
+    "cardholdername", "cardholderdocument", "holder", "holdername",
+    "document", "cpf", "cnpj", "name", "nome", "email", "phone", "telefone",
+    "address", "endereco", "customer", "buyer", "payer",
+}
+
+
+def _redigir(obj):
+    """Copia o corpo do webhook redigindo valores sob chaves sensíveis (recursivo)."""
+    if isinstance(obj, dict):
+        return {
+            k: ("[REDACTED]" if str(k).lower() in _CHAVES_SENSIVEIS else _redigir(v))
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_redigir(x) for x in obj]
+    return obj

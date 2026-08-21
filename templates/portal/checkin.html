@@ -1,0 +1,24 @@
+{% extends "portal/base.html" %}
+
+{% block titulo %}Check-in online — Pousada Vô Testa{% endblock %}
+
+{% block conteudo %}
+<div class="pt-card">
+  <p class="letreiro">Check-in online</p>
+  <h2>Ficha de hóspedes</h2>
+  <p class="subtitulo">Preencha os dados de cada pessoa da reserva. É rápido e evita
+    fila na chegada.</p>
+  <div class="pt-progresso {% if pronta %}ok{% endif %}">
+    <span class="pt-progresso-barra" style="--pct: {% if total %}{% widthratio completas total 100 %}{% else %}0{% endif %}%"></span>
+    <span class="pt-progresso-txt">{{ completas }} de {{ total }} preenchida{{ total|pluralize }}</span>
+  </div>
+</div>
+
+<form method="post" action="{% url 'portal:checkin' token %}">
+  {% csrf_token %}
+  {% include "reservas/partials/fnrh_fichas.html" %}
+  <div class="pt-barra-fixa">
+    <button type="submit" class="botao-primario">Enviar ficha</button>
+  </div>
+</form>
+{% endblock %}

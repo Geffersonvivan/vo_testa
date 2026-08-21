@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block titulo %}BOH — Boletim de Ocupação Hoteleira — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Reservas · Embratur</p>
+<div class="pagina-cabecalho">
+  <h1>Boletim de Ocupação Hoteleira</h1>
+  <a href="?ano={{ ano }}&mes={{ mes }}&formato=csv" class="botao-primario">Exportar CSV</a>
+</div>
+<p class="subtitulo">Agregado mensal da FNRH (hóspedes que entraram no mês) + ocupação.
+  Base para o boletim mensal ao Ministério do Turismo.</p>
+
+<form method="get" class="filtros boh-filtros">
+  <select name="mes" onchange="this.form.submit()">
+    {% for num, nome in meses %}
+      <option value="{{ num }}" {% if num == mes %}selected{% endif %}>{{ nome }}</option>
+    {% endfor %}
+  </select>
+  <select name="ano" onchange="this.form.submit()">
+    {% for a in anos %}
+      <option value="{{ a }}" {% if a == ano %}selected{% endif %}>{{ a }}</option>
+    {% endfor %}
+  </select>
+  <noscript><button type="submit" class="botao-neutro">Ver</button></noscript>
+</form>
+
+<div class="boh-resumo">
+  <div class="boh-hero">
+    <span class="indicador-rotulo letreiro">Taxa de ocupação</span>
+    <strong class="boh-hero-num">{{ boh.taxa_ocupacao }}<span class="boh-hero-pct">%</span></strong>
+    <span class="boh-hero-sub">{{ boh.uh_noites_ocupadas }} de {{ boh.uh_noites_disponiveis }} UH-noites</span>
+  </div>
+  <div class="boh-mini">
+    <div class="cartao"><span class="indicador-rotulo letreiro">Hóspedes</span><span class="indicador-valor num">{{ boh.total_hospedes }}</span></div>
+    <div class="cartao"><span class="indicador-rotulo letreiro">Chegadas</span><span class="indicador-valor num">{{ boh.total_chegadas }}</span></div>
+    <div class="cartao"><span class="indicador-rotulo letreiro">Permanência média</span><span class="indicador-valor num">{{ boh.permanencia_media }}<small> noites</small></span></div>
+  </div>
+</div>
+
+<div class="boh-quadros">
+  {% include "reservas/partials/boh_quadro.html" with titulo="Procedência nacional (UF)" itens=boh.nacional %}
+  {% include "reservas/partials/boh_quadro.html" with titulo="Procedência internacional (país)" itens=boh.internacional %}
+  {% include "reservas/partials/boh_quadro.html" with titulo="Motivo da viagem" itens=boh.motivo %}
+  {% include "reservas/partials/boh_quadro.html" with titulo="Meio de transporte" itens=boh.transporte %}
+  {% include "reservas/partials/boh_quadro.html" with titulo="Sexo" itens=boh.sexo %}
+</div>
+{% endblock %}

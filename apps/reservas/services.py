@@ -7,7 +7,7 @@ models internos.
 """
 
 from datetime import date, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -27,6 +27,7 @@ from apps.nucleo.models import (
 from .models import (
     Adiantamento,
     ContaHospedagem,
+    GrupoReserva,
     LancamentoConta,
     PagamentoConta,
     Reserva,
@@ -78,6 +79,107 @@ def diaria_media(tipo_uh: TipoUH, checkin: date, checkout: date) -> Decimal:
         tarifa_do_dia(tipo_uh, checkin + timedelta(days=n)) for n in range(noites)
     )
     return (Decimal(total) / noites).quantize(Decimal("0.01"))
+
+
+# ---------- Tarifa por unidade (Passo 3) ----------
+#
+# A matriz Tarifa (TipoUH × classificação) segue a base. O que a unidade acrescenta:
+# quarto de dois cômodos custa mais que o de um, e a unidade pode ter tarifa própria.
+# Ordem de resolução: tarifa_override → tarifa do tipo × fator se duplo → tarifa do tipo.
+
+
+def _arredonda_dezena(valor: Decimal) -> Decimal:
+    """Arredonda à dezena mais próxima (250 × 1.6 = 400)."""
+    return (valor / 10).quantize(Decimal("1"), rounding=ROUND_HALF_UP) * 10
+
+
+def _tarifa_unidade_sobre(uh: UH, tarifa_tipo: Decimal) -> Decimal:
+    """Aplica as regras da unidade sobre uma diária-base do tipo."""
+    from apps.nucleo.estrutura import eh_duplo
+
+    if uh.tarifa_override is not None:
+        return uh.tarifa_override
+    if eh_duplo(uh):
+        fator = Decimal(str(getattr(settings, "ACRESCIMO_TARIFA_DUPLO", 1.6)))
+        return _arredonda_dezena(tarifa_tipo * fator)
+    return tarifa_tipo
+
+
+def tarifa_da_unidade(uh: UH, dia: date) -> Decimal:
+    """Diária efetiva da unidade num dia (override → tipo×fator se duplo → tipo)."""
+    return _tarifa_unidade_sobre(uh, tarifa_do_dia(uh.tipo, dia))
+
+
+def diaria_media_unidade(uh: UH, checkin: date, checkout: date) -> Decimal:
+    """Média das diárias efetivas da unidade no período."""
+    noites = (checkout - checkin).days
+    if noites <= 0:
+        raise ValidationError("Período inválido: a saída deve ser após a entrada.")
+    total = sum(
+        tarifa_da_unidade(uh, checkin + timedelta(days=n)) for n in range(noites)
+    )
+    return (Decimal(total) / noites).quantize(Decimal("0.01"))
+
+
+def tarifa_minima_do_tipo(tipo_uh: TipoUH) -> Decimal | None:
+    """Menor diária efetiva entre as unidades do tipo — o "a partir de" honesto.
+
+    Usa a tarifa base do tipo como referência (fora de temporada). Corrige a
+    promessa falsa de anunciar por menos do que qualquer unidade custa.
+    """
+    valores = [
+        _tarifa_unidade_sobre(uh, tipo_uh.tarifa_base)
+        for uh in tipo_uh.uhs.all()
+    ]
+    return min(valores) if valores else None
+
+
+# ---------- Colchão extra e cotação itemizada (Passo 4) ----------
+
+
+def colchoes_extras(reserva) -> int:
+    """Quantos colchões extras a reserva exige (para a governança preparar o quarto).
+
+    Interface pública: a governança lê daqui, sem importar models de reservas.
+    """
+    from apps.nucleo.estrutura import extras_para
+
+    return extras_para(reserva.uh, reserva.adultos + reserva.criancas)
+
+
+def cotacao_unidade(uh: UH, checkin: date, checkout: date, pessoas: int) -> dict:
+    """Cotação itemizada de uma unidade: diárias + colchões extras, separados.
+
+    O colchão nunca entra embutido na diária — o hóspede vê a linha própria
+    "N colchões extras · R$ X". Sofá-cama e berço não cobram.
+    """
+    from apps.nucleo.estrutura import extras_para
+
+    noites = (checkout - checkin).days
+    if noites <= 0:
+        raise ValidationError("Período inválido: a saída deve ser após a entrada.")
+
+    diarias = [
+        {"dia": checkin + timedelta(days=n),
+         "valor": tarifa_da_unidade(uh, checkin + timedelta(days=n))}
+        for n in range(noites)
+    ]
+    total_diarias = sum((d["valor"] for d in diarias), Decimal("0.00"))
+
+    qtd_extras = extras_para(uh, pessoas)
+    config = getattr(uh, "config", None)
+    tarifa_colchao = config.tarifa_colchao_extra if config else Decimal("0.00")
+    total_colchoes = (tarifa_colchao * qtd_extras * noites) if qtd_extras else Decimal("0.00")
+
+    return {
+        "noites": noites,
+        "diarias": diarias,
+        "total_diarias": total_diarias,
+        "colchoes_qtd": qtd_extras,
+        "colchoes_tarifa": tarifa_colchao,
+        "colchoes_total": total_colchoes,
+        "bruto": total_diarias + total_colchoes,
+    }
 
 
 def reservas_ativas_qs():
@@ -497,6 +599,219 @@ def receber_pagamento(
     )
 
 
+# ---------- Reserva de grupo (reserva-mãe + filhas por quarto) ----------
+#
+# Folio híbrido: as diárias (e o colchão) de todos os quartos caem no folio-mãe,
+# pago pelo titular; o consumo fica na conta de cada quarto. Antioverbooking,
+# check-in e check-out seguem por quarto — a mãe agrupa e soma.
+
+
+@transaction.atomic
+def criar_grupo(*, rotulo, titular, checkin, checkout, usuario,
+                faturamento=Reserva.Faturamento.PARTICULAR,
+                canal=Reserva.Canal.BALCAO, observacoes="", reter=False):
+    """Abre a reserva-mãe e o folio-mãe (conta das diárias). Sem quartos ainda —
+    a recepção adiciona os quartos com `adicionar_quarto`."""
+    if checkout <= checkin:
+        raise ValidationError("A saída deve ser depois da entrada.")
+    expira = (timezone.now() + timedelta(minutes=settings.RESERVA_RETENCAO_MINUTOS)
+              if reter else None)
+    grupo = GrupoReserva.objects.create(
+        rotulo=rotulo, titular=titular, checkin=checkin, checkout=checkout,
+        faturamento=faturamento, canal=canal, observacoes=observacoes,
+        expira_em=expira, criado_por=usuario,
+    )
+    ContaHospedagem.objects.create(grupo=grupo)  # folio-mãe
+    registrar_auditoria(usuario, "criar_grupo", grupo, {"rotulo": rotulo})
+    return grupo
+
+
+@transaction.atomic
+def adicionar_quarto(grupo, *, uh, hospede, usuario, adultos=2, criancas=0,
+                     valor_diaria=None):
+    """Adiciona um quarto (reserva-filha) ao grupo, num UH específico escolhido pela
+    recepção. Antioverbooking valida a UH; herda período e faturamento do grupo."""
+    if grupo.encerrado_em:
+        raise ValidationError("Este grupo já foi encerrado.")
+    if not uh_disponivel(uh, grupo.checkin, grupo.checkout):
+        raise ValidationError(
+            f"O quarto {uh.numero} não está livre no período do grupo."
+        )
+    if valor_diaria is None:
+        valor_diaria = diaria_media_unidade(uh, grupo.checkin, grupo.checkout)
+    try:
+        return Reserva.objects.create(
+            uh=uh, hospede=hospede, grupo=grupo,
+            checkin=grupo.checkin, checkout=grupo.checkout,
+            adultos=adultos, criancas=criancas,
+            status=Reserva.Status.PRE_RESERVA, canal=grupo.canal,
+            faturamento=grupo.faturamento, titular=grupo.titular,
+            valor_diaria=valor_diaria, criado_por=usuario,
+        )
+    except IntegrityError:
+        raise ValidationError("Este quarto acabou de ser reservado. Tente outro.")
+
+
+@transaction.atomic
+def confirmar_grupo(grupo_id, usuario) -> bool:
+    """Confirma todas as filhas em pré-reserva/orçamento. Idempotente — usada pelo
+    sinal único do grupo (Pagamentos). Limpa a retenção do grupo."""
+    grupo = GrupoReserva.objects.filter(pk=grupo_id).first()
+    if not grupo:
+        return False
+    confirmadas = 0
+    for filha in grupo.filhas.filter(
+        status__in=[Reserva.Status.ORCAMENTO, Reserva.Status.PRE_RESERVA]
+    ):
+        filha.confirmar(usuario)
+        confirmadas += 1
+    if grupo.expira_em:
+        grupo.expira_em = None
+        grupo.save(update_fields=["expira_em", "atualizado_em"])
+    return confirmadas > 0
+
+
+@transaction.atomic
+def checkin_grupo(grupo, usuario) -> dict:
+    """Check-in de conveniência do bloco: entra em cada quarto pronto, pula os que
+    não dá (bloqueado, sujo) e devolve o que entrou e o que ficou."""
+    entrou, pendentes = [], []
+    for filha in grupo.filhas.filter(status=Reserva.Status.CONFIRMADA):
+        try:
+            filha.fazer_checkin(usuario)
+            entrou.append(filha.uh.numero)
+        except ValidationError as erro:
+            pendentes.append(f"{filha.uh.numero}: {' '.join(erro.messages)}")
+    return {"entrou": entrou, "pendentes": pendentes}
+
+
+@transaction.atomic
+def cancelar_grupo(grupo, usuario, motivo: str):
+    """Cancela o bloco inteiro (cascata). Recusa se algum quarto já está hospedado —
+    faça o check-out antes."""
+    if not motivo:
+        raise ValidationError("Informe o motivo do cancelamento.")
+    if grupo.filhas.filter(status=Reserva.Status.HOSPEDADA).exists():
+        raise ValidationError(
+            "Há quarto hospedado no grupo — faça o check-out antes de cancelar."
+        )
+    for filha in grupo.filhas.filter(
+        status__in=[Reserva.Status.PRE_RESERVA, Reserva.Status.CONFIRMADA,
+                    Reserva.Status.ORCAMENTO]
+    ):
+        filha.cancelar(usuario, motivo)
+    grupo.motivo_cancelamento = motivo
+    grupo.save(update_fields=["motivo_cancelamento", "atualizado_em"])
+    registrar_auditoria(usuario, "cancelar_grupo", grupo, {"motivo": motivo})
+
+
+@transaction.atomic
+def remover_do_grupo(reserva, usuario, motivo: str):
+    """Remove um quarto do bloco cancelando aquela filha (encolhe, sem derrubar o
+    resto). Só antes do check-in."""
+    if reserva.grupo_id is None:
+        raise ValidationError("Esta reserva não pertence a um grupo.")
+    if reserva.status not in (Reserva.Status.PRE_RESERVA, Reserva.Status.CONFIRMADA,
+                              Reserva.Status.ORCAMENTO):
+        raise ValidationError("Só dá para remover um quarto antes do check-in.")
+    reserva.cancelar(usuario, motivo or "Quarto removido do grupo.")
+
+
+def total_grupo(grupo) -> dict:
+    """Visão consolidada do grupo: folio-mãe (diárias) + consumo por quarto.
+    Só lê e soma — nunca recalcula (cada conta é a fonte única do seu escopo)."""
+    folio = grupo.folio
+    quartos = []
+    consumo_total = Decimal("0.00")
+    saldo_consumo_total = Decimal("0.00")
+    for filha in grupo.filhas.select_related("uh", "hospede").all():
+        conta = getattr(filha, "conta", None)
+        consumo = conta.total_lancamentos() if conta else Decimal("0.00")
+        saldo = conta.saldo() if conta else Decimal("0.00")
+        consumo_total += consumo
+        saldo_consumo_total += saldo
+        quartos.append({
+            "reserva": filha, "uh": filha.uh, "consumo": consumo, "saldo": saldo,
+        })
+    return {
+        "grupo": grupo,
+        "folio": folio,
+        "diarias": folio.total_lancamentos(),
+        "folio_pago": folio.total_pago(),
+        "folio_saldo": folio.saldo(),
+        "quartos": quartos,
+        "consumo_total": consumo_total,
+        "saldo_consumo_total": saldo_consumo_total,
+        "total_geral": folio.total_lancamentos() + consumo_total,
+    }
+
+
+@transaction.atomic
+def receber_folio_grupo(grupo, usuario, forma: FormaPagamento, valor: Decimal,
+                        parcelas: int = 1, observacao: str = "") -> PagamentoConta:
+    """Recebe (parcial ou total) o folio-mãe pelo caixa do operador. O folio só fecha
+    no `encerrar_grupo`, quando o saldo zera."""
+    folio = grupo.folio
+    if not folio.aberta:
+        raise ValidationError("O folio deste grupo já foi fechado.")
+    sufixo = f" ({observacao})" if observacao else ""
+    movimento = _receber_no_caixa(
+        usuario, forma, valor, f"Folio grupo #{grupo.pk} — {grupo.rotulo}{sufixo}",
+        parcelas,
+    )
+    return PagamentoConta.objects.create(
+        conta=folio, movimento_caixa=movimento, valor=valor, observacao=observacao
+    )
+
+
+@transaction.atomic
+def encerrar_grupo(grupo, usuario):
+    """Encerra o grupo: exige todos os quartos fora de estado ativo (check-out ou
+    cancelados) e o folio-mãe com saldo zero. Fecha o folio e marca o grupo."""
+    if grupo.encerrado_em:
+        raise ValidationError("Este grupo já foi encerrado.")
+    if grupo.filhas_ativas.exists():
+        raise ValidationError(
+            "Ainda há quartos ativos no grupo — faça o check-out de todos antes."
+        )
+    folio = grupo.folio
+    if folio.saldo() != Decimal("0.00"):
+        raise ValidationError(
+            f"O folio do grupo tem saldo de R$ {folio.saldo()} — receba ou fature antes."
+        )
+    folio.status = ContaHospedagem.Status.FECHADA
+    folio.fechada_em = timezone.now()
+    folio.save(update_fields=["status", "fechada_em"])
+    grupo.encerrado_em = timezone.now()
+    grupo.save(update_fields=["encerrado_em", "atualizado_em"])
+    registrar_auditoria(usuario, "encerrar_grupo", grupo, {})
+
+
+def expirar_grupos_vencidos() -> int:
+    """Cancela em bloco os grupos cuja retenção venceu (todas as filhas juntas).
+    Roda no cron, junto de expirar_vencidas."""
+    from django.db import transaction as _tx
+
+    agora = timezone.now()
+    vencidos = GrupoReserva.objects.filter(
+        expira_em__lt=agora, encerrado_em__isnull=True
+    ).exclude(filhas__status=Reserva.Status.HOSPEDADA)
+    n = 0
+    for grupo in vencidos:
+        tem_ativas = grupo.filhas.filter(status__in=Reserva.STATUS_ATIVOS).exists()
+        if not tem_ativas:
+            continue
+        with _tx.atomic():
+            for filha in grupo.filhas.filter(status__in=Reserva.STATUS_ATIVOS):
+                filha.status = Reserva.Status.CANCELADA
+                filha.motivo_cancelamento = "Pré-reserva de grupo expirada."
+                filha.save(update_fields=["status", "motivo_cancelamento"])
+            grupo.motivo_cancelamento = "Pré-reserva de grupo expirada (retenção sem confirmação)."
+            grupo.save(update_fields=["motivo_cancelamento", "atualizado_em"])
+        n += 1
+    return n
+
+
 @transaction.atomic
 def trocar_quarto(reserva, novo_uh, usuario, motivo=""):
     """
@@ -539,9 +854,12 @@ def trocar_quarto(reserva, novo_uh, usuario, motivo=""):
 
 
 def contas_abertas():
-    """Contas de hospedagem abertas (para PDVs lançarem consumo na conta do quarto)."""
+    """Contas de hospedagem abertas de QUARTO (para PDVs lançarem consumo na conta).
+    Exclui os folios-mãe de grupo (que não têm reserva/quarto — só diárias)."""
     return (
-        ContaHospedagem.objects.filter(status=ContaHospedagem.Status.ABERTA)
+        ContaHospedagem.objects.filter(
+            status=ContaHospedagem.Status.ABERTA, reserva__isnull=False
+        )
         .select_related("reserva", "reserva__uh", "reserva__hospede")
         .order_by("reserva__uh__numero")
     )
@@ -638,6 +956,7 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
     """
     from django.conf import settings as dj_settings
 
+    from apps.nucleo.estrutura import capacidade as capacidade_estrutura
     from apps.nucleo.models import modulo_ativo
     from apps.nucleo.modulos import Modulo
 
@@ -645,7 +964,7 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
     hospedadas = {
         r.uh_id: r
         for r in Reserva.objects.filter(status=Reserva.Status.HOSPEDADA)
-        .select_related("hospede", "conta")
+        .select_related("hospede", "conta", "grupo")
     }
     chegadas = {
         r.uh_id: r
@@ -748,6 +1067,8 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
             "limpeza_label": _LIMPEZA_LABEL.get(limpeza_cod or "", ""),
             "frigobar_pendente": frigobar_pendente,
             "tipo_nome": uh.tipo.nome,
+            "lotacao": capacidade_estrutura(uh)["maxima_criancas"],
+            "grupo": (reserva.grupo.rotulo if reserva and reserva.grupo_id else ""),
         })
 
     situacoes_filtro = [
@@ -866,3 +1187,209 @@ def dados_graficos() -> dict:
         "canais": {"labels": canal_labels, "valores": canal_valores},
         "funil": {"labels": funil_labels, "valores": funil_valores},
     }
+
+
+# ───────────────────────── FNRH (Ficha Nacional de Registro de Hóspedes) ─────────
+
+def _prefill_titular(reserva) -> dict:
+    """Dados iniciais da ficha do titular, a partir do cadastro do hóspede."""
+    p = reserva.hospede
+    hospede = getattr(p, "hospede", None)
+    dados = {
+        "titular": True,
+        "pessoa": p,
+        "nome": p.nome,
+        "documento_numero": p.documento or "",
+        "cpf": p.documento if p.tipo == p.Tipo.FISICA else "",
+        "endereco": p.endereco or "",
+        "cidade": p.cidade or "",
+        "uf": p.uf or "",
+        "cep": p.cep or "",
+        "telefone": p.telefone or "",
+        "email": p.email or "",
+    }
+    if hospede is not None:
+        dados["nascimento"] = hospede.nascimento
+        dados["nacionalidade"] = hospede.nacionalidade or "Brasileira"
+    return dados
+
+
+def garantir_fichas_fnrh(reserva):
+    """Garante uma ficha por hóspede (titular + acompanhantes = adultos+crianças).
+    Cria a do titular pré-preenchida e os slots vazios que faltarem. Idempotente.
+    Retorna o queryset das fichas da reserva."""
+    from .models import FichaFNRH
+
+    if not reserva.fichas_fnrh.filter(titular=True).exists():
+        FichaFNRH.objects.create(reserva=reserva, **_prefill_titular(reserva))
+    faltam = reserva.total_hospedes - reserva.fichas_fnrh.count()
+    for _ in range(max(0, faltam)):
+        FichaFNRH.objects.create(reserva=reserva, titular=False, nome="")
+    return reserva.fichas_fnrh.all()
+
+
+def marcar_fichas_preenchidas(fichas, *, origem, usuario=None):
+    """Carimba as fichas salvas com quem/quando/por onde foram preenchidas."""
+    from .models import FichaFNRH
+
+    agora = timezone.now()
+    for ficha in fichas:
+        if not ficha.completa:
+            continue
+        ficha.origem = origem
+        ficha.preenchida_em = agora
+        ficha.preenchida_por = usuario if origem == FichaFNRH.Origem.RECEPCAO else None
+        ficha.save(update_fields=["origem", "preenchida_em", "preenchida_por"])
+
+
+def preparar_fnrh(reserva_id):
+    """Portal/recepção: garante as fichas da reserva e devolve (reserva, queryset).
+    (None, None) se a reserva não existe."""
+    reserva = Reserva.objects.filter(pk=reserva_id).first()
+    if reserva is None:
+        return None, None
+    garantir_fichas_fnrh(reserva)
+    return reserva, reserva.fichas_fnrh.all()
+
+
+def fnrh_formset(*, data=None, queryset):
+    """Formset das fichas — para o portal editar sem importar forms internos."""
+    from .forms import FichaFNRHFormSet
+
+    return FichaFNRHFormSet(data, queryset=queryset)
+
+
+# ───────────────────────── BOH (Boletim de Ocupação Hoteleira) ───────────────────
+
+def boh_mensal(ano: int, mes: int) -> dict:
+    """Agrega os dados da FNRH + ocupação de um mês, no formato do Boletim de
+    Ocupação Hoteleira (Embratur). Base: hóspedes que ENTRARAM no mês (check-in no
+    período e que de fato se hospedaram). Só lê e soma."""
+    import calendar
+    from collections import Counter
+
+    from .models import FichaFNRH
+
+    primeiro = date(ano, mes, 1)
+    ultimo = date(ano, mes, calendar.monthrange(ano, mes)[1])
+    dia_seguinte = ultimo + timedelta(days=1)
+    entrou = [Reserva.Status.HOSPEDADA, Reserva.Status.CHECKOUT]
+
+    fichas = FichaFNRH.objects.filter(
+        reserva__checkin__gte=primeiro,
+        reserva__checkin__lte=ultimo,
+        reserva__status__in=entrou,
+    ).select_related("reserva")
+
+    nacional, internacional = Counter(), Counter()
+    motivo, transporte, sexo = Counter(), Counter(), Counter()
+    total_hospedes = 0
+    for f in fichas:
+        total_hospedes += 1
+        pais = (f.pais or "").strip()
+        eh_estrangeiro = bool(pais) and pais.lower() not in ("brasil", "brazil")
+        if eh_estrangeiro:
+            internacional[pais] += 1
+        else:
+            nacional[(f.uf or "").upper() or "Não informado"] += 1
+        motivo[f.get_motivo_viagem_display() or "Não informado"] += 1
+        transporte[f.get_meio_transporte_display() or "Não informado"] += 1
+        sexo[f.get_sexo_display() or "Não informado"] += 1
+
+    # Ocupação (UH-noites) no mês.
+    uhs_hospedagem = UH.objects.filter(
+        tipo__modalidade=TipoUH.Modalidade.HOSPEDAGEM
+    ).exclude(status=UH.Status.INATIVA).count()
+    dias_mes = (dia_seguinte - primeiro).days
+    uh_noites_disponiveis = uhs_hospedagem * dias_mes
+
+    reservas_mes = Reserva.objects.filter(
+        status__in=entrou, checkin__lt=dia_seguinte, checkout__gt=primeiro,
+    )
+    uh_noites_ocupadas = 0
+    for r in reservas_mes:
+        ini = max(r.checkin, primeiro)
+        fim = min(r.checkout, dia_seguinte)
+        uh_noites_ocupadas += max(0, (fim - ini).days)
+
+    # Chegadas do mês (para permanência média).
+    chegadas = list(Reserva.objects.filter(
+        status__in=entrou, checkin__gte=primeiro, checkin__lte=ultimo,
+    ))
+    noites_total = sum(r.noites for r in chegadas)
+    permanencia_media = (noites_total / len(chegadas)) if chegadas else 0.0
+    taxa = (uh_noites_ocupadas / uh_noites_disponiveis) if uh_noites_disponiveis else 0.0
+
+    def ordena(counter):
+        return sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))
+
+    return {
+        "ano": ano, "mes": mes,
+        "periodo": (primeiro, ultimo),
+        "total_hospedes": total_hospedes,
+        "total_chegadas": len(chegadas),
+        "uh_noites_disponiveis": uh_noites_disponiveis,
+        "uh_noites_ocupadas": uh_noites_ocupadas,
+        "taxa_ocupacao": round(taxa * 100, 1),
+        "permanencia_media": round(permanencia_media, 1),
+        "nacional": ordena(nacional),
+        "internacional": ordena(internacional),
+        "motivo": ordena(motivo),
+        "transporte": ordena(transporte),
+        "sexo": ordena(sexo),
+    }
+
+
+# ───────────────────────── Envio à FNRH Digital (push — estratégia B) ────────────
+
+def enviar_fnrh(reserva) -> bool:
+    """Empurra a reserva + fichas para a FNRH Digital via gateway. Idempotente
+    (reaproveita ids já obtidos) e best-effort: em falha, marca erro e NÃO levanta —
+    a recepção não trava. Retorna True se ficou 'enviada'."""
+    import logging
+
+    from . import fnrh_gateway
+
+    log = logging.getLogger(__name__)
+    if reserva.fnrh_status == Reserva.SincFNRH.ENVIADA:
+        return True
+    try:
+        gw = fnrh_gateway.get_gateway()
+        if not reserva.fnrh_reserva_id:
+            reserva.fnrh_reserva_id = gw.criar_reserva(reserva)
+        for ficha in reserva.fichas_fnrh.all():
+            if not ficha.completa:
+                continue
+            mudou = []
+            if not ficha.fnrh_pessoa_id:
+                ficha.fnrh_pessoa_id = gw.criar_pessoa(ficha)
+                mudou.append("fnrh_pessoa_id")
+            if not ficha.fnrh_hospede_id:
+                ficha.fnrh_hospede_id = gw.adicionar_hospede(
+                    reserva.fnrh_reserva_id, ficha, ficha.fnrh_pessoa_id
+                )
+                mudou.append("fnrh_hospede_id")
+            if mudou:
+                ficha.save(update_fields=mudou)
+        gw.checkin(reserva.fnrh_reserva_id)
+    except Exception as erro:  # best-effort: registra e segue
+        reserva.fnrh_status = Reserva.SincFNRH.ERRO
+        reserva.fnrh_erro = str(erro)[:500]
+        reserva.save(update_fields=["fnrh_reserva_id", "fnrh_status", "fnrh_erro"])
+        log.warning("Envio FNRH falhou (reserva %s): %s", reserva.pk, erro)
+        return False
+    reserva.fnrh_status = Reserva.SincFNRH.ENVIADA
+    reserva.fnrh_sincronizada_em = timezone.now()
+    reserva.fnrh_erro = ""
+    reserva.save(update_fields=[
+        "fnrh_reserva_id", "fnrh_status", "fnrh_sincronizada_em", "fnrh_erro",
+    ])
+    return True
+
+
+def fnrh_pendentes_qs():
+    """Reservas hospedadas/checkout que ainda não foram aceitas pela FNRH."""
+    return Reserva.objects.filter(
+        status__in=[Reserva.Status.HOSPEDADA, Reserva.Status.CHECKOUT],
+        fnrh_status__in=[Reserva.SincFNRH.PENDENTE, Reserva.SincFNRH.ERRO],
+    )

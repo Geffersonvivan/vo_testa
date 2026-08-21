@@ -1,9 +1,15 @@
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
+from django.contrib.sitemaps.views import sitemap
 from django.http import HttpResponse
 from django.urls import include, path, re_path
 from django.views.static import serve
+
+from apps.site import views as site_views
+from apps.site.sitemaps import PaginasEstaticas
+
+sitemaps = {"paginas": PaginasEstaticas}
 
 
 def healthz(_request):
@@ -13,6 +19,11 @@ def healthz(_request):
 
 urlpatterns = [
     path("healthz/", healthz, name="healthz"),
+
+    # SEO / robôs (raiz do domínio).
+    path("robots.txt", site_views.robots_txt),
+    path("llms.txt", site_views.llms_txt),
+    path("sitemap.xml", sitemap, {"sitemaps": sitemaps}, name="sitemap"),
 
     # Público (hóspede) — permanece na raiz, fora do /crm.
     path("hospede/", include("apps.portal.urls")),

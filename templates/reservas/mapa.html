@@ -9,6 +9,7 @@
   <h1>Mapa de reservas</h1>
   <div class="acoes" style="margin:0">
     <a href="{% url 'reservas:mapa_quartos' %}" class="botao-neutro">Mapa de quartos</a>
+    <a href="{% url 'reservas:grupos' %}" class="botao-neutro">Grupos</a>
     <button type="button" class="botao-primario"
             hx-get="{% url 'reservas:nova' %}" hx-target="#modal-conteudo">Nova reserva</button>
   </div>

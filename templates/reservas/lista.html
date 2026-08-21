@@ -6,8 +6,12 @@
 <p class="pagina-eyebrow letreiro">Reservas</p>
 <div class="pagina-cabecalho">
   <h1>Reservas</h1>
-  <button type="button" class="botao-primario"
-          hx-get="{% url 'reservas:nova' %}" hx-target="#modal-conteudo">Nova reserva</button>
+  <div class="acoes">
+    <a href="{% url 'reservas:grupos' %}" class="botao-neutro">Grupos</a>
+    {% if eh_gerente %}<a href="{% url 'reservas:boh' %}" class="botao-neutro">BOH (Embratur)</a>{% endif %}
+    <button type="button" class="botao-primario"
+            hx-get="{% url 'reservas:nova' %}" hx-target="#modal-conteudo">Nova reserva</button>
+  </div>
 </div>
 
 <form method="get" class="barra-busca">

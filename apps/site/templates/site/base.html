@@ -6,6 +6,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Pousada Vô Testa{% endblock %}</title>
 
+    {# SEO: descrição por página (override no bloco), canonical e Open Graph #}
+    <meta name="description" content="{% block meta_description %}Pousada Vô Testa — hospedagem à beira do Lago de Itá (Itá/SC): quartos, cabanas, day use com piscina e mirantes, pesca esportiva e eventos. Reserve direto pelo site.{% endblock %}">
+    <link rel="canonical" href="{{ request.build_absolute_uri }}">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="{% block og_title %}Pousada Vô Testa · Lago de Itá{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}À beira do Lago de Itá (SC): hospedagem, day use, pesca esportiva e eventos.{% endblock %}">
+    {% block og_extra %}{% endblock %}
+
+    {# Google Analytics (GA4) — só carrega se GA_MEASUREMENT_ID estiver setado. #}
+    {# TODO: banner de consentimento (LGPD) antes de ligar em produção. #}
+    {% if ga_measurement_id %}
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_measurement_id }}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '{{ ga_measurement_id }}');
+    </script>
+    {% endif %}
+
     <!-- Fontes — Neco (display + corpo) -->
     <style>
         @font-face {
@@ -39,26 +59,10 @@
     </style>
 
     <!-- Tailwind CSS (CDN para desenvolvimento) -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        noturno: '#051C2C',
-                        madeira: '#4F2C1D',
-                        lampiao: '#D7A048',
-                        pergaminho: '#EFDBB2',
-                        musgo: '#2E483E',
-                    },
-                    fontFamily: {
-                        display: ['Neco', 'serif'],
-                        body: ['Neco', 'serif'],
-                    }
-                }
-            }
-        }
-    </script>
+    {# Tailwind: build estático (substitui o Play CDN). Regenerar após mudar classes:
+       npx tailwindcss@3 -c tailwind.config.js -i tailwind.src.css -o apps/site/static/site/css/tailwind.css --minify #}
+    <link rel="stylesheet" href="{% static 'site/css/tailwind.css' %}?v=1">
+    {# 'lab.html' (beta oculto) segue no CDN por ser sandbox de protótipos. #}
 
     <!-- Animações -->
     <link rel="stylesheet" href="{% static 'site/css/animations.css' %}">

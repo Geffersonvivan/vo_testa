@@ -57,3 +57,10 @@ evidencias/safrapay/*.json
 evidencias/safrapay/prints/*
 !evidencias/safrapay/prints/.gitkeep
 !evidencias/safrapay/README.md
+
+# Artefatos grandes (não são código-fonte)
+/SIteCRM*.zip
+/SIteCRM_Vo_Testa_Design/
+
+# Referência pesada — manter local, fora do git
+docs/Foco_Tecnologia.pdf

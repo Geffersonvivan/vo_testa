@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}Sua estadia — Pousada Vô Testa{% endblock %}</title>
   <link rel="icon" href="{% static 'img/simbolo-dourado.png' %}" type="image/png">
-  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=fnrh3">
   <style>
     body { background: var(--canvas); margin: 0; padding: 0 0 3rem; }
     .pt-topo { background: var(--noturno); padding: 1.1rem 1rem; text-align: center; }
@@ -49,6 +49,30 @@
       background: rgba(46,125,91,.1); color: var(--musgo);
     }
     .pt-nps-nota.desabilitada { opacity: .45; }
+    /* Check-in online: progresso + barra de envio fixa (alcance do polegar) */
+    .pt-progresso { margin-top: .9rem; }
+    .pt-progresso-barra {
+      display: block; height: 7px; border-radius: 999px; background: var(--fio);
+      overflow: hidden; position: relative;
+    }
+    .pt-progresso-barra::after {
+      content: ""; position: absolute; inset: 0; width: var(--pct, 0%);
+      background: linear-gradient(90deg, var(--lampiao-claro), var(--lampiao));
+      border-radius: 999px; transition: width .35s cubic-bezier(.2,.9,.3,1);
+    }
+    .pt-progresso.ok .pt-progresso-barra::after { background: var(--musgo); }
+    .pt-progresso-txt { display: block; margin-top: .4rem; font-size: .8rem; color: var(--tinta-suave); font-weight: 600; }
+    .pt-barra-fixa {
+      position: sticky; bottom: 0; margin: 1rem -1rem -1rem; padding: .9rem 1rem calc(.9rem + env(safe-area-inset-bottom));
+      background: color-mix(in srgb, var(--canvas) 82%, transparent);
+      backdrop-filter: blur(12px) saturate(160%); -webkit-backdrop-filter: blur(12px) saturate(160%);
+      border-top: 1px solid var(--fio);
+    }
+    .pt-barra-fixa .botao-primario { width: 100%; padding: .85rem; font-size: 1rem; }
+    .pt-barra-fixa .botao-primario:active { transform: scale(.985); }
+    @media (prefers-reduced-transparency: reduce) {
+      .pt-barra-fixa { background: var(--canvas); backdrop-filter: none; -webkit-backdrop-filter: none; }
+    }
   </style>
 </head>
 <body>

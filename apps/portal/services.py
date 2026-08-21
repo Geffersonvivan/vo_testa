@@ -40,6 +40,12 @@ def resolver(token):
     return dados_estadia(acesso.reserva_id)
 
 
+def acesso_por_token(token) -> AcessoPortal | None:
+    """AcessoPortal cru pelo token — usado no pré check-in (FNRH), que acontece
+    ANTES da hospedagem, quando `resolver` ainda não retorna dados de estadia."""
+    return AcessoPortal.objects.filter(token=token).first()
+
+
 def _local_restaurante():
     return (
         LocalEstoque.objects.filter(modulo=Modulo.RESTAURANTE, ativo=True).first()

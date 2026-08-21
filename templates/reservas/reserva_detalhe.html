@@ -138,25 +138,55 @@
   </details>
 {% endif %}
 
-{# ---------- Acompanhantes ---------- #}
-<h2>Acompanhantes</h2>
-{% if reserva.acompanhantes.exists %}
+{# ---------- FNRH (Ficha Nacional de Registro de Hóspedes) ---------- #}
+<h2>FNRH — Ficha de hóspedes
+  {% if fnrh_pronta %}
+    <span class="selo selo-ok">completa</span>
+  {% else %}
+    <span class="selo selo-alerta">{{ fnrh_completas }}/{{ fnrh_total }} preenchida{{ fnrh_total|pluralize }}</span>
+  {% endif %}
+</h2>
+<p class="subtitulo">Registro obrigatório (Embratur) de cada hóspede — uma ficha completa por
+  pessoa libera o check-in.</p>
+{% if reserva.fichas_fnrh.exists %}
   <table class="tabela">
-    <thead><tr><th>Nome</th><th>Documento</th></tr></thead>
+    <thead><tr><th>Hóspede</th><th>Documento</th><th>Situação</th><th>Via</th></tr></thead>
     <tbody>
-      {% for a in reserva.acompanhantes.all %}
-        <tr><td>{{ a.nome }}</td><td>{{ a.documento|default:"—" }}</td></tr>
+      {% for f in reserva.fichas_fnrh.all %}
+        <tr>
+          <td>{{ f.nome|default:"—" }} {% if f.titular %}<span class="selo selo-neutro">responsável</span>{% endif %}</td>
+          <td>{{ f.documento_numero|default:"—" }}</td>
+          <td>{% if f.completa %}<span class="selo selo-ok">completa</span>{% else %}<span class="selo selo-alerta">pendente</span>{% endif %}</td>
+          <td>{{ f.get_origem_display }}</td>
+        </tr>
       {% endfor %}
     </tbody>
   </table>
 {% endif %}
 {% if reserva.ativa %}
-  <form method="post" action="{% url 'reservas:acompanhante_novo' reserva.pk %}" class="form-inline form-cartao">
-    {% csrf_token %}
-    <input type="text" name="nome" placeholder="Nome do acompanhante" required>
-    <input type="text" name="documento" placeholder="Documento (opcional)">
-    <button type="submit" class="botao-neutro">Incluir</button>
-  </form>
+  <div class="acoes">
+    <a href="{% url 'reservas:fnrh' reserva.pk %}" class="botao-primario">Preencher / editar FNRH</a>
+    <a href="{% url 'portal:qr_fnrh' reserva.pk %}" class="botao-neutro">QR para o hóspede preencher</a>
+  </div>
+{% endif %}
+
+{% if reserva.fnrh_status != 'nao_enviada' %}
+  <p class="fnrh-sinc">
+    <span class="letreiro">FNRH Digital (Embratur):</span>
+    {% if reserva.fnrh_status == 'enviada' %}
+      <span class="selo selo-ok">enviada</span> em {{ reserva.fnrh_sincronizada_em|date:"d/m/Y H:i" }}
+    {% elif reserva.fnrh_status == 'erro' %}
+      <span class="selo selo-alerta">erro</span> <small class="ajuda">{{ reserva.fnrh_erro }}</small>
+    {% else %}
+      <span class="selo selo-neutro">pendente de envio</span>
+    {% endif %}
+    {% if eh_gerente and reserva.fnrh_status != 'enviada' %}
+      <form method="post" action="{% url 'reservas:fnrh_reenviar' reserva.pk %}" style="display:inline">
+        {% csrf_token %}
+        <button type="submit" class="botao-mini">Reenviar</button>
+      </form>
+    {% endif %}
+  </p>
 {% endif %}
 
 {# ---------- Conta do quarto ---------- #}

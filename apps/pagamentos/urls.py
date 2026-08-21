@@ -19,4 +19,5 @@ urlpatterns = [
     # Link público de pagamento
     path("pagar/<uuid:token>/", views.pagar, name="pagar"),
     path("pagar/<uuid:token>/confirmar/", views.pagar_simular, name="pagar_simular"),
+    path("pagar/<uuid:token>/cartao/", views.pagar_cartao, name="pagar_cartao"),
 ]

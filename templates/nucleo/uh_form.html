@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ titulo }} — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Cadastros</p>
+<h1>{% if uh %}Quarto {{ uh.numero }}{% else %}Novo quarto{% endif %}</h1>
+
+<form method="post" class="form-cartao">
+  {% csrf_token %}
+
+  {% include "nucleo/partials/campos.html" %}
+
+  {% if uh %}
+  <h2>Composição de camas</h2>
+  <p class="subtitulo">A capacidade e a frase de camas são calculadas daqui — não se digita capacidade.</p>
+
+  <h3>Posições de cama</h3>
+  <p class="ajuda">Cada posição acomoda 2 pessoas em qualquer montagem. Marque «Excluir» para remover.</p>
+  {{ formset.management_form }}
+  {% if formset.non_form_errors %}
+    <div class="mensagem error">{{ formset.non_form_errors|join:" " }}</div>
+  {% endif %}
+  <table class="tabela">
+    <thead>
+      <tr><th>Nome</th><th>Montagem padrão</th><th>Ordem</th><th>Excluir</th></tr>
+    </thead>
+    <tbody>
+      {% for f in formset %}
+        <tr class="campo {% if f.errors %}campo-erro{% endif %}">
+          {% for hidden in f.hidden_fields %}{{ hidden }}{% endfor %}
+          <td>{{ f.nome }}</td>
+          <td>{{ f.montagem_padrao }}</td>
+          <td>{{ f.ordem }}</td>
+          <td>{% if f.instance.pk %}{{ f.DELETE }}{% else %}<span class="ajuda">nova</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h3>Sofá-cama e colchões extras</h3>
+  {% include "nucleo/partials/campos.html" with form=config_form %}
+
+  <div class="cartao" style="margin-top:1rem">
+    <h3>Capacidade calculada</h3>
+    <p>
+      <strong>{{ capacidade.maxima_criancas }} pessoas</strong> —
+      {{ capacidade.fixa }} em cama fixa
+      {% if capacidade.sofa_adultos %}· {{ capacidade.sofa_adultos }} no sofá (ou {{ capacidade.sofa_criancas }} crianças até {{ capacidade.idade_sofa }} anos){% endif %}
+      {% if capacidade.extras %}· até {{ capacidade.extras }} em colchão extra{% endif %}.
+    </p>
+    <p class="ajuda">Só adultos: {{ capacidade.maxima }} · com crianças no sofá: {{ capacidade.maxima_criancas }}.</p>
+    <p>{{ descricao_camas }}</p>
+  </div>
+  {% else %}
+  <p class="ajuda">Salve o quarto para configurar as camas e a capacidade.</p>
+  {% endif %}
+
+  <div class="acoes">
+    <button type="submit" class="botao-primario">Salvar</button>
+    <a href="{% url voltar %}" class="botao-neutro">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

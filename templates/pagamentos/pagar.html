@@ -23,6 +23,17 @@
     .pay .botao-primario:active { transform: scale(.98) translateY(1px); }
     .pay-ok { color: var(--sucesso); font-weight: 700; margin: 0 0 .4rem; font-size: 1.05rem; }
     .pay-ok-ico { font-size: 1.4rem; }
+    /* Formulário de cartão */
+    .card-form { text-align: left; margin-top: 1rem; }
+    .card-form label { display: block; font-size: .72rem; color: var(--tinta-suave); margin: .7rem 0 .25rem; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; }
+    .card-form input {
+      width: 100%; padding: .7rem .8rem; font-size: 1rem; font-variant-numeric: tabular-nums;
+      color: var(--tinta); background: var(--superficie); border: 1px solid var(--fio-forte);
+      border-radius: var(--raio-p); transition: border-color .15s, box-shadow .15s;
+    }
+    .card-form input:focus { outline: none; border-color: var(--lampiao); box-shadow: 0 0 0 3px rgba(215,160,72,.25); }
+    .card-form .linha { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; }
+    .card-seguro { font-size: .72rem; color: var(--tinta-suave); margin-top: .8rem; display: flex; align-items: center; gap: .35rem; justify-content: center; }
   </style>
 </head>
 <body>
@@ -65,20 +76,54 @@
         {% if cobranca.payload.boleto_url %}
           <a href="{{ cobranca.payload.boleto_url }}" target="_blank" rel="noopener" class="botao-neutro" style="display:block;margin-top:.6rem">Abrir boleto (PDF)</a>
         {% endif %}
-      {% elif cobranca.metodo == 'cartao' %}
-        <p class="subtitulo">Pagamento com cartão{% if sandbox %} (sandbox){% endif %}.{% if sandbox %} Confirme abaixo para simular a aprovação.{% endif %}</p>
       {% endif %}
-      <form method="post" action="{% url 'pagamentos:pagar_simular' cobranca.token %}" data-verificar>
-        {% csrf_token %}
-        <button type="submit" class="botao-primario" style="width:100%;margin-top:1rem">
-          <span class="btn-label">{% if sandbox %}Já paguei{% else %}Já paguei — verificar pagamento{% endif %}</span>
-          <span class="btn-spin" aria-hidden="true"></span>
-        </button>
-      </form>
-      {% if sandbox %}
-        <p class="subtitulo" style="margin-top:1rem;font-size:.78rem">Ambiente de testes (sandbox). Nenhum valor real é cobrado.</p>
+
+      {% if cobranca.metodo == 'cartao' and not sandbox %}
+        {# Captura do cartão — crédito à vista. O número só transita para o gateway. #}
+        <p class="subtitulo">Pague com cartão de crédito.</p>
+        <form method="post" action="{% url 'pagamentos:pagar_cartao' cobranca.token %}" class="card-form" data-verificar>
+          {% csrf_token %}
+          <label for="cc-nome">Nome impresso no cartão</label>
+          <input type="text" id="cc-nome" name="nome" autocomplete="cc-name" required>
+          <label for="cc-num">Número do cartão</label>
+          <input type="text" id="cc-num" name="numero" inputmode="numeric" autocomplete="cc-number"
+                 maxlength="19" placeholder="0000 0000 0000 0000" required>
+          <div class="linha">
+            <div>
+              <label for="cc-val">Validade (MM/AA)</label>
+              <input type="text" id="cc-val" name="validade" inputmode="numeric" autocomplete="cc-exp"
+                     maxlength="5" placeholder="MM/AA" required>
+            </div>
+            <div>
+              <label for="cc-cvv">CVV</label>
+              <input type="text" id="cc-cvv" name="cvv" inputmode="numeric" autocomplete="cc-csc"
+                     maxlength="4" placeholder="123" required>
+            </div>
+          </div>
+          <label for="cc-doc">CPF do titular</label>
+          <input type="text" id="cc-doc" name="documento" inputmode="numeric" placeholder="Somente números">
+          <button type="submit" class="botao-primario" style="width:100%;margin-top:1.1rem">
+            <span class="btn-label">Pagar R$ {{ cobranca.valor|floatformat:2 }}</span>
+            <span class="btn-spin" aria-hidden="true"></span>
+          </button>
+          <p class="card-seguro">🔒 Seus dados são enviados com segurança e não ficam guardados aqui.</p>
+        </form>
       {% else %}
-        <p class="subtitulo" style="margin-top:1rem;font-size:.78rem">Após pagar, clique acima — verificamos a confirmação com o banco. Pode levar alguns instantes.</p>
+        {% if cobranca.metodo == 'cartao' %}
+          <p class="subtitulo">Pagamento com cartão (sandbox). Confirme abaixo para simular a aprovação.</p>
+        {% endif %}
+        <form method="post" action="{% url 'pagamentos:pagar_simular' cobranca.token %}" data-verificar>
+          {% csrf_token %}
+          <button type="submit" class="botao-primario" style="width:100%;margin-top:1rem">
+            <span class="btn-label">{% if sandbox %}Já paguei{% else %}Já paguei — verificar pagamento{% endif %}</span>
+            <span class="btn-spin" aria-hidden="true"></span>
+          </button>
+        </form>
+        {% if sandbox %}
+          <p class="subtitulo" style="margin-top:1rem;font-size:.78rem">Ambiente de testes (sandbox). Nenhum valor real é cobrado.</p>
+        {% else %}
+          <p class="subtitulo" style="margin-top:1rem;font-size:.78rem">Após pagar, clique acima — verificamos a confirmação com o banco. Pode levar alguns instantes.</p>
+        {% endif %}
       {% endif %}
       <div class="acoes">
         <a href="{% url 'core:home' %}" class="botao-neutro">Cancelar e voltar ao site</a>

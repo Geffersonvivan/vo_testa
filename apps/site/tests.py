@@ -441,3 +441,36 @@ class MinhaReservaTests(TestCase):
             r = self.client.get(reverse(nome))
             self.assertContains(r, 'Voltar ao site')
             self.assertContains(r, reverse('core:home'))
+
+
+class SeoTests(TestCase):
+    """Pacote SEO: robots, llms, sitemap, meta tags e GA4 condicional."""
+
+    def test_robots_bloqueia_crm_e_aponta_sitemap(self):
+        r = self.client.get("/robots.txt")
+        self.assertEqual(r.status_code, 200)
+        corpo = r.content.decode()
+        self.assertIn("Disallow: /crm/", corpo)
+        self.assertIn("Disallow: /hospede/", corpo)
+        self.assertIn("Sitemap:", corpo)
+
+    def test_llms_txt(self):
+        r = self.client.get("/llms.txt")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("Pousada Vô Testa", r.content.decode())
+
+    def test_sitemap_lista_paginas(self):
+        r = self.client.get("/sitemap.xml")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("<loc>", r.content.decode())
+
+    def test_home_tem_meta_description_e_canonical(self):
+        html = self.client.get("/").content.decode()
+        self.assertIn('name="description"', html)
+        self.assertIn('rel="canonical"', html)
+
+    def test_ga4_so_carrega_com_id(self):
+        self.assertNotIn("googletagmanager", self.client.get("/").content.decode())
+        with self.settings(GA_MEASUREMENT_ID="G-TESTE123"):
+            html = self.client.get("/").content.decode()
+            self.assertIn("G-TESTE123", html)

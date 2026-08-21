@@ -7,9 +7,11 @@ app_name = "portal"
 urlpatterns = [
     # Recepção (staff)
     path("recepcao/<int:reserva_id>/qr/", views.qr, name="qr"),
+    path("recepcao/<int:reserva_id>/fnrh-qr/", views.qr_fnrh, name="qr_fnrh"),
     path("recepcao/solicitacoes/", views.solicitacoes, name="solicitacoes"),
     # Hóspede (público, por token)
     path("<uuid:token>/", views.home, name="home"),
+    path("<uuid:token>/checkin/", views.checkin, name="checkin"),
     path("<uuid:token>/nps/", views.nps, name="nps"),
     path("<uuid:token>/pedir/", views.pedir, name="pedir"),
     path("<uuid:token>/solicitar/", views.solicitar, name="solicitar"),
