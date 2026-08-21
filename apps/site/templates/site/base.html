@@ -59,10 +59,12 @@
     </style>
 
     <!-- Tailwind CSS (CDN para desenvolvimento) -->
-    {# Tailwind: build estático (substitui o Play CDN). Regenerar após mudar classes:
-       npx tailwindcss@3 -c tailwind.config.js -i tailwind.src.css -o apps/site/static/site/css/tailwind.css --minify #}
+    {% comment %}Tailwind: build estático (substitui o Play CDN). Regenerar após mudar
+    classes: npx tailwindcss@3 -c tailwind.config.js -i tailwind.src.css -o apps/site/static/site/css/tailwind.css --minify
+    'lab.html' (beta oculto) segue no CDN por ser sandbox de protótipos.{% endcomment %}
     <link rel="stylesheet" href="{% static 'site/css/tailwind.css' %}?v=1">
-    {# 'lab.html' (beta oculto) segue no CDN por ser sandbox de protótipos. #}
+    {# Cor de fundo antes do CSS carregar (evita flash branco no refresh) #}
+    <style>html{background:#051C2C}</style>
 
     <!-- Animações -->
     <link rel="stylesheet" href="{% static 'site/css/animations.css' %}">
