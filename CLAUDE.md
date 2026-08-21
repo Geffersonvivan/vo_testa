@@ -26,9 +26,15 @@ Config por variável de ambiente (`.env` local — ver `.env.example`). `DEBUG=1
 
 **NUNCA fazer deploy, commit ou push sem comando explícito do usuário.** Trabalhar
 normalmente no código local (editar, migrar, testar); versionar e subir, só quando
-ele mandar. Quando o deploy for autorizado: criar projeto Railway novo para o CRM —
-o projeto `pousada-vo-testa` existente é o SITE em produção (repo
-`Pousada_Vo_Testa.git`), não tocar.
+ele mandar.
+
+**Produção (cutover feito):** o site+CRM unificado deste repo (`Geffersonvivan/vo_testa`)
+já roda em produção no projeto Railway **`Site_CRM_Pousada_Vo_Testa`** (env `production`,
+serviço `web`), servindo **`www.pousadavotesta.com.br`**. O serviço é **conectado ao
+GitHub e auto-deploya no push da `main`** (roda `migrate + collectstatic + gunicorn` via
+`railway.json`) — ou seja, autorizar `push` na `main` = publicar. Não rodar `railway up`
+manual (criaria deploy paralelo à integração do GitHub); para publicar, basta o push
+autorizado. O antigo `pousada-vo-testa`/`Site_Vo_Testa` foi aposentado.
 
 ## Processo por módulo
 
@@ -302,10 +308,10 @@ desenhar o nosso.
     pendente e só autoriza quando o hóspede digita. **Bloqueio real = processo, não
     código:** falta gerar/enviar o pacote de evidências à Safrapay p/ liberar o Token
     (Developers→Keys), depois `.env` + webhook público. Plano em `docs/Implementar_Safrapay.md`.
-  - **Pendente (fase 2, cutover):** (1) reconciliar/
-    limpar os models duplicados do site (core.Reserva/Quarto/Hospede vs CRM) e telas de
-    gestão do site no CRM; (3) apontar DNS `www.pousadavotesta.com.br` pro app unificado
-    e aposentar o `Site_Vo_Testa`. Até o cutover, não tocar no site em produção.
+  - **Cutover FEITO:** o app unificado já está em produção em `www.pousadavotesta.com.br`
+    (Railway `Site_CRM_Pousada_Vo_Testa`, auto-deploy no push da `main`); o `Site_Vo_Testa`
+    antigo foi aposentado. Pendente ainda: reconciliar/limpar os models duplicados do site
+    (core.Reserva/Quarto/Hospede vs CRM) e as telas de gestão do site no CRM.
 - **Fiscal — esqueleto implementado** (§14, fase 2, **inativo por padrão**): app
   `apps/fiscal` com **gateway plugável** (`FISCAL_GATEWAY`: `simulado` sandbox ativo /
   `focus` Focus NFe / `governo` direto — os dois últimos são **stubs** a preencher).
