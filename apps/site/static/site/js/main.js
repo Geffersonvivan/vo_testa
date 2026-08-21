@@ -179,3 +179,79 @@ function aplicarMascara(el) {
 }
 
 document.querySelectorAll('[data-mask="cpf"], [data-mask="telefone"]').forEach(aplicarMascara);
+
+
+/* ── Galeria: lightbox/carrossel (foto grande + cartão + Instagram) ── */
+(function () {
+    const lb = document.getElementById('galeria-lightbox');
+    const grid = document.getElementById('galeria-grid');
+    if (!lb || !grid) return;
+
+    const itens = Array.from(grid.querySelectorAll('[data-galeria-item]'))
+        .map(b => ({ src: b.dataset.src, legenda: b.dataset.legenda, categoria: b.dataset.categoria }))
+        .filter(f => f.src);
+    if (!itens.length) return;
+
+    const insta = lb.dataset.instagram || '#';
+    const q = s => lb.querySelector(s);
+    const dotsBox = q('[data-gl-dots]');
+    let atual = 0;
+
+    // Pontos de navegação
+    itens.forEach((_, i) => {
+        const d = document.createElement('button');
+        d.type = 'button';
+        d.setAttribute('aria-label', `Foto ${i + 1}`);
+        d.className = 'w-2.5 h-2.5 rounded-full transition-colors';
+        d.addEventListener('click', () => ir(i));
+        dotsBox.appendChild(d);
+    });
+
+    function pintar() {
+        const f = itens[atual];
+        // conteúdo (desktop + mobile)
+        [q('[data-gl-img]'), q('[data-gl-img-m]')].forEach(img => { if (img) img.src = f.src; });
+        [q('[data-gl-legenda]'), q('[data-gl-legenda-m]')].forEach(e => { if (e) e.textContent = f.legenda || f.categoria; });
+        [q('[data-gl-categoria]'), q('[data-gl-categoria-m]')].forEach(e => { if (e) e.textContent = f.categoria; });
+        [q('[data-gl-insta]'), q('[data-gl-insta-m]')].forEach(a => { if (a) a.href = insta; });
+        // fade suave nos blocos
+        ['[data-gl-img]', '[data-gl-card]', '[data-gl-img-m]', '[data-gl-card-m]'].forEach(sel => {
+            const el = q(sel); if (!el) return;
+            el.style.opacity = '0';
+            requestAnimationFrame(() => { el.style.opacity = '1'; });
+        });
+        // pontos ativos
+        Array.from(dotsBox.children).forEach((d, i) => {
+            d.className = 'w-2.5 h-2.5 rounded-full transition-colors ' +
+                (i === atual ? 'bg-lampiao' : 'bg-pergaminho/30');
+        });
+    }
+
+    function ir(i) { atual = (i + itens.length) % itens.length; pintar(); }
+
+    function abrir(i) {
+        ir(i);
+        lb.classList.remove('hidden');
+        lb.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+    }
+    function fechar() {
+        lb.classList.add('hidden');
+        lb.classList.remove('flex');
+        document.body.style.overflow = '';
+    }
+
+    grid.querySelectorAll('[data-galeria-item]').forEach((b, i) => {
+        if (b.dataset.src) b.addEventListener('click', () => abrir(i));
+    });
+    q('[data-gl-prev]').addEventListener('click', () => ir(atual - 1));
+    q('[data-gl-next]').addEventListener('click', () => ir(atual + 1));
+    q('[data-gl-close]').addEventListener('click', fechar);
+    lb.addEventListener('click', e => { if (e.target === lb) fechar(); });
+    document.addEventListener('keydown', e => {
+        if (lb.classList.contains('hidden')) return;
+        if (e.key === 'Escape') fechar();
+        else if (e.key === 'ArrowLeft') ir(atual - 1);
+        else if (e.key === 'ArrowRight') ir(atual + 1);
+    });
+})();
