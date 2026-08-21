@@ -14,7 +14,12 @@ build/
 db.sqlite3
 *.sqlite3
 /staticfiles/
-/media/
+# Mídia: ignora conteúdo dinâmico, mas versiona as fotos curadas do site
+# (galeria/quartos) — conteúdo estático que precisa ir para produção.
+# (Railway = filesystem efêmero, sem S3; sem isto as fotos dão 404 no site.)
+/media/*
+!/media/galeria/
+!/media/quartos/
 local_settings.py
 
 # Credenciais e segredos
