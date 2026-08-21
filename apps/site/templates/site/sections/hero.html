@@ -1,16 +1,18 @@
 {% load static %}
 
 <!-- HERO SECTION -->
-<section id="inicio" class="relative min-h-screen flex items-center justify-center overflow-hidden">
+<section id="inicio" class="relative min-h-screen flex flex-col overflow-hidden">
     <!-- Background -->
     <div class="absolute inset-0 bg-gradient-to-br from-noturno via-madeira to-noturno"></div>
 
-    <!-- Conteúdo Hero -->
-    <div class="relative z-10 text-center px-4 sm:px-6 max-w-4xl w-full">
+    <!-- Conteúdo Hero: ocupa o espaço e centraliza; a barra de números abaixo
+         fica no fluxo normal (não sobrepõe em telas de altura menor). -->
+    <div class="relative z-10 flex-1 flex items-center justify-center px-4 sm:px-6 py-24 sm:py-20">
+      <div class="text-center max-w-4xl w-full mx-auto">
         <p class="text-pergaminho/60 text-xs sm:text-sm tracking-[0.3em] sm:tracking-[0.4em] uppercase mb-4 sm:mb-6 font-medium">{{ config.texto_boas_vindas }}</p>
 
         <!-- Logo oficial centralizada -->
-        <img src="{% static 'site/img/logo-hero.png' %}" alt="Pousada Vô Testa" class="h-56 sm:h-80 md:h-[34rem] w-auto mx-auto mb-4 sm:mb-6">
+        <img src="{% static 'site/img/logo-hero.png' %}" alt="Pousada Vô Testa" class="h-44 sm:h-64 md:h-80 lg:h-96 xl:h-[32rem] w-auto mx-auto mb-4 sm:mb-6">
 
         <p class="text-pergaminho/80 text-base sm:text-lg md:text-xl mb-6 sm:mb-10 max-w-2xl mx-auto leading-relaxed px-2">
             {{ config.frase_hero }}
@@ -41,10 +43,11 @@
                 </button>
             </div>
         </form>
+      </div>
     </div>
 
-    <!-- Números de impacto -->
-    <div class="absolute bottom-0 left-0 right-0 bg-madeira/80 backdrop-blur-sm border-t border-lampiao/20">
+    <!-- Números de impacto (fluxo normal, no rodapé do hero — não sobrepõe) -->
+    <div class="relative z-10 bg-madeira/80 backdrop-blur-sm border-t border-lampiao/20">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6 text-center">
             <div>
                 <span class="font-display text-xl sm:text-3xl font-black text-lampiao">{{ config.numero_viajantes }}</span>
