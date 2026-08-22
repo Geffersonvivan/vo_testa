@@ -2657,3 +2657,17 @@ form.filtros:not(.subnav) select:focus {
   .tela-reservas .form-cartao { border-color: var(--fio-forte); }
   .tela-reservas .selo { border-width: 1.5px; }
 }
+
+/* Ficha do Funcionário (RH) — blocos lado a lado, campos em grade */
+.ficha-cols { display: grid; grid-template-columns: 1.25fr 1fr; gap: 18px; align-items: start; }
+.bloco-ficha { background: var(--superficie); border: 1px solid var(--fio); border-radius: var(--raio); box-shadow: var(--sombra-1); padding: 16px 18px; }
+.bloco-ficha h4 { margin: 0 0 12px; font-size: .72rem; color: var(--tinta-suave); }
+.ficha-func .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+.ficha-func .campo { margin: 0; }
+.ficha-func .campo label { display: block; font-size: .68rem; letter-spacing: .05em; text-transform: uppercase; color: var(--tinta-suave); margin-bottom: 3px; }
+.ficha-func .campo input, .ficha-func .campo select {
+  width: 100%; padding: .5rem .65rem; border: 1px solid var(--fio); border-radius: 8px;
+  background: var(--superficie-2); color: var(--tinta); font-size: .9rem; font-family: inherit;
+}
+.ficha-func .campo input:focus, .ficha-func .campo select:focus { outline: none; border-color: var(--lampiao); box-shadow: 0 0 0 2px rgba(226,168,74,.18); }
+@media (max-width: 820px) { .ficha-cols { grid-template-columns: 1fr; } .ficha-func .grid2 { grid-template-columns: 1fr; } }

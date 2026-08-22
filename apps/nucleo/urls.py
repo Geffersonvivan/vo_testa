@@ -6,11 +6,15 @@ urlpatterns = [
     path("", views.dashboard, name="dashboard"),
     path("busca/", views.busca_global, name="busca_global"),
     path("configuracoes/modulos/", views.modulos_central, name="modulos_central"),
-    path("configuracoes/equipe/", views.equipe, name="equipe"),
-    path("configuracoes/equipe/nova/", views.equipe_nova, name="equipe_nova"),
-    path("configuracoes/equipe/<int:pk>/", views.equipe_editar, name="equipe_editar"),
+    # Funcionários (RH) — Pessoal + acesso deriva daqui (substitui Equipe & Acessos)
+    path("funcionarios/", views.funcionarios, name="funcionarios"),
+    path("funcionarios/novo/", views.funcionario_novo, name="funcionario_novo"),
+    path("funcionarios/<int:pk>/", views.funcionario_editar, name="funcionario_editar"),
     # Cadastros
     path("pessoas/", views.pessoas, name="pessoas"),
+    path("hospedes/", views.hospedes, name="hospedes"),
+    path("agencias/", views.agencias, name="agencias"),
+    path("empresas/", views.empresas, name="empresas"),
     path("pessoas/nova/", views.pessoa_form, name="pessoa_nova"),
     path("pessoas/nova-rapida/", views.pessoa_nova_rapida, name="pessoa_nova_rapida"),
     path("pessoas/<int:pk>/", views.pessoa_form, name="pessoa_editar"),

@@ -678,54 +678,8 @@ class EquipeAcessosTests(TestCase):
         self.op.save()
         self.assertEqual(self.client.get(reverse("estrutura")).status_code, 200)
 
-    def test_equipe_exige_area_equipe(self):
-        self.client.force_login(self.op)
-        self.assertEqual(self.client.get(reverse("equipe")).status_code, 403)
-        self.client.force_login(self.dono)  # super passa
-        self.assertEqual(self.client.get(reverse("equipe")).status_code, 200)
-
-    def test_criar_usuario(self):
-        self.client.force_login(self.dono)
-        r = self.client.post(reverse("equipe_nova"), {
-            "username": "novo", "first_name": "Novo", "password": "senha-forte-123",
-        })
-        self.assertEqual(r.status_code, 302)
-        self.assertTrue(Usuario.objects.filter(username="novo").exists())
-
-    def test_editar_concede_modulos_e_areas(self):
-        ModuloContratado.objects.get_or_create(codigo=Modulo.RESERVAS, defaults={"ativo": True})
-        self.client.force_login(self.dono)
-        self.client.post(reverse("equipe_editar", args=[self.op.pk]), {
-            "modulos": [Modulo.RESERVAS], "areas": ["quartos", "financeiro"],
-            "gerente": "on", "ativo": "on",
-        })
-        self.op.refresh_from_db()
-        self.assertTrue(self.op.pode_acessar(Modulo.RESERVAS))
-        self.assertEqual(sorted(self.op.areas), ["financeiro", "quartos"])
-        self.assertTrue(self.op.is_staff)
-
-    def test_nao_rebaixa_a_si_mesmo(self):
-        # dono edita a si mesmo tentando tirar gerência/ativar=off — deve ignorar
-        gerente = Usuario.objects.create_user(
-            username="ger", password="senha-forte-123", is_staff=True
-        )
-        gerente.areas = ["equipe"]
-        gerente.save()
-        self.client.force_login(gerente)
-        self.client.post(reverse("equipe_editar", args=[gerente.pk]), {
-            "areas": ["equipe"],  # sem 'gerente' nem 'ativo'
-        })
-        gerente.refresh_from_db()
-        self.assertTrue(gerente.is_staff)   # não se rebaixou
-        self.assertTrue(gerente.is_active)  # não se desativou
-
-    def test_area_invalida_ignorada(self):
-        self.client.force_login(self.dono)
-        self.client.post(reverse("equipe_editar", args=[self.op.pk]), {
-            "areas": ["quartos", "hackeando"],
-        })
-        self.op.refresh_from_db()
-        self.assertEqual(self.op.areas, ["quartos"])  # 'hackeando' descartada
+    # A gestão de acesso migrou para a ficha do Funcionário — coberta em
+    # FuncionariosTests (conceder acesso, salário só-gerência, self-protection).
 
 
 class AuditoriaAutomaticaTests(TestCase):
@@ -822,3 +776,131 @@ class AuditoriaAutomaticaTests(TestCase):
         self.assertTrue(
             self._trilha(alvo="Usuario", acao="logout", usuario=self.user).exists()
         )
+
+
+class FuncionariosTests(TestCase):
+    """Onda 1: tela de Funcionários (RH) + acesso derivando do funcionário."""
+
+    def setUp(self):
+        from apps.nucleo.models import Funcionario, Pessoa
+        self.Funcionario = Funcionario
+        self.dono = Usuario.objects.create_superuser(username="dono", password="senha-forte-123")
+        p = Pessoa.objects.create(nome="Fulano")
+        self.func = Funcionario.objects.create(pessoa=p, cargo="Recepcionista")
+
+    def test_lista_exige_area(self):
+        op = Usuario.objects.create_user(username="op", password="x")
+        self.client.force_login(op)
+        self.assertEqual(self.client.get(reverse("funcionarios")).status_code, 403)
+        op.areas = ["funcionarios"]; op.save()
+        self.assertEqual(self.client.get(reverse("funcionarios")).status_code, 200)
+
+    def test_novo_cria_pessoa_e_funcionario(self):
+        self.client.force_login(self.dono)
+        n = self.Funcionario.objects.count()
+        self.client.post(reverse("funcionario_novo"), {"nome": "Nova Camareira", "cargo": "Camareira"})
+        self.assertEqual(self.Funcionario.objects.count(), n + 1)
+        self.assertTrue(self.Funcionario.objects.filter(pessoa__nome="Nova Camareira").exists())
+
+    def test_gerencia_edita_rh_e_salario(self):
+        self.client.force_login(self.dono)
+        self.client.post(reverse("funcionario_editar", args=[self.func.pk]), {
+            "nome": "Fulano da Silva", "cargo": "Gerente", "setor": "Recepção",
+            "turno": "manha", "carga_semanal": "40", "salario": "2400.00",
+        })
+        self.func.refresh_from_db()
+        self.assertEqual(self.func.cargo, "Gerente")
+        self.assertEqual(self.func.turno, "manha")
+        self.assertEqual(str(self.func.salario), "2400.00")
+        self.assertEqual(self.func.pessoa.nome, "Fulano da Silva")
+
+    def test_nao_gerencia_nao_ve_nem_edita_salario(self):
+        op = Usuario.objects.create_user(username="rh", password="x")
+        op.areas = ["funcionarios"]; op.save()
+        self.client.force_login(op)
+        r = self.client.get(reverse("funcionario_editar", args=[self.func.pk]))
+        self.assertNotContains(r, "Salário base")
+        self.client.post(reverse("funcionario_editar", args=[self.func.pk]), {
+            "nome": "Fulano", "cargo": "Recepcionista", "salario": "9999",
+        })
+        self.func.refresh_from_db()
+        self.assertIsNone(self.func.salario)  # ignorado — não é gerência
+
+    def test_gerencia_cria_login_e_concede_acesso(self):
+        self.client.force_login(self.dono)
+        self.client.post(reverse("funcionario_editar", args=[self.func.pk]), {
+            "nome": "Fulano", "cargo": "Recepcionista",
+            "username": "fulano", "password": "senha-forte-123",
+            "areas": ["caixa", "logbook"],
+        })
+        self.func.refresh_from_db()
+        self.assertIsNotNone(self.func.usuario)
+        self.assertEqual(self.func.usuario.username, "fulano")
+        self.assertIn("caixa", self.func.usuario.areas)
+
+    def test_nao_rebaixa_a_si_mesmo(self):
+        from apps.nucleo.models import Funcionario, Pessoa
+        ger = Usuario.objects.create_user(username="ger", password="x", is_staff=True)
+        ger.areas = ["funcionarios"]; ger.save()
+        fg = Funcionario.objects.create(pessoa=Pessoa.objects.create(nome="Ger"), cargo="Gerente", usuario=ger)
+        self.client.force_login(ger)
+        self.client.post(reverse("funcionario_editar", args=[fg.pk]), {
+            "nome": "Ger", "cargo": "Gerente",  # sem 'gerente'/'ativo' — tentaria rebaixar
+        })
+        ger.refresh_from_db()
+        self.assertTrue(ger.is_staff)   # não se rebaixou
+        self.assertTrue(ger.is_active)  # não se desativou
+
+    def test_area_invalida_descartada(self):
+        self.client.force_login(self.dono)
+        self.client.post(reverse("funcionario_editar", args=[self.func.pk]), {
+            "nome": "Fulano", "cargo": "Recepcionista",
+            "username": "ful", "password": "senha-forte-123",
+            "areas": ["caixa", "hackeando"],
+        })
+        self.func.refresh_from_db()
+        self.assertEqual(self.func.usuario.areas, ["caixa"])  # 'hackeando' fora
+
+
+class PessoasPapelTests(TestCase):
+    """Onda 2: telas separadas por papel (Hóspedes/Agências/Empresas)."""
+
+    def setUp(self):
+        from apps.nucleo.models import Agencia, Hospede, Pessoa
+        self.dono = Usuario.objects.create_superuser(username="dono", password="senha-forte-123")
+        self.client.force_login(self.dono)
+        self.ph = Pessoa.objects.create(nome="Hospede X"); Hospede.objects.create(pessoa=self.ph)
+        self.pa = Pessoa.objects.create(nome="Agencia CVC"); Agencia.objects.create(pessoa=self.pa, categoria="agencia")
+        self.pe = Pessoa.objects.create(nome="Empresa ACME"); Agencia.objects.create(pessoa=self.pe, categoria="empresa")
+
+    def test_papeis_distingue_agencia_empresa(self):
+        self.assertIn("Agência", self.pa.papeis)
+        self.assertIn("Empresa", self.pe.papeis)
+        self.assertNotIn("Empresa", self.pa.papeis)
+
+    def test_tela_hospedes_so_hospedes(self):
+        b = self.client.get(reverse("hospedes")).content.decode()
+        self.assertIn("Hospede X", b)
+        self.assertNotIn("Agencia CVC", b)
+        self.assertNotIn("Empresa ACME", b)
+
+    def test_tela_agencias_so_agencias(self):
+        b = self.client.get(reverse("agencias")).content.decode()
+        self.assertIn("Agencia CVC", b)
+        self.assertNotIn("Empresa ACME", b)
+
+    def test_tela_empresas_so_empresas(self):
+        b = self.client.get(reverse("empresas")).content.decode()
+        self.assertIn("Empresa ACME", b)
+        self.assertNotIn("Agencia CVC", b)
+
+    def test_novo_empresa_cria_agencia_categoria_empresa(self):
+        from apps.nucleo.models import Pessoa
+        self.client.post(reverse("pessoa_nova") + "?papel=empresa", {
+            "nome": "Nova Empresa Ltda", "tipo": "juridica",
+            "eh_agencia": "on",
+            "agencia-categoria": "empresa", "agencia-comissao_padrao": "0",
+        })
+        p = Pessoa.objects.filter(nome="Nova Empresa Ltda").first()
+        self.assertIsNotNone(p)
+        self.assertEqual(p.agencia.categoria, "empresa")

@@ -1,21 +1,25 @@
 {% extends "base.html" %}
 
-{% block titulo %}Pessoas — CRM Vô Testa{% endblock %}
+{% block titulo %}{{ titulo|default:"Pessoas" }} — CRM Vô Testa{% endblock %}
 
 {% block conteudo %}
-<p class="pagina-eyebrow letreiro">Cadastros</p>
+<p class="pagina-eyebrow letreiro">Cadastros{% if perfil %} · Pessoas{% endif %}</p>
 <div class="pagina-cabecalho">
-  <h1>Pessoas</h1>
-  <a href="{% url 'pessoa_nova' %}" class="botao-primario">Nova pessoa</a>
+  <h1>{{ titulo|default:"Pessoas" }}</h1>
+  {% if perfil %}
+    <a href="{% url 'pessoa_nova' %}?papel={{ novo_papel }}" class="botao-primario">{% if perfil == 'empresas' %}+ Nova empresa{% elif perfil == 'agencias' %}+ Nova agência{% else %}+ Novo hóspede{% endif %}</a>
+  {% else %}
+    <a href="{% url 'pessoa_nova' %}" class="botao-primario">Nova pessoa</a>
+  {% endif %}
 </div>
-<p class="subtitulo">Hóspedes, agências/empresas, fornecedores, funcionários e clientes avulsos — uma base única.</p>
+<p class="subtitulo">{% if perfil == 'hospedes' %}Quem se hospeda — base para as reservas.{% elif perfil == 'agencias' %}Agências de viagens que fecham grupos (com comissão).{% elif perfil == 'empresas' %}Empresas que fecham estadia/eventos (cliente corporativo direto).{% else %}Hóspedes, agências, empresas, fornecedores, funcionários e clientes avulsos — uma base única.{% endif %}</p>
 
 <form method="get" class="barra-busca">
   <input type="search" name="q" value="{{ busca }}" placeholder="Buscar por nome, CPF/CNPJ ou e-mail">
-  {% if papel %}<input type="hidden" name="papel" value="{{ papel }}">{% endif %}
   <button type="submit" class="botao-neutro">Buscar</button>
 </form>
 
+{% if filtros %}
 <div class="filtros">
   {% for f in filtros %}
     <a href="?{% if busca %}q={{ busca|urlencode }}&{% endif %}{% if f.chave %}papel={{ f.chave }}{% endif %}"
@@ -24,6 +28,7 @@
     </a>
   {% endfor %}
 </div>
+{% endif %}
 
 <table class="tabela">
   <thead>

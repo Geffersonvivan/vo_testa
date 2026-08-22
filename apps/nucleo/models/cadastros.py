@@ -58,7 +58,7 @@ class Pessoa(models.Model):
         if hasattr(self, "hospede"):
             nomes.append("Hóspede")
         if hasattr(self, "agencia"):
-            nomes.append("Agência/Empresa")
+            nomes.append("Empresa" if self.agencia.categoria == "empresa" else "Agência")
         if hasattr(self, "funcionario"):
             nomes.append("Funcionário")
         if hasattr(self, "fornecedor"):
@@ -109,6 +109,22 @@ class Prospecto(models.Model):
 
 
 class Funcionario(models.Model):
+    """Quem trabalha na pousada. Dados de RH (jornada, remuneração) + vínculo com
+    o login do CRM. Salário é dado sensível — só gerência vê/edita (LGPD)."""
+
+    class Turno(models.TextChoices):
+        MANHA = "manha", "Manhã"
+        TARDE = "tarde", "Tarde"
+        NOITE = "noite", "Noite"
+        INTEGRAL = "integral", "Integral"
+
+    class Vinculo(models.TextChoices):
+        CLT = "clt", "CLT"
+        PJ = "pj", "PJ"
+        TEMPORARIO = "temporario", "Temporário"
+        ESTAGIO = "estagio", "Estágio"
+        DIARISTA = "diarista", "Diarista"
+
     pessoa = models.OneToOneField(
         Pessoa, on_delete=models.CASCADE, related_name="funcionario",
         verbose_name="pessoa",
@@ -116,6 +132,22 @@ class Funcionario(models.Model):
     cargo = models.CharField("cargo", max_length=80)
     setor = models.CharField("setor", max_length=80, blank=True)
     admissao = models.DateField("data de admissão", null=True, blank=True)
+    vinculo = models.CharField(
+        "vínculo", max_length=12, choices=Vinculo.choices, blank=True
+    )
+    # Jornada & turno
+    turno = models.CharField("turno", max_length=10, choices=Turno.choices, blank=True)
+    expediente_inicio = models.TimeField("início do expediente", null=True, blank=True)
+    expediente_fim = models.TimeField("fim do expediente", null=True, blank=True)
+    intervalo_inicio = models.TimeField("início do intervalo", null=True, blank=True)
+    intervalo_fim = models.TimeField("fim do intervalo", null=True, blank=True)
+    carga_semanal = models.PositiveSmallIntegerField(
+        "carga semanal (h)", null=True, blank=True
+    )
+    # Remuneração (sensível — só gerência)
+    salario = models.DecimalField(
+        "salário base (R$)", max_digits=10, decimal_places=2, null=True, blank=True
+    )
     usuario = models.OneToOneField(
         "nucleo.Usuario", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="funcionario", verbose_name="usuário do sistema",
@@ -125,6 +157,7 @@ class Funcionario(models.Model):
     class Meta:
         verbose_name = "funcionário"
         verbose_name_plural = "funcionários"
+        ordering = ["pessoa__nome"]
 
     def __str__(self):
         return f"{self.pessoa.nome} ({self.cargo})"

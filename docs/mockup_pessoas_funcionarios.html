@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Pessoas, Papéis & Funcionários</title>
+<style>
+  :root{
+    --noturno:#051C2C; --noturno-2:#0B2432; --canvas:#F3F0EA; --superficie:#FFFDF9;
+    --superficie-2:#F6F2EA; --lampiao:#D7A048; --lampiao-2:#E2A84A; --musgo:#2E7D5B;
+    --musgo-bg:#E7F1EB; --madeira:#4F2C1D; --tinta:#1C2B33; --tinta-suave:#64717B;
+    --fio:#E7DFCF; --fio-forte:#D8CDB6; --alerta:#B0741C; --alerta-bg:#F7ECD6;
+    --info:#2C6E7A; --info-bg:#E1EEF0; --perigo:#A6402C; --sombra:0 12px 30px rgba(5,28,44,.10);
+    --raio:16px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--canvas);color:var(--tinta);
+    font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+    line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1180px;margin:0 auto;padding:44px 28px 80px}
+  .display{font-family:Georgia,'Times New Roman',serif;font-weight:700;letter-spacing:-.02em}
+  h1{font-size:2.5rem;line-height:1.05;margin:0 0 .2rem}
+  .eyebrow{font-size:.72rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--lampiao);margin:0 0 .5rem}
+  .lead{color:var(--tinta-suave);font-size:1.05rem;max-width:70ch;margin:0 0 8px}
+  h2{font-family:Georgia,serif;font-size:1.5rem;margin:52px 0 4px}
+  .sub{color:var(--tinta-suave);margin:0 0 20px;font-size:.95rem}
+  .card{background:var(--superficie);border:1px solid var(--fio);border-radius:var(--raio);box-shadow:var(--sombra)}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:.7rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+  .p-novo{color:var(--musgo);background:var(--musgo-bg);border:1px solid rgba(46,125,91,.28)}
+  .p-existe{color:var(--tinta-suave);background:var(--superficie-2);border:1px solid var(--fio-forte)}
+  .p-sensivel{color:var(--alerta);background:var(--alerta-bg);border:1px solid rgba(176,116,28,.3)}
+
+  /* Arquitetura */
+  .arq{display:flex;flex-direction:column;align-items:center;gap:0;padding:30px 24px 34px}
+  .base{background:var(--noturno);color:#EAF0F2;border-radius:14px;padding:18px 26px;text-align:center;min-width:320px;box-shadow:0 10px 24px rgba(5,28,44,.22)}
+  .base b{font-size:1.2rem;letter-spacing:.01em}
+  .base small{display:block;color:#9DB2BC;font-size:.82rem;margin-top:3px}
+  .stem{width:2px;height:26px;background:var(--fio-forte)}
+  .papeis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;width:100%;margin-top:4px}
+  .papel{background:var(--superficie-2);border:1px solid var(--fio);border-radius:13px;padding:14px 12px;position:relative}
+  .papel .top{width:2px;height:18px;background:var(--fio-forte);position:absolute;top:-18px;left:50%;transform:translateX(-50%)}
+  .papel b{display:block;font-size:.98rem}
+  .papel .role{font-size:.72rem;color:var(--tinta-suave);margin:2px 0 8px}
+  .papel ul{margin:0;padding-left:15px;font-size:.78rem;color:var(--tinta-suave)}
+  .papel ul li{margin:1px 0}
+  .arq-nota{margin-top:22px;font-size:.85rem;color:var(--tinta-suave);text-align:center;max-width:60ch}
+  .arq-nota b{color:var(--madeira)}
+
+  /* Telas (browser frame) */
+  .telas{display:grid;grid-template-columns:1fr;gap:26px}
+  .frame{border-radius:16px;overflow:hidden;border:1px solid var(--fio);box-shadow:var(--sombra);background:var(--superficie)}
+  .frame-bar{background:var(--superficie-2);border-bottom:1px solid var(--fio);padding:9px 14px;display:flex;align-items:center;gap:7px}
+  .dot{width:11px;height:11px;border-radius:50%;background:#D8CDB6}
+  .frame-url{margin-left:10px;font-size:.78rem;color:var(--tinta-suave);font-family:ui-monospace,monospace}
+  .app{display:grid;grid-template-columns:210px 1fr}
+  .side{background:var(--noturno);color:#C6D2D8;padding:16px 12px}
+  .brand{color:var(--lampiao);font-family:Georgia,serif;font-weight:700;font-size:1.05rem;padding:4px 8px 14px;letter-spacing:.02em}
+  .navcap{font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;color:#6E8492;margin:14px 8px 5px}
+  .nav{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:9px;font-size:.86rem;color:#C6D2D8}
+  .nav.on{background:rgba(215,160,72,.16);color:#F3E4C6;font-weight:600}
+  .nav.new::after{content:'novo';margin-left:auto;font-size:.58rem;background:var(--musgo);color:#fff;padding:1px 6px;border-radius:6px;letter-spacing:.04em;font-weight:700}
+  .nav .ic{width:15px;height:15px;border-radius:4px;background:rgba(255,255,255,.16);flex:0 0 auto}
+  .main{padding:22px 24px;background:var(--canvas)}
+  .m-eyebrow{font-size:.66rem;letter-spacing:.13em;text-transform:uppercase;color:var(--tinta-suave)}
+  .m-h{font-family:Georgia,serif;font-size:1.5rem;margin:2px 0 2px}
+  .m-sub{color:var(--tinta-suave);font-size:.86rem;margin:0 0 16px}
+  table{width:100%;border-collapse:separate;border-spacing:0;background:var(--superficie);border:1px solid var(--fio);border-radius:12px;overflow:hidden;font-size:.85rem}
+  th{text-align:left;font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-suave);background:var(--superficie-2);padding:9px 12px;border-bottom:1px solid var(--fio)}
+  td{padding:10px 12px;border-bottom:1px solid var(--fio)}
+  tr:last-child td{border-bottom:none}
+  td b{font-weight:700}
+  td .role{color:var(--tinta-suave);font-size:.76rem}
+  .btn{display:inline-block;padding:5px 12px;border-radius:9px;font-size:.78rem;font-weight:600;border:1px solid var(--fio-forte);background:var(--superficie);color:var(--tinta);text-decoration:none}
+  .btn.pri{background:var(--lampiao);border-color:var(--lampiao);color:#2A1B08}
+  .chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .chip{padding:5px 11px;border-radius:999px;border:1px solid var(--fio);background:var(--superficie);font-size:.78rem;font-weight:600;color:var(--tinta)}
+  .chip.on{border-color:var(--lampiao);box-shadow:0 0 0 2px rgba(215,160,72,.18);background:var(--superficie-2)}
+  .chip b{margin-left:4px}
+
+  /* Ficha (form) */
+  .ficha{display:grid;grid-template-columns:1.3fr 1fr;gap:18px}
+  .bloco{background:var(--superficie);border:1px solid var(--fio);border-radius:12px;padding:16px 18px}
+  .bloco h4{margin:0 0 12px;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--tinta-suave)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+  .field label{display:block;font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;color:var(--tinta-suave);margin-bottom:3px}
+  .field .val{background:var(--superficie-2);border:1px solid var(--fio);border-radius:8px;padding:8px 11px;font-size:.88rem;min-height:20px}
+  .field.full{grid-column:1/-1}
+  .lock{font-size:.66rem;color:var(--alerta);font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+  .acesso-item{display:flex;align-items:center;gap:9px;font-size:.85rem;padding:5px 0;border-bottom:1px dashed var(--fio)}
+  .acesso-item:last-child{border-bottom:none}
+  .box{width:16px;height:16px;border-radius:5px;border:1.5px solid var(--fio-forte);flex:0 0 auto}
+  .box.ck{background:var(--lampiao);border-color:var(--lampiao);position:relative}
+  .box.ck::after{content:'';position:absolute;left:5px;top:1px;width:4px;height:9px;border:solid #2A1B08;border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .cols2{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px}
+  .callout{display:flex;gap:12px;background:var(--info-bg);border:1px solid rgba(44,110,122,.25);border-radius:12px;padding:13px 16px;font-size:.86rem;color:#274b52;margin-top:14px}
+  .callout b{color:var(--info)}
+  .foot{margin-top:44px;color:var(--tinta-suave);font-size:.8rem;text-align:center}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="eyebrow">CRM Pousada Vô Testa · Proposta de arquitetura</p>
+  <h1 class="display">Pessoas, papéis &amp; Funcionários</h1>
+  <p class="lead">Uma pessoa, um cadastro — vários papéis, cada um com sua tela. A base <b>Pessoa</b> continua a fonte de verdade única; separamos as <b>telas por papel</b> e enriquecemos o Funcionário com dados de RH. <b>Equipe &amp; Acessos</b> passa a derivar de Funcionário.</p>
+  <div class="legend">
+    <span class="pill p-novo">novo</span>
+    <span class="pill p-existe">já existe</span>
+    <span class="pill p-sensivel">dado sensível · RH/gerência + LGPD</span>
+  </div>
+
+  <!-- ARQUITETURA -->
+  <h2 class="display">1 · A base não fragmenta</h2>
+  <p class="sub">Um <code>Pessoa</code> pode acumular papéis (o funcionário que se hospeda; a empresa que também é fornecedora). Nunca duplicar CPF/dados por módulo.</p>
+  <div class="card arq">
+    <div class="base"><b>Pessoa</b><small>base única · PF/PJ · CPF/CNPJ · contato · fonte de verdade</small></div>
+    <div class="stem"></div>
+    <div class="papeis">
+      <div class="papel"><span class="top"></span><b>Hóspede</b><div class="role">recepção · reservas</div>
+        <ul><li>preferências</li><li>FNRH / docs</li><li>histórico</li></ul></div>
+      <div class="papel"><span class="top"></span><b>Funcionário</b> <span class="pill p-novo" style="font-size:.55rem;padding:1px 6px">RH+</span><div class="role">RH / gerência</div>
+        <ul><li>cargo · setor</li><li>salário 🔒</li><li>turno · intervalo</li><li>admissão</li></ul></div>
+      <div class="papel"><span class="top"></span><b>Agência</b><div class="role">comercial</div>
+        <ul><li>comissão</li><li>grupos</li><li>faturamento</li></ul></div>
+      <div class="papel"><span class="top"></span><b>Empresa</b> <span class="pill p-novo" style="font-size:.55rem;padding:1px 6px">novo</span><div class="role">comercial</div>
+        <ul><li>estadia / evento</li><li>contrato</li><li>faturamento</li></ul></div>
+      <div class="papel"><span class="top"></span><b>Fornecedor</b><div class="role">compras</div>
+        <ul><li>produtos</li><li>contas a pagar</li></ul></div>
+    </div>
+    <p class="arq-nota">Cada papel é um <b>OneToOne sobre Pessoa</b> com os campos daquele papel + sua própria tela. Agência e Empresa ficam como <b>papéis (não módulos contratáveis)</b> — senão Reservas passaria a depender deles.</p>
+  </div>
+
+  <!-- SIDEBAR + TELA FUNCIONÁRIOS -->
+  <h2 class="display">2 · Telas separadas por papel</h2>
+  <p class="sub">Some a lista-mãe confusa: cada perfil abre sua própria tela, com os campos e permissões certos.</p>
+  <div class="frame">
+    <div class="frame-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="frame-url">/crm/funcionarios/</span></div>
+    <div class="app">
+      <div class="side">
+        <div class="brand">Vô Testa</div>
+        <div class="navcap">Cadastros</div>
+        <div class="nav"><span class="ic"></span>Hóspedes</div>
+        <div class="nav on new"><span class="ic"></span>Funcionários</div>
+        <div class="nav"><span class="ic"></span>Agências</div>
+        <div class="nav new"><span class="ic"></span>Empresas</div>
+        <div class="nav"><span class="ic"></span>Fornecedores</div>
+        <div class="navcap">Configurações</div>
+        <div class="nav"><span class="ic"></span>Equipe &amp; Acessos</div>
+      </div>
+      <div class="main">
+        <div class="m-eyebrow">Cadastros · Pessoal</div>
+        <div class="m-h">Funcionários</div>
+        <p class="m-sub">Quem trabalha na pousada — dados de RH, jornada e vínculo com o acesso ao sistema.</p>
+        <div class="chips">
+          <span class="chip on">Todos <b>9</b></span>
+          <span class="chip">Recepção <b>3</b></span>
+          <span class="chip">Governança <b>3</b></span>
+          <span class="chip">Cozinha <b>2</b></span>
+          <span class="chip">Manutenção <b>1</b></span>
+          <span style="margin-left:auto"><a class="btn pri">+ Novo funcionário</a></span>
+        </div>
+        <table>
+          <thead><tr><th>Nome</th><th>Cargo · Setor</th><th>Turno</th><th>Admissão</th><th>Acesso</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><b>Peterson Vivan</b><div class="role">peterson</div></td><td>Recepcionista · Recepção</td><td>Manhã · 07–15h</td><td>12/03/2025</td><td><span class="pill p-existe">Operador</span></td><td><a class="btn">Abrir</a></td></tr>
+            <tr><td><b>Maria Aparecida</b><div class="role">maria</div></td><td>Camareira · Governança</td><td>Manhã · 08–16h</td><td>02/01/2024</td><td><span class="pill p-existe">Sem login</span></td><td><a class="btn">Abrir</a></td></tr>
+            <tr><td><b>João Batista</b><div class="role">joao</div></td><td>Cozinheiro · Cozinha</td><td>Tarde · 14–22h</td><td>20/06/2024</td><td><span class="pill p-existe">Operador</span></td><td><a class="btn">Abrir</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- FICHA DO FUNCIONÁRIO -->
+  <h2 class="display">3 · Ficha do Funcionário (RH)</h2>
+  <p class="sub">Tudo o que o funcionário precisa — com salário e jornada isolados por acesso e auditados.</p>
+  <div class="ficha">
+    <div class="bloco">
+      <h4>Dados profissionais</h4>
+      <div class="grid2">
+        <div class="field"><label>Nome</label><div class="val">Peterson Vivan</div></div>
+        <div class="field"><label>CPF</label><div class="val">•••.•••.•••-••</div></div>
+        <div class="field"><label>Cargo</label><div class="val">Recepcionista</div></div>
+        <div class="field"><label>Setor</label><div class="val">Recepção</div></div>
+        <div class="field"><label>Admissão</label><div class="val">12/03/2025</div></div>
+        <div class="field"><label>Vínculo</label><div class="val">CLT</div></div>
+      </div>
+      <h4 style="margin-top:18px">Jornada &amp; turno</h4>
+      <div class="grid2">
+        <div class="field"><label>Turno</label><div class="val">Manhã</div></div>
+        <div class="field"><label>Expediente</label><div class="val">07:00 → 15:00</div></div>
+        <div class="field"><label>Intervalo</label><div class="val">11:00 → 12:00</div></div>
+        <div class="field"><label>Carga semanal</label><div class="val">40h</div></div>
+      </div>
+      <h4 style="margin-top:18px">Remuneração <span class="lock">🔒 RH / gerência</span></h4>
+      <div class="grid2">
+        <div class="field"><label>Salário base</label><div class="val">R$ 2.400,00</div></div>
+        <div class="field"><label>Forma</label><div class="val">Mensal</div></div>
+      </div>
+    </div>
+    <div class="bloco">
+      <h4>Acesso ao sistema <span class="pill p-existe" style="font-size:.58rem">deriva daqui</span></h4>
+      <div class="field"><label>Login</label><div class="val">peterson · ativo</div></div>
+      <div style="margin-top:12px;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-suave)">Módulos</div>
+      <div class="cols2" style="margin-top:6px">
+        <div class="acesso-item"><span class="box ck"></span>Reservas</div>
+        <div class="acesso-item"><span class="box ck"></span>Loja</div>
+        <div class="acesso-item"><span class="box ck"></span>Manutenção</div>
+        <div class="acesso-item"><span class="box"></span>Financeiro</div>
+      </div>
+      <div style="margin-top:12px;font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-suave)">Áreas</div>
+      <div class="cols2" style="margin-top:6px">
+        <div class="acesso-item"><span class="box ck"></span>Caixa próprio</div>
+        <div class="acesso-item"><span class="box ck"></span>Recados</div>
+        <div class="acesso-item"><span class="box"></span>Pessoas</div>
+        <div class="acesso-item"><span class="box"></span>Equipe</div>
+      </div>
+      <div class="callout"><span>🔗</span><div><b>Equipe &amp; Acessos herda daqui.</b> Só funcionário tem login. Usuários técnicos (<code>_portal</code>, <code>_sistema</code>) ficam à parte, fora da lista de funcionários.</div></div>
+    </div>
+  </div>
+
+  <!-- RESUMO / IMPACTO -->
+  <h2 class="display">4 · O que muda no código</h2>
+  <div class="card" style="padding:20px 24px">
+    <div class="cols2" style="gap:14px 40px;font-size:.9rem">
+      <div class="acesso-item"><span class="box ck"></span><span><b>Enriquecer <code>Funcionario</code></b> — salário, turno, expediente, intervalo, carga, vínculo (já tem cargo/setor/admissão/usuário).</span></div>
+      <div class="acesso-item"><span class="box ck"></span><span><b>Novo papel <code>Empresa</code></b> — OneToOne sobre Pessoa (como Agência).</span></div>
+      <div class="acesso-item"><span class="box ck"></span><span><b>Telas por papel</b> — Hóspedes, Funcionários, Agências, Empresas, Fornecedores (filtram Pessoa).</span></div>
+      <div class="acesso-item"><span class="box ck"></span><span><b>Equipe &amp; Acessos → Funcionário</b> — gerir login + módulos/áreas a partir do funcionário.</span></div>
+      <div class="acesso-item"><span class="box ck"></span><span><b>Acesso &amp; auditoria</b> — salário/jornada só RH/gerência; tudo já auditado (LGPD).</span></div>
+      <div class="acesso-item"><span class="box ck"></span><span><b>Área <code>Area.FUNCIONARIOS</code></b> (ou módulo leve "Pessoal/RH") — lar de folha, ponto, escala.</span></div>
+    </div>
+  </div>
+
+  <p class="foot">Mockup para discussão — não é a tela final. Base <b>Pessoa</b> preservada; evolução moderada, sem reescrever a fundação.</p>
+</div>
+</body>
+</html>

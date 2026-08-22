@@ -16,6 +16,7 @@ class Area(models.TextChoices):
     # Gestão financeira: contas a pagar/receber, lançamentos, sessões de todos, relatórios.
     FINANCEIRO = "financeiro", "Financeiro (contas/gestão)"
     PESSOAS = "pessoas", "Pessoas"
+    FUNCIONARIOS = "funcionarios", "Funcionários (RH)"
     LOGBOOK = "logbook", "Recados do turno"
     NPS = "nps", "NPS"
     EQUIPE = "equipe", "Equipe & Acessos"

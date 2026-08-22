@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block titulo %}Funcionários — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Cadastros · Pessoal</p>
+<div class="pagina-cabecalho">
+  <h1>Funcionários</h1>
+  <a href="{% url 'funcionario_novo' %}" class="botao-primario">+ Novo funcionário</a>
+</div>
+<p class="subtitulo">Quem trabalha na pousada — dados de RH, jornada e vínculo com o acesso ao sistema.</p>
+
+<div class="filtro-limpeza">
+  <a href="{% url 'funcionarios' %}" class="chip-limpeza {% if not setor %}ativo{% endif %}">Todos <b>{{ total }}</b></a>
+  {% for s in setores %}
+    <a href="?setor={{ s|urlencode }}" class="chip-limpeza {% if setor == s %}ativo{% endif %}">{{ s }}</a>
+  {% endfor %}
+</div>
+
+<table class="tabela">
+  <thead>
+    <tr><th>Nome</th><th>Cargo · Setor</th><th>Turno</th><th>Admissão</th><th>Acesso</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for item in funcionarios %}
+      <tr>
+        <td><a href="{% url 'funcionario_editar' item.f.pk %}"><strong>{{ item.f.pessoa.nome }}</strong></a>
+          {% if item.f.usuario %}<small class="ajuda-inline">{{ item.f.usuario.username }}</small>{% endif %}</td>
+        <td>{{ item.f.cargo }}{% if item.f.setor %} · {{ item.f.setor }}{% endif %}</td>
+        <td>{% if item.f.turno %}{{ item.f.get_turno_display }}{% if item.f.expediente_inicio %} · {{ item.f.expediente_inicio|time:"H:i" }}–{{ item.f.expediente_fim|time:"H:i" }}{% endif %}{% else %}—{% endif %}</td>
+        <td>{{ item.f.admissao|date:"d/m/Y"|default:"—" }}</td>
+        <td>
+          {% if item.nivel == 'Gerência' %}<span class="selo selo-ativo">Gerência</span>
+          {% elif item.nivel == 'Operador' %}<span class="selo selo-neutro">Operador</span>
+          {% else %}<span class="selo">Sem login</span>{% endif %}
+          {% if item.f.usuario and not item.ativo %}<span class="selo selo-alerta">inativo</span>{% endif %}
+        </td>
+        <td><a href="{% url 'funcionario_editar' item.f.pk %}" class="botao-neutro">Abrir</a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vazio">Nenhum funcionário ainda — cadastre o primeiro.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

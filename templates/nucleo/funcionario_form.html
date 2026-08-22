@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block titulo %}{% if modo == 'novo' %}Novo funcionário{% else %}{{ f.pessoa.nome }}{% endif %} — Funcionários{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Cadastros · Pessoal</p>
+
+{% if modo == 'novo' %}
+<h1>Novo funcionário</h1>
+<p class="subtitulo">Cadastre o nome; na próxima tela você completa a ficha (jornada, remuneração, acesso).</p>
+<form method="post" action="{% url 'funcionario_novo' %}" class="form-cartao" style="max-width:520px">
+  {% csrf_token %}
+  <div class="campo"><label for="nome">Nome</label><input type="text" id="nome" name="nome" required></div>
+  <div class="campo"><label for="cargo">Cargo</label><input type="text" id="cargo" name="cargo" placeholder="Ex.: Recepcionista"></div>
+  <div class="acoes">
+    <button type="submit" class="botao-primario">Criar funcionário</button>
+    <a href="{% url 'funcionarios' %}" class="botao-neutro">Cancelar</a>
+  </div>
+</form>
+
+{% else %}
+<div class="pagina-cabecalho">
+  <h1>{{ f.pessoa.nome }}</h1>
+  <a href="{% url 'funcionarios' %}" class="botao-neutro">Voltar</a>
+</div>
+<p class="subtitulo">Ficha de RH e acesso ao sistema.{% if proprio %} <span class="selo selo-neutro">é você</span>{% endif %}</p>
+
+<form method="post" action="{% url 'funcionario_editar' f.pk %}" class="ficha-func">
+  {% csrf_token %}
+  <div class="ficha-cols">
+
+    <div class="bloco-ficha">
+      <h4 class="letreiro">Dados profissionais</h4>
+      <div class="grid2">
+        <div class="campo"><label>Nome</label><input type="text" name="nome" value="{{ f.pessoa.nome }}" required></div>
+        <div class="campo"><label>CPF/CNPJ</label><input type="text" name="documento" value="{{ f.pessoa.documento }}"></div>
+        <div class="campo"><label>Cargo</label>{{ form.cargo }}</div>
+        <div class="campo"><label>Setor</label>{{ form.setor }}</div>
+        <div class="campo"><label>Admissão</label>{{ form.admissao }}</div>
+        <div class="campo"><label>Vínculo</label>{{ form.vinculo }}</div>
+      </div>
+
+      <h4 class="letreiro" style="margin-top:1.1rem">Jornada &amp; turno</h4>
+      <div class="grid2">
+        <div class="campo"><label>Turno</label>{{ form.turno }}</div>
+        <div class="campo"><label>Carga semanal (h)</label>{{ form.carga_semanal }}</div>
+        <div class="campo"><label>Início do expediente</label>{{ form.expediente_inicio }}</div>
+        <div class="campo"><label>Fim do expediente</label>{{ form.expediente_fim }}</div>
+        <div class="campo"><label>Início do intervalo</label>{{ form.intervalo_inicio }}</div>
+        <div class="campo"><label>Fim do intervalo</label>{{ form.intervalo_fim }}</div>
+      </div>
+
+      {% if form.salario %}
+      <h4 class="letreiro" style="margin-top:1.1rem">Remuneração <span class="selo selo-alerta" style="font-size:.58rem">🔒 só gerência</span></h4>
+      <div class="grid2">
+        <div class="campo"><label>Salário base (R$)</label>{{ form.salario }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="bloco-ficha">
+      <h4 class="letreiro">Acesso ao sistema {% if not gerente %}<span class="ajuda-inline">(só gerência edita)</span>{% endif %}</h4>
+      {% if gerente %}
+        {% if usuario %}
+          <p class="ajuda">Login <strong>{{ usuario.username }}</strong>{% if usuario.is_superuser %} · <span class="selo selo-ativo">Dono</span>{% endif %}.</p>
+          {% if not proprio %}
+          <div class="campo">
+            <label class="filtro-check"><input type="checkbox" name="gerente" {% if usuario.is_staff or usuario.is_superuser %}checked{% endif %}> É gerência (ações sensíveis)</label>
+            <label class="filtro-check"><input type="checkbox" name="ativo" {% if usuario.is_active %}checked{% endif %}> Ativo (pode entrar)</label>
+          </div>
+          {% else %}
+          <p class="ajuda">Você não pode rebaixar/desativar a si mesmo.</p>
+          {% endif %}
+        {% else %}
+          <p class="ajuda">Este funcionário ainda não tem login. Defina um usuário e senha para conceder acesso.</p>
+          <div class="grid2">
+            <div class="campo"><label>Login (usuário)</label><input type="text" name="username" autocomplete="off"></div>
+            <div class="campo"><label>Senha (mín. 8)</label><input type="password" name="password" minlength="8" autocomplete="new-password"></div>
+          </div>
+        {% endif %}
+
+        <fieldset class="fnrh-grupo" style="margin-top:.6rem">
+          <legend class="letreiro">Módulos</legend>
+          <div class="acessos-grade">
+            {% for m in modulos %}<label class="filtro-check"><input type="checkbox" name="modulos" value="{{ m.codigo }}" {% if m.tem %}checked{% endif %}> {{ m.nome }}</label>{% empty %}<p class="ajuda">Nenhum módulo ativo.</p>{% endfor %}
+          </div>
+        </fieldset>
+        <fieldset class="fnrh-grupo">
+          <legend class="letreiro">Áreas do núcleo</legend>
+          <div class="acessos-grade">
+            {% for a in areas %}<label class="filtro-check"><input type="checkbox" name="areas" value="{{ a.codigo }}" {% if a.tem %}checked{% endif %}> {{ a.nome }}</label>{% endfor %}
+          </div>
+        </fieldset>
+
+        {% if usuario %}
+        <div class="campo"><label>Redefinir senha (em branco = manter)</label><input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Nova senha (mín. 8)"></div>
+        {% endif %}
+        <p class="ajuda">Equipe &amp; Acessos deriva daqui — só funcionário tem login. Usuários técnicos (<code>_portal</code>, <code>_sistema</code>) ficam à parte.</p>
+      {% else %}
+        <p class="ajuda">Somente a gerência gerencia login, módulos e áreas.</p>
+      {% endif %}
+    </div>
+
+  </div>
+  <div class="acoes" style="margin-top:1rem">
+    <button type="submit" class="botao-primario">Salvar ficha</button>
+    <a href="{% url 'funcionarios' %}" class="botao-neutro">Cancelar</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}

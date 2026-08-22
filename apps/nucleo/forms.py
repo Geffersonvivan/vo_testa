@@ -25,6 +25,17 @@ from .models import (
 
 class DataInput(forms.DateInput):
     input_type = "date"
+    # <input type="date"> exige o valor em ISO (yyyy-mm-dd) para pré-preencher na edição.
+    def __init__(self, *a, **k):
+        k.setdefault("format", "%Y-%m-%d")
+        super().__init__(*a, **k)
+
+
+class HoraInput(forms.TimeInput):
+    input_type = "time"
+    def __init__(self, *a, **k):
+        k.setdefault("format", "%H:%M")
+        super().__init__(*a, **k)
 
 
 # ---------- Cadastros ----------
@@ -59,10 +70,26 @@ class HospedeForm(forms.ModelForm):
 
 
 class FuncionarioForm(forms.ModelForm):
+    """Ficha de RH do funcionário. O `salario` é sensível — a view só o inclui
+    para gerência; o acesso ao sistema (login/módulos/áreas) é tratado à parte."""
+
     class Meta:
         model = Funcionario
-        fields = ["cargo", "setor", "admissao", "usuario"]
-        widgets = {"admissao": DataInput()}
+        fields = [
+            "cargo", "setor", "admissao", "vinculo",
+            "turno", "expediente_inicio", "expediente_fim",
+            "intervalo_inicio", "intervalo_fim", "carga_semanal", "salario",
+        ]
+        widgets = {
+            "admissao": DataInput(),
+            "expediente_inicio": HoraInput(), "expediente_fim": HoraInput(),
+            "intervalo_inicio": HoraInput(), "intervalo_fim": HoraInput(),
+        }
+
+    def __init__(self, *args, ver_salario=True, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not ver_salario:
+            self.fields.pop("salario", None)  # salário só p/ gerência
 
 
 class FornecedorForm(forms.ModelForm):

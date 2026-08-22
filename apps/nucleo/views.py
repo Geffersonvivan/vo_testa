@@ -31,8 +31,10 @@ from .forms import (
 )
 from .models import (
     UH,
+    Agencia,
     ContaPagarReceber,
     EntradaLogbook,
+    Funcionario,
     Hospede,
     LancamentoFinanceiro,
     ModuloContratado,
@@ -339,7 +341,8 @@ def _alternar_modulo(request, codigo, acao):
 
 PAPEL_FILTROS = {
     "hospedes": ("Hóspedes", Q(hospede__isnull=False)),
-    "agencias": ("Agências/Empresas", Q(agencia__isnull=False)),
+    "agencias": ("Agências", Q(agencia__categoria="agencia")),
+    "empresas": ("Empresas", Q(agencia__categoria="empresa")),
     "fornecedores": ("Fornecedores", Q(fornecedor__isnull=False)),
     "funcionarios": ("Funcionários", Q(funcionario__isnull=False)),
     "avulsos": (
@@ -349,11 +352,20 @@ PAPEL_FILTROS = {
     ),
 }
 
+# Telas focadas por papel (Cadastros): perfil -> (título, filtro, papel do "novo").
+PERFIS_PESSOA = {
+    "hospedes": ("Hóspedes", "hospedes", "hospede"),
+    "agencias": ("Agências", "agencias", "agencia"),
+    "empresas": ("Empresas", "empresas", "empresa"),
+}
+
 
 @requer_area(Area.PESSOAS)
-def pessoas(request):
+def pessoas(request, perfil=None):
+    """Base de pessoas. `perfil` (hospedes/agencias/empresas) foca a tela num papel:
+    trava o filtro, muda o título e o 'novo' já marca o papel certo."""
     busca = request.GET.get("q", "").strip()
-    papel = request.GET.get("papel", "")
+    papel = perfil or request.GET.get("papel", "")
 
     base = Pessoa.objects.all()
     if busca:
@@ -362,6 +374,14 @@ def pessoas(request):
             | Q(documento__icontains=busca)
             | Q(email__icontains=busca)
         )
+
+    if perfil:  # tela focada: só aquele papel, sem chips de outros
+        titulo, chave, novo_papel = PERFIS_PESSOA[perfil]
+        return render(request, "nucleo/pessoas.html", {
+            "pessoas": base.filter(PAPEL_FILTROS[chave][1]),
+            "busca": busca, "papel": chave, "perfil": perfil,
+            "titulo": titulo, "novo_papel": novo_papel, "filtros": [],
+        })
 
     # Contadores por papel respeitam a busca atual.
     filtros = [{"chave": "", "rotulo": "Todos", "total": base.count()}]
@@ -374,11 +394,25 @@ def pessoas(request):
     if papel in PAPEL_FILTROS:
         lista = lista.filter(PAPEL_FILTROS[papel][1])
 
-    return render(
-        request,
-        "nucleo/pessoas.html",
-        {"pessoas": lista, "busca": busca, "papel": papel, "filtros": filtros},
-    )
+    return render(request, "nucleo/pessoas.html", {
+        "pessoas": lista, "busca": busca, "papel": papel, "filtros": filtros,
+        "titulo": "Pessoas",
+    })
+
+
+@requer_area(Area.PESSOAS)
+def hospedes(request):
+    return pessoas(request, perfil="hospedes")
+
+
+@requer_area(Area.PESSOAS)
+def agencias(request):
+    return pessoas(request, perfil="agencias")
+
+
+@requer_area(Area.PESSOAS)
+def empresas(request):
+    return pessoas(request, perfil="empresas")
 
 
 @login_required
@@ -501,12 +535,22 @@ def pessoa_form(request, pk=None):
             return redirect("pessoas")
     else:
         form = PessoaForm(instance=pessoa)
+        # "Novo" vindo de uma tela focada (?papel=hospede/agencia/empresa) já marca o papel.
+        papel_novo = request.GET.get("papel", "") if not pk else ""
+        ag_inicial = None
+        if papel_novo == "empresa":
+            ag_inicial = {"agencia-categoria": Agencia.Categoria.EMPRESA}
+        elif papel_novo == "agencia":
+            ag_inicial = {"agencia-categoria": Agencia.Categoria.AGENCIA}
         form_hospede = HospedeForm(prefix="hospede", instance=hospede)
-        form_agencia = AgenciaForm(prefix="agencia", instance=agencia)
+        form_agencia = AgenciaForm(
+            prefix="agencia", instance=agencia,
+            initial={"categoria": ag_inicial["agencia-categoria"]} if ag_inicial else None,
+        )
         form_funcionario = FuncionarioForm(prefix="funcionario", instance=funcionario)
         form_fornecedor = FornecedorForm(prefix="fornecedor", instance=fornecedor)
-        eh_hospede = hospede is not None
-        eh_agencia = agencia is not None
+        eh_hospede = hospede is not None or papel_novo == "hospede"
+        eh_agencia = agencia is not None or papel_novo in ("agencia", "empresa")
         eh_funcionario = funcionario is not None
         eh_fornecedor = fornecedor is not None
 
@@ -890,95 +934,117 @@ def logbook(request):
     )
 
 
-# ---------- Equipe & Acessos (gestão de usuários e permissões) ----------
+# ---------- Funcionários (RH) — Pessoal; Equipe & Acessos deriva daqui ----------
 
 from django.contrib.auth import get_user_model  # noqa: E402
 
 Usuario = get_user_model()
 
 
-def _usuarios_gerenciaveis():
-    """Usuários reais (exclui os de sistema: _portal, _site, etc.)."""
-    return Usuario.objects.exclude(username__startswith="_").order_by(
-        "-is_active", "first_name", "username"
+@requer_area(Area.FUNCIONARIOS, Area.EQUIPE)
+def funcionarios(request):
+    """Lista de quem trabalha na pousada — cargo/setor/turno/admissão + acesso."""
+    setor = request.GET.get("setor", "")
+    qs = Funcionario.objects.select_related("pessoa", "usuario")
+    if setor:
+        qs = qs.filter(setor=setor)
+    lista = []
+    for f in qs:
+        u = f.usuario
+        nivel = "Gerência" if u and (u.is_superuser or u.is_staff) else ("Operador" if u else "Sem login")
+        lista.append({"f": f, "nivel": nivel, "ativo": bool(u and u.is_active)})
+    setores = (
+        Funcionario.objects.exclude(setor="")
+        .values_list("setor", flat=True).distinct().order_by("setor")
     )
+    return render(request, "nucleo/funcionarios.html", {
+        "funcionarios": lista, "setores": setores, "setor": setor,
+        "total": Funcionario.objects.count(),
+    })
 
 
-@requer_area(Area.EQUIPE)
-def equipe(request):
-    usuarios = []
-    for u in _usuarios_gerenciaveis():
-        usuarios.append({
-            "obj": u,
-            "gerente": u.is_superuser or u.is_staff,
-            "n_modulos": u.modulos.count(),
-            "n_areas": len(u.areas or []),
-        })
-    return render(request, "nucleo/equipe.html", {"usuarios": usuarios})
-
-
-@requer_area(Area.EQUIPE)
-def equipe_nova(request):
+@requer_area(Area.FUNCIONARIOS, Area.EQUIPE)
+def funcionario_novo(request):
     if request.method == "POST":
-        username = (request.POST.get("username") or "").strip()
-        nome = (request.POST.get("first_name") or "").strip()
-        email = (request.POST.get("email") or "").strip()
-        senha = request.POST.get("password") or ""
-        if not username or not senha:
-            messages.error(request, "Usuário e senha são obrigatórios.")
-        elif Usuario.objects.filter(username=username).exists():
-            messages.error(request, "Já existe um usuário com esse login.")
-        elif len(senha) < 8:
-            messages.error(request, "A senha deve ter ao menos 8 caracteres.")
+        nome = (request.POST.get("nome") or "").strip()
+        cargo = (request.POST.get("cargo") or "").strip()
+        if not nome:
+            messages.error(request, "Informe o nome do funcionário.")
         else:
-            u = Usuario.objects.create_user(
-                username=username, first_name=nome, email=email, password=senha
-            )
-            messages.success(request, f"Usuário “{u}” criado. Defina os acessos.")
-            return redirect("equipe_editar", pk=u.pk)
-    return render(request, "nucleo/equipe_form.html", {"modo": "novo"})
+            pessoa = Pessoa.objects.create(nome=nome)
+            f = Funcionario.objects.create(pessoa=pessoa, cargo=cargo or "—")
+            messages.success(request, f"Funcionário “{nome}” criado. Complete a ficha.")
+            return redirect("funcionario_editar", pk=f.pk)
+    return render(request, "nucleo/funcionario_form.html", {"modo": "novo"})
 
 
-@requer_area(Area.EQUIPE)
-def equipe_editar(request, pk):
-    u = get_object_or_404(_usuarios_gerenciaveis(), pk=pk)
+def _aplicar_acesso_funcionario(request, f, modulos_ativos_qs):
+    """Cria/atualiza o login do funcionário + módulos/áreas. Só gerência chama."""
+    username = (request.POST.get("username") or "").strip()
+    senha = request.POST.get("password") or ""
+    u = f.usuario
+    if not u:
+        if not username:
+            return  # sem login e não pediram — ok
+        if Usuario.objects.filter(username=username).exists():
+            messages.error(request, "Já existe um usuário com esse login.")
+            return
+        if len(senha) < 8:
+            messages.error(request, "Defina uma senha (mín. 8) para criar o login.")
+            return
+        u = Usuario.objects.create_user(
+            username=username, first_name=f.pessoa.nome, password=senha
+        )
+        f.usuario = u
+        f.save(update_fields=["usuario"])
+        senha = ""  # já consumida na criação
+    proprio = u.pk == request.user.pk
+    u.modulos.set(modulos_ativos_qs.filter(codigo__in=set(request.POST.getlist("modulos"))))
+    codigos_areas = {c for c, _ in areas_catalogo()}
+    u.areas = [a for a in request.POST.getlist("areas") if a in codigos_areas]
+    if not proprio:  # trava: não rebaixa/desativa a si mesmo
+        u.is_staff = request.POST.get("gerente") == "on"
+        u.is_active = request.POST.get("ativo") == "on"
+    if senha and len(senha) >= 8:
+        u.set_password(senha)
+    u.save()
+
+
+@requer_area(Area.FUNCIONARIOS, Area.EQUIPE)
+def funcionario_editar(request, pk):
+    f = get_object_or_404(Funcionario.objects.select_related("pessoa", "usuario"), pk=pk)
+    gerente = eh_gerente(request.user)
     modulos_ativos_qs = ModuloContratado.objects.filter(ativo=True).order_by("codigo")
 
     if request.method == "POST":
-        # Trava de segurança: não rebaixar/desativar a si mesmo.
-        proprio = u.pk == request.user.pk
-        # Módulos
-        marcados = set(request.POST.getlist("modulos"))
-        u.modulos.set(modulos_ativos_qs.filter(codigo__in=marcados))
-        # Áreas-core
-        codigos_areas = {c for c, _ in areas_catalogo()}
-        u.areas = [a for a in request.POST.getlist("areas") if a in codigos_areas]
-        # Gerência e ativo (não em si mesmo)
-        if not proprio:
-            u.is_staff = request.POST.get("gerente") == "on"
-            u.is_active = request.POST.get("ativo") == "on"
-        # Senha (opcional)
-        nova = request.POST.get("password") or ""
-        if nova:
-            if len(nova) < 8:
-                messages.error(request, "A nova senha deve ter ao menos 8 caracteres.")
-                return redirect("equipe_editar", pk=u.pk)
-            u.set_password(nova)
-        u.save()
-        messages.success(request, f"Acessos de “{u}” atualizados.")
-        return redirect("equipe")
+        form = FuncionarioForm(request.POST, instance=f, ver_salario=gerente)
+        if form.is_valid():
+            f.pessoa.nome = (request.POST.get("nome") or f.pessoa.nome).strip()
+            doc = request.POST.get("documento")
+            if doc is not None:
+                f.pessoa.documento = doc.strip()
+            f.pessoa.save()
+            form.save()
+            if gerente:  # o acesso (login/módulos/áreas) só gerência mexe
+                _aplicar_acesso_funcionario(request, f, modulos_ativos_qs)
+            messages.success(request, f"Ficha de {f.pessoa.nome} salva.")
+            return redirect("funcionarios")
+        messages.error(request, "Revise os campos da ficha.")
+    else:
+        form = FuncionarioForm(instance=f, ver_salario=gerente)
 
+    u = f.usuario
     modulos = [
         {"codigo": m.codigo, "nome": m.get_codigo_display(),
-         "tem": u.modulos.filter(pk=m.pk).exists()}
+         "tem": bool(u and u.modulos.filter(pk=m.pk).exists())}
         for m in modulos_ativos_qs
     ]
     areas = [
-        {"codigo": c, "nome": rot, "tem": c in (u.areas or [])}
+        {"codigo": c, "nome": rot, "tem": bool(u and c in (u.areas or []))}
         for c, rot in areas_catalogo()
     ]
-    return render(request, "nucleo/equipe_form.html", {
-        "modo": "editar", "u": u, "modulos": modulos, "areas": areas,
-        "proprio": u.pk == request.user.pk,
-        "gerente": u.is_superuser or u.is_staff,
+    return render(request, "nucleo/funcionario_form.html", {
+        "modo": "editar", "f": f, "form": form, "gerente": gerente,
+        "usuario": u, "modulos": modulos, "areas": areas,
+        "proprio": bool(u and u.pk == request.user.pk),
     })
