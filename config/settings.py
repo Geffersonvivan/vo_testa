@@ -87,6 +87,8 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Publica quem/IP da requisição para a auditoria automática (depois do auth).
+    "apps.nucleo.audit.AuditContextMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"

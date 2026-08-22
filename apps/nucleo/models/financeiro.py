@@ -304,17 +304,22 @@ class MovimentoCaixa(models.Model):
         )
 
 
-def receber_no_caixa(usuario, forma, valor: Decimal, descricao: str, parcelas: int = 1):
+def receber_no_caixa(usuario, forma, valor: Decimal, descricao: str, parcelas: int = 1,
+                     modulo: str = CENTRO_NUCLEO):
     """
-    Recebimento pela sessão de caixa aberta do operador — a "veia do dinheiro".
-    Interface pública para os módulos (Loja, PDV...) cobrarem no caixa.
+    Recebimento pela sessão de caixa aberta do operador NAQUELE módulo — a "veia
+    do dinheiro". Cada caixa (Loja, Reservas, Restaurante…) é uma gaveta física
+    separada, conferida à parte: o dinheiro da Loja só entra no caixa da Loja.
+    Interface pública para os módulos cobrarem no seu próprio caixa.
     """
     sessao = SessaoCaixa.objects.filter(
-        operador=usuario, status=SessaoCaixa.Status.ABERTA
+        operador=usuario, modulo=modulo, status=SessaoCaixa.Status.ABERTA
     ).first()
     if not sessao:
+        nome = dict(centro_choices()).get(modulo, modulo)
         raise ValidationError(
-            "Você precisa de um caixa aberto para receber — abra em Operação → Caixa."
+            f"Você precisa do caixa de {nome} aberto para receber — "
+            "abra em Operação → Caixa."
         )
     movimento = MovimentoCaixa(
         sessao=sessao,
@@ -521,7 +526,13 @@ class ContaPagarReceber(models.Model):
 
 
 class TrilhaAuditoria(models.Model):
-    """Registro de operações sensíveis: quem, quando, o quê e por quê."""
+    """Registro de ações: quem, quando, o quê, de onde e (quando cabe) por quê.
+
+    Append-only — nunca editar/apagar; correção é um novo registro. Alimentada por
+    duas vias: (1) automática, via signals nos models de negócio (piso garantido de
+    "toda ação do atendente fica registrada") e (2) explícita, via `registrar_auditoria`
+    nos fluxos que carregam intenção/motivo (estorno, cancelamento, troca…).
+    """
 
     usuario = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
@@ -531,22 +542,34 @@ class TrilhaAuditoria(models.Model):
     alvo = models.CharField("alvo", max_length=80)
     alvo_id = models.CharField("id do alvo", max_length=40)
     detalhe = models.JSONField("detalhe", default=dict, blank=True)
+    ip = models.GenericIPAddressField("IP", null=True, blank=True)
     criado_em = models.DateTimeField("em", auto_now_add=True)
 
     class Meta:
         verbose_name = "trilha de auditoria"
         verbose_name_plural = "trilhas de auditoria"
         ordering = ["-criado_em"]
+        indexes = [
+            models.Index(fields=["-criado_em"]),
+            models.Index(fields=["usuario", "-criado_em"]),
+            models.Index(fields=["alvo", "alvo_id"]),
+        ]
 
     def __str__(self):
         return f"{self.acao} — {self.alvo}#{self.alvo_id} por {self.usuario}"
 
 
-def registrar_auditoria(usuario, acao: str, objeto, detalhe: dict | None = None):
+def registrar_auditoria(usuario, acao: str, objeto, detalhe: dict | None = None, ip=None):
+    """Registra uma ação na trilha. Se `usuario`/`ip` não vierem, usa o contexto da
+    requisição atual (middleware) — assim serviços chamados sem `request` ainda
+    ficam atribuídos a quem disparou a ação."""
+    from apps.nucleo.audit import ip_atual, usuario_atual
+
     TrilhaAuditoria.objects.create(
-        usuario=usuario,
+        usuario=usuario if usuario is not None else usuario_atual(),
         acao=acao,
         alvo=objeto.__class__.__name__,
         alvo_id=str(objeto.pk),
         detalhe=detalhe or {},
+        ip=ip if ip is not None else ip_atual(),
     )

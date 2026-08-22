@@ -54,6 +54,46 @@ class RelatoriosServiceTests(TestCase):
         grupos = services.disponiveis()
         self.assertIn("Consolidados", grupos)
 
+    def test_periodo_por_mes_ano(self):
+        from django.test import RequestFactory
+        req = RequestFactory().get("/", {"mes": "3", "ano": "2026"})
+        ini, fim, rotulo = services.periodo(req)
+        self.assertEqual((ini.year, ini.month, ini.day), (2026, 3, 1))
+        self.assertEqual((fim.year, fim.month, fim.day), (2026, 3, 31))
+        self.assertEqual(rotulo, "Março/2026")
+
+    def test_periodo_padrao_mes_corrente(self):
+        from django.test import RequestFactory
+        hoje = timezone.localdate()
+        ini, fim, _ = services.periodo(RequestFactory().get("/"))
+        self.assertEqual((ini.year, ini.month), (hoje.year, hoje.month))
+        self.assertEqual(ini.day, 1)
+
+    def test_faturamento_diarias_vao_para_o_quarto(self):
+        ini, fim = self._periodo()
+        f = services.rel_faturamento_modulos(ini, fim)
+        kpis = dict(f["kpis"])
+        # 3 diárias × 200 = 600, tudo "lançado no quarto" (recepção recebe).
+        self.assertIn("600", kpis["Lançado nos quartos (recepção recebe)"])
+        hosp = next(l for l in f["linhas"] if "Hospedagem" in l[0])
+        self.assertIn("0.00", hosp[1])   # nada no caixa do setor
+        self.assertIn("600", hosp[2])    # tudo no quarto
+
+    def test_faturamento_loja_separa_caixa_e_quarto(self):
+        from apps.loja.models import Venda
+        from apps.nucleo.models import LocalEstoque
+        local = LocalEstoque.objects.create(nome="Loja", modulo="loja")
+        Venda.objects.create(local=local, destino=Venda.Destino.CAIXA,
+                             total=Decimal("100.00"), criado_por=self.op)
+        Venda.objects.create(local=local, destino=Venda.Destino.CONTA,
+                             total=Decimal("50.00"), criado_por=self.op)
+        ini, fim = self._periodo()
+        f = services.rel_faturamento_modulos(ini, fim)
+        loja = next(l for l in f["linhas"] if l[0] == "Loja")
+        self.assertIn("100", loja[1])  # no caixa do setor
+        self.assertIn("50", loja[2])   # lançado no quarto
+        self.assertIn("150", loja[3])  # total vendido
+
 
 class RelatoriosViewTests(TestCase):
     def setUp(self):

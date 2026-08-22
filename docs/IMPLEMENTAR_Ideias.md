@@ -89,8 +89,20 @@ importante** para o Google não indexar o sistema interno.
 
 ### Infra / cutover
 
-- [ ] 🟡 **Domínio personalizado** — `www.pousadavotesta.com.br` no app unificado
-      (apontar DNS). Confiança + marca + SEO. *Já é passo do cutover site↔CRM.*
+- [x] 🟡 **Domínio personalizado** — ✅ `www.pousadavotesta.com.br` já no app unificado
+      (Railway `Site_CRM_Pousada_Vo_Testa`, auto-deploy no push da main). Cutover feito.
+- [ ] 🟡 **Mídia em object storage (Cloudflare R2)** — **fazer antes de popular fotos reais.**
+      Hoje a mídia vive no filesystem efêmero do Railway → fotos subidas pelo admin em
+      produção **somem no próximo deploy** (por isso as 72 fotos curadas foram commitadas
+      no git como gambiarra). Com R2 (object storage S3-compatível, **sem taxa de egress**,
+      10GB grátis/mês → ~grátis p/ ~2MB de fotos), a mídia persiste e independe de git/deploy.
+      **Código (eu faço):** `django-storages` + `boto3`, `STORAGES` apontando pro R2 (via env
+      vars, sem segredo no git), comando p/ migrar as 72 fotos atuais, e devolver `media/` ao
+      gitignore. **Você (conta externa, ~10min):** criar bucket R2 + gerar API keys (Access
+      Key/Secret) → vão pro `.env`. **Bônus:** casa com o backup 3-2-1 — o NAS QNAP puxa do R2
+      com `rclone` (cópia offsite). Alternativa mais simples: **Railway Volume** (disco
+      persistente, sem conta externa, mas preso ao Railway, sem CDN nem backup offsite) — R2
+      é melhor p/ este caso.
 
 ### Atividade contínua (não é "arquivo")
 

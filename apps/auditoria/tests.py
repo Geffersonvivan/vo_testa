@@ -97,3 +97,55 @@ class PainelTrilhaTests(TestCase):
         Usuario.objects.create_user(username="x", password="senha-forte-123")
         self.client.login(username="x", password="senha-forte-123")
         self.assertEqual(self.client.get(reverse("auditoria:painel")).status_code, 403)
+
+
+class FormatacaoTrilhaTests(TestCase):
+    """A trilha lê como frase, não como JSON cru."""
+
+    def _reg(self, acao, alvo="", detalhe=None, alvo_id="1"):
+        from types import SimpleNamespace
+        return SimpleNamespace(acao=acao, alvo=alvo, detalhe=detalhe or {}, alvo_id=alvo_id)
+
+    def _frase(self, *a, **k):
+        from .formatacao import frase
+        return frase(self._reg(*a, **k))
+
+    def test_login_logout(self):
+        self.assertEqual(self._frase("login", "Usuario"), "Entrou no sistema")
+        self.assertEqual(self._frase("logout", "Usuario"), "Saiu do sistema")
+
+    def test_abrir_caixa(self):
+        f = self._frase("criar", "SessaoCaixa",
+                        {"valores": {"modulo": "reservas", "fundo_troco": "50.00"}})
+        self.assertIn("Abriu o caixa de reservas", f)
+        self.assertIn("R$ 50,00", f)
+
+    def test_fechar_caixa(self):
+        f = self._frase("fechamento_caixa", "SessaoCaixa",
+                        {"contado": "350.00", "diferenca": "0.00"})
+        self.assertIn("Fechou o caixa", f)
+        self.assertIn("contado R$ 350,00", f)
+        self.assertIn("diferença R$ 0,00", f)
+
+    def test_recebimento(self):
+        f = self._frase("criar", "MovimentoCaixa",
+                        {"valores": {"tipo": "recebimento", "valor": "120.00",
+                                     "descricao": "Conta reserva #5"}})
+        self.assertIn("Recebeu R$ 120,00", f)
+        self.assertIn("Conta reserva #5", f)
+
+    def test_editar_mostra_diff(self):
+        f = self._frase("editar", "Reserva", {"alteracoes": {"status": ["confirmada", "hospedada"]}})
+        self.assertIn("Alterou reserva", f)
+        self.assertIn("status: confirmada → hospedada", f)
+
+    def test_fallback_nunca_quebra(self):
+        f = self._frase("acao_desconhecida", "Reserva", {"algo": "x"})
+        self.assertIn("Acao desconhecida", f)
+        self.assertNotIn("{", f)  # nada de JSON cru
+
+    def test_entidades_operacionais(self):
+        self.assertEqual(self._frase("criar", "EntradaLogbook"), "Deixou um recado no turno")
+        self.assertIn("Abriu ordem de serviço", self._frase("criar", "OrdemServico", alvo_id="12"))
+        self.assertIn("Registrou venda", self._frase("criar", "Venda", alvo_id="45"))
+        self.assertIn("Abriu comanda", self._frase("criar", "Comanda", alvo_id="3"))

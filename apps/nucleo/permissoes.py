@@ -51,3 +51,21 @@ def requer_modulo(codigo: str):
         return wrapper
 
     return decorator
+
+
+def requer_area(*codigos: str):
+    """403 para quem não tem a área-core concedida (Quartos, Financeiro, Equipe…).
+    Aceita várias áreas: passa quem tiver QUALQUER uma delas (ex.: telas de caixa =
+    Caixa OU Financeiro). Superusuário passa. Ver apps/nucleo/areas.py e Equipe & Acessos."""
+
+    def decorator(view):
+        @wraps(view)
+        @login_required
+        def wrapper(request, *args, **kwargs):
+            if not any(request.user.pode_area(c) for c in codigos):
+                raise PermissionDenied("Sem acesso a esta área.")
+            return view(request, *args, **kwargs)
+
+        return wrapper
+
+    return decorator

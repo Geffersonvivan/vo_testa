@@ -32,7 +32,7 @@ class LavanderiaBase(TestCase):
         self.dinheiro = FormaPagamento.objects.get(tipo="dinheiro")
 
     def abrir_caixa(self):
-        return SessaoCaixa.objects.create(operador=self.op, modulo="nucleo",
+        return SessaoCaixa.objects.create(operador=self.op, modulo="lavanderia",
                                           fundo_troco=Decimal("0.00"))
 
 

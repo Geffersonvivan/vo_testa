@@ -74,7 +74,7 @@ class SinalCheckoutTests(GovernancaBase):
         )
         conta = r.fazer_checkin(self.user)
         SessaoCaixa.objects.create(
-            operador=self.user, modulo="nucleo", fundo_troco=Decimal("0")
+            operador=self.user, modulo="reservas", fundo_troco=Decimal("0")
         )
         rs.receber_pagamento(
             conta, self.user, FormaPagamento.objects.get(tipo="dinheiro"),

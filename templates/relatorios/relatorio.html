@@ -14,7 +14,7 @@
   <div class="pagina-cabecalho">
     <h1>{{ titulo }}</h1>
     <div style="display:flex; gap:.5rem">
-      <a href="?{% if f.de %}de={{ f.de }}&ate={{ f.ate }}{% else %}preset={{ f.preset|default:'mes' }}{% endif %}&export=csv" class="botao-neutro">Exportar CSV</a>
+      <a href="?{% if f.de %}de={{ f.de }}&ate={{ f.ate }}{% else %}mes={{ mes_sel }}&ano={{ ano_sel }}{% endif %}&export=csv" class="botao-neutro">Exportar CSV</a>
       <button type="button" class="botao-neutro" onclick="window.print()">Imprimir / PDF</button>
       <a href="{% url 'relatorios:index' %}" class="botao-mini">Voltar</a>
     </div>
@@ -22,21 +22,29 @@
 
   <form method="get" class="filtro-barra rel-filtro">
     <div class="filtro-campo">
-      <label>Atalhos</label>
-      <div class="segmentado">
-        <a href="?preset=hoje" class="chip {% if rotulo == 'hoje' %}chip-ativo{% endif %}">Hoje</a>
-        <a href="?preset=semana" class="chip {% if rotulo == 'semana' %}chip-ativo{% endif %}">Semana</a>
-        <a href="?preset=mes" class="chip {% if rotulo == 'mês' %}chip-ativo{% endif %}">Mês</a>
-      </div>
+      <label>Mês</label>
+      <select name="mes" aria-label="Mês" onchange="this.form.submit()">
+        {% for num, nome in meses %}
+          <option value="{{ num }}" {% if num == mes_sel %}selected{% endif %}>{{ nome }}</option>
+        {% endfor %}
+      </select>
     </div>
     <div class="filtro-campo">
-      <label>Período</label>
+      <label>Ano</label>
+      <select name="ano" aria-label="Ano" onchange="this.form.submit()">
+        {% for a in anos %}
+          <option value="{{ a }}" {% if a == ano_sel %}selected{% endif %}>{{ a }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <details class="rel-personalizado">
+      <summary>Período personalizado</summary>
       <div class="filtro-periodo">
         <input type="date" name="de" value="{{ f.de }}" aria-label="De" onchange="this.form.submit()">
         <span class="sep">→</span>
         <input type="date" name="ate" value="{{ f.ate }}" aria-label="Até" onchange="this.form.submit()">
       </div>
-    </div>
+    </details>
     <button type="submit" class="botao-primario filtro-aplicar">Aplicar</button>
   </form>
 </div>

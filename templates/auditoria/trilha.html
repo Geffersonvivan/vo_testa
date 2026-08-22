@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load auditoria_extras %}
 
 {% block titulo %}Trilha de auditoria{% endblock %}
 
@@ -10,7 +11,7 @@
   <h1>Trilha de auditoria</h1>
   <a href="?{{ f.urlencode }}{% if f %}&{% endif %}export=csv" class="botao-neutro">Exportar CSV</a>
 </div>
-<p class="subtitulo">Quem fez o quê, quando e por quê — operações sensíveis de todos os módulos.</p>
+<p class="subtitulo">Quem fez o quê, quando e por quê — operações sensíveis de todos os módulos. <strong>Período: {{ rotulo }}</strong></p>
 
 <form method="get" class="filtro-barra">
   <div class="filtro-campo">
@@ -26,13 +27,25 @@
     </select>
   </div>
   <div class="filtro-campo">
-    <label>Período</label>
+    <label>Mês</label>
+    <select name="mes" onchange="this.form.submit()">
+      {% for num, nome in meses %}<option value="{{ num }}" {% if num == mes_sel %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="filtro-campo">
+    <label>Ano</label>
+    <select name="ano" onchange="this.form.submit()">
+      {% for a in anos %}<option value="{{ a }}" {% if a == ano_sel %}selected{% endif %}>{{ a }}</option>{% endfor %}
+    </select>
+  </div>
+  <details class="rel-personalizado">
+    <summary>Período personalizado</summary>
     <div class="filtro-periodo">
       <input type="date" name="de" value="{{ f.de }}" aria-label="De" onchange="this.form.submit()">
       <span class="sep">→</span>
       <input type="date" name="ate" value="{{ f.ate }}" aria-label="Até" onchange="this.form.submit()">
     </div>
-  </div>
+  </details>
   <button type="submit" class="botao-primario filtro-aplicar">Filtrar</button>
   <a href="{% url 'auditoria:trilha' %}" class="botao-neutro" style="align-self:flex-end;height:40px;display:inline-flex;align-items:center">Limpar</a>
 </form>
@@ -45,10 +58,10 @@
     {% for t in registros %}
       <tr>
         <td>{{ t.criado_em|date:"d/m/Y H:i" }}</td>
-        <td>{{ t.usuario|default:"—" }}</td>
+        <td>{% if t.usuario %}<a href="?usuario={{ t.usuario.pk }}&mes={{ mes_sel }}&ano={{ ano_sel }}" title="Ver só as ações de {{ t.usuario }}">{{ t.usuario }}</a>{% else %}—{% endif %}</td>
         <td><span class="selo">{{ t.acao }}</span></td>
         <td>{{ t.alvo }} #{{ t.alvo_id }}</td>
-        <td><small>{{ t.detalhe }}</small></td>
+        <td><span title="{{ t.detalhe }}">{{ t|frase_auditoria }}</span></td>
       </tr>
     {% empty %}
       <tr><td colspan="5" class="vazio">Nenhum registro no filtro.</td></tr>

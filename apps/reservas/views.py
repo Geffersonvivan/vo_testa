@@ -197,12 +197,18 @@ def lista(request):
     reservas = Reserva.objects.select_related("hospede", "uh")
     status = request.GET.get("status", "")
     busca = request.GET.get("q", "").strip()
+    saida = request.GET.get("saida", "")
     if status:
         reservas = reservas.filter(status=status)
     if busca:
         reservas = reservas.filter(
             Q(hospede__nome__icontains=busca) | Q(uh__numero__icontains=busca)
         )
+    # Atalhos do painel "Precisa de atenção": saídas atrasadas por situação de conta.
+    if saida in ("vencida_saldo", "vencida_quitada"):
+        v = services.saidas_vencidas()
+        alvo = v["com_saldo"] if saida == "vencida_saldo" else v["quitadas"]
+        reservas = reservas.filter(pk__in=[r.pk for r in alvo])
     return render(
         request,
         "reservas/lista.html",
@@ -210,6 +216,7 @@ def lista(request):
             "reservas": reservas[:200],
             "status": status,
             "busca": busca,
+            "saida": saida,
             "status_choices": Reserva.Status.choices,
         },
     )
@@ -333,7 +340,6 @@ def detalhe(request, pk):
     from apps.nucleo.models import modulo_ativo
 
     aviso_checkin = None
-    frigobar_pendente = False
     if reserva.status in (Reserva.Status.CONFIRMADA, Reserva.Status.PRE_RESERVA):
         if modulo_ativo(Modulo.GOVERNANCA):
             from apps.governanca.services import uh_pronta_para_checkin
@@ -342,17 +348,6 @@ def detalhe(request, pk):
                 aviso_checkin = (
                     f"O quarto {reserva.uh.numero} não está limpo/inspecionado."
                 )
-    if (
-        reserva.status == Reserva.Status.HOSPEDADA
-        and conta
-        and modulo_ativo(Modulo.FRIGOBAR)
-    ):
-        from django.conf import settings as dj_settings
-
-        from apps.frigobar.services import conferencia_checkout_feita
-
-        if getattr(dj_settings, "FRIGOBAR_BLOQUEAR_CHECKOUT", True):
-            frigobar_pendente = not conferencia_checkout_feita(conta=conta)
 
     return render(
         request,
@@ -367,7 +362,6 @@ def detalhe(request, pk):
             "quartos_livres": quartos_livres,
             "eh_gerente": eh_gerente(request.user),
             "aviso_checkin": aviso_checkin,
-            "frigobar_pendente": frigobar_pendente,
             "fnrh_pronta": reserva.fnrh_pronta,
             "fnrh_total": reserva.total_hospedes,
             "fnrh_completas": sum(1 for f in reserva.fichas_fnrh.all() if f.completa),

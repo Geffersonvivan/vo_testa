@@ -47,6 +47,7 @@ def relatorio(request, chave):
         "chave": chave, "titulo": r["nome"], "grupo": r["grupo"],
         "inicio": inicio, "fim": fim, "rotulo": rotulo,
         "dados": dados, "f": request.GET,
+        **services.selecao_periodo(request),
     })
 
 

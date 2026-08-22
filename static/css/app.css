@@ -590,6 +590,9 @@ a.cartao-link:hover, .cartao-link:hover {
 input[type="checkbox"], input[type="radio"] { accent-color: var(--lampiao); }
 
 .ajuda { display: block; color: var(--tinta-suave); font-size: .74rem; margin-top: .25rem; }
+/* Como CÉLULA de tabela, .ajuda vale só como texto suave — sem block/margin
+   (senão o td sai do fluxo e a linha divisória escalona). */
+.tabela td.ajuda { display: table-cell; margin-top: 0; font-size: .84rem; vertical-align: middle; }
 .erro { display: block; color: var(--perigo); font-size: .78rem; margin-top: .25rem; }
 .campo-erro input, .campo-erro select, .campo-erro textarea { border-color: var(--perigo); }
 
@@ -682,8 +685,47 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--lampiao); }
 .selo-suja, .selo-pendente { color: var(--alerta); background: var(--alerta-bg); border-color: rgba(176,116,28,.3); }
 .selo-em_limpeza, .selo-em_andamento { color: #B5591C; background: rgba(200,98,30,.12); border-color: rgba(200,98,30,.3); }
 .selo-alerta { color: var(--perigo); background: var(--perigo-bg); border-color: rgba(166, 64, 44, .28); }
+
+/* Governança — tela única de limpeza: chips-contadores (filtro) + tabela compacta */
+.filtro-limpeza { display: flex; flex-wrap: wrap; gap: 8px; margin: .2rem 0 1.1rem; }
+.chip-limpeza {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: .4rem .8rem; border-radius: 999px;
+  font-size: .82rem; font-weight: 600; color: var(--tinta);
+  background: var(--superficie); border: 1px solid var(--fio);
+  cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .1s;
+}
+.chip-limpeza:hover { border-color: var(--fio-forte); }
+.chip-limpeza:active { transform: translateY(1px); }
+.chip-limpeza.ativo { border-color: var(--lampiao); box-shadow: 0 0 0 2px rgba(226,168,74,.18); background: var(--superficie-2); }
+.chip-limpeza b { font-weight: 800; font-variant-numeric: tabular-nums; }
+.chip-limpeza .ponto { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.chip-suja .ponto { background: var(--alerta); }
+.chip-em_limpeza .ponto { background: #C8621E; }
+.chip-limpa .ponto { background: var(--sucesso); }
+.chip-inspecionada .ponto { background: var(--info); }
+
+.tabela-limpeza td { padding-top: .55rem; padding-bottom: .55rem; }
+.tabela-limpeza .selo { min-width: 92px; justify-content: center; }
+.tabela-limpeza .form-inline select { min-width: 150px; }
+.tabela-limpeza .celula-vazia { color: var(--tinta-suave); }
+/* NÃO usar flex/block no <td> (sai do fluxo da tabela e escalona a borda) —
+   os botões ficam inline-block com um respiro entre eles. */
+.acoes-limpeza { white-space: nowrap; }
+.acoes-limpeza form { display: inline-block; margin: 0 .5rem 0 0; }
+.acoes-limpeza form:last-child { margin-right: 0; }
+.acoes-limpeza .botao-primario, .acoes-limpeza .botao-neutro { padding: .4rem .85rem; font-size: .84rem; }
+.botao-neutro:active { transform: translateY(1px); }
 .selo-ok { color: var(--sucesso); background: var(--sucesso-bg); border-color: rgba(46,125,91,.25); }
 .selo-ativo { color: var(--noturno); background: var(--lampiao-claro); border-color: var(--lampiao); }
+
+/* Equipe & Acessos: grade de checkboxes de módulos/áreas */
+.acessos-grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: .4rem .9rem;
+  margin-top: .3rem;
+}
 
 /* FNRH — cada ficha (titular/acompanhante) como cartão no formulário */
 .fnrh-ficha {
@@ -1693,15 +1735,15 @@ a.quarto-porta:hover .porta-circulo, button.quarto-porta:hover .porta-circulo {
 }
 
 .porta {
-  aspect-ratio: 3 / 4.1;
+  aspect-ratio: 3 / 4;
   min-height: 0;
-  border-radius: 8px 8px 4px 4px;
+  border-radius: 10px 10px 5px 5px;
   border: 1px solid rgba(255, 255, 255, .08);
   background: linear-gradient(180deg, #1A3A4C, #122937);
   color: #D7E2E8;
   display: flex; flex-direction: column;
-  gap: 3px;
-  padding: 7px 6px 6px;
+  gap: 2px;
+  padding: 8px 7px 8px;
   cursor: pointer;
   text-align: left;
   text-decoration: none;
@@ -1712,75 +1754,101 @@ a.quarto-porta:hover .porta-circulo, button.quarto-porta:hover .porta-circulo {
 }
 button.porta { appearance: none; }
 div.porta { cursor: default; }
+/* Sem cursor "?" nas portas: a dica aparece no hover, mas o cursor segue a ação
+   (mão nos clicáveis, seta nos inertes) — sobrepõe a regra genérica de .dica. */
+.porta.dica[data-dica] { cursor: pointer; }
+div.porta.dica[data-dica] { cursor: default; }
 .porta:hover {
   transform: translateY(-2px);
   border-color: rgba(226, 168, 74, .45);
   z-index: 30; /* sobe a porta inteira + dica acima da grade */
 }
 .porta-topo {
-  display: flex; align-items: center; justify-content: space-between; gap: 3px;
-  padding-right: 10px;
+  display: flex; align-items: center; justify-content: space-between; gap: 4px;
+  min-height: 20px;
 }
 .porta-num {
-  font-family: var(--fonte-mono); font-weight: 700; font-size: 1rem;
-  letter-spacing: .02em; line-height: 1.1;
+  font-family: var(--fonte-mono); font-weight: 700; font-size: 1.05rem;
+  letter-spacing: 0; line-height: 1;
 }
+.porta-topo-marcas { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .porta-pcd {
-  font-size: .62rem; font-weight: 800; letter-spacing: .04em;
+  font-size: .58rem; font-weight: 800; letter-spacing: .04em;
   color: var(--noturno);
   background: var(--lampiao-claro);
-  padding: 2px 5px; border-radius: 4px;
+  padding: 1px 4px; border-radius: 4px;
   flex-shrink: 0;
 }
+/* Ponto de status no canto — leitura instantânea (cor = situação) */
+.porta-fecho {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #6B808C; flex-shrink: 0;
+}
+/* Micro-rótulo de situação: sem pílula, só texto discreto (a cor do card carrega o estado) */
 .porta-selo {
   align-self: flex-start;
-  font-size: .68rem; font-weight: 700; letter-spacing: .03em;
+  font-size: .58rem; font-weight: 700; letter-spacing: .08em;
   text-transform: uppercase;
-  padding: 2px 6px; border-radius: 999px;
-  background: rgba(0, 0, 0, .28);
-}
-.porta-fecho {
-  position: absolute; right: 6px; top: 28%;
-  width: 5px; height: 5px; border-radius: 50%;
-  background: #6B808C;
+  color: #93A7B2;
+  line-height: 1;
 }
 .porta-nome {
-  font-size: .78rem; font-weight: 600; color: #E8F0F4;
-  line-height: 1.2;
+  font-size: .8rem; font-weight: 650; color: #EEF4F7;
+  line-height: 1.2; margin-top: 1px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .porta-periodo {
   font-family: var(--fonte-mono);
-  font-size: .68rem; font-weight: 500; color: #A8BBC6;
-  letter-spacing: -.01em;
+  font-size: .64rem; font-weight: 500; color: #A0B4BF;
+  letter-spacing: -.02em; line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Rodapé SEMPRE numa linha só — nada vaza para a fileira de baixo */
 .porta-rodape {
   margin-top: auto;
-  display: flex; flex-wrap: wrap; gap: 2px 5px;
-  align-items: center;
+  display: flex; flex-wrap: nowrap; gap: 5px;
+  align-items: center; justify-content: space-between;
+  overflow: hidden; min-height: 16px;
+  padding-top: 3px;
 }
 .porta-saldo {
   font-family: var(--fonte-mono);
-  font-size: .72rem; font-weight: 700;
+  font-size: .74rem; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  min-width: 0;
 }
 .porta-saldo.devendo { color: #F0C97A; }
 .porta-saldo.ok { color: #8FCBB0; }
 .porta-limp {
-  font-size: .62rem; font-weight: 700; letter-spacing: .02em;
-  text-transform: uppercase;
-  color: #9BB0BC;
+  font-size: .6rem; font-weight: 700; letter-spacing: .02em;
+  text-transform: uppercase; white-space: nowrap;
+  color: #9BB0BC; flex-shrink: 0;
 }
 .porta-limp.limpeza-suja,
 .porta-limp.limpeza-em_limpeza { color: #E8B07A; }
 .porta-limp.limpeza-limpa,
 .porta-limp.limpeza-inspecionada { color: #8FCBB0; }
 .porta-flag {
-  font-size: .62rem; font-weight: 700; letter-spacing: .02em;
-  text-transform: uppercase;
-  color: var(--lampiao-claro);
+  font-size: .6rem; font-weight: 700; letter-spacing: .02em;
+  text-transform: uppercase; white-space: nowrap;
+  color: var(--lampiao-claro); flex-shrink: 0;
 }
-.porta-flag.frigobar { color: #F0A090; }
-.porta-flag.alerta { color: #F28B6A; font-weight: 800; }   /* saída atrasada = alerta */
+/* Alerta (saída atrasada) = selo compacto de ícone, nunca quebra linha */
+.porta-alerta {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 17px; height: 17px; border-radius: 50%;
+  background: rgba(242, 139, 106, .16);
+  color: #F5A085; flex-shrink: 0;
+}
+.porta-alerta svg { width: 11px; height: 11px; }
+.porta-marcas-rodape { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; min-width: 0; }
+
+/* Ponto de status: cor = situação, leitura instantânea no canto do card */
+.porta.sit-livre .porta-fecho { background: #7FC9A3; box-shadow: 0 0 8px rgba(127, 201, 163, .5); }
+.porta.sit-a_limpar .porta-fecho { background: #E8B07A; box-shadow: 0 0 8px rgba(232, 176, 122, .5); }
+.porta.sit-em_limpeza .porta-fecho { background: #D98A4A; box-shadow: 0 0 8px rgba(217, 138, 74, .5); }
+.porta.sit-bloqueada .porta-fecho,
+.porta.sit-inativa .porta-fecho { background: #6B808C; box-shadow: none; }
 
 /* Dica do corredor: abaixo da porta (não cobre a fileira de cima), fundo opaco */
 .porta.dica::after {
@@ -1788,13 +1856,13 @@ div.porta { cursor: default; }
   bottom: auto;
   left: 50%;
   transform: translateX(-50%);
-  white-space: normal;
+  white-space: pre-line;   /* respeita as quebras de linha da lista (- item) */
   width: max(200px, 140%);
   max-width: 260px;
   text-align: left;
   font-size: .82rem;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.5;
   padding: .55rem .7rem;
   background: #04151F;
   color: #F4F8FA;

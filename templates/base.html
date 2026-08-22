@@ -1,4 +1,4 @@
-{% load static %}
+{% load static nucleo_extras %}
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
@@ -73,10 +73,12 @@
       </button>
     </div>
 
+    {% if user|pode_modulo:'reservas' %}
     <button class="acao-topo" onclick="abrirNovaReserva()">
       <svg viewBox="0 0 24 24" class="ico"><path d="M12 5v14M5 12h14"/></svg>
       <span class="rotulo">Nova reserva</span>
     </button>
+    {% endif %}
 
     <nav>
       <div class="nav-grupo">
@@ -115,6 +117,7 @@
         </div>
       {% endfor %}
 
+      {% if user|pode_area:'nps' %}
       <div class="nav-grupo">
         <span class="nav-titulo letreiro">Relacionamento</span>
         <a href="{% url 'nps:painel' %}" class="nav-item {% if request.resolver_match.namespace == 'nps' %}ativo{% endif %}" title="Proposta NPS — fase CRM do Hóspede">
@@ -122,35 +125,51 @@
           <span class="rotulo">NPS</span>
         </a>
       </div>
+      {% endif %}
 
+      {% if user|pode_area:'caixa' or user|pode_area:'financeiro' or user|pode_area:'logbook' %}
       <div class="nav-grupo">
         <span class="nav-titulo letreiro">Operação</span>
+        {% if user|pode_area:'caixa' or user|pode_area:'financeiro' %}
         <a href="{% url 'caixa' %}" class="nav-item {% if atual == 'caixa' %}ativo{% endif %}">
           <svg viewBox="0 0 24 24" class="ico"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
           <span class="rotulo">Caixa</span>
         </a>
+        {% endif %}
+        {% if user|pode_area:'logbook' %}
         <a href="{% url 'logbook' %}" class="nav-item {% if atual == 'logbook' %}ativo{% endif %}">
           <svg viewBox="0 0 24 24" class="ico"><path d="M4 5h13a2 2 0 012 2v12H6a2 2 0 01-2-2z"/><path d="M8 8h7M8 12h7"/></svg>
           <span class="rotulo">Recados do turno</span>
         </a>
+        {% endif %}
       </div>
+      {% endif %}
 
+      {% if user|pode_area:'pessoas' or user|pode_area:'quartos' or user|pode_area:'temporadas' %}
       <div class="nav-grupo">
         <span class="nav-titulo letreiro">Cadastros</span>
+        {% if user|pode_area:'pessoas' %}
         <a href="{% url 'pessoas' %}" class="nav-item {% if 'pessoa' in atual %}ativo{% endif %}">
           <svg viewBox="0 0 24 24" class="ico"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0111 0"/><path d="M16 11a3 3 0 000-6"/><path d="M15 20a5.5 5.5 0 016-5"/></svg>
           <span class="rotulo">Pessoas</span>
         </a>
+        {% endif %}
+        {% if user|pode_area:'quartos' %}
         <a href="{% url 'estrutura' %}" class="nav-item {% if 'uh' in atual or atual == 'estrutura' %}ativo{% endif %}">
           <svg viewBox="0 0 24 24" class="ico"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/></svg>
           <span class="rotulo">Quartos &amp; tipos</span>
         </a>
+        {% endif %}
+        {% if user|pode_area:'temporadas' %}
         <a href="{% url 'temporadas' %}" class="nav-item {% if 'temporada' in atual %}ativo{% endif %}">
           <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v3M16 3v3"/></svg>
           <span class="rotulo">Temporadas</span>
         </a>
+        {% endif %}
       </div>
+      {% endif %}
 
+      {% if user|pode_area:'financeiro' %}
       <div class="nav-grupo">
         <span class="nav-titulo letreiro">Financeiro</span>
         <a href="{% url 'lancamentos' %}" class="nav-item {% if 'lancamento' in atual %}ativo{% endif %}">
@@ -166,14 +185,23 @@
           <span class="rotulo">Sessões de caixa</span>
         </a>
       </div>
+      {% endif %}
 
-      {% if user.is_staff or user.is_superuser %}
+      {% if user.is_staff or user.is_superuser or user|pode_area:'equipe' %}
       <div class="nav-grupo">
         <span class="nav-titulo letreiro">Configurações</span>
+        {% if user.is_staff or user.is_superuser %}
         <a href="{% url 'modulos_central' %}" class="nav-item {% if atual == 'modulos_central' %}ativo{% endif %}">
           <svg viewBox="0 0 24 24" class="ico"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
           <span class="rotulo">Módulos</span>
         </a>
+        {% endif %}
+        {% if user|pode_area:'equipe' %}
+        <a href="{% url 'equipe' %}" class="nav-item {% if 'equipe' in atual %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0111 0"/><path d="M16 11a3 3 0 000-6"/><path d="M15 20a5.5 5.5 0 016-5"/></svg>
+          <span class="rotulo">Equipe &amp; Acessos</span>
+        </a>
+        {% endif %}
       </div>
       {% endif %}
     </nav>
@@ -330,21 +358,39 @@
 
   // ---------- Paleta de comandos ----------
   const COMANDOS = [
+    {% if user|pode_modulo:'reservas' %}
     { rotulo: 'Nova reserva', tipo: 'Ação', acao: abrirNovaReserva, icone: 'add' },
+    {% endif %}
     { rotulo: 'Visão geral', tipo: 'Ir para', url: '{% url "dashboard" %}' },
+    {% if user|pode_modulo:'reservas' %}
     { rotulo: 'Mapa de reservas', tipo: 'Ir para', url: '/reservas/' },
     { rotulo: 'Mapa de quartos', tipo: 'Ir para', url: '/reservas/quartos/' },
     { rotulo: 'Lista de reservas', tipo: 'Ir para', url: '/reservas/lista/' },
+    {% endif %}
+    {% if user|pode_area:'caixa' or user|pode_area:'financeiro' %}
     { rotulo: 'Caixa', tipo: 'Ir para', url: '{% url "caixa" %}' },
     { rotulo: 'Sessões de caixa', tipo: 'Ir para', url: '{% url "caixa_sessoes" %}' },
-    { rotulo: 'Pessoas', tipo: 'Ir para', url: '{% url "pessoas" %}' },
-    { rotulo: 'Quartos & tipos', tipo: 'Ir para', url: '{% url "estrutura" %}' },
-    { rotulo: 'Temporadas', tipo: 'Ir para', url: '{% url "temporadas" %}' },
+    {% endif %}
+    {% if user|pode_area:'financeiro' %}
     { rotulo: 'Lançamentos', tipo: 'Ir para', url: '{% url "lancamentos" %}' },
     { rotulo: 'Contas a pagar/receber', tipo: 'Ir para', url: '{% url "contas" %}' },
+    {% endif %}
+    {% if user|pode_area:'pessoas' %}
+    { rotulo: 'Pessoas', tipo: 'Ir para', url: '{% url "pessoas" %}' },
+    {% endif %}
+    {% if user|pode_area:'quartos' %}
+    { rotulo: 'Quartos & tipos', tipo: 'Ir para', url: '{% url "estrutura" %}' },
+    {% endif %}
+    {% if user|pode_area:'temporadas' %}
+    { rotulo: 'Temporadas', tipo: 'Ir para', url: '{% url "temporadas" %}' },
+    {% endif %}
+    {% if user|pode_modulo:'estoque' %}
     { rotulo: 'Estoque', tipo: 'Ir para', url: '/estoque/' },
     { rotulo: 'Produtos', tipo: 'Ir para', url: '/estoque/produtos/' },
+    {% endif %}
+    {% if user|pode_area:'logbook' %}
     { rotulo: 'Recados do turno', tipo: 'Ir para', url: '{% url "logbook" %}' },
+    {% endif %}
   ];
   let paletaItens = [], paletaSel = 0, paletaTimer = null;
 

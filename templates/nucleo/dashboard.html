@@ -5,7 +5,7 @@
 {% block conteudo %}
 <p class="pagina-eyebrow letreiro">Recepção · hoje</p>
 <div class="pagina-cabecalho">
-  <h1>O corredor</h1>
+  <h1>{% if tem_reservas %}O corredor{% else %}Visão geral{% endif %}</h1>
   {% if corredor %}
   <div class="acoes" style="margin:0">
     <a href="{% url 'reservas:mapa_quartos' %}" class="botao-neutro">Filtros e troca</a>
@@ -13,7 +13,7 @@
   </div>
   {% endif %}
 </div>
-<p class="subtitulo">A casa fala primeiro — situação de cada quarto agora.</p>
+<p class="subtitulo">{% if tem_reservas %}A casa fala primeiro — situação de cada quarto agora.{% else %}Seu resumo do dia.{% endif %}</p>
 
 {% if corredor %}
 <section class="corredor-hero">
@@ -26,6 +26,7 @@
 </section>
 {% endif %}
 
+{% if tem_logbook %}
 <section class="mural">
   <div class="mural-cabecalho">
     <span class="mural-titulo">
@@ -48,6 +49,7 @@
     <a href="{% url 'logbook' %}" class="mural-vazio">Nenhum recado ainda. Deixe um aviso para o próximo turno →</a>
   {% endif %}
 </section>
+{% endif %}
 
 {% if atencao %}
 <section class="atencao-secao">
@@ -70,6 +72,7 @@
 </section>
 {% endif %}
 
+{% if resumo_reservas or tem_financeiro or indicadores.estoque_minimo is not None %}
 <div class="cartoes cartoes-indicadores kpis">
   {% if resumo_reservas %}
     <a href="{% url 'reservas:mapa' %}" class="cartao kpi cartao-link">
@@ -80,23 +83,24 @@
       <div class="kpi-valor">{{ resumo_reservas.ocupacao }}%</div>
       <div class="kpi-nota">{{ resumo_reservas.hospedadas }} de {{ resumo_reservas.uhs_ativas }} quartos ocupados</div>
     </a>
-    <a href="{% url 'reservas:lista' %}?status=confirmada" class="cartao kpi cartao-link">
+    {% if resumo_reservas.chegadas_hoje %}<a href="{% url 'reservas:mapa' %}" class="cartao kpi cartao-link">{% else %}<div class="cartao kpi">{% endif %}
       <div class="kpi-topo">
         <span class="kpi-rotulo letreiro">Chegadas hoje</span>
         <svg viewBox="0 0 24 24" class="ico kpi-ico"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
       </div>
       <div class="kpi-valor">{{ resumo_reservas.chegadas_hoje }}</div>
       <div class="kpi-nota">check-ins previstos</div>
-    </a>
-    <a href="{% url 'reservas:lista' %}?status=hospedada" class="cartao kpi cartao-link">
+    {% if resumo_reservas.chegadas_hoje %}</a>{% else %}</div>{% endif %}
+    {% if resumo_reservas.saidas_hoje %}<a href="{% url 'reservas:mapa' %}" class="cartao kpi cartao-link">{% else %}<div class="cartao kpi">{% endif %}
       <div class="kpi-topo">
         <span class="kpi-rotulo letreiro">Saídas hoje</span>
         <svg viewBox="0 0 24 24" class="ico kpi-ico"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
       </div>
       <div class="kpi-valor">{{ resumo_reservas.saidas_hoje }}</div>
       <div class="kpi-nota">check-outs previstos</div>
-    </a>
+    {% if resumo_reservas.saidas_hoje %}</a>{% else %}</div>{% endif %}
   {% endif %}
+  {% if tem_financeiro %}
   <a href="{% url 'caixa_sessoes' %}" class="cartao kpi cartao-link {% if indicadores.caixas_abertos %}ok{% endif %}">
     <div class="kpi-topo">
       <span class="kpi-rotulo letreiro">Caixas abertos</span>
@@ -113,6 +117,7 @@
     <div class="kpi-valor">{{ indicadores.contas_vencidas }}</div>
     <div class="kpi-nota">a pagar/receber em atraso</div>
   </a>
+  {% endif %}
   {% if indicadores.estoque_minimo is not None %}
     <a href="{% url 'estoque:posicao' %}?alerta=1" class="cartao kpi cartao-link {% if indicadores.estoque_minimo %}alerta{% endif %}">
       <div class="kpi-topo">
@@ -124,6 +129,7 @@
     </a>
   {% endif %}
 </div>
+{% endif %}
 
 {% if graficos %}
 <h2>Indicadores para decisão</h2>
@@ -168,6 +174,7 @@
 {{ graficos|json_script:"dados-graficos" }}
 {% endif %}
 
+{% if tem_reservas %}
 <div class="painel-2col igual">
   <section class="painel-bloco">
     <h2>Chegadas de hoje</h2>
@@ -209,22 +216,7 @@
     {% endif %}
   </section>
 </div>
-
-<h2>Atalhos dos módulos</h2>
-{% for grupo in grupos_modulos %}
-  <p class="area-titulo letreiro">{{ grupo.titulo }}</p>
-  <div class="modulos-lista">
-    {% for m in grupo.itens %}
-      {% if m.url %}
-        <a href="{{ m.url }}" class="modulo-chip modulo-ativo">{{ m.nome }}</a>
-      {% else %}
-        <span class="modulo-chip modulo-breve">{{ m.nome }} <em>em breve</em></span>
-      {% endif %}
-    {% endfor %}
-  </div>
-{% empty %}
-  <p class="bloco-vazio">Nenhum módulo ativo.</p>
-{% endfor %}
+{% endif %}
 
 {% if graficos %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>

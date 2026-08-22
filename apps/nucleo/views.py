@@ -44,7 +44,8 @@ from .models import (
     estornar_movimento,
 )
 from .modulos import APRESENTACAO
-from .permissoes import eh_gerente, requer_gerencia
+from .areas import Area, areas_catalogo
+from .permissoes import eh_gerente, requer_area, requer_gerencia
 
 # ---------- Dashboard ----------
 
@@ -81,38 +82,62 @@ def dashboard(request):
         {"titulo": titulo, "itens": itens} for titulo, itens in grupos.items()
     ]
 
+    # Visão geral montada conforme o acesso do usuário — nada de outras áreas.
     hoje = timezone.localdate()
-    contas_vencidas = ContaPagarReceber.objects.filter(
-        status=ContaPagarReceber.Status.ABERTA, vencimento__lt=hoje
-    ).count()
-    indicadores = {
-        "caixas_abertos": SessaoCaixa.objects.filter(
-            status=SessaoCaixa.Status.ABERTA
-        ).count(),
-        "contas_vencidas": contas_vencidas,
-        "logbook_hoje": EntradaLogbook.objects.filter(criado_em__date=hoje).count(),
-        "uhs_ativas": UH.objects.filter(status=UH.Status.ATIVA).exclude(
-            tipo__modalidade="day_use"
-        ).count(),
-        "total_uhs": UH.objects.count(),
-    }
+    tem_reservas = request.user.pode_acessar(Modulo.RESERVAS)
+    tem_estoque = request.user.pode_acessar(Modulo.ESTOQUE)
+    tem_financeiro = request.user.pode_area(Area.FINANCEIRO)
+    tem_logbook = request.user.pode_area(Area.LOGBOOK)
+    # Gráficos de decisão são de gestão — atendente não vê.
+    tem_graficos = eh_gerente(request.user)
 
-    # ----- "Precisa de atenção": pendências acionáveis -----
-    atencao = []
-    if contas_vencidas:
-        atencao.append({
-            "nivel": "alerta",
-            "rotulo": f"{contas_vencidas} conta{'s' if contas_vencidas > 1 else ''} vencida{'s' if contas_vencidas > 1 else ''}",
-            "detalhe": "a pagar/receber em atraso",
-            "url": reverse("contas") + "?situacao=abertas",
-        })
-
+    indicadores: dict = {}
+    atencao: list = []
+    graficos: dict = {}
     resumo_reservas = None
     corredor = None
-    if request.user.pode_acessar(Modulo.RESERVAS):
-        from apps.reservas.models import Reserva
-        from apps.reservas.services import mapa_quartos_hoje, resumo_do_dia
+    recados_turno: list = []
 
+    if tem_financeiro:
+        contas_vencidas = ContaPagarReceber.objects.filter(
+            status=ContaPagarReceber.Status.ABERTA, vencimento__lt=hoje
+        ).count()
+        indicadores["caixas_abertos"] = SessaoCaixa.objects.filter(
+            status=SessaoCaixa.Status.ABERTA
+        ).count()
+        indicadores["contas_vencidas"] = contas_vencidas
+        if contas_vencidas:
+            atencao.append({
+                "nivel": "alerta",
+                "rotulo": f"{contas_vencidas} conta{'s' if contas_vencidas > 1 else ''} vencida{'s' if contas_vencidas > 1 else ''}",
+                "detalhe": "a pagar/receber em atraso",
+                "url": reverse("contas") + "?situacao=abertas",
+            })
+        if tem_graficos:
+            mix = (
+                MovimentoCaixa.objects.filter(tipo=MovimentoCaixa.Tipo.RECEBIMENTO)
+                .values("forma_pagamento__nome")
+                .annotate(t=Sum("valor"))
+                .order_by("-t")
+            )
+            if mix:
+                graficos["pagamento"] = {
+                    "labels": [m["forma_pagamento__nome"] or "—" for m in mix],
+                    "valores": [float(m["t"]) for m in mix],
+                }
+
+    if tem_reservas:
+        from apps.reservas.models import Reserva
+        from apps.reservas.services import (
+            dados_graficos,
+            mapa_quartos_hoje,
+            resumo_do_dia,
+        )
+
+        indicadores["uhs_ativas"] = UH.objects.filter(
+            status=UH.Status.ATIVA
+        ).exclude(tipo__modalidade="day_use").count()
+        indicadores["total_uhs"] = UH.objects.count()
         resumo_reservas = resumo_do_dia()
         corredor = mapa_quartos_hoje(
             ler_limpeza=request.user.pode_acessar(Modulo.GOVERNANCA),
@@ -125,8 +150,38 @@ def dashboard(request):
                 "detalhe": "confirme o sinal ou cancele",
                 "url": reverse("reservas:lista") + "?status=pre_reserva",
             })
+        # Saídas vencidas — o atendente finaliza (cobra e/ou fecha).
+        from apps.reservas.services import saidas_vencidas
 
-    if request.user.pode_acessar(Modulo.ESTOQUE):
+        vencidas = saidas_vencidas()
+        n_saldo = len(vencidas["com_saldo"])
+        n_quit = len(vencidas["quitadas"])
+        if n_saldo:
+            atencao.append({
+                "nivel": "alerta",
+                "rotulo": (
+                    f"{n_saldo} saída{'s' if n_saldo > 1 else ''} vencida"
+                    f"{'s' if n_saldo > 1 else ''} com saldo em aberto — "
+                    f"R$ {vencidas['total_aberto']} a receber"
+                ),
+                "detalhe": "cobre no caixa e finalize o check-out",
+                "url": reverse("reservas:lista") + "?saida=vencida_saldo",
+            })
+        if n_quit:
+            atencao.append({
+                "nivel": "aviso",
+                "rotulo": (
+                    f"{n_quit} saída{'s' if n_quit > 1 else ''} vencida"
+                    f"{'s' if n_quit > 1 else ''} já quitada"
+                    f"{'s' if n_quit > 1 else ''} — confirmar saída"
+                ),
+                "detalhe": "conta zerada, só finalizar o check-out",
+                "url": reverse("reservas:lista") + "?saida=vencida_quitada",
+            })
+        if tem_graficos:
+            graficos.update(dados_graficos())
+
+    if tem_estoque:
         from .models import produtos_abaixo_minimo
 
         minimo = produtos_abaixo_minimo()
@@ -139,30 +194,11 @@ def dashboard(request):
                 "url": reverse("estoque:posicao") + "?alerta=1",
             })
 
-    # Recados do turno têm mural próprio (ver abaixo), fora de "atenção".
-    recados_turno = list(
-        EntradaLogbook.objects.select_related("autor")[:6]
-    )
-
-    # ----- Gráficos -----
-    graficos = {}
-    if request.user.pode_acessar(Modulo.RESERVAS):
-        from apps.reservas.services import dados_graficos
-
-        graficos = dados_graficos()
-
-    # Mix de pagamento do caixa (recebimentos por forma)
-    mix = (
-        MovimentoCaixa.objects.filter(tipo=MovimentoCaixa.Tipo.RECEBIMENTO)
-        .values("forma_pagamento__nome")
-        .annotate(t=Sum("valor"))
-        .order_by("-t")
-    )
-    if mix:
-        graficos["pagamento"] = {
-            "labels": [m["forma_pagamento__nome"] or "—" for m in mix],
-            "valores": [float(m["t"]) for m in mix],
-        }
+    if tem_logbook:
+        indicadores["logbook_hoje"] = EntradaLogbook.objects.filter(
+            criado_em__date=hoje
+        ).count()
+        recados_turno = list(EntradaLogbook.objects.select_related("autor")[:6])
 
     return render(
         request,
@@ -175,6 +211,9 @@ def dashboard(request):
             "atencao": atencao,
             "graficos": graficos,
             "recados_turno": recados_turno,
+            "tem_reservas": tem_reservas,
+            "tem_financeiro": tem_financeiro,
+            "tem_logbook": tem_logbook,
         },
     )
 
@@ -311,7 +350,7 @@ PAPEL_FILTROS = {
 }
 
 
-@login_required
+@requer_area(Area.PESSOAS)
 def pessoas(request):
     busca = request.GET.get("q", "").strip()
     papel = request.GET.get("papel", "")
@@ -412,7 +451,7 @@ def _form_especializacao(request, form_cls, instancia, prefixo, marcado):
     return form_cls(request.POST, prefix=prefixo, instance=instancia)
 
 
-@login_required
+@requer_area(Area.PESSOAS)
 def pessoa_form(request, pk=None):
     pessoa = get_object_or_404(Pessoa, pk=pk) if pk else None
     hospede = getattr(pessoa, "hospede", None)
@@ -492,7 +531,7 @@ def pessoa_form(request, pk=None):
 # ---------- Cadastros: estrutura (tipos de UH e UHs) ----------
 
 
-@login_required
+@requer_area(Area.QUARTOS)
 def estrutura(request):
     from apps.reservas.services import tarifa_minima_do_tipo
 
@@ -514,7 +553,7 @@ def estrutura(request):
     )
 
 
-@login_required
+@requer_area(Area.QUARTOS)
 def tipo_uh_form(request, pk=None):
     tipo = get_object_or_404(TipoUH, pk=pk) if pk else None
     form = TipoUHForm(request.POST or None, instance=tipo)
@@ -529,7 +568,7 @@ def tipo_uh_form(request, pk=None):
     )
 
 
-@login_required
+@requer_area(Area.QUARTOS)
 def uh_form(request, pk=None):
     from .estrutura import capacidade, descricao_camas
     from .models import ConfiguracaoUH
@@ -573,14 +612,14 @@ def uh_form(request, pk=None):
 # ---------- Cadastros: temporadas ----------
 
 
-@login_required
+@requer_area(Area.TEMPORADAS)
 def temporadas(request):
     return render(
         request, "nucleo/temporadas.html", {"temporadas": Temporada.objects.all()}
     )
 
 
-@login_required
+@requer_area(Area.TEMPORADAS)
 def temporada_form(request, pk=None):
     temporada = get_object_or_404(Temporada, pk=pk) if pk else None
     form = TemporadaForm(request.POST or None, instance=temporada)
@@ -598,7 +637,7 @@ def temporada_form(request, pk=None):
 # ---------- Caixa ----------
 
 
-@login_required
+@requer_area(Area.CAIXA, Area.FINANCEIRO)
 def caixa(request):
     sessao = SessaoCaixa.objects.filter(
         operador=request.user, status=SessaoCaixa.Status.ABERTA
@@ -619,7 +658,7 @@ def caixa(request):
     )
 
 
-@login_required
+@requer_area(Area.CAIXA, Area.FINANCEIRO)
 def caixa_abrir(request):
     if request.method != "POST":
         return redirect("caixa")
@@ -639,7 +678,7 @@ def caixa_abrir(request):
     return redirect("caixa")
 
 
-@login_required
+@requer_area(Area.CAIXA, Area.FINANCEIRO)
 def caixa_movimento(request):
     if request.method != "POST":
         return redirect("caixa")
@@ -667,7 +706,7 @@ def caixa_movimento(request):
     return redirect("caixa")
 
 
-@login_required
+@requer_area(Area.CAIXA, Area.FINANCEIRO)
 def caixa_fechar(request):
     if request.method != "POST":
         return redirect("caixa")
@@ -691,7 +730,7 @@ def caixa_fechar(request):
     return redirect("caixa")
 
 
-@login_required
+@requer_area(Area.CAIXA, Area.FINANCEIRO)
 def caixa_sessoes(request):
     """Histórico de sessões: gerência vê todas; operador, só as suas."""
     sessoes = SessaoCaixa.objects.select_related("operador")
@@ -700,7 +739,7 @@ def caixa_sessoes(request):
     return render(request, "nucleo/caixa_sessoes.html", {"sessoes": sessoes})
 
 
-@login_required
+@requer_area(Area.CAIXA, Area.FINANCEIRO)
 def caixa_sessao(request, pk):
     sessao = get_object_or_404(SessaoCaixa.objects.select_related("operador"), pk=pk)
     if sessao.operador != request.user and not eh_gerente(request.user):
@@ -758,7 +797,7 @@ def estorno(request, movimento_pk):
 # ---------- Financeiro: lançamentos e contas ----------
 
 
-@login_required
+@requer_area(Area.FINANCEIRO)
 def lancamentos(request):
     lista = LancamentoFinanceiro.objects.select_related("categoria")
     tipo = request.GET.get("tipo", "")
@@ -775,7 +814,7 @@ def lancamentos(request):
     )
 
 
-@login_required
+@requer_area(Area.FINANCEIRO)
 def lancamento_form(request):
     form = LancamentoFinanceiroForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -791,7 +830,7 @@ def lancamento_form(request):
     )
 
 
-@login_required
+@requer_area(Area.FINANCEIRO)
 def contas(request):
     lista = ContaPagarReceber.objects.select_related("pessoa", "categoria")
     situacao = request.GET.get("situacao", "abertas")
@@ -802,7 +841,7 @@ def contas(request):
     )
 
 
-@login_required
+@requer_area(Area.FINANCEIRO)
 def conta_form(request):
     form = ContaPagarReceberForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
@@ -832,7 +871,7 @@ def conta_baixar(request, pk):
 # ---------- Logbook ----------
 
 
-@login_required
+@requer_area(Area.LOGBOOK)
 def logbook(request):
     if request.method == "POST":
         form = EntradaLogbookForm(request.POST)
@@ -849,3 +888,97 @@ def logbook(request):
         "nucleo/logbook.html",
         {"entradas": EntradaLogbook.objects.select_related("autor")[:100], "form": form},
     )
+
+
+# ---------- Equipe & Acessos (gestão de usuários e permissões) ----------
+
+from django.contrib.auth import get_user_model  # noqa: E402
+
+Usuario = get_user_model()
+
+
+def _usuarios_gerenciaveis():
+    """Usuários reais (exclui os de sistema: _portal, _site, etc.)."""
+    return Usuario.objects.exclude(username__startswith="_").order_by(
+        "-is_active", "first_name", "username"
+    )
+
+
+@requer_area(Area.EQUIPE)
+def equipe(request):
+    usuarios = []
+    for u in _usuarios_gerenciaveis():
+        usuarios.append({
+            "obj": u,
+            "gerente": u.is_superuser or u.is_staff,
+            "n_modulos": u.modulos.count(),
+            "n_areas": len(u.areas or []),
+        })
+    return render(request, "nucleo/equipe.html", {"usuarios": usuarios})
+
+
+@requer_area(Area.EQUIPE)
+def equipe_nova(request):
+    if request.method == "POST":
+        username = (request.POST.get("username") or "").strip()
+        nome = (request.POST.get("first_name") or "").strip()
+        email = (request.POST.get("email") or "").strip()
+        senha = request.POST.get("password") or ""
+        if not username or not senha:
+            messages.error(request, "Usuário e senha são obrigatórios.")
+        elif Usuario.objects.filter(username=username).exists():
+            messages.error(request, "Já existe um usuário com esse login.")
+        elif len(senha) < 8:
+            messages.error(request, "A senha deve ter ao menos 8 caracteres.")
+        else:
+            u = Usuario.objects.create_user(
+                username=username, first_name=nome, email=email, password=senha
+            )
+            messages.success(request, f"Usuário “{u}” criado. Defina os acessos.")
+            return redirect("equipe_editar", pk=u.pk)
+    return render(request, "nucleo/equipe_form.html", {"modo": "novo"})
+
+
+@requer_area(Area.EQUIPE)
+def equipe_editar(request, pk):
+    u = get_object_or_404(_usuarios_gerenciaveis(), pk=pk)
+    modulos_ativos_qs = ModuloContratado.objects.filter(ativo=True).order_by("codigo")
+
+    if request.method == "POST":
+        # Trava de segurança: não rebaixar/desativar a si mesmo.
+        proprio = u.pk == request.user.pk
+        # Módulos
+        marcados = set(request.POST.getlist("modulos"))
+        u.modulos.set(modulos_ativos_qs.filter(codigo__in=marcados))
+        # Áreas-core
+        codigos_areas = {c for c, _ in areas_catalogo()}
+        u.areas = [a for a in request.POST.getlist("areas") if a in codigos_areas]
+        # Gerência e ativo (não em si mesmo)
+        if not proprio:
+            u.is_staff = request.POST.get("gerente") == "on"
+            u.is_active = request.POST.get("ativo") == "on"
+        # Senha (opcional)
+        nova = request.POST.get("password") or ""
+        if nova:
+            if len(nova) < 8:
+                messages.error(request, "A nova senha deve ter ao menos 8 caracteres.")
+                return redirect("equipe_editar", pk=u.pk)
+            u.set_password(nova)
+        u.save()
+        messages.success(request, f"Acessos de “{u}” atualizados.")
+        return redirect("equipe")
+
+    modulos = [
+        {"codigo": m.codigo, "nome": m.get_codigo_display(),
+         "tem": u.modulos.filter(pk=m.pk).exists()}
+        for m in modulos_ativos_qs
+    ]
+    areas = [
+        {"codigo": c, "nome": rot, "tem": c in (u.areas or [])}
+        for c, rot in areas_catalogo()
+    ]
+    return render(request, "nucleo/equipe_form.html", {
+        "modo": "editar", "u": u, "modulos": modulos, "areas": areas,
+        "proprio": u.pk == request.user.pk,
+        "gerente": u.is_superuser or u.is_staff,
+    })

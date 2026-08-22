@@ -82,8 +82,10 @@ def entregar(ordem, operador, destino, forma=None, conta_id=None, desconto=ZERO)
     if destino == OrdemLavanderia.Destino.CAIXA:
         if not forma:
             raise ValidationError("Escolha a forma de pagamento.")
+        from apps.nucleo.modulos import Modulo
+
         ordem.movimento_caixa = receber_no_caixa(
-            operador, forma, total, f"Lavanderia #{ordem.pk}"
+            operador, forma, total, f"Lavanderia #{ordem.pk}", modulo=Modulo.LAVANDERIA,
         )
         ordem.forma_pagamento = forma
     else:

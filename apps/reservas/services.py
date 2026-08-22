@@ -554,25 +554,14 @@ def lancar_na_conta(
 def _receber_no_caixa(
     usuario, forma: FormaPagamento, valor: Decimal, descricao: str, parcelas: int = 1
 ) -> MovimentoCaixa:
-    """Recebimento pela sessão de caixa aberta do operador (a veia do dinheiro)."""
-    sessao = SessaoCaixa.objects.filter(
-        operador=usuario, status=SessaoCaixa.Status.ABERTA
-    ).first()
-    if not sessao:
-        raise ValidationError(
-            "Você precisa de um caixa aberto para receber — abra sua sessão em Operação → Caixa."
-        )
-    movimento = MovimentoCaixa(
-        sessao=sessao,
-        tipo=MovimentoCaixa.Tipo.RECEBIMENTO,
-        forma_pagamento=forma,
-        valor=valor,
-        parcelas=parcelas,
-        descricao=descricao,
-        criado_por=usuario,
+    """Recebimento pelo caixa de RESERVAS do operador — gaveta própria da recepção,
+    separada de Loja/Restaurante. Delega ao helper público do núcleo."""
+    from apps.nucleo.models import receber_no_caixa
+    from apps.nucleo.modulos import Modulo
+
+    return receber_no_caixa(
+        usuario, forma, valor, descricao, parcelas, modulo=Modulo.RESERVAS
     )
-    movimento.save()
-    return movimento
 
 
 def receber_pagamento(
@@ -812,6 +801,42 @@ def expirar_grupos_vencidos() -> int:
     return n
 
 
+def saidas_vencidas() -> dict:
+    """
+    Reservas HOSPEDADA cuja data de saída já passou e que ninguém finalizou
+    (esquecimento, virada de turno, hóspede que já foi). Separadas por dinheiro,
+    porque o atendente trata cada caso de um jeito:
+
+    - `com_saldo`: tem valor a receber → cobrar no caixa e então fechar (alerta).
+    - `quitadas`: conta zerada, só falta formalizar a saída num clique (aviso).
+
+    Fechar é sempre do atendente — este helper só ALIMENTA os avisos do painel,
+    não altera nada.
+    """
+    hoje = timezone.localdate()
+    vencidas = (
+        Reserva.objects.select_related("uh", "hospede", "conta")
+        .filter(status=Reserva.Status.HOSPEDADA, checkout__lt=hoje)
+        .exclude(uh__tipo__modalidade=TipoUH.Modalidade.DAY_USE)
+        .order_by("checkout", "uh__numero")
+    )
+    com_saldo, quitadas = [], []
+    total_aberto = Decimal("0.00")
+    for reserva in vencidas:
+        conta = getattr(reserva, "conta", None)
+        saldo = conta.saldo() if conta else Decimal("0.00")
+        if saldo > Decimal("0.00"):
+            total_aberto += saldo
+            com_saldo.append(reserva)
+        else:
+            quitadas.append(reserva)
+    return {
+        "com_saldo": com_saldo,
+        "quitadas": quitadas,
+        "total_aberto": total_aberto,
+    }
+
+
 @transaction.atomic
 def trocar_quarto(reserva, novo_uh, usuario, motivo=""):
     """
@@ -904,7 +929,16 @@ def resumo_do_dia() -> dict:
     uhs_ativas = UH.objects.filter(
         status=UH.Status.ATIVA,
     ).exclude(tipo__modalidade=TipoUH.Modalidade.DAY_USE).count()
-    hospedadas = Reserva.objects.filter(status=Reserva.Status.HOSPEDADA).count()
+    # Ocupação = QUARTOS distintos ocupados / quartos ativos. Contar reservas
+    # (e não quartos) estoura 100% quando há grupo/duplicidade no mesmo quarto;
+    # day-use não entra no mapa dos 24, então fica de fora dos dois lados.
+    hospedadas = (
+        Reserva.objects.filter(status=Reserva.Status.HOSPEDADA)
+        .exclude(uh__tipo__modalidade=TipoUH.Modalidade.DAY_USE)
+        .values("uh")
+        .distinct()
+        .count()
+    )
     chegadas = (
         Reserva.objects.select_related("hospede", "uh")
         .filter(
@@ -941,10 +975,10 @@ SITUACOES_QUARTO = {
 
 
 _LIMPEZA_LABEL = {
-    "limpa": "Limpa",
-    "suja": "Suja",
+    "limpa": "Limpo",
+    "suja": "Sujo",
     "em_limpeza": "Em limpeza",
-    "inspecionada": "Inspecionada",
+    "inspecionada": "Inspecionado",
 }
 
 
@@ -1042,7 +1076,7 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
         frigobar_pendente = False
         periodo = ""
         if reserva:
-            periodo = f"{reserva.checkin:%d/%m} → {reserva.checkout:%d/%m}"
+            periodo = f"{reserva.checkin:%d/%m}→{reserva.checkout:%d/%m}"
             if situacao == "ocupada" and hasattr(reserva, "conta"):
                 try:
                     saldo = reserva.conta.saldo()
@@ -1063,6 +1097,11 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
             "pcd": uh.pcd,
             "periodo": periodo,
             "saldo": saldo,
+            # Saldo compacto para o card do mapa (reais inteiros, ponto de milhar);
+            # o valor exato com centavos fica no fólio e na dica.
+            "saldo_fmt": (
+                "R$ " + f"{saldo:,.0f}".replace(",", ".") if saldo is not None else ""
+            ),
             "limpeza_cod": limpeza_cod,
             "limpeza_label": _LIMPEZA_LABEL.get(limpeza_cod or "", ""),
             "frigobar_pendente": frigobar_pendente,

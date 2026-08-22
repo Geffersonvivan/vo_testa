@@ -295,25 +295,13 @@ class Reserva(models.Model):
     def fazer_checkout(self, usuario):
         self._exige_status(self.Status.HOSPEDADA)
         conta = self.conta
+        # Único bloqueio de check-out é o dinheiro: saldo tem que estar zerado.
+        # (A pousada não trabalha com consumo de frigobar, então não há trava de
+        # conferência na saída.)
         if conta.saldo() != Decimal("0.00"):
             raise ValidationError(
                 f"A conta tem saldo de R$ {conta.saldo()} — receba ou ajuste antes."
             )
-        # Frigobar ativo: exige conferência de check-out (mesmo zerada).
-        from apps.nucleo.models import modulo_ativo
-        from apps.nucleo.modulos import Modulo
-
-        if (
-            modulo_ativo(Modulo.FRIGOBAR)
-            and getattr(settings, "FRIGOBAR_BLOQUEAR_CHECKOUT", True)
-        ):
-            from apps.frigobar.services import conferencia_checkout_feita
-
-            if not conferencia_checkout_feita(conta=conta):
-                raise ValidationError(
-                    "Conferência do frigobar pendente — registre o consumo "
-                    "(mesmo zerado) antes da saída."
-                )
         conta.status = ContaHospedagem.Status.FECHADA
         conta.fechada_em = timezone.now()
         conta.save()

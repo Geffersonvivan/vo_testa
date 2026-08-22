@@ -48,7 +48,7 @@ class RestauranteBase(TestCase):
 
     def abrir_caixa(self):
         return SessaoCaixa.objects.create(
-            operador=self.op, modulo="nucleo", fundo_troco=Decimal("0.00")
+            operador=self.op, modulo="restaurante", fundo_troco=Decimal("0.00")
         )
 
 

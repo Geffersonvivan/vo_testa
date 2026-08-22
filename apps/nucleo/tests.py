@@ -302,6 +302,8 @@ class RegrasDeCaixaTests(CaixaTestsBase):
         outro = Usuario.objects.create_user(
             username="loja", password="senha-forte-123"
         )
+        outro.areas = ["financeiro"]
+        outro.save()
         self.client.login(username="loja", password="senha-forte-123")
         self.client.post(
             reverse("caixa_abrir"), {"modulo": "nucleo", "fundo_troco": "50.00"}
@@ -323,6 +325,41 @@ class RegrasDeCaixaTests(CaixaTestsBase):
         sessao.refresh_from_db()
         self.assertEqual(sessao.status, SessaoCaixa.Status.FECHADA)
         self.assertEqual(sessao.diferenca, Decimal("0.00"))
+
+
+class AreaCaixaTests(TestCase):
+    """Operar o próprio caixa (área 'caixa') é separado da gestão financeira."""
+
+    def setUp(self):
+        self.dinheiro = FormaPagamento.objects.get(tipo="dinheiro")
+
+    def _user(self, username, areas):
+        u = Usuario.objects.create_user(username=username, password="senha-forte-123")
+        u.areas = areas
+        u.save()
+        self.client.force_login(u)
+        return u
+
+    def test_area_caixa_abre_o_proprio_caixa(self):
+        u = self._user("atendente", ["caixa"])
+        self.assertEqual(self.client.get(reverse("caixa")).status_code, 200)
+        self.client.post(
+            reverse("caixa_abrir"), {"modulo": "nucleo", "fundo_troco": "50.00"}
+        )
+        self.assertTrue(SessaoCaixa.objects.filter(operador=u).exists())
+
+    def test_sem_caixa_nem_financeiro_bloqueia(self):
+        self._user("semacesso", ["logbook"])
+        self.assertEqual(self.client.get(reverse("caixa")).status_code, 403)
+
+    def test_financeiro_ainda_acessa_caixa(self):
+        self._user("gestor", ["financeiro"])
+        self.assertEqual(self.client.get(reverse("caixa")).status_code, 200)
+
+    def test_caixa_nao_da_acesso_a_gestao_financeira(self):
+        self._user("atendente", ["caixa"])
+        self.assertEqual(self.client.get(reverse("contas")).status_code, 403)
+        self.assertEqual(self.client.get(reverse("lancamentos")).status_code, 403)
 
 
 class FinanceiroTests(CaixaTestsBase):
@@ -375,7 +412,9 @@ class FinanceiroTests(CaixaTestsBase):
 
 class LogbookTests(TestCase):
     def test_registro_pela_view(self):
-        Usuario.objects.create_user(username="turno", password="senha-forte-123")
+        u = Usuario.objects.create_user(username="turno", password="senha-forte-123")
+        u.areas = ["logbook"]
+        u.save()
         self.client.login(username="turno", password="senha-forte-123")
         resposta = self.client.post(
             reverse("logbook"),
@@ -417,7 +456,9 @@ class CadastroRapidoTests(TestCase):
 class TabelaPessoasTests(TestCase):
     def setUp(self):
         from apps.nucleo.models import Agencia, Fornecedor, Hospede
-        Usuario.objects.create_user(username="recepcao", password="senha-forte-123")
+        u = Usuario.objects.create_user(username="recepcao", password="senha-forte-123")
+        u.areas = ["pessoas"]
+        u.save()
         self.client.login(username="recepcao", password="senha-forte-123")
         h = Pessoa.objects.create(nome="Hóspede Um")
         Hospede.objects.create(pessoa=h)
@@ -611,3 +652,173 @@ class EstruturaCamasTests(TestCase):
         PosicaoCama.objects.create(uh=grande, nome="Quarto 2", ordem=1)
         ConfiguracaoUH.objects.create(uh=grande, tem_sofa_cama=True, max_colchoes_extras=2)
         self.assertEqual(faixa_do_tipo(tipo), "2 a 8 pessoas")
+
+
+class EquipeAcessosTests(TestCase):
+    """Equipe & Acessos: gating por área, gestão de usuários e travas."""
+
+    def setUp(self):
+        self.dono = Usuario.objects.create_superuser(
+            username="dono", password="senha-forte-123"
+        )
+        self.op = Usuario.objects.create_user(
+            username="operador", password="senha-forte-123"
+        )
+
+    def test_pode_area(self):
+        self.assertFalse(self.op.pode_area("quartos"))
+        self.op.areas = ["quartos"]
+        self.assertTrue(self.op.pode_area("quartos"))
+        self.assertTrue(self.dono.pode_area("financeiro"))  # super bypassa
+
+    def test_estrutura_gateada_por_area(self):
+        self.client.force_login(self.op)
+        self.assertEqual(self.client.get(reverse("estrutura")).status_code, 403)
+        self.op.areas = ["quartos"]
+        self.op.save()
+        self.assertEqual(self.client.get(reverse("estrutura")).status_code, 200)
+
+    def test_equipe_exige_area_equipe(self):
+        self.client.force_login(self.op)
+        self.assertEqual(self.client.get(reverse("equipe")).status_code, 403)
+        self.client.force_login(self.dono)  # super passa
+        self.assertEqual(self.client.get(reverse("equipe")).status_code, 200)
+
+    def test_criar_usuario(self):
+        self.client.force_login(self.dono)
+        r = self.client.post(reverse("equipe_nova"), {
+            "username": "novo", "first_name": "Novo", "password": "senha-forte-123",
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(Usuario.objects.filter(username="novo").exists())
+
+    def test_editar_concede_modulos_e_areas(self):
+        ModuloContratado.objects.get_or_create(codigo=Modulo.RESERVAS, defaults={"ativo": True})
+        self.client.force_login(self.dono)
+        self.client.post(reverse("equipe_editar", args=[self.op.pk]), {
+            "modulos": [Modulo.RESERVAS], "areas": ["quartos", "financeiro"],
+            "gerente": "on", "ativo": "on",
+        })
+        self.op.refresh_from_db()
+        self.assertTrue(self.op.pode_acessar(Modulo.RESERVAS))
+        self.assertEqual(sorted(self.op.areas), ["financeiro", "quartos"])
+        self.assertTrue(self.op.is_staff)
+
+    def test_nao_rebaixa_a_si_mesmo(self):
+        # dono edita a si mesmo tentando tirar gerência/ativar=off — deve ignorar
+        gerente = Usuario.objects.create_user(
+            username="ger", password="senha-forte-123", is_staff=True
+        )
+        gerente.areas = ["equipe"]
+        gerente.save()
+        self.client.force_login(gerente)
+        self.client.post(reverse("equipe_editar", args=[gerente.pk]), {
+            "areas": ["equipe"],  # sem 'gerente' nem 'ativo'
+        })
+        gerente.refresh_from_db()
+        self.assertTrue(gerente.is_staff)   # não se rebaixou
+        self.assertTrue(gerente.is_active)  # não se desativou
+
+    def test_area_invalida_ignorada(self):
+        self.client.force_login(self.dono)
+        self.client.post(reverse("equipe_editar", args=[self.op.pk]), {
+            "areas": ["quartos", "hackeando"],
+        })
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.areas, ["quartos"])  # 'hackeando' descartada
+
+
+class AuditoriaAutomaticaTests(TestCase):
+    """Piso garantido: escrita em model de negócio com usuário no contexto vira trilha."""
+
+    def setUp(self):
+        from apps.nucleo import audit
+        self.audit = audit
+        self.user = Usuario.objects.create_user(username="rec", password="x")
+
+    def tearDown(self):
+        self.audit.limpar_contexto()
+
+    def _pessoa(self):
+        from apps.nucleo.models import Pessoa
+        return Pessoa
+
+    def _trilha(self, **f):
+        from apps.nucleo.models import TrilhaAuditoria
+        return TrilhaAuditoria.objects.filter(**f)
+
+    def test_sem_usuario_no_contexto_nao_registra(self):
+        self.audit.limpar_contexto()
+        p = self._pessoa().objects.create(nome="Anônimo")
+        self.assertFalse(self._trilha(alvo="Pessoa", alvo_id=str(p.pk)).exists())
+
+    def test_criar_registra_com_usuario_e_ip(self):
+        self.audit.definir_contexto(self.user, "200.1.2.3")
+        p = self._pessoa().objects.create(nome="Fulano")
+        t = self._trilha(alvo="Pessoa", alvo_id=str(p.pk), acao="criar").first()
+        self.assertIsNotNone(t)
+        self.assertEqual(t.usuario, self.user)
+        self.assertEqual(t.ip, "200.1.2.3")
+        self.assertIn("valores", t.detalhe)
+
+    def test_editar_registra_diff(self):
+        self.audit.definir_contexto(self.user)
+        p = self._pessoa().objects.create(nome="Fulano")
+        p.nome = "Beltrano"
+        p.save()
+        t = self._trilha(alvo="Pessoa", alvo_id=str(p.pk), acao="editar").first()
+        self.assertIsNotNone(t)
+        self.assertEqual(t.detalhe["alteracoes"]["nome"], ["Fulano", "Beltrano"])
+
+    def test_save_sem_mudanca_nao_registra_edicao(self):
+        self.audit.definir_contexto(self.user)
+        p = self._pessoa().objects.create(nome="Fulano")
+        antes = self._trilha(alvo="Pessoa", acao="editar").count()
+        p.save()  # nenhum campo mudou
+        self.assertEqual(self._trilha(alvo="Pessoa", acao="editar").count(), antes)
+
+    def test_excluir_registra(self):
+        self.audit.definir_contexto(self.user)
+        p = self._pessoa().objects.create(nome="Fulano")
+        pk = p.pk
+        p.delete()
+        self.assertTrue(
+            self._trilha(alvo="Pessoa", alvo_id=str(pk), acao="excluir").exists()
+        )
+
+    def test_middleware_define_e_limpa_contexto(self):
+        from django.test import RequestFactory
+        capturado = {}
+
+        def get_response(req):
+            capturado["u"] = self.audit.usuario_atual()
+            capturado["ip"] = self.audit.ip_atual()
+            return "ok"
+
+        req = RequestFactory().get("/", REMOTE_ADDR="9.9.9.9")
+        req.user = self.user
+        self.audit.AuditContextMiddleware(get_response)(req)
+        self.assertEqual(capturado["u"], self.user)
+        self.assertEqual(capturado["ip"], "9.9.9.9")
+        self.assertIsNone(self.audit.usuario_atual())  # limpou depois da requisição
+
+    def test_usuario_anonimo_nao_vira_contexto(self):
+        from django.contrib.auth.models import AnonymousUser
+        self.audit.definir_contexto(AnonymousUser(), "1.1.1.1")
+        self.assertIsNone(self.audit.usuario_atual())
+
+    def test_login_registra_na_trilha(self):
+        self.user.set_password("senha-forte-123")
+        self.user.save()
+        self.client.login(username="rec", password="senha-forte-123")
+        t = self._trilha(alvo="Usuario", acao="login", usuario=self.user).first()
+        self.assertIsNotNone(t)
+
+    def test_logout_registra_na_trilha(self):
+        self.user.set_password("senha-forte-123")
+        self.user.save()
+        self.client.login(username="rec", password="senha-forte-123")
+        self.client.logout()
+        self.assertTrue(
+            self._trilha(alvo="Usuario", acao="logout", usuario=self.user).exists()
+        )

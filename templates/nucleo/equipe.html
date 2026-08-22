@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block titulo %}Equipe & Acessos — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Configurações</p>
+<div class="pagina-cabecalho">
+  <h1>Equipe &amp; Acessos</h1>
+  <a href="{% url 'equipe_nova' %}" class="botao-primario">Novo usuário</a>
+</div>
+<p class="subtitulo">Quem entra no sistema e o que cada um pode acessar — módulos e áreas.
+  Superusuário (dono) acessa tudo.</p>
+
+<table class="tabela">
+  <thead>
+    <tr><th>Nome</th><th>Login</th><th>Nível</th><th>Módulos</th><th>Áreas</th><th>Situação</th></tr>
+  </thead>
+  <tbody>
+    {% for item in usuarios %}
+      <tr>
+        <td><a href="{% url 'equipe_editar' item.obj.pk %}">{{ item.obj.get_full_name|default:item.obj.username }}</a></td>
+        <td class="ajuda">{{ item.obj.username }}</td>
+        <td>
+          {% if item.obj.is_superuser %}<span class="selo selo-ativo">Dono</span>
+          {% elif item.gerente %}<span class="selo selo-ok">Gerência</span>
+          {% else %}<span class="selo selo-neutro">Operador</span>{% endif %}
+        </td>
+        <td>{% if item.obj.is_superuser %}todos{% else %}{{ item.n_modulos }}{% endif %}</td>
+        <td>{% if item.obj.is_superuser %}todas{% else %}{{ item.n_areas }}{% endif %}</td>
+        <td>{% if item.obj.is_active %}<span class="selo selo-ok">ativo</span>{% else %}<span class="selo selo-alerta">inativo</span>{% endif %}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vazio">Nenhum usuário ainda — crie o primeiro.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -63,6 +63,13 @@ desenhar o nosso.
 - **Acesso por usuário × módulo, gerido pelo Admin:** toda view de módulo usa
   `@requer_modulo(Modulo.X)` (`apps/nucleo/permissoes.py`). Módulo inativo → 404;
   usuário sem o módulo em `Usuario.modulos` → 403. Superusuário acessa tudo.
+- **Áreas-core (o que não é módulo contratável):** o núcleo (quartos, temporadas,
+  caixa, financeiro, pessoas, logbook, NPS, equipe) tem controle por usuário via
+  `Usuario.areas` (JSONField) + `@requer_area(*codigos)` (variádico: passa quem tiver
+  QUALQUER uma). Catálogo em `apps/nucleo/areas.py` (`Area`), checagem `pode_area()`,
+  filtros de template `|pode_area:'x'` / `|pode_modulo:'x'`. Gerido na tela **Equipe &
+  Acessos** (`configuracoes/equipe/`, `@requer_area(Area.EQUIPE)`), não no admin.
+  Superusuário faz bypass; gerentes (is_staff) recebem as áreas por migração seed.
 
 ## Convenções
 
@@ -338,6 +345,54 @@ desenhar o nosso.
   — tela de leitura/filtro da `TrilhaAuditoria` (usuário/ação/período) + **exportar CSV**.
   Não altera dados; correção nos módulos donos. Decoupling: auditoria só chama services
   (sem import cruzado de models).
+- **Auditoria total ("toda ação de qualquer usuário fica registrada")**:
+  `apps/nucleo/audit.py`. **(1)** `AuditContextMiddleware` publica quem/IP da requisição
+  num threadlocal (`usuario_atual()`/`ip_atual()`), para qualquer service atribuir a ação
+  mesmo sem `request`. **(2) Denylist, não allowlist:** signals `post_save`/`post_delete`
+  em **TODOS os models dos apps `apps.*`** por padrão (`_modelos_para_auditar()`), menos
+  `MODELOS_EXCLUIDOS` (`nucleo.TrilhaAuditoria` = evita loop; `pagamentos.EventoPagamento`
+  = já é trilha de webhook) e tabelas M2M automáticas — ~79 models, inclui **`Usuario`**
+  (mudança de permissão), Tarifa, Temporada, FichaFNRH, Cobrança, etc. Gravam
+  **criar/editar/excluir** com **diff** dos campos. **(3)** Signals `user_logged_in`/
+  `user_logged_out` → **login/logout** na trilha. **Só registra com usuário real no
+  contexto** (seed/migration/shell/cron/webhook-sistema não poluem); `password` nunca
+  entra no diff (`CAMPOS_IGNORADOS`). `registrar_auditoria(usuario, acao, objeto, detalhe,
+  ip)` faz fallback de usuário/IP para o contexto — as ~25 chamadas explícitas seguem como
+  narrativa com motivo (estorno, cancelamento, troca…). `TrilhaAuditoria` tem campo `ip` +
+  índices; **append-only**, acesso só gerência. Ligada no `NucleoConfig.ready()`.
+  **Trilha (`apps/auditoria`)**: **frases legíveis** (`formatacao.frase()` + filter
+  `frase_auditoria`, JSON cru no `title`) — "Abriu o caixa de reservas — fundo R$ 0,00",
+  "Fechou o caixa — contado R$ 350,00 (diferença R$ 0,00)", "Alterou usuário: areas: …";
+  filtro **mês/ano** compartilhado com Relatórios (`apps/nucleo/periodos.py`), **usuário
+  clicável** (timeline por operador) e export CSV com a coluna descrição.
+  **Limites (não cobre):** só ESCRITAS, não leituras (ver dados = log de acesso à parte);
+  `bulk_create`/`QuerySet.update()`/SQL cru não passam por signals; `pre_save` faz 1 query
+  extra por escrita.
+- **Equipe & Acessos + dashboard por permissões**: tela `nucleo:equipe`
+  (`@requer_area(Area.EQUIPE)`) cria usuários e concede módulos + áreas-core por
+  checkbox (auto-protege: não rebaixa/desativa a si mesmo, senha mín. 8). Sidebar,
+  paleta de comandos e **Visão geral** montados conforme o acesso: KPIs/blocos de
+  Reservas/Financeiro/Estoque/Logbook só aparecem para quem tem a área/módulo; os
+  **gráficos de decisão são só gerência** (`eh_gerente`). Migração `0019/0020` (campo
+  `areas` + seed de áreas p/ gerentes).
+- **Caixa por módulo (gaveta física separada) + área Caixa**: cada caixa é do
+  operador × **módulo** (`SessaoCaixa.modulo`, constraint uma-aberta-por-operador-módulo).
+  `receber_no_caixa(usuario, forma, valor, descricao, parcelas, modulo)` acha a sessão
+  **daquele módulo** — Loja→caixa Loja, Restaurante→Restaurante, Lavanderia→Lavanderia,
+  Reservas→Reservas (recepção). Se faltar, erro nomeia o caixa a abrir. **Loja/serviço
+  lançado no quarto** vai ao folio e é recebido pela RECEPÇÃO (caixa Reservas) no
+  check-out — o dinheiro está na gaveta da recepção, mas a **venda** segue creditada ao
+  setor (registro `Venda`/`"Loja: item"` no folio). Nova área **`Area.CAIXA`** ("operar o
+  próprio caixa": abrir/receber/fechar) separada de **`Area.FINANCEIRO`** (contas/gestão);
+  telas de caixa aceitam Caixa OU Financeiro. Migração `0022` concede `caixa` a gerentes,
+  a quem tinha `financeiro` e a operadores de reservas/loja/restaurante.
+- **Relatórios por mês/ano + Faturamento por setor**: `apps/relatorios` — o filtro
+  agora é **seletor mês/ano** (padrão = mês corrente; período personalizado recolhido),
+  vale p/ todos os relatórios; CSV/print carregam mês/ano. Novo relatório
+  **"Faturamento por setor (caixa × quarto)"** (`rel_faturamento_modulos`): por setor,
+  quanto entrou **no caixa do setor** (venda na hora) × **lançado no quarto** (recepção
+  recebe via folio) + total vendido. Fecha o ciclo do caixa por módulo (a soma de
+  "lançado no quarto" = o que o caixa Reservas coleta de outros setores + diárias).
 - Fase 1 de módulos concluída. Fase 2 (§8): CRM do Hóspede, Canais/OTAs, Fiscal
   (provider real), integração site↔CRM (cutover), Safrapay.
 - Perguntas de negócio em aberto: §9 da especificação (parâmetros, não bloqueiam).

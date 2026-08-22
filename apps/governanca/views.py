@@ -14,13 +14,10 @@ Usuario = get_user_model()
 
 @requer_modulo(Modulo.GOVERNANCA)
 def painel(request):
-    # Situação de cada quarto (garante um StatusLimpeza para todos).
-    quartos = []
-    for uh in UH.objects.select_related("tipo").exclude(status=UH.Status.INATIVA):
-        quartos.append({"uh": uh, "status": services.situacao_uh(uh)})
+    dados = services.painel_limpeza()
     return render(request, "governanca/painel.html", {
-        "quartos": quartos,
-        "tarefas": services.tarefas_ativas(),
+        "linhas": dados["linhas"],
+        "contagem": dados["contagem"],
         "camareiras": Usuario.objects.filter(is_active=True).order_by("first_name", "username"),
         "tipos": TarefaGovernanca.Tipo.choices,
     })

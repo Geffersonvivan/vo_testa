@@ -23,6 +23,11 @@ class Usuario(AbstractUser):
             "Superusuários acessam todos os módulos ativos."
         ),
     )
+    areas = models.JSONField(
+        "áreas-core com acesso", default=list, blank=True,
+        help_text="Áreas do núcleo concedidas (Quartos, Financeiro, Equipe…). "
+                  "Gerido em Equipe & Acessos. Superusuário acessa tudo.",
+    )
 
     class Meta:
         verbose_name = "usuário"
@@ -38,6 +43,12 @@ class Usuario(AbstractUser):
         if self.is_superuser:
             return True
         return self.modulos.filter(codigo=codigo, ativo=True).exists()
+
+    def pode_area(self, codigo: str) -> bool:
+        """Acesso a área-core = superusuário OU área concedida em Equipe & Acessos."""
+        if self.is_superuser:
+            return True
+        return codigo in (self.areas or [])
 
 
 class ModuloContratado(models.Model):

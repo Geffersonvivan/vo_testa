@@ -21,7 +21,9 @@ class NpsPropostaTests(TestCase):
         self.assertEqual(resp.status_code, 302)
 
     def test_painel_mostra_proposta(self):
-        Usuario.objects.create_user(username="nps", password="x")
+        u = Usuario.objects.create_user(username="nps", password="x")
+        u.areas = ["nps"]
+        u.save()
         self.client.login(username="nps", password="x")
         resp = self.client.get(reverse("nps:painel"))
         self.assertEqual(resp.status_code, 200)

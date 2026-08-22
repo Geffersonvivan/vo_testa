@@ -55,7 +55,7 @@ class ReservasTestsBase(TestCase):
 
     def abrir_caixa(self):
         return SessaoCaixa.objects.create(
-            operador=self.usuario, modulo="nucleo", fundo_troco=Decimal("0.00")
+            operador=self.usuario, modulo="reservas", fundo_troco=Decimal("0.00")
         )
 
 
@@ -125,6 +125,7 @@ class RetencaoExpiracaoTests(ReservasTestsBase):
         self.assertIsNone(r.expira_em)
         self.assertEqual(services.expirar_vencidas(), 0)  # confirmada não expira
 
+
     def test_criar_reserva_site_grava_prazo(self):
         r = services.criar_reserva_site(
             tipo_uh=self.tipo, checkin=HOJE + timedelta(days=1),
@@ -133,6 +134,44 @@ class RetencaoExpiracaoTests(ReservasTestsBase):
         )
         self.assertIsNotNone(r.expira_em)
         self.assertGreater(r.expira_em, timezone.now())
+
+
+@override_settings(FNRH_BLOQUEAR_CHECKIN=False)
+class SaidasVencidasTests(ReservasTestsBase):
+    """Saídas atrasadas alimentam o painel; fechar é sempre do atendente."""
+
+    def _hospedar_vencida(self, dias=2, offset=-5, uh=None):
+        r = self.reserva(status=Reserva.Status.CONFIRMADA, dias=dias, offset=offset, uh=uh)
+        r.fazer_checkin(self.usuario)
+        return r
+
+    def test_com_saldo_entra_em_com_saldo(self):
+        r = self._hospedar_vencida()  # diárias em aberto
+        res = services.saidas_vencidas()
+        self.assertIn(r, res["com_saldo"])
+        self.assertNotIn(r, res["quitadas"])
+        self.assertEqual(res["total_aberto"], r.conta.saldo())
+
+    def test_quitada_entra_em_quitadas(self):
+        self.abrir_caixa()
+        r = self._hospedar_vencida()
+        services.receber_pagamento(r.conta, self.usuario, self.dinheiro, r.conta.saldo())
+        res = services.saidas_vencidas()
+        self.assertIn(r, res["quitadas"])
+        self.assertNotIn(r, res["com_saldo"])
+
+    def test_dentro_do_prazo_nao_aparece(self):
+        r = self.reserva(status=Reserva.Status.CONFIRMADA, dias=3, offset=-1)
+        r.fazer_checkin(self.usuario)  # saída amanhã, ainda não venceu
+        res = services.saidas_vencidas()
+        self.assertNotIn(r, res["com_saldo"])
+        self.assertNotIn(r, res["quitadas"])
+
+    def test_helper_nao_altera_status(self):
+        r = self._hospedar_vencida()
+        services.saidas_vencidas()
+        r.refresh_from_db()
+        self.assertEqual(r.status, Reserva.Status.HOSPEDADA)
 
 
 class TarifaTests(ReservasTestsBase):
@@ -236,10 +275,7 @@ class CicloDeEstadosTests(ReservasTestsBase):
         services.receber_pagamento(
             r.conta, self.usuario, self.dinheiro, Decimal("300.00")
         )
-        # Frigobar ativo (seed): conferência de check-out antes da saída.
-        from apps.frigobar.services import registrar_conferencia
-
-        registrar_conferencia(self.usuario, r.conta, "checkout", [])
+        # Saldo zerado é o único requisito de saída (sem trava de frigobar).
         r.fazer_checkout(self.usuario)
         r.refresh_from_db()
         self.assertEqual(r.status, Reserva.Status.CHECKOUT)
@@ -267,19 +303,8 @@ class CicloDeEstadosTests(ReservasTestsBase):
         r = self.reserva(dias=1)
         self.assertIsNotNone(r.fazer_checkin(self.usuario))
 
-    def test_checkout_bloqueado_sem_conferencia_frigobar(self):
-        r = self.reserva(dias=1)
-        r.fazer_checkin(self.usuario)
-        self.abrir_caixa()
-        services.receber_pagamento(
-            r.conta, self.usuario, self.dinheiro, r.conta.saldo()
-        )
-        with self.assertRaises(ValidationError) as ctx:
-            r.fazer_checkout(self.usuario)
-        self.assertIn("frigobar", str(ctx.exception).lower())
-
-    def test_checkout_sem_frigobar_nao_exige_conferencia(self):
-        ModuloContratado.objects.filter(codigo=Modulo.FRIGOBAR).update(ativo=False)
+    def test_checkout_so_depende_do_saldo(self):
+        # Não há consumo de frigobar: com a conta zerada, a saída é liberada.
         r = self.reserva(dias=1)
         r.fazer_checkin(self.usuario)
         self.abrir_caixa()

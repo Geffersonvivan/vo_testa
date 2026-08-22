@@ -203,7 +203,7 @@ class TokenPosCheckoutTests(PortalBase):
         from apps.reservas import services as rsv
         conta = self.reserva.conta
         if conta.saldo():
-            SessaoCaixa.objects.create(operador=self.op, modulo="nucleo",
+            SessaoCaixa.objects.create(operador=self.op, modulo="reservas",
                                        fundo_troco=Decimal("0"))
             dinheiro = FormaPagamento.objects.get(tipo="dinheiro")
             rsv.receber_pagamento(conta, self.op, dinheiro, conta.saldo())

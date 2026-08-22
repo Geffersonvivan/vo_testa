@@ -12,10 +12,11 @@ class StatusLimpeza(models.Model):
     """Situação de limpeza atual de cada quarto."""
 
     class Situacao(models.TextChoices):
-        LIMPA = "limpa", "Limpa"
-        SUJA = "suja", "Suja"
+        # Rótulos no masculino — concordam com "quarto" (Quarto 06 está limpo/sujo).
+        LIMPA = "limpa", "Limpo"
+        SUJA = "suja", "Sujo"
         EM_LIMPEZA = "em_limpeza", "Em limpeza"
-        INSPECIONADA = "inspecionada", "Inspecionada"
+        INSPECIONADA = "inspecionada", "Inspecionado"
 
     uh = models.OneToOneField(
         "nucleo.UH", on_delete=models.CASCADE,

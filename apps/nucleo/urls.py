@@ -6,6 +6,9 @@ urlpatterns = [
     path("", views.dashboard, name="dashboard"),
     path("busca/", views.busca_global, name="busca_global"),
     path("configuracoes/modulos/", views.modulos_central, name="modulos_central"),
+    path("configuracoes/equipe/", views.equipe, name="equipe"),
+    path("configuracoes/equipe/nova/", views.equipe_nova, name="equipe_nova"),
+    path("configuracoes/equipe/<int:pk>/", views.equipe_editar, name="equipe_editar"),
     # Cadastros
     path("pessoas/", views.pessoas, name="pessoas"),
     path("pessoas/nova/", views.pessoa_form, name="pessoa_nova"),

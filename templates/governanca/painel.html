@@ -1,84 +1,64 @@
 {% extends "base.html" %}
 
-{% block titulo %}Governança — CRM Vô Testa{% endblock %}
+{% block titulo %}Limpeza dos quartos — Governança{% endblock %}
 
 {% block conteudo %}
 <p class="pagina-eyebrow letreiro">Hospedagem</p>
-<h1>Governança</h1>
-<p class="subtitulo">Fila de faxinas (gerada no check-out e na troca de quarto) e a situação de limpeza de cada quarto.</p>
+<div class="pagina-cabecalho">
+  <h1>Limpeza dos quartos</h1>
+</div>
+<p class="subtitulo">Do check-out à liberação: o quarto vira <em>a limpar</em>, a camareira limpa e a recepção libera para o próximo hóspede.</p>
 
-<h2>Fila de faxina</h2>
-<table class="tabela">
-  <thead>
-    <tr><th>Quarto</th><th>Tipo</th><th>Camareira</th><th>Situação</th><th></th></tr>
-  </thead>
-  <tbody>
-    {% for t in tarefas %}
-      <tr>
-        <td><strong>{{ t.uh.numero }}</strong> <small class="ajuda">{{ t.uh.tipo.nome }}</small></td>
-        <td>{{ t.get_tipo_display }}</td>
+<div x-data="{ f: 'todas' }" class="governanca-painel">
+  <div class="filtro-limpeza" role="tablist" aria-label="Filtrar por situação">
+    <button type="button" class="chip-limpeza" :class="f==='todas' && 'ativo'" @click="f='todas'">Todas <b>{{ linhas|length }}</b></button>
+    <button type="button" class="chip-limpeza chip-suja" :class="f==='suja' && 'ativo'" @click="f='suja'"><span class="ponto"></span>A limpar <b>{{ contagem.suja }}</b></button>
+    <button type="button" class="chip-limpeza chip-em_limpeza" :class="f==='em_limpeza' && 'ativo'" @click="f='em_limpeza'"><span class="ponto"></span>Em limpeza <b>{{ contagem.em_limpeza }}</b></button>
+    <button type="button" class="chip-limpeza chip-limpa" :class="f==='limpa' && 'ativo'" @click="f='limpa'"><span class="ponto"></span>Limpas <b>{{ contagem.limpa }}</b></button>
+    <button type="button" class="chip-limpeza chip-inspecionada" :class="f==='inspecionada' && 'ativo'" @click="f='inspecionada'"><span class="ponto"></span>Inspecionadas <b>{{ contagem.inspecionada }}</b></button>
+  </div>
+
+  <table class="tabela tabela-limpeza">
+    <thead>
+      <tr><th>Quarto</th><th>Situação</th><th>Camareira</th><th>Ação</th></tr>
+    </thead>
+    <tbody>
+      {% for ln in linhas %}
+      <tr x-show="f==='todas' || f==='{{ ln.situacao }}'" x-transition.opacity>
+        <td><strong>{{ ln.uh.numero }}</strong><small class="ajuda">{{ ln.uh.tipo.nome }}</small></td>
+        <td><span class="selo selo-{{ ln.situacao }}">{{ ln.situacao_label }}</span></td>
         <td>
-          <form method="post" action="{% url 'governanca:tarefa_acao' t.pk %}" class="form-inline">
-            {% csrf_token %}<input type="hidden" name="acao" value="atribuir">
-            <select name="camareira">
-              <option value="">— camareira —</option>
-              {% for u in camareiras %}<option value="{{ u.pk }}" {% if t.camareira_id == u.pk %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}
-            </select>
-            <button type="submit" class="botao-neutro">Atribuir</button>
-          </form>
-        </td>
-        <td><span class="selo selo-{{ t.status }}">{{ t.get_status_display }}</span></td>
-        <td>
-          {% if t.status == 'pendente' %}
-            <form method="post" action="{% url 'governanca:tarefa_acao' t.pk %}" style="display:inline">
-              {% csrf_token %}<input type="hidden" name="acao" value="iniciar">
-              <button type="submit" class="botao-neutro">Iniciar</button>
+          {% if ln.tarefa and ln.situacao == 'suja' or ln.situacao == 'em_limpeza' and ln.tarefa %}
+            <form method="post" action="{% url 'governanca:tarefa_acao' ln.tarefa.pk %}" class="form-inline">
+              {% csrf_token %}<input type="hidden" name="acao" value="atribuir">
+              <select name="camareira" onchange="this.form.submit()" aria-label="Camareira do {{ ln.uh.numero }}">
+                <option value="">— camareira —</option>
+                {% for u in camareiras %}<option value="{{ u.pk }}" {% if ln.tarefa.camareira_id == u.pk %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+              </select>
             </form>
-          {% elif t.status == 'em_andamento' %}
-            <form method="post" action="{% url 'governanca:tarefa_acao' t.pk %}" style="display:inline">
-              {% csrf_token %}<input type="hidden" name="acao" value="concluir">
-              <button type="submit" class="botao-primario">Concluir</button>
-            </form>
+          {% else %}
+            <span class="celula-vazia">—</span>
           {% endif %}
         </td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="5" class="vazio">Nenhuma faxina na fila. Tudo em dia. ✨</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
-
-<h2>Situação dos quartos</h2>
-<table class="tabela">
-  <thead>
-    <tr><th>Quarto</th><th>Tipo</th><th>Limpeza</th><th>Ações</th></tr>
-  </thead>
-  <tbody>
-    {% for q in quartos %}
-      <tr>
-        <td><strong>{{ q.uh.numero }}</strong></td>
-        <td>{{ q.uh.tipo.nome }}</td>
-        <td><span class="selo selo-{{ q.status.situacao }}">{{ q.status.get_situacao_display }}</span></td>
         <td class="acoes-limpeza">
-          {% if q.status.situacao != 'limpa' and q.status.situacao != 'inspecionada' %}
-            <form method="post" action="{% url 'governanca:status_marcar' q.uh.pk %}" style="display:inline">
-              {% csrf_token %}<input type="hidden" name="situacao" value="limpa">
-              <button type="submit" class="botao-neutro">Marcar limpo</button>
-            </form>
+          {% if ln.situacao == 'suja' %}
+            {% if ln.tarefa %}
+              <form method="post" action="{% url 'governanca:tarefa_acao' ln.tarefa.pk %}">{% csrf_token %}<input type="hidden" name="acao" value="iniciar"><button type="submit" class="botao-primario">Iniciar limpeza</button></form>
+            {% else %}
+              <form method="post" action="{% url 'governanca:nova_tarefa' %}">{% csrf_token %}<input type="hidden" name="uh" value="{{ ln.uh.pk }}"><input type="hidden" name="tipo" value="faxina_completa"><button type="submit" class="botao-primario">Abrir faxina</button></form>
+            {% endif %}
+          {% elif ln.situacao == 'em_limpeza' %}
+            <form method="post" action="{% if ln.tarefa %}{% url 'governanca:tarefa_acao' ln.tarefa.pk %}{% else %}{% url 'governanca:status_marcar' ln.uh.pk %}{% endif %}">{% csrf_token %}{% if ln.tarefa %}<input type="hidden" name="acao" value="concluir">{% else %}<input type="hidden" name="situacao" value="limpa">{% endif %}<button type="submit" class="botao-primario">Marcar limpo</button></form>
+          {% elif ln.situacao == 'limpa' %}
+            <form method="post" action="{% url 'governanca:status_marcar' ln.uh.pk %}">{% csrf_token %}<input type="hidden" name="situacao" value="inspecionada"><button type="submit" class="botao-neutro">Inspecionar</button></form>
+            <form method="post" action="{% url 'governanca:nova_tarefa' %}">{% csrf_token %}<input type="hidden" name="uh" value="{{ ln.uh.pk }}"><input type="hidden" name="tipo" value="faxina_completa"><button type="submit" class="botao-neutro">Nova faxina</button></form>
+          {% elif ln.situacao == 'inspecionada' %}
+            <form method="post" action="{% url 'governanca:nova_tarefa' %}">{% csrf_token %}<input type="hidden" name="uh" value="{{ ln.uh.pk }}"><input type="hidden" name="tipo" value="faxina_completa"><button type="submit" class="botao-neutro">Nova faxina</button></form>
           {% endif %}
-          {% if q.status.situacao == 'limpa' %}
-            <form method="post" action="{% url 'governanca:status_marcar' q.uh.pk %}" style="display:inline">
-              {% csrf_token %}<input type="hidden" name="situacao" value="inspecionada">
-              <button type="submit" class="botao-neutro">Inspecionar</button>
-            </form>
-          {% endif %}
-          <form method="post" action="{% url 'governanca:nova_tarefa' %}" style="display:inline">
-            {% csrf_token %}<input type="hidden" name="uh" value="{{ q.uh.pk }}"><input type="hidden" name="tipo" value="faxina_completa">
-            <button type="submit" class="botao-neutro">Nova faxina</button>
-          </form>
         </td>
       </tr>
-    {% endfor %}
-  </tbody>
-</table>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% endblock %}

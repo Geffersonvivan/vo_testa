@@ -6,34 +6,13 @@ módulos e models do núcleo, nunca models internos de outros módulos.
 
 Dois grupos: **Consolidados** (cruzam módulos) e **Por módulo** (individuais).
 """
-from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.db.models import Sum
-from django.utils import timezone
 
 from apps.nucleo.modulos import Modulo
-
-
-def _data(txt):
-    try:
-        return datetime.strptime(txt, "%Y-%m-%d").date()
-    except (TypeError, ValueError):
-        return None
-
-
-def periodo(request):
-    """Resolve o período dos filtros (presets ou datas). Retorna (inicio, fim, rotulo)."""
-    hoje = timezone.localdate()
-    de, ate = _data(request.GET.get("de")), _data(request.GET.get("ate"))
-    if de and ate:
-        return de, ate, "personalizado"
-    preset = request.GET.get("preset", "mes")
-    if preset == "hoje":
-        return hoje, hoje, "hoje"
-    if preset == "semana":
-        return hoje - timedelta(days=hoje.weekday()), hoje, "semana"
-    return hoje.replace(day=1), hoje, "mês"  # padrão
+# Seletor de período compartilhado (mês/ano) — mesmo controle da Trilha de auditoria.
+from apps.nucleo.periodos import periodo, selecao_periodo  # noqa: F401
 
 
 def _rs(v):
@@ -102,6 +81,79 @@ def rel_caixa(inicio, fim):
     }
 
 
+def rel_faturamento_modulos(inicio, fim):
+    """
+    Faturamento por setor, separando ONDE o dinheiro é recebido:
+      - "no caixa do setor" = venda paga na hora, entra na gaveta do próprio setor;
+      - "lançado no quarto" = foi pro folio; quem recebe é a RECEPÇÃO (caixa Reservas).
+    Fecha o ciclo do caixa por módulo: a soma da coluna "lançado no quarto" é
+    exatamente o que a recepção coleta de outros setores (+ as diárias).
+    """
+    from apps.nucleo.models import modulo_ativo
+
+    rng = (inicio, fim)
+    linhas = []
+    tot_caixa = tot_quarto = Decimal("0")
+
+    def add(setor, no_caixa, no_quarto):
+        nonlocal tot_caixa, tot_quarto
+        linhas.append([setor, _rs(no_caixa), _rs(no_quarto), _rs(no_caixa + no_quarto)])
+        tot_caixa += no_caixa
+        tot_quarto += no_quarto
+
+    # Hospedagem — as diárias são sempre folio (recebidas pela recepção).
+    if modulo_ativo(Modulo.RESERVAS):
+        from apps.reservas.models import LancamentoConta
+        diarias = LancamentoConta.objects.filter(
+            criado_em__date__range=rng, tipo=LancamentoConta.Tipo.DIARIA
+        ).aggregate(t=Sum("valor"))["t"] or Decimal("0")
+        add("Hospedagem (diárias)", Decimal("0"), diarias)
+
+    # Loja — Venda.total é campo: dá para somar no banco.
+    if modulo_ativo(Modulo.LOJA):
+        from apps.loja.models import Venda
+        v = Venda.objects.filter(criado_em__date__range=rng, status=Venda.Status.FECHADA)
+        no_caixa = v.filter(destino=Venda.Destino.CAIXA).aggregate(t=Sum("total"))["t"] or Decimal("0")
+        no_quarto = v.filter(destino=Venda.Destino.CONTA).aggregate(t=Sum("total"))["t"] or Decimal("0")
+        add("Loja", no_caixa, no_quarto)
+
+    # Restaurante — total é método; soma em Python.
+    if modulo_ativo(Modulo.RESTAURANTE):
+        from apps.restaurante.models import Comanda
+        c1 = c2 = Decimal("0")
+        for c in Comanda.objects.filter(
+            fechada_em__date__range=rng, status=Comanda.Status.FECHADA
+        ):
+            if c.destino == Comanda.Destino.CAIXA:
+                c1 += c.total()
+            else:
+                c2 += c.total()
+        add("Restaurante", c1, c2)
+
+    # Lavanderia — total é método; soma em Python.
+    if modulo_ativo(Modulo.LAVANDERIA):
+        from apps.lavanderia.models import OrdemLavanderia
+        l1 = l2 = Decimal("0")
+        for o in OrdemLavanderia.objects.filter(
+            entregue_em__date__range=rng, status=OrdemLavanderia.Status.ENTREGUE
+        ):
+            if o.destino == OrdemLavanderia.Destino.CAIXA:
+                l1 += o.total()
+            else:
+                l2 += o.total()
+        add("Lavanderia", l1, l2)
+
+    return {
+        "kpis": [
+            ("Faturamento total", _rs(tot_caixa + tot_quarto)),
+            ("Recebido na gaveta do setor", _rs(tot_caixa)),
+            ("Lançado nos quartos (recepção recebe)", _rs(tot_quarto)),
+        ],
+        "colunas": ["Setor", "No caixa do setor", "Lançado no quarto", "Total vendido"],
+        "linhas": linhas,
+    }
+
+
 # ───────────────────────── Por módulo (individuais) ─────────────────────────
 
 def rel_estoque_consumo(inicio, fim):
@@ -160,6 +212,9 @@ RELATORIOS = {
                  "builder": rel_ocupacao, "modulo": Modulo.RESERVAS},
     "caixa": {"nome": "Caixa / Financeiro", "grupo": "Consolidados",
               "builder": rel_caixa, "modulo": None},
+    "faturamento_modulos": {"nome": "Faturamento por setor (caixa × quarto)",
+                            "grupo": "Consolidados",
+                            "builder": rel_faturamento_modulos, "modulo": None},
     "estoque": {"nome": "Estoque — consumo (curva ABC)", "grupo": "Por módulo",
                 "builder": rel_estoque_consumo, "modulo": Modulo.ESTOQUE},
     "reservas": {"nome": "Reservas — canal e status", "grupo": "Por módulo",

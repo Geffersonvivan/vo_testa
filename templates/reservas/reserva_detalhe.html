@@ -49,14 +49,9 @@
     </form>
   {% endif %}
   {% if reserva.status == "hospedada" %}
-    {% if frigobar_pendente %}
-      <div class="mensagem warning">Conferência do frigobar pendente.
-        <a href="{% url 'frigobar:conferir' %}?conta={{ conta.pk }}">Conferir agora</a>
-      </div>
-    {% endif %}
     <form method="post" action="{% url 'reservas:checkout' reserva.pk %}"
           onsubmit="return confirm('Concluir a saída (check-out)? A conta precisa estar zerada.')">
-      {% csrf_token %}<button type="submit" class="botao-primario"{% if frigobar_pendente %} disabled title="Conferência do frigobar pendente"{% endif %}>Fazer saída (check-out)</button>
+      {% csrf_token %}<button type="submit" class="botao-primario">Fazer saída (check-out)</button>
     </form>
     {% if 'appsite'|modulo_ativo %}
       <a href="{% url 'portal:qr' reserva.pk %}" class="botao-neutro">QR do hóspede</a>

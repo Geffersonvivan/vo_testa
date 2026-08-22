@@ -74,8 +74,10 @@ def finalizar_venda(operador, local, itens, destino, forma=None, cliente=None,
         )
 
     if destino == Venda.Destino.CAIXA:
+        from apps.nucleo.modulos import Modulo
+
         mov = receber_no_caixa(
-            operador, forma, total, f"Venda Loja #{venda.pk}"
+            operador, forma, total, f"Venda Loja #{venda.pk}", modulo=Modulo.LOJA,
         )
         venda.movimento_caixa = mov
         venda.save(update_fields=["movimento_caixa"])

@@ -14,6 +14,18 @@ def modulo_ativo(codigo):
 
 
 @register.filter
+def pode_area(user, codigo):
+    """Uso: {% if user|pode_area:'equipe' %} ... {% endif %}"""
+    return bool(user.is_authenticated and user.pode_area(codigo))
+
+
+@register.filter
+def pode_modulo(user, codigo):
+    """Uso: {% if user|pode_modulo:'reservas' %} ... {% endif %}"""
+    return bool(user.is_authenticated and user.pode_acessar(codigo))
+
+
+@register.filter
 def camas_uh(uh):
     """Frase de camas gerada da estrutura. Uso: {{ uh|camas_uh }}"""
     return _descricao_camas(uh)

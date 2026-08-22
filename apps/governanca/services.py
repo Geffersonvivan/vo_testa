@@ -73,3 +73,43 @@ def tarefas_ativas():
         TarefaGovernanca.objects.exclude(status=TarefaGovernanca.Status.CONCLUIDA)
         .select_related("uh", "uh__tipo", "camareira")
     )
+
+
+# Urgência: o que precisa de ação sobe. (a limpar → em limpeza → limpa → inspecionada)
+_ORDEM_LIMPEZA = {
+    StatusLimpeza.Situacao.SUJA: 0,
+    StatusLimpeza.Situacao.EM_LIMPEZA: 1,
+    StatusLimpeza.Situacao.LIMPA: 2,
+    StatusLimpeza.Situacao.INSPECIONADA: 3,
+}
+
+
+def painel_limpeza():
+    """Tela única de Governança: uma linha por quarto FÍSICO (day-use fora), com o
+    status de limpeza + a tarefa ativa (se houver), ordenada por urgência. Substitui
+    as duas tabelas (fila de faxina + situação dos quartos) por uma só."""
+    from apps.nucleo.models import UH, TipoUH
+
+    tarefas = {}
+    for t in tarefas_ativas():
+        tarefas.setdefault(t.uh_id, t)  # a mais recente por quarto (ordering do model)
+
+    contagem = {c: 0 for c, _ in StatusLimpeza.Situacao.choices}
+    linhas = []
+    quartos = (
+        UH.objects.select_related("tipo")
+        .exclude(status=UH.Status.INATIVA)
+        .exclude(tipo__modalidade=TipoUH.Modalidade.DAY_USE)
+    )
+    for uh in quartos:
+        status = situacao_uh(uh)
+        contagem[status.situacao] += 1
+        linhas.append({
+            "uh": uh,
+            "situacao": status.situacao,
+            "situacao_label": status.get_situacao_display(),
+            "tarefa": tarefas.get(uh.pk),
+            "atualizado_em": status.atualizado_em,
+        })
+    linhas.sort(key=lambda ln: (_ORDEM_LIMPEZA.get(ln["situacao"], 9), ln["uh"].numero))
+    return {"linhas": linhas, "contagem": contagem}

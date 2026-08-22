@@ -81,7 +81,11 @@ def fechar_comanda(comanda, operador, destino, forma=None, conta_id=None, descon
     if destino == Comanda.Destino.CAIXA:
         if not forma:
             raise ValidationError("Escolha a forma de pagamento.")
-        mov = receber_no_caixa(operador, forma, total, f"Comanda #{comanda.pk}")
+        from apps.nucleo.modulos import Modulo
+
+        mov = receber_no_caixa(
+            operador, forma, total, f"Comanda #{comanda.pk}", modulo=Modulo.RESTAURANTE,
+        )
         comanda.forma_pagamento = forma
         comanda.movimento_caixa = mov
     else:

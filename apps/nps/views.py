@@ -5,11 +5,14 @@ from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
+from apps.nucleo.areas import Area
+from apps.nucleo.permissoes import requer_area
+
 from . import services
 
 
 @never_cache
-@login_required
+@requer_area(Area.NPS)
 def painel(request):
     """Sidebar CRM: proposta registrada (sem coleta real nesta fase)."""
     return render(request, "nps/painel.html", {"proposta": services.proposta()})
