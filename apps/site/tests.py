@@ -114,8 +114,17 @@ class FluxoReservaViewTests(TestCase):
         cache.clear()
         # Fonte da verdade no CRM: um tipo com 1 quarto físico; o card do site aponta pra ele.
         from apps.nucleo.models import UH, TipoUH
-        self.tipo = TipoUH.objects.create(nome='Suíte', tarifa_base=Decimal('400.00'))
-        UH.objects.create(numero='S1', tipo=self.tipo)
+        from apps.site.models import VitrineQuarto
+        self.tipo = TipoUH.objects.create(
+            nome='Suíte', tarifa_base=Decimal('400.00'), capacidade=2,
+        )
+        self.uh = UH.objects.create(
+            numero='S1', tipo=self.tipo, nome_tematico='Cabine do Lago', vista_lago=True,
+        )
+        # Vitrine por unidade: sem ela o quarto não aparece na venda por quarto.
+        self.vitrine = VitrineQuarto.objects.create(
+            uh=self.uh, publicar=True, destaque=True, metragem=25,
+        )
         self.quarto = criar_quarto()
         self.quarto.tipo_uh = self.tipo
         self.quarto.save(update_fields=['tipo_uh'])
@@ -135,12 +144,32 @@ class FluxoReservaViewTests(TestCase):
     def test_passo1_datas_ok(self):
         self.assertEqual(self.client.get(reverse('core:reservar')).status_code, 200)
 
-    def test_passo2_lista_quartos(self):
+    def test_passo2_lista_quartos_por_unidade(self):
+        # Venda por unidade: o passo 2 lista o quarto físico (nome temático) e seus
+        # diferenciais, com link para reservar aquela UH específica.
         resp = self.client.get(reverse('core:reservar'), {
             'checkin': self.ci, 'checkout': self.co, 'hospedes': 2,
         })
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, self.quarto.nome)
+        self.assertContains(resp, 'Cabine do Lago')
+        self.assertContains(resp, 'Vista para o lago')
+        self.assertContains(resp, reverse('core:selecionar_unidade', args=[self.uh.pk]))
+
+    def test_finalizar_por_unidade_reserva_o_quarto_exato(self):
+        from apps.reservas.models import Reserva as CrmReserva
+        resp = self.client.post(reverse('core:finalizar_reserva'), {
+            'uh_id': self.uh.id, 'checkin': self.ci, 'checkout': self.co,
+            'hospedes': 2, 'metodo_pagamento': 'pix', 'nome': 'João Teste',
+            'email': 'joao@ex.com', 'telefone': '49991438813', 'cpf': CPF_VALIDO,
+            'observacoes': '',
+        })
+        self.assertEqual(resp.status_code, 302)
+        reserva = Reserva.objects.get()
+        self.assertIsNotNone(reserva.crm_reserva_id)
+        crm = CrmReserva.objects.get(pk=reserva.crm_reserva_id)
+        self.assertEqual(crm.uh, self.uh)  # o quarto EXATO, não "qualquer do tipo"
+        self.assertEqual(crm.canal, CrmReserva.Canal.SITE)
+        self.assertEqual(crm.status, CrmReserva.Status.PRE_RESERVA)
 
     def test_finalizar_cria_reserva_no_site_e_no_crm(self):
         from apps.pagamentos.models import Cobranca

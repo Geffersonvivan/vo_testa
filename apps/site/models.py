@@ -85,6 +85,50 @@ class Quarto(models.Model):
         return f'{self.nome} ({self.categoria})'
 
 
+class VitrineQuarto(models.Model):
+    """Apresentação de marketing de um quarto físico (UH do CRM) na vitrine do site.
+
+    Venda por unidade: cada quarto real aparece com seu nome temático (do CRM),
+    qualidades e preço (do CRM) + a mídia editorial que fica aqui (foto, tour 360°).
+    Overlay 1:1 com a UH — sem linha, o quarto simplesmente não aparece no site.
+    """
+    uh = models.OneToOneField(
+        'nucleo.UH', on_delete=models.CASCADE, related_name='vitrine',
+        verbose_name='Quarto (CRM)',
+    )
+    descricao_curta = models.CharField(
+        'Descrição curta', max_length=200, blank=True,
+        help_text='Frase exibida no card. Vazio = usa a do tipo.',
+    )
+    descricao = models.TextField('Descrição completa', blank=True)
+    foto_principal = models.ImageField(
+        'Foto principal', upload_to='quartos/', blank=True,
+        validators=[validar_tamanho_imagem],
+    )
+    tour_360_url = models.URLField(
+        'Tour 360° (URL de embed)', blank=True,
+        help_text='Cole o link de embed do tour (Kuula, Matterport, Google Street View).',
+    )
+    metragem = models.PositiveSmallIntegerField('Metragem (m²)', null=True, blank=True)
+    nota_avaliacao = models.DecimalField(
+        'Nota de avaliação', max_digits=2, decimal_places=1,
+        validators=[MinValueValidator(0), MaxValueValidator(5)], default=5.0,
+    )
+    destaque = models.BooleanField('Destaque na home (os 9 melhores)', default=False)
+    publicar = models.BooleanField('Publicar no site', default=True)
+    ordem = models.PositiveSmallIntegerField('Ordem de exibição', default=0)
+    criado_em = models.DateTimeField('Criado em', auto_now_add=True)
+    atualizado_em = models.DateTimeField('Atualizado em', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Vitrine do quarto'
+        verbose_name_plural = 'Vitrine dos quartos'
+        ordering = ['ordem', 'uh__numero']
+
+    def __str__(self):
+        return f'Vitrine — {self.uh}'
+
+
 class FotoQuarto(models.Model):
     quarto = models.ForeignKey(Quarto, on_delete=models.CASCADE, related_name='fotos', verbose_name='Quarto')
     imagem = models.ImageField('Imagem', upload_to='quartos/', validators=[validar_tamanho_imagem])

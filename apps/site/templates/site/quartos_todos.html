@@ -1,0 +1,78 @@
+{% extends 'site/base.html' %}
+{% load static %}
+
+{% block title %}Nossos Quartos — Pousada Vô Testa{% endblock %}
+{% block meta_description %}Conheça todos os quartos temáticos da Pousada Vô Testa, cada um com sua história, vista e diferenciais. Escolha o seu e reserve direto.{% endblock %}
+
+{% block content %}
+<section class="bg-noturno min-h-screen pt-28 md:pt-32 pb-20 relative overflow-hidden">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 relative z-10">
+        <div class="text-center mb-12">
+            <p class="text-lampiao text-xs sm:text-sm tracking-[0.3em] uppercase mb-3">Acomodações</p>
+            <h1 class="font-display text-3xl sm:text-4xl md:text-5xl font-black text-pergaminho mb-3">Todos os Quartos</h1>
+            <p class="text-pergaminho/50 max-w-2xl mx-auto text-sm sm:text-base px-2">
+                Cada quarto tem seu nome, sua vista e seus detalhes. Escolha em qual história você quer despertar —
+                a disponibilidade e o preço aparecem ao informar as suas datas.
+            </p>
+        </div>
+
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            {% for quarto in quartos %}
+            <div class="group bg-noturno border border-lampiao/20 rounded-2xl overflow-hidden hover:border-lampiao/50 transition-all duration-500 hover:-translate-y-1 flex flex-col">
+                <div class="aspect-[4/3] bg-gradient-to-br from-madeira/30 to-madeira/10 flex items-center justify-center relative overflow-hidden">
+                    {% if quarto.foto_principal %}
+                    <img src="{{ quarto.foto_principal.url }}" alt="{{ quarto.nome }}" class="w-full h-full object-cover">
+                    {% else %}
+                    <p class="text-pergaminho/30 text-sm">[ Foto do Quarto ]</p>
+                    {% endif %}
+                    {% if quarto.tour_360_url %}
+                    <a href="{{ quarto.tour_360_url }}" target="_blank" rel="noopener"
+                       class="absolute bottom-3 right-3 bg-noturno/80 text-pergaminho text-[11px] font-semibold px-3 py-1.5 rounded-full border border-lampiao/30 hover:bg-lampiao hover:text-noturno transition flex items-center gap-1">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 21a9 9 0 100-18 9 9 0 000 18zM3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/></svg>
+                        Tour 360°
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="p-5 sm:p-6 flex flex-col flex-1">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="text-lampiao/60 text-xs uppercase tracking-wider">{{ quarto.categoria.nome }}</span>
+                        <span class="text-lampiao text-xs">★ {{ quarto.nota_avaliacao }}</span>
+                    </div>
+                    <h3 class="font-display text-xl font-bold text-pergaminho mb-2">{{ quarto.nome }}</h3>
+                    <p class="text-pergaminho/50 text-sm mb-3">{{ quarto.descricao_curta }}</p>
+                    {% if quarto.qualidades %}
+                    <div class="flex flex-wrap gap-1.5 mb-4">
+                        {% for qual in quarto.qualidades %}
+                        <span class="text-lampiao/80 text-[11px] border border-lampiao/20 px-2 py-0.5 rounded-full">{{ qual }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div class="flex items-end justify-between mt-auto pt-4 border-t border-pergaminho/10">
+                        <div>
+                            <span class="text-pergaminho/40 text-[11px] block">a partir de</span>
+                            <span class="text-lampiao font-body text-2xl font-bold">R$ {{ quarto.preco_base|floatformat:0 }}</span>
+                            <span class="text-pergaminho/40 text-xs"> /noite</span>
+                        </div>
+                        <a href="{% url 'core:reservar' %}" class="bg-lampiao/10 text-lampiao text-sm px-4 py-2 rounded-lg border border-lampiao/30 hover:bg-lampiao hover:text-noturno transition">
+                            Reservar
+                        </a>
+                    </div>
+                    <div class="flex gap-3 mt-3 text-pergaminho/40 text-xs">
+                        <span>{{ quarto.capacidade }} hóspedes</span>
+                        {% if quarto.metragem %}<span>· {{ quarto.metragem }}m²</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-pergaminho/50 col-span-full text-center py-16">Em breve, os quartos aparecem aqui.</p>
+            {% endfor %}
+        </div>
+
+        <div class="text-center mt-14">
+            <a href="{% url 'core:reservar' %}" class="inline-block bg-lampiao text-noturno font-bold px-8 py-3 rounded-full hover:bg-lampiao/90 transition text-sm">
+                Ver disponibilidade e reservar
+            </a>
+        </div>
+    </div>
+</section>
+{% endblock %}

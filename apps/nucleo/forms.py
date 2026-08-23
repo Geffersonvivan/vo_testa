@@ -136,8 +136,15 @@ class TipoUHForm(forms.ModelForm):
 class UHForm(forms.ModelForm):
     class Meta:
         model = UH
-        fields = ["numero", "tipo", "bloco", "andar", "status", "pcd", "observacoes"]
-        widgets = {"observacoes": forms.Textarea(attrs={"rows": 3})}
+        fields = [
+            "numero", "nome_tematico", "tipo", "bloco", "andar", "status",
+            "pcd", "vista_lago", "varanda", "aceita_pet", "ar_condicionado",
+            "tipo_cama", "diferenciais", "observacoes",
+        ]
+        widgets = {
+            "observacoes": forms.Textarea(attrs={"rows": 2}),
+            "diferenciais": forms.Textarea(attrs={"rows": 2}),
+        }
 
 
 class ConfiguracaoUHForm(forms.ModelForm):

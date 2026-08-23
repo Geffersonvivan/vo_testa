@@ -39,20 +39,24 @@
 </div>
 <table class="tabela">
   <thead>
-    <tr><th>Número/nome</th><th>Tipo</th><th>Camas</th><th>Lotação</th><th>Bloco</th><th>Status</th></tr>
+    <tr><th>Número/nome</th><th>Tipo</th><th>Camas</th><th>Lotação</th><th>Bloco</th><th>Status</th><th class="col-acao"></th></tr>
   </thead>
   <tbody>
     {% for uh in uhs %}
       <tr>
-        <td><a href="{% url 'uh_editar' uh.pk %}">{{ uh.numero }}</a></td>
+        <td>
+          <a href="{% url 'uh_editar' uh.pk %}"><strong>{{ uh.numero }}</strong></a>
+          {% if uh.nome_tematico %}<span class="celula-sub">{{ uh.nome_tematico }}</span>{% endif %}
+        </td>
         <td>{{ uh.tipo.nome }}</td>
         <td class="ajuda">{{ uh|camas_uh }}</td>
         <td>{% with n=uh|lotacao_uh %}{% if n %}até {{ n }}{% else %}—{% endif %}{% endwith %}</td>
         <td>{{ uh.bloco|default:"—" }}</td>
         <td>{{ uh.get_status_display }}</td>
+        <td class="col-acao"><a href="{% url 'uh_editar' uh.pk %}" class="botao-mini">Editar</a></td>
       </tr>
     {% empty %}
-      <tr><td colspan="6" class="vazio">Nenhum quarto cadastrado — crie um tipo primeiro, depois os quartos.</td></tr>
+      <tr><td colspan="7" class="vazio">Nenhum quarto cadastrado — crie um tipo primeiro, depois os quartos.</td></tr>
     {% endfor %}
   </tbody>
 </table>

@@ -96,7 +96,7 @@
     </div>
 
     <div class="flex justify-between mt-8">
-        <a href="{% url 'core:selecionar_quarto' quarto.id %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}"
+        <a href="{% if uh_id %}{% url 'core:selecionar_unidade' uh_id %}{% else %}{% url 'core:selecionar_quarto' quarto.id %}{% endif %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}"
            class="text-madeira/40 hover:text-madeira transition flex items-center gap-2 text-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
             Editar dados
@@ -104,7 +104,7 @@
 
         <form method="post" action="{% url 'core:finalizar_reserva' %}" id="form-finalizar">
             {% csrf_token %}
-            <input type="hidden" name="quarto_id" value="{{ quarto.id }}">
+            {% if uh_id %}<input type="hidden" name="uh_id" value="{{ uh_id }}">{% else %}<input type="hidden" name="quarto_id" value="{{ quarto.id }}">{% endif %}
             <input type="hidden" name="checkin" value="{{ busca.checkin|date:'Y-m-d' }}">
             <input type="hidden" name="checkout" value="{{ busca.checkout|date:'Y-m-d' }}">
             <input type="hidden" name="hospedes" value="{{ busca.hospedes }}">

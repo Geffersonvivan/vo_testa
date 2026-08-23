@@ -57,6 +57,38 @@ class Tarifa(models.Model):
         return f"{self.tipo_uh.nome} / {self.get_classificacao_display()}: R$ {self.valor}"
 
 
+class TarifaUnidade(models.Model):
+    """Preço por QUARTO × classificação de temporada. Vende-se por unidade: cada
+    quarto pode ter seu próprio preço sazonal. Sem linha → cai na tarifa do tipo."""
+
+    uh = models.ForeignKey(
+        "nucleo.UH", on_delete=models.CASCADE,
+        related_name="tarifas_unidade", verbose_name="quarto",
+    )
+    classificacao = models.CharField(
+        "classificação da temporada", max_length=12,
+        choices=Temporada.Classificacao.choices,
+    )
+    valor = models.DecimalField(
+        "diária (R$)", max_digits=10, decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+
+    class Meta:
+        verbose_name = "tarifa por quarto"
+        verbose_name_plural = "tarifas por quarto"
+        ordering = ["uh__numero", "classificacao"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["uh", "classificacao"],
+                name="tarifa_unica_por_quarto_e_classificacao",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.uh.numero} / {self.get_classificacao_display()}: R$ {self.valor}"
+
+
 class Reserva(models.Model):
     """
     Ciclo: Orçamento → Pré-reserva → Confirmada → Hospedada → Check-out.

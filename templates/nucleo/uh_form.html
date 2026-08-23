@@ -6,12 +6,29 @@
 <p class="pagina-eyebrow letreiro">Cadastros</p>
 <h1>{% if uh %}Quarto {{ uh.numero }}{% else %}Novo quarto{% endif %}</h1>
 
-<form method="post" class="form-cartao">
+<form method="post" class="form-cartao" enctype="multipart/form-data">
   {% csrf_token %}
 
   {% include "nucleo/partials/campos.html" %}
 
   {% if uh %}
+  <h2>Preço por quarto</h2>
+  <p class="subtitulo">Diária específica deste quarto em cada temporada — vence a tarifa do tipo. Em branco = usa o tipo.</p>
+  <div class="tarifas-quarto">
+    {% for t in tarifas_quarto %}
+      <div class="campo">
+        <label>{{ t.rotulo }}</label>
+        <div class="tarifa-input"><span class="tarifa-rs">R$</span><input type="text" name="tarifa_{{ t.cod }}" class="money-mask" value="{{ t.valor_fmt }}" placeholder="usa o tipo" inputmode="decimal"></div>
+      </div>
+    {% endfor %}
+  </div>
+
+  {% if vitrine_form %}
+  <h2>Vitrine do site</h2>
+  <p class="subtitulo">Como este quarto aparece na página pública — foto, tour 360° e destaque na home. Nome temático, qualidades e preço vêm dos campos acima.</p>
+  {% include "nucleo/partials/campos.html" with form=vitrine_form %}
+  {% endif %}
+
   <h2>Composição de camas</h2>
   <p class="subtitulo">A capacidade e a frase de camas são calculadas daqui — não se digita capacidade.</p>
 

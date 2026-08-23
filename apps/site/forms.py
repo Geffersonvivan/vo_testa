@@ -3,7 +3,27 @@ from datetime import date, timedelta
 
 from django import forms
 
-from apps.site.models import Hospede
+from apps.site.models import Hospede, VitrineQuarto
+
+
+class VitrineQuartoForm(forms.ModelForm):
+    """Apresentação do quarto na vitrine do site — editada junto do quarto no CRM."""
+
+    class Meta:
+        model = VitrineQuarto
+        fields = [
+            'descricao_curta', 'descricao', 'foto_principal', 'tour_360_url',
+            'metragem', 'nota_avaliacao', 'destaque', 'publicar', 'ordem',
+        ]
+        widgets = {
+            'descricao': forms.Textarea(attrs={'rows': 3}),
+            'descricao_curta': forms.TextInput(
+                attrs={'placeholder': 'Ex.: Oficina do Relojoeiro — vista para o lago'}
+            ),
+            'tour_360_url': forms.URLInput(
+                attrs={'placeholder': 'https://kuula.co/share/...'}
+            ),
+        }
 
 
 def validar_cpf(cpf):

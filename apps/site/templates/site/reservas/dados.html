@@ -11,7 +11,7 @@
         <!-- Form de reserva -->
         <form method="post" action="{% url 'core:resumo_reserva' %}" id="form-dados">
             {% csrf_token %}
-            <input type="hidden" name="quarto_id" value="{{ quarto.id }}">
+            {% if uh_id %}<input type="hidden" name="uh_id" value="{{ uh_id }}">{% else %}<input type="hidden" name="quarto_id" value="{{ quarto.id }}">{% endif %}
             <input type="hidden" name="checkin" value="{{ busca.checkin|date:'Y-m-d' }}">
             <input type="hidden" name="checkout" value="{{ busca.checkout|date:'Y-m-d' }}">
             <input type="hidden" name="hospedes" value="{{ busca.hospedes }}">

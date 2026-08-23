@@ -610,6 +610,55 @@ def tipo_uh_form(request, pk=None):
     )
 
 
+def _salvar_tarifas_quarto(request, uh):
+    """Preço por quarto × temporada: cria/atualiza/remove TarifaUnidade a partir
+    dos inputs `tarifa_<classificacao>` (vazio = remove/usa o tipo)."""
+    from apps.reservas.models import TarifaUnidade
+    from apps.reservas.models import Temporada as _Temp
+
+    for cod, _rot in _Temp.Classificacao.choices:
+        bruto = (request.POST.get(f"tarifa_{cod}") or "").strip().replace(".", "").replace(",", ".")
+        if not bruto:
+            TarifaUnidade.objects.filter(uh=uh, classificacao=cod).delete()
+            continue
+        try:
+            valor = Decimal(bruto)
+        except (ValueError, ArithmeticError):
+            continue
+        TarifaUnidade.objects.update_or_create(
+            uh=uh, classificacao=cod, defaults={"valor": valor}
+        )
+
+
+def _tarifas_quarto(uh):
+    """Editor de preço por quarto: [(código, rótulo, valor formatado BRL)]."""
+    from apps.reservas.models import TarifaUnidade
+    from apps.reservas.models import Temporada as _Temp
+
+    from .forms import _brl
+
+    atuais = {t.classificacao: t.valor for t in TarifaUnidade.objects.filter(uh=uh)} if uh else {}
+    return [
+        {"cod": c, "rotulo": rot, "valor_fmt": _brl(atuais[c]) if c in atuais else ""}
+        for c, rot in _Temp.Classificacao.choices
+    ]
+
+
+def _vitrine_do_quarto(request, uh):
+    """(vitrine, form) da apresentação do quarto no site. Só para hospedagem e com
+    o quarto já salvo — quarto novo/day use não tem vitrine ainda. Lazy import para
+    não inverter a dependência (núcleo → site)."""
+    if uh is None or uh.tipo.modalidade == uh.tipo.Modalidade.DAY_USE:
+        return None, None
+    from apps.site.forms import VitrineQuartoForm
+    from apps.site.models import VitrineQuarto
+
+    vitrine, _ = VitrineQuarto.objects.get_or_create(uh=uh)
+    dados = request.POST if request.method == "POST" else None
+    arquivos = request.FILES if request.method == "POST" else None
+    return vitrine, VitrineQuartoForm(dados, arquivos, instance=vitrine)
+
+
 @requer_area(Area.QUARTOS)
 def uh_form(request, pk=None):
     from .estrutura import capacidade, descricao_camas
@@ -619,6 +668,8 @@ def uh_form(request, pk=None):
     config = None
     if uh is not None:
         config, _ = ConfiguracaoUH.objects.get_or_create(uh=uh)
+
+    vitrine, vitrine_form = _vitrine_do_quarto(request, uh)
 
     form = UHForm(request.POST or None, instance=uh)
     config_form = ConfiguracaoUHForm(request.POST or None, instance=config)
@@ -631,9 +682,15 @@ def uh_form(request, pk=None):
             config, _ = ConfiguracaoUH.objects.get_or_create(uh=uh)
             config_form = ConfiguracaoUHForm(request.POST, instance=config)
             formset = PosicaoCamaFormSet(request.POST, instance=uh)
-            if config_form.is_valid() and formset.is_valid():
+            vitrine, vitrine_form = _vitrine_do_quarto(request, uh)
+            if config_form.is_valid() and formset.is_valid() and (
+                vitrine_form is None or vitrine_form.is_valid()
+            ):
                 config_form.save()
                 formset.save()
+                _salvar_tarifas_quarto(request, uh)
+                if vitrine_form is not None:
+                    vitrine_form.save()
                 messages.success(request, f"Quarto {uh.numero} salvo.")
                 return redirect("estrutura")
 
@@ -641,9 +698,11 @@ def uh_form(request, pk=None):
         "form": form,
         "config_form": config_form,
         "formset": formset,
+        "vitrine_form": vitrine_form,
         "uh": uh,
         "titulo": "Quarto",
         "voltar": "estrutura",
+        "tarifas_quarto": _tarifas_quarto(uh),
     }
     if uh is not None:
         contexto["capacidade"] = capacidade(uh)

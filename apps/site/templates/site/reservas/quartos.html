@@ -52,6 +52,7 @@
                     <div class="flex gap-2 flex-wrap text-madeira/40 text-xs">
                         <span class="bg-pergaminho px-2 py-0.5 rounded">{{ r.quarto.capacidade }} pessoas</span>
                         {% if r.quarto.metragem %}<span class="bg-pergaminho px-2 py-0.5 rounded">{{ r.quarto.metragem }}m²</span>{% endif %}
+                        {% for qual in r.quarto.qualidades %}<span class="bg-musgo/10 text-musgo px-2 py-0.5 rounded">{{ qual }}</span>{% endfor %}
                     </div>
                 </div>
                 <div class="flex items-end justify-between mt-4 pt-4 border-t border-pergaminho">
@@ -64,7 +65,7 @@
                         {% endif %}
                         <p class="text-madeira font-display text-2xl font-bold mt-1">R$ {{ r.total|floatformat:0 }} <span class="text-madeira/30 text-xs font-normal">total</span></p>
                     </div>
-                    <a href="{% url 'core:selecionar_quarto' r.quarto.id %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}{% if busca.modalidade %}&modalidade={{ busca.modalidade }}{% endif %}"
+                    <a href="{% if r.eh_unidade %}{% url 'core:selecionar_unidade' r.quarto.uh_id %}{% else %}{% url 'core:selecionar_quarto' r.quarto.id %}{% endif %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}{% if busca.modalidade %}&modalidade={{ busca.modalidade }}{% endif %}"
                        class="bg-madeira text-pergaminho font-bold text-sm px-6 py-2.5 rounded-xl hover:bg-madeira/90 transition shadow-sm">
                         Reservar
                     </a>

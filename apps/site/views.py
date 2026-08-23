@@ -1,5 +1,6 @@
 import logging
 from decimal import Decimal
+from types import SimpleNamespace
 
 from django.contrib import messages
 from django.core.cache import cache
@@ -25,6 +26,7 @@ from apps.site.models import (
     Quarto,
     Reserva,
     Temporada,
+    VitrineQuarto,
 )
 
 
@@ -63,10 +65,10 @@ def _usuario_sistema():
 
 def home(request):
     config = ConfiguracaoSite.load()
-    quartos = Quarto.objects.filter(
-        status='disponivel', destaque=True, tipo_uh__isnull=False,
-        tipo_uh__modalidade='hospedagem',
-    ).select_related('categoria')[:6]
+    from apps.reservas import services as reservas
+    # Vitrine por unidade: os 9 melhores quartos (grid 3×3), destaque primeiro.
+    vitrines = _vitrines_publicadas().order_by('-destaque', 'ordem', 'uh__numero')[:9]
+    quartos = [_card_de_uh(v, reservas.tarifa_base_unidade(v.uh)) for v in vitrines]
     dia_pousada = Quarto.objects.filter(
         status='disponivel', tipo_uh__modalidade='day_use',
     ).select_related('categoria', 'tipo_uh').first()
@@ -92,6 +94,17 @@ def home(request):
         'proposta': proposta,
     }
     return render(request, 'site/home.html', context)
+
+
+def quartos_todos(request):
+    """Página com TODOS os quartos (venda por unidade) — a partir do "Ver todos"."""
+    from apps.reservas import services as reservas
+    vitrines = _vitrines_publicadas().order_by('ordem', 'uh__numero')
+    quartos = [_card_de_uh(v, reservas.tarifa_base_unidade(v.uh)) for v in vitrines]
+    return render(request, 'site/quartos_todos.html', {
+        'config': ConfiguracaoSite.load(),
+        'quartos': quartos,
+    })
 
 
 def pedir_proposta(request):
@@ -172,6 +185,86 @@ def _temporada_de(data):
     ).order_by('-multiplicador').first()
 
 
+def _qualidades_uh(uh):
+    """Diferenciais do quarto para os selos do card (a partir dos campos do CRM)."""
+    q = []
+    if uh.vista_lago:
+        q.append('Vista para o lago')
+    if uh.varanda:
+        q.append('Varanda')
+    if uh.ar_condicionado:
+        q.append('Ar-condicionado')
+    if uh.aceita_pet:
+        q.append('Aceita pet')
+    if uh.tipo_cama:
+        q.append(uh.get_tipo_cama_display())
+    if uh.pcd:
+        q.append('Acessível (PCD)')
+    return q
+
+
+def _card_de_uh(vitrine, preco=None):
+    """Card de vitrine de um quarto físico (UH) — nome temático, qualidades e mídia.
+    Exposto no template com a mesma cara de um `Quarto`, mas por unidade."""
+    uh = vitrine.uh
+    nome = uh.nome_tematico or f'Quarto {uh.numero}'
+    return SimpleNamespace(
+        id=uh.pk, uh_id=uh.pk, numero=uh.numero,
+        nome=nome,
+        descricao_curta=vitrine.descricao_curta or nome,
+        descricao=vitrine.descricao or uh.diferenciais,
+        categoria=SimpleNamespace(nome=uh.tipo.nome),
+        capacidade=uh.tipo.capacidade,
+        metragem=vitrine.metragem or 0,
+        nota_avaliacao=vitrine.nota_avaliacao,
+        foto_principal=vitrine.foto_principal,
+        tour_360_url=vitrine.tour_360_url,
+        qualidades=_qualidades_uh(uh),
+        preco_base=preco if preco is not None else Decimal('0'),
+    )
+
+
+def _vitrines_publicadas():
+    """VitrineQuarto publicadas de quartos de hospedagem ativos (com o UH e o tipo)."""
+    from apps.nucleo.models import TipoUH, UH
+    return (
+        VitrineQuarto.objects.filter(
+            publicar=True, uh__status=UH.Status.ATIVA,
+            uh__tipo__modalidade=TipoUH.Modalidade.HOSPEDAGEM,
+        )
+        .select_related('uh', 'uh__tipo')
+    )
+
+
+def _buscar_unidades(checkin, checkout, hospedes):
+    """Disponibilidade e preço POR QUARTO (venda por unidade), formato do template."""
+    from apps.reservas import services as reservas
+    noites = (checkout - checkin).days
+    vitrines = _vitrines_publicadas().filter(
+        uh__tipo__capacidade__gte=hospedes,
+    ).order_by('ordem', 'uh__numero')
+    resultados = []
+    for v in vitrines:
+        disponivel = reservas.uh_disponivel(v.uh, checkin, checkout)
+        base = reservas.tarifa_base_unidade(v.uh)
+        preco_noite = reservas.diaria_media_unidade(v.uh, checkin, checkout)
+        resultados.append({
+            'quarto': _card_de_uh(v, base),
+            'eh_unidade': True,
+            'disponivel': disponivel,
+            'preco_base': base,
+            'temporada': _temporada_de(checkin),
+            'tem_ajuste': preco_noite != base,
+            'preco_noite': preco_noite,
+            'noites': noites,
+            'total': preco_noite * noites,
+            'eh_day_use': False,
+            'unidade_preco': 'noite',
+        })
+    resultados.sort(key=lambda r: (not r['disponivel'], r['quarto'].numero))
+    return resultados
+
+
 def _buscar_quartos(checkin, checkout, hospedes, modalidade=""):
     """Tipos disponíveis — disponibilidade e preço vêm do CRM.
     `modalidade`: '' | 'hospedagem' | 'day_use'."""
@@ -231,6 +324,31 @@ def _resumo_preco(quarto, checkin, checkout, metodo='pix'):
     }
 
 
+def _resumo_preco_unidade(uh, checkin, checkout, metodo='pix'):
+    """Resumo de valores de um quarto específico (venda por unidade)."""
+    from apps.reservas import services as reservas
+    config = ConfiguracaoSite.load()
+    noites = (checkout - checkin).days
+    temporada = _temporada_de(checkin)
+    preco_noite = reservas.diaria_media_unidade(uh, checkin, checkout)
+    subtotal = preco_noite * noites
+    desconto_pct = Decimal(config.desconto_pix) if metodo == 'pix' else Decimal('0')
+    desconto_valor = subtotal * desconto_pct / 100
+    return {
+        'noites': noites,
+        'temporada': temporada,
+        'preco_base': reservas.tarifa_base_unidade(uh),
+        'preco_noite': preco_noite,
+        'subtotal': subtotal,
+        'metodo': metodo,
+        'desconto_pct': desconto_pct,
+        'desconto_valor': desconto_valor,
+        'total': subtotal - desconto_valor,
+        'eh_day_use': False,
+        'unidade_preco': 'noite',
+    }
+
+
 def _url_busca(checkin, checkout, hospedes, modalidade=''):
     url = (
         f"{reverse('core:reservar')}"
@@ -274,7 +392,10 @@ def reservar(request):
         checkout = form.cleaned_data['checkout']
         hospedes = form.cleaned_data['hospedes']
         modalidade = form.cleaned_data.get('modalidade') or ''
-        resultados = _buscar_quartos(checkin, checkout, hospedes, modalidade)
+        if modalidade == 'day_use':
+            resultados = _buscar_quartos(checkin, checkout, hospedes, modalidade)
+        else:
+            resultados = _buscar_unidades(checkin, checkout, hospedes)
         num_disponiveis = sum(1 for r in resultados if r['disponivel'])
         busca = {
             'checkin': checkin, 'checkout': checkout, 'hospedes': hospedes,
@@ -354,10 +475,116 @@ def selecionar_quarto(request, quarto_id):
     return render(request, 'site/reservas/dados.html', context)
 
 
+def _vitrine_ou_404(uh):
+    """VitrineQuarto publicada do quarto, ou 404 (quarto sem vitrine não se reserva)."""
+    from django.http import Http404
+    v = VitrineQuarto.objects.filter(uh=uh, publicar=True).select_related(
+        'uh', 'uh__tipo').first()
+    if v is None:
+        raise Http404('Quarto indisponível.')
+    return v
+
+
+def selecionar_unidade(request, uh_id):
+    """Passo 3 — dados do hóspede para o QUARTO específico escolhido (venda por unidade)."""
+    from apps.nucleo.models import UH
+    from apps.reservas import services as reservas
+
+    uh = get_object_or_404(UH, pk=uh_id, status=UH.Status.ATIVA)
+    vitrine = _vitrine_ou_404(uh)
+    form = BuscaDisponibilidadeForm(request.GET or None)
+    if not (request.GET and form.is_valid()):
+        messages.error(request, 'Selecione datas válidas para continuar a reserva.')
+        return redirect('core:reservar')
+
+    checkin = form.cleaned_data['checkin']
+    checkout = form.cleaned_data['checkout']
+    hospedes = form.cleaned_data['hospedes']
+
+    if hospedes > uh.tipo.capacidade:
+        messages.error(request, 'Este quarto não comporta o número de pessoas.')
+        return redirect_busca(checkin, checkout, hospedes)
+    if not reservas.uh_disponivel(uh, checkin, checkout):
+        messages.error(request, 'Este quarto não está mais disponível nessas datas.')
+        return redirect_busca(checkin, checkout, hospedes)
+
+    context = {
+        'passo': 3,
+        'quarto': _card_de_uh(vitrine, reservas.tarifa_base_unidade(uh)),
+        'uh_id': uh.pk,
+        'busca': {'checkin': checkin, 'checkout': checkout, 'hospedes': hospedes,
+                  'modalidade': 'hospedagem'},
+        'resumo': _resumo_preco_unidade(uh, checkin, checkout),
+        'dados_form': DadosHospedeForm(),
+        'config': ConfiguracaoSite.load(),
+        'eh_day_use': False,
+        'modalidade': 'hospedagem',
+    }
+    return render(request, 'site/reservas/dados.html', context)
+
+
+def _resumo_reserva_unidade(request):
+    """Passo 4 (venda por unidade) — revisão da reserva de um quarto específico."""
+    from apps.nucleo.models import UH
+    from apps.reservas import services as reservas
+
+    uh = get_object_or_404(UH, pk=request.POST.get('uh_id'), status=UH.Status.ATIVA)
+    vitrine = _vitrine_ou_404(uh)
+    card = _card_de_uh(vitrine, reservas.tarifa_base_unidade(uh))
+    busca_form = BuscaDisponibilidadeForm({
+        'checkin': request.POST.get('checkin'),
+        'checkout': request.POST.get('checkout'),
+        'hospedes': request.POST.get('hospedes'),
+        'modalidade': 'hospedagem',
+    })
+    hospede_existente = encontrar_hospede(
+        email=request.POST.get('email', ''), cpf=request.POST.get('cpf', ''),
+    )
+    dados_form = DadosHospedeForm(request.POST, instance=hospede_existente)
+    metodo = request.POST.get('metodo_pagamento', 'pix')
+
+    if not busca_form.is_valid() or not dados_form.is_valid():
+        context = {
+            'passo': 3, 'quarto': card, 'uh_id': uh.pk,
+            'busca': busca_form.cleaned_data or {}, 'resumo': None,
+            'dados_form': dados_form, 'config': ConfiguracaoSite.load(),
+            'eh_day_use': False, 'modalidade': 'hospedagem',
+        }
+        if busca_form.is_valid():
+            context['busca'] = busca_form.cleaned_data
+            context['resumo'] = _resumo_preco_unidade(
+                uh, busca_form.cleaned_data['checkin'],
+                busca_form.cleaned_data['checkout'], metodo,
+            )
+        return render(request, 'site/reservas/dados.html', context)
+
+    checkin = busca_form.cleaned_data['checkin']
+    checkout = busca_form.cleaned_data['checkout']
+    hospedes = busca_form.cleaned_data['hospedes']
+
+    if hospedes > uh.tipo.capacidade or not reservas.uh_disponivel(uh, checkin, checkout):
+        messages.error(request, 'Este quarto não está mais disponível nessas datas.')
+        return redirect_busca(checkin, checkout, hospedes)
+
+    return render(request, 'site/reservas/resumo.html', {
+        'passo': 4, 'quarto': card, 'uh_id': uh.pk,
+        'busca': {'checkin': checkin, 'checkout': checkout, 'hospedes': hospedes,
+                  'modalidade': 'hospedagem'},
+        'resumo': _resumo_preco_unidade(uh, checkin, checkout, metodo),
+        'dados': dados_form.cleaned_data, 'metodo': metodo,
+        'config': ConfiguracaoSite.load(), 'eh_day_use': False,
+        'modalidade': 'hospedagem',
+    })
+
+
 def resumo_reserva(request):
     """Passo 4 — revisão da reserva antes de confirmar (sem persistir ainda)."""
     if request.method != 'POST':
         return redirect('core:reservar')
+
+    # Venda por unidade: quando vem `uh_id`, a reserva é de um quarto específico.
+    if request.POST.get('uh_id'):
+        return _resumo_reserva_unidade(request)
 
     quarto = get_object_or_404(
         Quarto.objects.select_related('tipo_uh'),
@@ -434,6 +661,10 @@ def finalizar_reserva(request):
         messages.error(request, 'Muitas reservas em pouco tempo. Tente novamente mais tarde.')
         return redirect('core:reservar')
 
+    # Venda por unidade: reserva um quarto específico (não "qualquer do tipo").
+    if request.POST.get('uh_id'):
+        return _finalizar_reserva_unidade(request)
+
     quarto = get_object_or_404(
         Quarto.objects.select_related('tipo_uh'), pk=request.POST.get('quarto_id'),
     )
@@ -508,6 +739,83 @@ def finalizar_reserva(request):
         reserva.save(update_fields=['pagamento_id', 'atualizado_em'])
     from apps.site.emails import enviar_confirmacao
     enviar_confirmacao(reserva)  # e-mail ao hóspede (não quebra o fluxo se falhar)
+    return redirect('core:reserva_confirmada', token=reserva.token)
+
+
+def _quarto_recibo(uh):
+    """site.Quarto usado como recibo do canal para a reserva por unidade (a fonte da
+    verdade é o CRM). Reaproveita o card por tipo; degrada para qualquer um."""
+    return (
+        Quarto.objects.filter(tipo_uh=uh.tipo).first()
+        or Quarto.objects.filter(tipo_uh__modalidade='hospedagem').first()
+        or Quarto.objects.first()
+    )
+
+
+@transaction.atomic
+def _finalizar_reserva_unidade(request):
+    """Cria a reserva de um quarto ESPECÍFICO (venda por unidade). Vem do passo 4."""
+    from django.core.exceptions import ValidationError as VErr
+
+    from apps.nucleo.models import UH
+    from apps.reservas import services as reservas
+
+    uh = get_object_or_404(UH, pk=request.POST.get('uh_id'), status=UH.Status.ATIVA)
+    busca_form = BuscaDisponibilidadeForm({
+        'checkin': request.POST.get('checkin'),
+        'checkout': request.POST.get('checkout'),
+        'hospedes': request.POST.get('hospedes'),
+        'modalidade': 'hospedagem',
+    })
+    hospede_existente = encontrar_hospede(
+        email=request.POST.get('email', ''), cpf=request.POST.get('cpf', ''),
+    )
+    dados_form = DadosHospedeForm(request.POST, instance=hospede_existente)
+    metodo = request.POST.get('metodo_pagamento', 'pix')
+
+    if not busca_form.is_valid() or not dados_form.is_valid():
+        messages.error(request, 'Não foi possível concluir a reserva. Revise seus dados.')
+        return redirect('core:reservar')
+
+    checkin = busca_form.cleaned_data['checkin']
+    checkout = busca_form.cleaned_data['checkout']
+    hospedes = busca_form.cleaned_data['hospedes']
+
+    if hospedes > uh.tipo.capacidade:
+        messages.error(request, 'Este quarto não comporta o número de pessoas.')
+        return redirect_busca(checkin, checkout, hospedes)
+
+    hospede = dados_form.save()
+    pessoa = reservas.obter_ou_criar_hospede(
+        nome=hospede.nome, email=hospede.email, telefone=hospede.telefone,
+        documento=getattr(hospede, 'cpf', '') or '',
+    )
+    nome_quarto = uh.nome_tematico or f'Quarto {uh.numero}'
+    try:
+        crm_reserva = reservas.criar_reserva_site_unidade(
+            uh=uh, checkin=checkin, checkout=checkout,
+            hospede=pessoa, usuario=_usuario_sistema(),
+            adultos=hospedes, criancas=0,
+            observacoes=f'Reserva pelo site — {nome_quarto} — {hospede.nome}',
+        )
+    except VErr as erro:
+        messages.error(request, ' '.join(erro.messages))
+        return redirect_busca(checkin, checkout, hospedes)
+
+    config = ConfiguracaoSite.load()
+    desconto = Decimal(config.desconto_pix) if metodo == 'pix' else Decimal('0')
+    reserva = Reserva.objects.create(
+        hospede=hospede, quarto=_quarto_recibo(uh),
+        data_checkin=checkin, data_checkout=checkout, num_hospedes=hospedes,
+        preco_noite=crm_reserva.valor_diaria, desconto_percentual=desconto,
+        metodo_pagamento=metodo, status='aguardando', crm_reserva_id=crm_reserva.pk,
+    )
+    cobranca = _criar_cobranca_site(reserva, pessoa)
+    if cobranca:
+        reserva.pagamento_id = str(cobranca.token)
+        reserva.save(update_fields=['pagamento_id', 'atualizado_em'])
+    from apps.site.emails import enviar_confirmacao
+    enviar_confirmacao(reserva)
     return redirect('core:reserva_confirmada', token=reserva.token)
 
 

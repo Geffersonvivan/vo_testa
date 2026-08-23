@@ -255,7 +255,18 @@ class UH(models.Model):
         BLOQUEADA = "bloqueada", "Bloqueada"
         INATIVA = "inativa", "Inativa"
 
-    numero = models.CharField("número/nome", max_length=20, unique=True)
+    class Cama(models.TextChoices):
+        CASAL = "casal", "Casal"
+        CASAL_QUEEN = "queen", "Casal queen"
+        CASAL_KING = "king", "Casal king"
+        SOLTEIRO_2 = "2solteiros", "Dois solteiros"
+        MISTO = "misto", "Casal + solteiro"
+
+    numero = models.CharField("número", max_length=20, unique=True)
+    nome_tematico = models.CharField(
+        "nome temático", max_length=60, blank=True,
+        help_text="Ex.: Oficina do Relojoeiro. Aparece na vitrine do site.",
+    )
     tipo = models.ForeignKey(
         TipoUH, on_delete=models.PROTECT, related_name="uhs", verbose_name="tipo"
     )
@@ -269,6 +280,18 @@ class UH(models.Model):
         "acessível (PCD)",
         default=False,
         help_text="Quarto adaptado para pessoa com deficiência.",
+    )
+    # Qualidades específicas do quarto (sem banheira — decisão da pousada).
+    vista_lago = models.BooleanField("vista para o lago", default=False)
+    varanda = models.BooleanField("varanda", default=False)
+    aceita_pet = models.BooleanField("aceita pet", default=False)
+    ar_condicionado = models.BooleanField("ar-condicionado", default=False)
+    tipo_cama = models.CharField(
+        "tipo de cama", max_length=12, choices=Cama.choices, blank=True
+    )
+    diferenciais = models.TextField(
+        "diferenciais", blank=True,
+        help_text="Destaques livres do quarto (ex.: rede na varanda, banheira NÃO).",
     )
     tarifa_override = models.DecimalField(
         "tarifa própria (R$)", max_digits=10, decimal_places=2,

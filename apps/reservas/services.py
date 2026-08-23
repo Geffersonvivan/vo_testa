@@ -106,7 +106,16 @@ def _tarifa_unidade_sobre(uh: UH, tarifa_tipo: Decimal) -> Decimal:
 
 
 def tarifa_da_unidade(uh: UH, dia: date) -> Decimal:
-    """Diária efetiva da unidade num dia (override → tipo×fator se duplo → tipo)."""
+    """Diária efetiva da unidade num dia. Precedência:
+    preço do QUARTO na temporada (TarifaUnidade) → tarifa própria fixa
+    (tarifa_override) → tipo × fator se duplo → tipo."""
+    from .models import TarifaUnidade
+
+    classif = classificacao_do_dia(dia)
+    if classif:
+        t = TarifaUnidade.objects.filter(uh=uh, classificacao=classif).first()
+        if t:
+            return t.valor
     return _tarifa_unidade_sobre(uh, tarifa_do_dia(uh.tipo, dia))
 
 
@@ -119,6 +128,12 @@ def diaria_media_unidade(uh: UH, checkin: date, checkout: date) -> Decimal:
         tarifa_da_unidade(uh, checkin + timedelta(days=n)) for n in range(noites)
     )
     return (Decimal(total) / noites).quantize(Decimal("0.01"))
+
+
+def tarifa_base_unidade(uh: UH) -> Decimal:
+    """Diária de referência da unidade fora de temporada — o "a partir de" do card
+    por quarto na vitrine (sem datas)."""
+    return _tarifa_unidade_sobre(uh, uh.tipo.tarifa_base)
 
 
 def tarifa_minima_do_tipo(tipo_uh: TipoUH) -> Decimal | None:
@@ -294,19 +309,27 @@ def obter_ou_criar_hospede(*, nome, email="", telefone="", documento=""):
 
 
 @transaction.atomic
-def criar_prereserva(*, tipo_uh, checkin, checkout, hospede, usuario,
+def criar_prereserva(*, tipo_uh=None, uh=None, checkin, checkout, hospede, usuario,
                      canal=Reserva.Canal.BALCAO, faturamento=None, titular=None,
                      adultos=2, criancas=0, valor_diaria=None, observacoes="",
                      reter=False):
-    """Cria uma PRÉ-RESERVA num quarto físico livre do tipo. A UH é alocada aqui; o
+    """Cria uma PRÉ-RESERVA num quarto físico. Passe `uh` para reservar uma unidade
+    ESPECÍFICA (venda por quarto) ou `tipo_uh` para alocar qualquer livre do tipo. O
     antioverbooking (constraint) protege da corrida. Interface pública usada pelo Site
     (com retenção) e por outros canais/módulos, como a conversão do Comercial."""
     expirar_vencidas()  # solta retenções vencidas para não bloquear a constraint
-    uh = uh_livre_do_tipo(tipo_uh, checkin, checkout)
-    if not uh:
-        raise ValidationError("Não há quarto desse tipo disponível no período.")
-    if valor_diaria is None:
-        valor_diaria = diaria_media(tipo_uh, checkin, checkout)
+    if uh is not None:
+        if not uh_disponivel(uh, checkin, checkout):
+            raise ValidationError("Este quarto não está disponível no período.")
+        tipo_uh = uh.tipo
+        if valor_diaria is None:
+            valor_diaria = diaria_media_unidade(uh, checkin, checkout)
+    else:
+        uh = uh_livre_do_tipo(tipo_uh, checkin, checkout)
+        if not uh:
+            raise ValidationError("Não há quarto desse tipo disponível no período.")
+        if valor_diaria is None:
+            valor_diaria = diaria_media(tipo_uh, checkin, checkout)
     expira = (timezone.now() + timedelta(minutes=settings.RESERVA_RETENCAO_MINUTOS)
               if reter else None)
     extra = {}
@@ -331,6 +354,16 @@ def criar_reserva_site(*, tipo_uh, checkin, checkout, hospede, usuario,
     """Pré-reserva do canal Site, com prazo de retenção (fina camada sobre criar_prereserva)."""
     return criar_prereserva(
         tipo_uh=tipo_uh, checkin=checkin, checkout=checkout, hospede=hospede,
+        usuario=usuario, canal=Reserva.Canal.SITE, adultos=adultos, criancas=criancas,
+        valor_diaria=valor_diaria, observacoes=observacoes, reter=True,
+    )
+
+
+def criar_reserva_site_unidade(*, uh, checkin, checkout, hospede, usuario,
+                               adultos=2, criancas=0, valor_diaria=None, observacoes=""):
+    """Pré-reserva do canal Site num quarto ESPECÍFICO (venda por unidade), com retenção."""
+    return criar_prereserva(
+        uh=uh, checkin=checkin, checkout=checkout, hospede=hospede,
         usuario=usuario, canal=Reserva.Canal.SITE, adultos=adultos, criancas=criancas,
         valor_diaria=valor_diaria, observacoes=observacoes, reter=True,
     )

@@ -205,6 +205,22 @@ class TarifaTests(ReservasTestsBase):
             services.tarifa_do_dia(self.tipo, HOJE), Decimal("300.00")
         )
 
+    def test_preco_por_quarto_vence_o_tipo_na_temporada(self):
+        from apps.reservas.models import TarifaUnidade
+        Temporada.objects.create(
+            nome="Alta", classificacao="alta", inicio=HOJE, fim=HOJE + timedelta(days=10)
+        )
+        Tarifa.objects.create(tipo_uh=self.tipo, classificacao="alta", valor=Decimal("400.00"))
+        # sem preço do quarto → usa o do tipo na temporada
+        self.assertEqual(services.tarifa_da_unidade(self.uh, HOJE), Decimal("400.00"))
+        # com preço do quarto na temporada → vence
+        TarifaUnidade.objects.create(uh=self.uh, classificacao="alta", valor=Decimal("450.00"))
+        self.assertEqual(services.tarifa_da_unidade(self.uh, HOJE), Decimal("450.00"))
+        # fora da temporada → cai na base do tipo
+        self.assertEqual(
+            services.tarifa_da_unidade(self.uh, HOJE + timedelta(days=60)), Decimal("300.00")
+        )
+
     def test_diaria_media_do_periodo(self):
         Temporada.objects.create(
             nome="Feriadão", classificacao="feriado",

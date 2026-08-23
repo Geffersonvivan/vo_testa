@@ -39,9 +39,17 @@
                         <span class="text-lampiao/60 text-xs uppercase tracking-wider">{{ quarto.categoria.nome }}</span>
                     </div>
                     <h3 class="font-display text-xl font-bold text-pergaminho mb-2">{{ quarto.nome }}</h3>
-                    <p class="text-pergaminho/50 text-sm mb-4">{{ quarto.descricao_curta }}</p>
+                    <p class="text-pergaminho/50 text-sm mb-3">{{ quarto.descricao_curta }}</p>
+                    {% if quarto.qualidades %}
+                    <div class="flex flex-wrap gap-1.5 mb-4">
+                        {% for qual in quarto.qualidades %}
+                        <span class="text-lampiao/80 text-[11px] border border-lampiao/20 px-2 py-0.5 rounded-full">{{ qual }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     <div class="flex items-center justify-between">
                         <div>
+                            <span class="text-pergaminho/40 text-[11px] block">a partir de</span>
                             <span class="text-lampiao font-body text-2xl font-bold">R$ {{ quarto.preco_base|floatformat:0 }}</span>
                             <span class="text-pergaminho/40 text-xs"> /noite</span>
                         </div>
@@ -63,7 +71,7 @@
         </div>
 
         <div class="text-center mt-12">
-            <a href="{% url 'core:reservar' %}" class="text-lampiao border border-lampiao/30 px-8 py-3 rounded-full hover:bg-lampiao hover:text-noturno transition text-sm font-semibold">
+            <a href="{% url 'core:quartos_todos' %}" class="text-lampiao border border-lampiao/30 px-8 py-3 rounded-full hover:bg-lampiao hover:text-noturno transition text-sm font-semibold">
                 Ver todos os quartos →
             </a>
         </div>

@@ -308,6 +308,36 @@ desenhar o nosso.
     `expirar_vencidas()` cancela as vencidas (motivo registrado) e roda no
     `criar_reserva_site` (antes de alocar) + comando de cron
     `manage.py expirar_reservas` (backstop). `confirmar()` limpa `expira_em`.
+  - **Quartos por unidade (venda por quarto, "melhor dos dois") — feito.**
+    **Fase 1 (CRM):** `nucleo.UH` ganhou `nome_tematico` + qualidades (`vista_lago`,
+    `varanda`, `aceita_pet`, `ar_condicionado`, `tipo_cama` [choices], `diferenciais`
+    — banheira NÃO). **Preço por quarto × temporada:** model `reservas.TarifaUnidade`
+    (único por uh×classificação); precedência em `tarifa_da_unidade`: **TarifaUnidade da
+    temporada → `tarifa_override` fixo → tipo×fator (duplo) → tipo**. Editor de preço por
+    temporada no form do quarto (`_salvar_tarifas_quarto`/`_tarifas_quarto`, inputs
+    `tarifa_<classif>`). Migrações `nucleo.0025` + `reservas.0012`.
+    **Fase 2 (site):** venda por **unidade** (o hóspede escolhe o quarto exato).
+    `criar_prereserva` aceita `uh=` (reserva a UH específica; anti-overbooking pela mesma
+    constraint) + wrapper `criar_reserva_site_unidade`; `tarifa_base_unidade(uh)` = "a
+    partir de". Overlay de marketing `site.VitrineQuarto` (OneToOne→UH): foto, **tour 360°
+    (URL de embed — Kuula/Matterport/Street View)**, descrição, metragem, nota, `destaque`
+    (os 9 da home), `publicar`, `ordem` (migração `core.0006`). **Edita-se tudo num só
+    lugar:** o form de quarto do CRM (`uh_form`, `@requer_area(Area.QUARTOS)`, multipart)
+    edita a vitrine junto do nome temático/qualidades/preço via `_vitrine_do_quarto`
+    (lazy import p/ não inverter núcleo→site; só hospedagem). Lista de quartos
+    (`estrutura.html`) com ação "Editar" por linha + nome temático como subtítulo.
+    **Vitrine pública:** home = grid **3×3 (9 melhores)** por unidade (nome temático +
+    selos de qualidades + "a partir de"); "Ver todos" → `core:quartos_todos` (`/quartos/`,
+    os 24). Reserva: passo 2 lista cada quarto físico disponível (`_buscar_unidades`,
+    `uh_disponivel`/`diaria_media_unidade`), rota `core:selecionar_unidade`
+    (`reservar/unidade/<uh_id>/`); `resumo_reserva`/`finalizar_reserva` desviam p/
+    `_…_unidade` quando vem `uh_id` (reserva a UH exata; `site.Reserva.quarto` = card por
+    tipo só como recibo do canal). **Day use inalterado** (segue venda por tipo). Comando
+    `manage.py sincronizar_vitrine` cria a vitrine dos 24 (marca 9 destaques) — **rodar no
+    deploy** (o migrate roda sozinho, o seed da vitrine não). Testes: preço por quarto
+    vence o tipo na temporada; passo 2 lista por unidade com qualidades; finalizar por
+    `uh_id` reserva o quarto exato. **Pendente (operação, não código):** marcar qualidades,
+    subir fotos/tour 360° e escolher os 9 destaques em cada quarto.
   - **Safrapay: provider implementado** (Pix/cartão/boleto batem na API HML; webhook →
     `confirmar_reserva`; site cria a cobrança e mostra "Pagar agora"). **UI de captura de
     cartão** na página pública `pagar/<token>/` (crédito à vista, `autorizar_cartao_online`
