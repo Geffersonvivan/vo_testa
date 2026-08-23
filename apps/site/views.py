@@ -107,6 +107,27 @@ def quartos_todos(request):
     })
 
 
+def quarto_detalhe(request, uh_id):
+    """Página de um quarto: fotos, descrição, diferenciais, tour 360° e preço.
+    O botão Reservar leva às datas com o quarto já escolhido (deep-link)."""
+    from apps.nucleo.models import UH, TipoUH
+    from apps.reservas import services as reservas
+
+    uh = get_object_or_404(
+        UH.objects.select_related('tipo'), pk=uh_id, status=UH.Status.ATIVA,
+        tipo__modalidade=TipoUH.Modalidade.HOSPEDAGEM,
+    )
+    vitrine = _vitrine_ou_404(uh)
+    card = _card_de_uh(vitrine, reservas.tarifa_base_unidade(uh))
+    outras = _vitrines_publicadas().exclude(uh=uh).order_by('ordem', 'uh__numero')[:3]
+    return render(request, 'site/quarto_detalhe.html', {
+        'config': ConfiguracaoSite.load(),
+        'quarto': card,
+        'descricao': vitrine.descricao or uh.diferenciais,
+        'outros': [_card_de_uh(v, reservas.tarifa_base_unidade(v.uh)) for v in outras],
+    })
+
+
 def pedir_proposta(request):
     """Formulário #contato / #eventos → Comercial. Degrada se módulo off."""
     if request.method != 'POST':
