@@ -21,11 +21,12 @@
   <thead>
     <tr><th>Nome</th><th>Cargo · Setor</th><th>Turno</th><th>Admissão</th><th>Acesso</th><th></th></tr>
   </thead>
-  <tbody>
-    {% for item in funcionarios %}
-      <tr>
-        <td><a href="{% url 'funcionario_editar' item.f.pk %}"><strong>{{ item.f.pessoa.nome }}</strong></a>
-          {% if item.f.usuario %}<small class="ajuda-inline">{{ item.f.usuario.username }}</small>{% endif %}</td>
+  {% for item in funcionarios %}
+    <tbody x-data="{ open: false }" class="func-grupo">
+      <tr class="func-linha" :class="open && 'aberta'" @click="open = !open"
+          hx-get="{% url 'funcionario_painel' item.f.pk %}" hx-target="#painel-{{ item.f.pk }}"
+          hx-swap="innerHTML" hx-trigger="click once" style="cursor:pointer">
+        <td><strong>{{ item.f.pessoa.nome }}</strong>{% if item.f.usuario %} <small class="ajuda-inline">{{ item.f.usuario.username }}</small>{% endif %}</td>
         <td>{{ item.f.cargo }}{% if item.f.setor %} · {{ item.f.setor }}{% endif %}</td>
         <td>{% if item.f.turno %}{{ item.f.get_turno_display }}{% if item.f.expediente_inicio %} · {{ item.f.expediente_inicio|time:"H:i" }}–{{ item.f.expediente_fim|time:"H:i" }}{% endif %}{% else %}—{% endif %}</td>
         <td>{{ item.f.admissao|date:"d/m/Y"|default:"—" }}</td>
@@ -35,11 +36,14 @@
           {% else %}<span class="selo">Sem login</span>{% endif %}
           {% if item.f.usuario and not item.ativo %}<span class="selo selo-alerta">inativo</span>{% endif %}
         </td>
-        <td><a href="{% url 'funcionario_editar' item.f.pk %}" class="botao-neutro">Abrir</a></td>
+        <td class="func-chev"><span x-text="open ? '▴' : '▾'"></span></td>
       </tr>
-    {% empty %}
-      <tr><td colspan="6" class="vazio">Nenhum funcionário ainda — cadastre o primeiro.</td></tr>
-    {% endfor %}
-  </tbody>
+      <tr x-show="open" x-cloak class="func-exp">
+        <td colspan="6" id="painel-{{ item.f.pk }}"><div class="func-carregando">Carregando…</div></td>
+      </tr>
+    </tbody>
+  {% empty %}
+    <tbody><tr><td colspan="6" class="vazio">Nenhum funcionário ainda — cadastre o primeiro.</td></tr></tbody>
+  {% endfor %}
 </table>
 {% endblock %}

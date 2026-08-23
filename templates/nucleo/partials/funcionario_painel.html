@@ -1,0 +1,96 @@
+{% load moeda %}
+<form class="func-painel ficha-func" x-data="{ aba: 'ficha' }"
+      hx-post="{% url 'funcionario_editar' f.pk %}" hx-target="#painel-{{ f.pk }}" hx-swap="innerHTML">
+  {% csrf_token %}
+  <div class="func-abas">
+    <button type="button" class="func-aba" :class="aba==='ficha' && 'on'" @click="aba='ficha'">Ficha RH</button>
+    <button type="button" class="func-aba" :class="aba==='acesso' && 'on'" @click="aba='acesso'">Acesso Sistema</button>
+    {% if gerente %}<button type="button" class="func-aba" :class="aba==='historico' && 'on'" @click="aba='historico'">Histórico</button>{% endif %}
+    <button type="submit" class="botao-primario func-editar">Salvar ficha</button>
+  </div>
+  {% if salvo %}<div class="func-salvo">Ficha salva ✓</div>{% endif %}
+
+  {# ---- Ficha RH (editável) ---- #}
+  <div x-show="aba==='ficha'" class="func-conteudo">
+    <div class="grid2">
+      <div class="campo"><label>Nome</label><input type="text" name="nome" value="{{ f.pessoa.nome }}" required></div>
+      <div class="campo"><label>CPF/CNPJ</label><input type="text" name="documento" value="{{ f.pessoa.documento }}"></div>
+      <div class="campo"><label>Cargo</label>{{ form.cargo }}</div>
+      <div class="campo"><label>Setor</label>{{ form.setor }}</div>
+      <div class="campo"><label>Admissão</label>{{ form.admissao }}</div>
+      <div class="campo"><label>Vínculo</label>{{ form.vinculo }}</div>
+      <div class="campo"><label>Turno</label>{{ form.turno }}</div>
+      <div class="campo"><label>Carga semanal (h)</label>{{ form.carga_semanal }}</div>
+      <div class="campo"><label>Início do expediente</label>{{ form.expediente_inicio }}</div>
+      <div class="campo"><label>Fim do expediente</label>{{ form.expediente_fim }}</div>
+      <div class="campo"><label>Início do intervalo</label>{{ form.intervalo_inicio }}</div>
+      <div class="campo"><label>Fim do intervalo</label>{{ form.intervalo_fim }}</div>
+      {% if form.salario %}<div class="campo"><label>Salário base 🔒 (só gerência)</label>{{ form.salario }}</div>{% endif %}
+    </div>
+  </div>
+
+  {# ---- Acesso Sistema (editável, gerência) ---- #}
+  <div x-show="aba==='acesso'" x-cloak class="func-conteudo">
+    {% if gerente %}
+      {% if usuario %}
+        <p class="func-login">Login <strong>{{ usuario.username }}</strong>{% if usuario.is_superuser %} · <span class="selo selo-ativo">Dono</span>{% endif %}</p>
+        {% if proprio %}<p class="ajuda">Você não pode rebaixar/desativar a si mesmo.</p>
+        {% elif usuario.is_superuser %}<p class="ajuda">Dono é gerido pelo admin — não é rebaixado/desativado por aqui.</p>
+        {% else %}
+        <div class="func-checks">
+          <label class="filtro-check"><input type="checkbox" name="gerente" {% if usuario.is_staff or usuario.is_superuser %}checked{% endif %}> É gerência (ações sensíveis)</label>
+          <label class="filtro-check"><input type="checkbox" name="ativo" {% if usuario.is_active %}checked{% endif %}> Ativo (pode entrar)</label>
+        </div>
+        {% endif %}
+      {% else %}
+        <div class="grid2">
+          <div class="campo"><label>Login (usuário)</label><input type="text" name="username" autocomplete="off"></div>
+          <div class="campo"><label>Senha (mín. 8)</label><input type="password" name="password" minlength="8" autocomplete="new-password"></div>
+        </div>
+      {% endif %}
+      <fieldset class="fnrh-grupo"><legend class="letreiro">Módulos</legend>
+        <div class="acessos-grade">
+          {% for m in modulos %}<label class="filtro-check"><input type="checkbox" name="modulos" value="{{ m.codigo }}" {% if m.tem %}checked{% endif %}> {{ m.nome }}</label>{% empty %}<p class="ajuda">Nenhum módulo ativo.</p>{% endfor %}
+        </div>
+      </fieldset>
+      <fieldset class="fnrh-grupo"><legend class="letreiro">Áreas do núcleo</legend>
+        <div class="acessos-grade">
+          {% for a in areas %}<label class="filtro-check"><input type="checkbox" name="areas" value="{{ a.codigo }}" {% if a.tem %}checked{% endif %}> {{ a.nome }}</label>{% endfor %}
+        </div>
+      </fieldset>
+      {% if usuario %}<div class="campo"><label>Redefinir senha (em branco = manter)</label><input type="password" name="password" minlength="8" autocomplete="new-password" placeholder="Nova senha (mín. 8)"></div>{% endif %}
+      <p class="ajuda">Equipe &amp; Acessos deriva daqui — só funcionário tem login.</p>
+    {% else %}
+      <p class="ajuda">Somente a gerência gerencia login, módulos e áreas.</p>
+    {% endif %}
+  </div>
+
+  {# ---- Histórico (read-only, gerência) ---- #}
+  {% if gerente %}
+  <div x-show="aba==='historico'" x-cloak class="func-conteudo">
+    <div class="func-cards">
+      <div class="func-card"><span class="k">⏱ Tempo de casa</span><span class="v">{{ historico.tempo_de_casa|default:"—" }}</span><span class="n">desde {{ historico.admissao|date:"d/m/Y"|default:"—" }}</span></div>
+      <div class="func-card"><span class="k">📅 Dias com acesso</span><span class="v">{% if historico.presenca %}{{ historico.presenca.dias_com_acesso }}{% else %}—{% endif %}</span><span class="n">últimos 30 dias</span></div>
+      <div class="func-card"><span class="k">💰 Reajustes</span><span class="v">{{ historico.progressao|length }}</span><span class="n">registros de salário</span></div>
+      <div class="func-card"><span class="k">🔁 Movimentações</span><span class="v">{{ historico.movimentacoes|length }}</span><span class="n">marcos registrados</span></div>
+    </div>
+    <div class="func-duas">
+      <div class="func-bloco">
+        <h4 class="letreiro">Progressão salarial</h4>
+        {% for s in historico.progressao %}
+          <div class="sal-row"><span class="sal-data">{{ s.data|date:"m/y" }}</span><span class="sal-val">{{ s.valor|intcomma_brl }}</span><span class="sal-delta">{% if s.delta is not None %}{% if s.delta > 0 %}+{% endif %}{{ s.delta }}%{% else %}{{ s.motivo }}{% endif %}</span></div>
+        {% empty %}
+          <p class="ajuda">Sem alterações de salário registradas ainda (aparecem conforme forem editadas).</p>
+        {% endfor %}
+      </div>
+      <div class="func-bloco">
+        <h4 class="letreiro">Movimentações &amp; marcos</h4>
+        <ul class="func-tl">
+          {% for m in historico.movimentacoes %}<li><b>{{ m.data|date:"d/m/y" }}</b> {{ m.texto }}</li>{% empty %}<li class="ajuda">Nada registrado ainda.</li>{% endfor %}
+        </ul>
+      </div>
+    </div>
+    <p class="ajuda">Dias/horas trabalhados, ausências e produtividade por papel entram na Fase 2 (via Escala e módulos).</p>
+  </div>
+  {% endif %}
+</form>

@@ -9,12 +9,14 @@ urlpatterns = [
     # Funcionários (RH) — Pessoal + acesso deriva daqui (substitui Equipe & Acessos)
     path("funcionarios/", views.funcionarios, name="funcionarios"),
     path("funcionarios/novo/", views.funcionario_novo, name="funcionario_novo"),
+    path("funcionarios/<int:pk>/painel/", views.funcionario_painel, name="funcionario_painel"),
     path("funcionarios/<int:pk>/", views.funcionario_editar, name="funcionario_editar"),
     # Cadastros
     path("pessoas/", views.pessoas, name="pessoas"),
     path("hospedes/", views.hospedes, name="hospedes"),
     path("agencias/", views.agencias, name="agencias"),
     path("empresas/", views.empresas, name="empresas"),
+    path("fornecedores/", views.fornecedores, name="fornecedores"),
     path("pessoas/nova/", views.pessoa_form, name="pessoa_nova"),
     path("pessoas/nova-rapida/", views.pessoa_nova_rapida, name="pessoa_nova_rapida"),
     path("pessoas/<int:pk>/", views.pessoa_form, name="pessoa_editar"),

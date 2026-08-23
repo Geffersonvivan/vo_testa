@@ -7,12 +7,12 @@
 <div class="pagina-cabecalho">
   <h1>{{ titulo|default:"Pessoas" }}</h1>
   {% if perfil %}
-    <a href="{% url 'pessoa_nova' %}?papel={{ novo_papel }}" class="botao-primario">{% if perfil == 'empresas' %}+ Nova empresa{% elif perfil == 'agencias' %}+ Nova agência{% else %}+ Novo hóspede{% endif %}</a>
+    <a href="{% url 'pessoa_nova' %}?papel={{ novo_papel }}" class="botao-primario">{% if perfil == 'empresas' %}+ Nova empresa{% elif perfil == 'agencias' %}+ Nova agência{% elif perfil == 'fornecedores' %}+ Novo fornecedor{% else %}+ Novo hóspede{% endif %}</a>
   {% else %}
     <a href="{% url 'pessoa_nova' %}" class="botao-primario">Nova pessoa</a>
   {% endif %}
 </div>
-<p class="subtitulo">{% if perfil == 'hospedes' %}Quem se hospeda — base para as reservas.{% elif perfil == 'agencias' %}Agências de viagens que fecham grupos (com comissão).{% elif perfil == 'empresas' %}Empresas que fecham estadia/eventos (cliente corporativo direto).{% else %}Hóspedes, agências, empresas, fornecedores, funcionários e clientes avulsos — uma base única.{% endif %}</p>
+<p class="subtitulo">{% if perfil == 'hospedes' %}Quem se hospeda — base para as reservas.{% elif perfil == 'agencias' %}Agências de viagens que fecham grupos (com comissão).{% elif perfil == 'empresas' %}Empresas que fecham estadia/eventos (cliente corporativo direto).{% elif perfil == 'fornecedores' %}Quem abastece a pousada — insumos, serviços e contas a pagar.{% else %}Hóspedes, agências, empresas, fornecedores, funcionários e clientes avulsos — uma base única.{% endif %}</p>
 
 <form method="get" class="barra-busca">
   <input type="search" name="q" value="{{ busca }}" placeholder="Buscar por nome, CPF/CNPJ ou e-mail">

@@ -2671,3 +2671,46 @@ form.filtros:not(.subnav) select:focus {
 }
 .ficha-func .campo input:focus, .ficha-func .campo select:focus { outline: none; border-color: var(--lampiao); box-shadow: 0 0 0 2px rgba(226,168,74,.18); }
 @media (max-width: 820px) { .ficha-cols { grid-template-columns: 1fr; } .ficha-func .grid2 { grid-template-columns: 1fr; } }
+
+/* Funcionários — linha expansível + painel de abas (Ficha RH / Acesso / Histórico) */
+.func-chev { text-align: center; color: var(--tinta-suave); width: 40px; }
+.func-linha.aberta { background: var(--superficie-2); }
+.func-exp > td { padding: 0 !important; background: var(--superficie-2); border-bottom: 1px solid var(--fio); }
+.func-carregando { padding: 18px; color: var(--tinta-suave); font-size: .88rem; }
+.func-painel { padding: 4px 18px 20px; }
+.func-abas { display: flex; gap: 4px; align-items: center; border-bottom: 1px solid var(--fio); margin: 0 -18px 16px; padding: 4px 18px 0; }
+.func-aba { background: none; border: none; padding: 9px 15px; font-size: .9rem; font-weight: 600; color: var(--tinta-suave); border-bottom: 2px solid transparent; cursor: pointer; font-family: inherit; }
+.func-aba:hover { color: var(--tinta); }
+.func-aba.on { color: var(--madeira); border-bottom-color: var(--lampiao); }
+.func-editar { margin-left: auto; padding: .4rem .8rem; font-size: .82rem; }
+.func-conteudo { padding-top: 2px; }
+.func-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 20px; }
+.func-grid .k, .func-card .k { display: block; font-size: .64rem; letter-spacing: .05em; text-transform: uppercase; color: var(--tinta-suave); }
+.func-grid .v { font-size: .92rem; font-weight: 600; }
+.func-grid .v .selo { margin: 2px 4px 0 0; }
+.func-login { font-size: .9rem; margin: 0 0 10px; }
+.func-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+.func-card { background: var(--superficie); border: 1px solid var(--fio); border-radius: 11px; padding: 11px 13px; }
+.func-card .v { font-family: var(--fonte-serifada, Georgia), serif; font-size: 1.5rem; font-weight: 700; margin-top: 2px; }
+.func-card .n { font-size: .72rem; color: var(--tinta-suave); }
+.func-duas { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.func-bloco { background: var(--superficie); border: 1px solid var(--fio); border-radius: 11px; padding: 13px 15px; }
+.func-bloco h4 { margin: 0 0 10px; font-size: .68rem; color: var(--tinta-suave); }
+.sal-row { display: flex; align-items: center; gap: 12px; padding: 5px 0; border-bottom: 1px dashed var(--fio); font-size: .88rem; }
+.sal-row:last-child { border-bottom: none; }
+.sal-data { width: 52px; color: var(--tinta-suave); font-family: var(--fonte-mono, monospace); font-size: .8rem; }
+.sal-val { font-weight: 700; min-width: 92px; }
+.sal-delta { color: var(--musgo); font-weight: 700; font-size: .82rem; }
+.func-tl { margin: 0; padding-left: 16px; list-style: none; position: relative; }
+.func-tl::before { content: ''; position: absolute; left: 3px; top: 4px; bottom: 4px; width: 2px; background: var(--fio-forte); }
+.func-tl li { position: relative; padding: 4px 0 4px 4px; font-size: .86rem; }
+.func-tl li::before { content: ''; position: absolute; left: -16px; top: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--lampiao); }
+.func-tl b { font-family: var(--fonte-mono, monospace); font-size: .76rem; color: var(--tinta-suave); margin-right: 6px; }
+@media (max-width: 820px) { .func-grid, .func-cards, .func-duas { grid-template-columns: 1fr 1fr; } }
+
+/* Painel do funcionário — editor inline */
+.func-painel.ficha-func .grid2 { grid-template-columns: repeat(3, 1fr); }
+.func-painel .fnrh-grupo { margin-top: 12px; }
+.func-checks { display: flex; gap: 18px; flex-wrap: wrap; margin: 4px 0 8px; }
+.func-salvo { background: var(--sucesso-bg); color: var(--musgo); border: 1px solid rgba(46,125,91,.28); border-radius: 8px; padding: 6px 12px; font-size: .85rem; font-weight: 600; margin-bottom: 12px; display: inline-block; }
+@media (max-width: 900px) { .func-painel.ficha-func .grid2 { grid-template-columns: 1fr 1fr; } }

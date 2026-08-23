@@ -357,6 +357,7 @@ PERFIS_PESSOA = {
     "hospedes": ("Hóspedes", "hospedes", "hospede"),
     "agencias": ("Agências", "agencias", "agencia"),
     "empresas": ("Empresas", "empresas", "empresa"),
+    "fornecedores": ("Fornecedores", "fornecedores", "fornecedor"),
 }
 
 
@@ -413,6 +414,11 @@ def agencias(request):
 @requer_area(Area.PESSOAS)
 def empresas(request):
     return pessoas(request, perfil="empresas")
+
+
+@requer_area(Area.PESSOAS)
+def fornecedores(request):
+    return pessoas(request, perfil="fornecedores")
 
 
 @login_required
@@ -493,11 +499,11 @@ def pessoa_form(request, pk=None):
     funcionario = getattr(pessoa, "funcionario", None)
     fornecedor = getattr(pessoa, "fornecedor", None)
 
+    # Funcionário tem tela própria (Funcionários/RH) — não é papel deste form.
     if request.method == "POST":
         form = PessoaForm(request.POST, instance=pessoa)
         eh_hospede = "eh_hospede" in request.POST
         eh_agencia = "eh_agencia" in request.POST
-        eh_funcionario = "eh_funcionario" in request.POST
         eh_fornecedor = "eh_fornecedor" in request.POST
         form_hospede = _form_especializacao(
             request, HospedeForm, hospede, "hospede", eh_hospede
@@ -505,16 +511,12 @@ def pessoa_form(request, pk=None):
         form_agencia = _form_especializacao(
             request, AgenciaForm, agencia, "agencia", eh_agencia
         )
-        form_funcionario = _form_especializacao(
-            request, FuncionarioForm, funcionario, "funcionario", eh_funcionario
-        )
         form_fornecedor = _form_especializacao(
             request, FornecedorForm, fornecedor, "fornecedor", eh_fornecedor
         )
         subforms_ok = (
             (not eh_hospede or form_hospede.is_valid())
             and (not eh_agencia or form_agencia.is_valid())
-            and (not eh_funcionario or form_funcionario.is_valid())
             and (not eh_fornecedor or form_fornecedor.is_valid())
         )
         if form.is_valid() and subforms_ok:
@@ -522,7 +524,6 @@ def pessoa_form(request, pk=None):
             for marcado, subform, existente in [
                 (eh_hospede, form_hospede, hospede),
                 (eh_agencia, form_agencia, agencia),
-                (eh_funcionario, form_funcionario, funcionario),
                 (eh_fornecedor, form_fornecedor, fornecedor),
             ]:
                 if marcado:
@@ -535,24 +536,22 @@ def pessoa_form(request, pk=None):
             return redirect("pessoas")
     else:
         form = PessoaForm(instance=pessoa)
-        # "Novo" vindo de uma tela focada (?papel=hospede/agencia/empresa) já marca o papel.
+        # "Novo" vindo de uma tela focada (?papel=…) já marca o papel certo.
         papel_novo = request.GET.get("papel", "") if not pk else ""
-        ag_inicial = None
+        cat_inicial = None
         if papel_novo == "empresa":
-            ag_inicial = {"agencia-categoria": Agencia.Categoria.EMPRESA}
+            cat_inicial = Agencia.Categoria.EMPRESA
         elif papel_novo == "agencia":
-            ag_inicial = {"agencia-categoria": Agencia.Categoria.AGENCIA}
+            cat_inicial = Agencia.Categoria.AGENCIA
         form_hospede = HospedeForm(prefix="hospede", instance=hospede)
         form_agencia = AgenciaForm(
             prefix="agencia", instance=agencia,
-            initial={"categoria": ag_inicial["agencia-categoria"]} if ag_inicial else None,
+            initial={"categoria": cat_inicial} if cat_inicial else None,
         )
-        form_funcionario = FuncionarioForm(prefix="funcionario", instance=funcionario)
         form_fornecedor = FornecedorForm(prefix="fornecedor", instance=fornecedor)
         eh_hospede = hospede is not None or papel_novo == "hospede"
         eh_agencia = agencia is not None or papel_novo in ("agencia", "empresa")
-        eh_funcionario = funcionario is not None
-        eh_fornecedor = fornecedor is not None
+        eh_fornecedor = fornecedor is not None or papel_novo == "fornecedor"
 
     return render(
         request,
@@ -562,12 +561,11 @@ def pessoa_form(request, pk=None):
             "pessoa": pessoa,
             "form_hospede": form_hospede,
             "form_agencia": form_agencia,
-            "form_funcionario": form_funcionario,
             "form_fornecedor": form_fornecedor,
             "eh_hospede": eh_hospede,
             "eh_agencia": eh_agencia,
-            "eh_funcionario": eh_funcionario,
             "eh_fornecedor": eh_fornecedor,
+            "funcionario": funcionario,
         },
     )
 
@@ -1002,7 +1000,9 @@ def _aplicar_acesso_funcionario(request, f, modulos_ativos_qs):
     u.modulos.set(modulos_ativos_qs.filter(codigo__in=set(request.POST.getlist("modulos"))))
     codigos_areas = {c for c, _ in areas_catalogo()}
     u.areas = [a for a in request.POST.getlist("areas") if a in codigos_areas]
-    if not proprio:  # trava: não rebaixa/desativa a si mesmo
+    # Travas: nunca rebaixar/desativar a si mesmo NEM um superusuário (o dono é
+    # gerido pelo admin — evita lockout acidental pela ficha).
+    if not proprio and not u.is_superuser:
         u.is_staff = request.POST.get("gerente") == "on"
         u.is_active = request.POST.get("ativo") == "on"
     if senha and len(senha) >= 8:
@@ -1010,41 +1010,74 @@ def _aplicar_acesso_funcionario(request, f, modulos_ativos_qs):
     u.save()
 
 
+def _ficha_contexto(request, f, gerente, form=None):
+    """Contexto editável da ficha do funcionário (compartilhado painel × página)."""
+    from .historico import historico_funcionario
+
+    modulos_qs = ModuloContratado.objects.filter(ativo=True).order_by("codigo")
+    u = f.usuario
+    return {
+        "f": f, "gerente": gerente, "usuario": u,
+        "form": form or FuncionarioForm(instance=f, ver_salario=gerente),
+        "modulos": [
+            {"codigo": m.codigo, "nome": m.get_codigo_display(),
+             "tem": bool(u and u.modulos.filter(pk=m.pk).exists())}
+            for m in modulos_qs
+        ],
+        "areas": [
+            {"codigo": c, "nome": rot, "tem": bool(u and c in (u.areas or []))}
+            for c, rot in areas_catalogo()
+        ],
+        "proprio": bool(u and u.pk == request.user.pk),
+        "historico": historico_funcionario(f) if gerente else None,
+    }
+
+
+def _salvar_ficha(request, f, gerente):
+    """Aplica a ficha (dados pessoais + RH + acesso). Retorna (ok, form)."""
+    form = FuncionarioForm(request.POST, instance=f, ver_salario=gerente)
+    if not form.is_valid():
+        return False, form
+    f.pessoa.nome = (request.POST.get("nome") or f.pessoa.nome).strip()
+    doc = request.POST.get("documento")
+    if doc is not None:
+        f.pessoa.documento = doc.strip()
+    f.pessoa.save()
+    form.save()
+    if gerente:  # login/módulos/áreas só gerência mexe
+        _aplicar_acesso_funcionario(
+            request, f, ModuloContratado.objects.filter(ativo=True).order_by("codigo")
+        )
+    return True, form
+
+
 @requer_area(Area.FUNCIONARIOS, Area.EQUIPE)
 def funcionario_editar(request, pk):
+    """Página cheia da ficha (fallback). O editor principal é o painel inline."""
     f = get_object_or_404(Funcionario.objects.select_related("pessoa", "usuario"), pk=pk)
     gerente = eh_gerente(request.user)
-    modulos_ativos_qs = ModuloContratado.objects.filter(ativo=True).order_by("codigo")
-
+    form = None
     if request.method == "POST":
-        form = FuncionarioForm(request.POST, instance=f, ver_salario=gerente)
-        if form.is_valid():
-            f.pessoa.nome = (request.POST.get("nome") or f.pessoa.nome).strip()
-            doc = request.POST.get("documento")
-            if doc is not None:
-                f.pessoa.documento = doc.strip()
-            f.pessoa.save()
-            form.save()
-            if gerente:  # o acesso (login/módulos/áreas) só gerência mexe
-                _aplicar_acesso_funcionario(request, f, modulos_ativos_qs)
+        ok, form = _salvar_ficha(request, f, gerente)
+        if ok:
+            # Vindo do painel inline (HTMX): devolve o painel atualizado.
+            if request.headers.get("HX-Request"):
+                ctx = _ficha_contexto(request, f, gerente)
+                ctx["salvo"] = True
+                return render(request, "nucleo/partials/funcionario_painel.html", ctx)
             messages.success(request, f"Ficha de {f.pessoa.nome} salva.")
             return redirect("funcionarios")
         messages.error(request, "Revise os campos da ficha.")
-    else:
-        form = FuncionarioForm(instance=f, ver_salario=gerente)
+    ctx = _ficha_contexto(request, f, gerente, form=form)
+    ctx["modo"] = "editar"
+    return render(request, "nucleo/funcionario_form.html", ctx)
 
-    u = f.usuario
-    modulos = [
-        {"codigo": m.codigo, "nome": m.get_codigo_display(),
-         "tem": bool(u and u.modulos.filter(pk=m.pk).exists())}
-        for m in modulos_ativos_qs
-    ]
-    areas = [
-        {"codigo": c, "nome": rot, "tem": bool(u and c in (u.areas or []))}
-        for c, rot in areas_catalogo()
-    ]
-    return render(request, "nucleo/funcionario_form.html", {
-        "modo": "editar", "f": f, "form": form, "gerente": gerente,
-        "usuario": u, "modulos": modulos, "areas": areas,
-        "proprio": bool(u and u.pk == request.user.pk),
-    })
+
+@requer_area(Area.FUNCIONARIOS, Area.EQUIPE)
+def funcionario_painel(request, pk):
+    """Painel expansível editável (HTMX): abas Ficha RH · Acesso · Histórico.
+    Histórico e salário só para gerência."""
+    f = get_object_or_404(Funcionario.objects.select_related("pessoa", "usuario"), pk=pk)
+    gerente = eh_gerente(request.user)
+    return render(request, "nucleo/partials/funcionario_painel.html",
+                  _ficha_contexto(request, f, gerente))

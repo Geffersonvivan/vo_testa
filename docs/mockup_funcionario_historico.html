@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mockup — Funcionário: abas + Histórico</title>
+<style>
+  :root{--noturno:#051C2C;--canvas:#F3F0EA;--superficie:#FFFDF9;--superficie-2:#F6F2EA;
+    --lampiao:#D7A048;--musgo:#2E7D5B;--musgo-bg:#E7F1EB;--madeira:#4F2C1D;--tinta:#1C2B33;
+    --tinta-suave:#64717B;--fio:#E7DFCF;--fio-forte:#D8CDB6;--alerta:#B0741C;--alerta-bg:#F7ECD6;
+    --info:#2C6E7A;--info-bg:#E1EEF0;--sombra:0 12px 30px rgba(5,28,44,.10);--raio:14px;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--canvas);color:var(--tinta);font-family:'Hanken Grotesk',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:40px 26px 70px}
+  .display{font-family:Georgia,serif;font-weight:700;letter-spacing:-.02em}
+  .eyebrow{font-size:.7rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--lampiao);margin:0 0 .4rem}
+  h1{font-size:2.1rem;margin:0 0 .2rem}
+  .lead{color:var(--tinta-suave);margin:0 0 22px;max-width:70ch}
+  .tabela{background:var(--superficie);border:1px solid var(--fio);border-radius:var(--raio);box-shadow:var(--sombra);overflow:hidden}
+  .th,.tr{display:grid;grid-template-columns:2fr 2fr 1.2fr 1fr 1fr 40px;align-items:center;gap:8px;padding:12px 18px}
+  .th{background:var(--superficie-2);border-bottom:1px solid var(--fio);font-size:.64rem;letter-spacing:.08em;text-transform:uppercase;color:var(--tinta-suave)}
+  .tr{border-bottom:1px solid var(--fio);cursor:pointer}
+  .tr:hover{background:var(--superficie-2)}
+  .tr b{font-weight:700}.tr .login{color:var(--tinta-suave);font-size:.78rem;margin-left:6px}
+  .pill{display:inline-flex;padding:2px 9px;border-radius:999px;font-size:.64rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+  .p-ger{color:var(--madeira);background:#F4E3C4;border:1px solid var(--lampiao)}
+  .p-op{color:var(--tinta-suave);background:var(--superficie-2);border:1px solid var(--fio-forte)}
+  .chev{justify-self:end;color:var(--tinta-suave)}
+  /* expandido */
+  .exp{background:var(--superficie-2);border-bottom:1px solid var(--fio);padding:0 18px 20px}
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--fio);margin:0 -18px 18px;padding:2px 18px 0}
+  .tab{padding:10px 16px;font-size:.9rem;font-weight:600;color:var(--tinta-suave);border-bottom:2px solid transparent;cursor:pointer}
+  .tab.on{color:var(--madeira);border-bottom-color:var(--lampiao)}
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+  .card{background:var(--superficie);border:1px solid var(--fio);border-radius:11px;padding:12px 14px}
+  .card .k{font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--tinta-suave)}
+  .card .v{font-family:Georgia,serif;font-size:1.5rem;font-weight:700;margin-top:2px}
+  .card .n{font-size:.72rem;color:var(--tinta-suave);margin-top:1px}
+  .bloco{background:var(--superficie);border:1px solid var(--fio);border-radius:11px;padding:14px 16px;margin-bottom:14px}
+  .bloco h4{margin:0 0 10px;font-size:.7rem;letter-spacing:.09em;text-transform:uppercase;color:var(--tinta-suave)}
+  .duas{display:grid;grid-template-columns:1.1fr .9fr;gap:14px}
+  /* progressão salarial */
+  .sal-row{display:flex;align-items:center;gap:12px;padding:6px 0;border-bottom:1px dashed var(--fio);font-size:.88rem}
+  .sal-row:last-child{border-bottom:none}
+  .sal-data{width:64px;color:var(--tinta-suave);font-family:ui-monospace,monospace;font-size:.8rem}
+  .sal-val{font-weight:700;width:92px}
+  .sal-delta{color:var(--musgo);font-weight:700;font-size:.8rem}
+  .sal-motivo{color:var(--tinta-suave);font-size:.82rem}
+  .spark{display:flex;align-items:flex-end;gap:8px;height:70px;margin-top:8px}
+  .spark span{flex:1;background:linear-gradient(180deg,var(--lampiao),#EBC583);border-radius:4px 4px 0 0}
+  /* timeline */
+  .tl{position:relative;padding-left:18px}
+  .tl::before{content:'';position:absolute;left:4px;top:4px;bottom:4px;width:2px;background:var(--fio-forte)}
+  .tl li{list-style:none;position:relative;padding:5px 0 5px 4px;font-size:.86rem}
+  .tl li::before{content:'';position:absolute;left:-18px;top:11px;width:9px;height:9px;border-radius:50%;background:var(--lampiao);border:2px solid var(--superficie)}
+  .tl b{font-family:ui-monospace,monospace;font-size:.78rem;color:var(--tinta-suave);margin-right:8px}
+  .badge{display:inline-block;font-size:.62rem;font-weight:700;padding:1px 7px;border-radius:6px;text-transform:uppercase;letter-spacing:.03em}
+  .b-trilha{color:var(--info);background:var(--info-bg)}.b-escala{color:var(--musgo);background:var(--musgo-bg)}.b-calc{color:var(--alerta);background:var(--alerta-bg)}
+  .legenda{display:flex;gap:14px;flex-wrap:wrap;margin:10px 0 0;font-size:.8rem;color:var(--tinta-suave)}
+  .foot{margin-top:36px;color:var(--tinta-suave);font-size:.8rem;text-align:center}
+</style></head>
+<body><div class="wrap">
+  <p class="eyebrow">CRM Vô Testa · Proposta</p>
+  <h1 class="display">Funcionário — abas &amp; Histórico</h1>
+  <p class="lead">Clicar no funcionário expande a linha em 3 abas: <b>Ficha RH</b>, <b>Acesso Sistema</b> e <b>Histórico</b>. O Histórico é <b>read-only</b> e, na Fase 1, é montado do que já temos — <span class="badge b-trilha">trilha</span> (salário/cargo/presença), <span class="badge b-calc">cálculo</span> (tempo de casa) — sem model novo. <span class="badge b-escala">escala</span> (dias/horas/ausências) entra na Fase 2.</p>
+
+  <div class="tabela">
+    <div class="th"><span>Nome</span><span>Cargo · Setor</span><span>Turno</span><span>Admissão</span><span>Acesso</span><span></span></div>
+
+    <div class="tr"><span><b>Ivone Santos</b></span><span>Camareira · Governança</span><span>—</span><span>01/09/2021</span><span><span class="pill p-op">Sem login</span></span><span class="chev">▾</span></div>
+
+    <!-- LINHA EXPANDIDA -->
+    <div class="tr" style="background:var(--superficie-2)"><span><b>Peterson Vivan</b><span class="login">peterson</span></span><span>Recepcionista · Recepção</span><span>Manhã · 07–15h</span><span>12/03/2025</span><span><span class="pill p-op">Operador</span></span><span class="chev">▴</span></div>
+    <div class="exp">
+      <div class="tabs"><div class="tab">Ficha RH</div><div class="tab">Acesso Sistema</div><div class="tab on">Histórico</div></div>
+
+      <div class="cards">
+        <div class="card"><div class="k">⏱ Tempo de casa</div><div class="v">1a 5m</div><div class="n">desde 12/03/2025 · <span class="badge b-calc">cálculo</span></div></div>
+        <div class="card"><div class="k">📅 Dias no mês</div><div class="v">22</div><div class="n">de 22 escalados · <span class="badge b-escala">escala</span></div></div>
+        <div class="card"><div class="k">⏳ Horas no mês</div><div class="v">176h</div><div class="n">jornada 40h/sem · <span class="badge b-escala">escala</span></div></div>
+        <div class="card"><div class="k">🏖 Folgas/ausências</div><div class="v">4</div><div class="n">3 folgas · 1 atestado · <span class="badge b-escala">escala</span></div></div>
+      </div>
+
+      <div class="duas">
+        <div class="bloco">
+          <h4>💰 Progressão salarial <span class="badge b-trilha">trilha</span></h4>
+          <div class="sal-row"><span class="sal-data">03/25</span><span class="sal-val">R$ 2.000</span><span class="sal-delta">admissão</span><span class="sal-motivo"></span></div>
+          <div class="sal-row"><span class="sal-data">09/25</span><span class="sal-val">R$ 2.100</span><span class="sal-delta">+5,0%</span><span class="sal-motivo">experiência</span></div>
+          <div class="sal-row"><span class="sal-data">01/26</span><span class="sal-val">R$ 2.310</span><span class="sal-delta">+10,0%</span><span class="sal-motivo">reajuste anual</span></div>
+          <div class="spark"><span style="height:55%"></span><span style="height:66%"></span><span style="height:82%"></span></div>
+        </div>
+        <div class="bloco">
+          <h4>🗓 Presença (30 dias) <span class="badge b-trilha">trilha login/logout</span></h4>
+          <div style="font-size:.86rem">Entrou/saiu por dia, média de horas logado e pontualidade — derivados dos eventos <b>login/logout</b> que já registramos.</div>
+          <div class="spark" style="height:48px;margin-top:10px">
+            <span style="height:80%"></span><span style="height:90%"></span><span style="height:70%"></span><span style="height:95%"></span><span style="height:85%"></span><span style="height:60%"></span><span style="height:88%"></span>
+          </div>
+          <div class="n" style="font-size:.72rem;color:var(--tinta-suave);margin-top:4px">seg–dom · horas logado/dia</div>
+        </div>
+      </div>
+
+      <div class="bloco">
+        <h4>🔁 Movimentações &amp; marcos</h4>
+        <ul class="tl" style="margin:0;padding-left:18px">
+          <li><b>12/03/2025</b> Admitido como <b>Recepcionista</b> · Recepção <span class="badge b-trilha">trilha</span></li>
+          <li><b>09/2025</b> Salário: R$ 2.000 → R$ 2.100 (+5%) <span class="badge b-trilha">trilha</span></li>
+          <li><b>12/2025</b> Férias (10 dias) <span class="badge b-escala">escala</span></li>
+          <li><b>01/2026</b> Reajuste anual: R$ 2.100 → R$ 2.310 (+10%) <span class="badge b-trilha">trilha</span></li>
+          <li><b>04/2026</b> Atestado (1 dia) <span class="badge b-escala">escala</span></li>
+        </ul>
+      </div>
+
+      <div class="bloco" style="margin-bottom:0">
+        <h4>📈 Produtividade por papel <span class="badge b-op" style="background:var(--superficie-2)">Fase 2</span></h4>
+        <div style="font-size:.86rem;color:var(--tinta-suave)">Recepção: check-ins realizados · Camareira: faxinas concluídas · Loja/Restaurante: vendas — puxados dos módulos donos (Governança/Loja/Reservas) via service. Fica para a Fase 2.</div>
+      </div>
+    </div>
+
+    <div class="tr"><span><b>Marta Kuhn</b></span><span>Confeiteira · Restaurante</span><span>—</span><span>05/02/2024</span><span><span class="pill p-op">Sem login</span></span><span class="chev">▾</span></div>
+  </div>
+
+  <p class="foot">Mockup para discussão. Fase 1 = abas + tempo de casa + progressão salarial + movimentações de cargo + presença (tudo da trilha/cálculo, <b>sem model novo</b>). Fase 2 = dias/horas/ausências (Escala) + produtividade por papel. Aba Histórico só p/ gerência/RH (LGPD).</p>
+</div></body></html>

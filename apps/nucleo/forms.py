@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from django import forms
 
@@ -69,9 +69,20 @@ class HospedeForm(forms.ModelForm):
         }
 
 
+def _brl(valor) -> str:
+    """Decimal → '10.000,00' (sem R$, para preencher input)."""
+    return f"{Decimal(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 class FuncionarioForm(forms.ModelForm):
     """Ficha de RH do funcionário. O `salario` é sensível — a view só o inclui
     para gerência; o acesso ao sistema (login/módulos/áreas) é tratado à parte."""
+
+    # Salário como texto mascarado (10.000,00) — parseado para Decimal no clean.
+    salario = forms.CharField(
+        required=False, label="salário base (R$)",
+        widget=forms.TextInput(attrs={"class": "money-mask", "inputmode": "decimal", "placeholder": "0,00"}),
+    )
 
     class Meta:
         model = Funcionario
@@ -90,6 +101,17 @@ class FuncionarioForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if not ver_salario:
             self.fields.pop("salario", None)  # salário só p/ gerência
+        elif getattr(self.instance, "salario", None) is not None:
+            self.initial["salario"] = _brl(self.instance.salario)
+
+    def clean_salario(self):
+        raw = (self.cleaned_data.get("salario") or "").strip()
+        if not raw:
+            return None
+        try:  # '10.000,00' → '10000.00'
+            return Decimal(raw.replace(".", "").replace(",", "."))
+        except (InvalidOperation, ValueError):
+            raise forms.ValidationError("Valor inválido — use o formato 10.000,00.")
 
 
 class FornecedorForm(forms.ModelForm):

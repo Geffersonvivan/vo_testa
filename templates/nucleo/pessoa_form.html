@@ -7,7 +7,7 @@
 <h1>{% if pessoa %}Editar {{ pessoa.nome }}{% else %}Nova pessoa{% endif %}</h1>
 
 <form method="post" class="form-cartao"
-      x-data='{ hospede: {{ eh_hospede|yesno:"true,false" }}, agencia: {{ eh_agencia|yesno:"true,false" }}, funcionario: {{ eh_funcionario|yesno:"true,false" }}, fornecedor: {{ eh_fornecedor|yesno:"true,false" }} }'>
+      x-data='{ hospede: {{ eh_hospede|yesno:"true,false" }}, agencia: {{ eh_agencia|yesno:"true,false" }}, fornecedor: {{ eh_fornecedor|yesno:"true,false" }} }'>
   {% csrf_token %}
   {% include "nucleo/partials/campos.html" %}
 
@@ -29,18 +29,15 @@
     </div>
 
     <label class="marcador">
-      <input type="checkbox" name="eh_funcionario" x-model="funcionario"> Funcionário
-    </label>
-    <div class="subform" x-show="funcionario" x-cloak>
-      {% include "nucleo/partials/campos.html" with form=form_funcionario %}
-    </div>
-
-    <label class="marcador">
       <input type="checkbox" name="eh_fornecedor" x-model="fornecedor"> Fornecedor
     </label>
     <div class="subform" x-show="fornecedor" x-cloak>
       {% include "nucleo/partials/campos.html" with form=form_fornecedor %}
     </div>
+
+    {% if funcionario %}
+    <p class="ajuda">Esta pessoa também é <strong>funcionário</strong> — os dados de RH e o acesso são geridos em <a href="{% url 'funcionario_editar' funcionario.pk %}">Funcionários</a>.</p>
+    {% endif %}
   </fieldset>
 
   <div class="acoes">

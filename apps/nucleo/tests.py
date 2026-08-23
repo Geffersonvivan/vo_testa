@@ -806,7 +806,7 @@ class FuncionariosTests(TestCase):
         self.client.force_login(self.dono)
         self.client.post(reverse("funcionario_editar", args=[self.func.pk]), {
             "nome": "Fulano da Silva", "cargo": "Gerente", "setor": "Recepção",
-            "turno": "manha", "carga_semanal": "40", "salario": "2400.00",
+            "turno": "manha", "carga_semanal": "40", "salario": "2.400,00",
         })
         self.func.refresh_from_db()
         self.assertEqual(self.func.cargo, "Gerente")
@@ -904,3 +904,68 @@ class PessoasPapelTests(TestCase):
         p = Pessoa.objects.filter(nome="Nova Empresa Ltda").first()
         self.assertIsNotNone(p)
         self.assertEqual(p.agencia.categoria, "empresa")
+
+    def test_tela_fornecedores_so_fornecedores(self):
+        from apps.nucleo.models import Fornecedor, Pessoa
+        pf = Pessoa.objects.create(nome="Hortifruti Itá")
+        Fornecedor.objects.create(pessoa=pf, atividade="hortifrúti")
+        b = self.client.get(reverse("fornecedores")).content.decode()
+        self.assertIn("Hortifruti Itá", b)
+        self.assertNotIn("Hospede X", b)
+        self.assertNotIn("Empresa ACME", b)
+
+    def test_pessoa_form_nao_mexe_no_funcionario(self):
+        from apps.nucleo.models import Funcionario, Pessoa
+        p = Pessoa.objects.create(nome="Zé Funcionário")
+        Funcionario.objects.create(pessoa=p, cargo="Jardineiro")
+        # Salvar a pessoa (sem eh_funcionario, que nem existe mais) não apaga o funcionário.
+        self.client.post(reverse("pessoa_editar", args=[p.pk]), {"nome": "Zé F.", "tipo": "fisica"})
+        self.assertTrue(Funcionario.objects.filter(pessoa=p).exists())
+
+
+class HistoricoFuncionarioTests(TestCase):
+    """Fase 1: histórico do funcionário montado da trilha, gerência-only."""
+
+    def setUp(self):
+        from datetime import date
+        from apps.nucleo.models import Funcionario, Pessoa
+        self.dono = Usuario.objects.create_superuser(username="dono", password="senha-forte-123")
+        p = Pessoa.objects.create(nome="Zé Cozinha")
+        self.f = Funcionario.objects.create(pessoa=p, cargo="Cozinheiro", admissao=date(2024, 3, 12))
+
+    def test_tempo_de_casa(self):
+        from datetime import date
+        from apps.nucleo.historico import tempo_de_casa
+        self.assertIsNone(tempo_de_casa(None))
+        self.assertIn("ano", tempo_de_casa(date(2024, 3, 12)))
+
+    def test_progressao_le_da_trilha(self):
+        from apps.nucleo.historico import progressao_salarial
+        from apps.nucleo.models import TrilhaAuditoria
+        TrilhaAuditoria.objects.create(
+            usuario=self.dono, acao="editar", alvo="Funcionario", alvo_id=str(self.f.pk),
+            detalhe={"alteracoes": {"salario": ["2000", "2200"]}},
+        )
+        prog = progressao_salarial(self.f)
+        self.assertEqual(len(prog), 1)
+        self.assertEqual(str(prog[0]["valor"]), "2200")
+
+    def test_painel_historico_so_gerencia(self):
+        self.client.force_login(self.dono)
+        self.assertContains(self.client.get(reverse("funcionario_painel", args=[self.f.pk])), "Tempo de casa")
+        op = Usuario.objects.create_user(username="rh", password="x")
+        op.areas = ["funcionarios"]; op.save()
+        self.client.force_login(op)
+        r = self.client.get(reverse("funcionario_painel", args=[self.f.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, "Tempo de casa")  # sem aba Histórico p/ não-gerência
+
+    def test_ficha_nao_desativa_superusuario(self):
+        from apps.nucleo.models import Funcionario, Pessoa
+        dono2 = Usuario.objects.create_superuser(username="dono2", password="senha-forte-123")
+        fs = Funcionario.objects.create(pessoa=Pessoa.objects.create(nome="Dono2"), cargo="Dono", usuario=dono2)
+        self.client.force_login(self.dono)  # outro gerente edita a ficha do superusuário
+        self.client.post(reverse("funcionario_editar", args=[fs.pk]), {"nome": "Dono2", "cargo": "Dono"})
+        dono2.refresh_from_db()
+        self.assertTrue(dono2.is_active)   # superusuário não é desativado pela ficha
+        self.assertTrue(dono2.is_superuser)
