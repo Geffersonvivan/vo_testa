@@ -16,7 +16,7 @@
 
         <div class="grid md:grid-cols-3 gap-6 sm:gap-8">
             {% for quarto in quartos %}
-            <div class="group bg-noturno border border-lampiao/20 rounded-2xl overflow-hidden hover:border-lampiao/50 transition-all duration-500 hover:-translate-y-2">
+            <a href="{% url 'core:reservar' %}" class="group block bg-noturno border border-lampiao/20 rounded-2xl overflow-hidden hover:border-lampiao/50 transition-all duration-500 hover:-translate-y-2 cursor-pointer">
                 <div class="aspect-[4/3] bg-gradient-to-br from-madeira/30 to-madeira/10 flex items-center justify-center relative overflow-hidden">
                     {% if quarto.foto_principal %}
                     <img src="{{ quarto.foto_principal.url }}" alt="{{ quarto.nome }}" class="w-full h-full object-cover">
@@ -43,19 +43,19 @@
                     {% if quarto.qualidades %}
                     <div class="flex flex-wrap gap-1.5 mb-4">
                         {% for qual in quarto.qualidades %}
-                        <span class="text-lampiao/80 text-[11px] border border-lampiao/20 px-2 py-0.5 rounded-full">{{ qual }}</span>
+                        <span class="text-pergaminho/50 text-xs border border-lampiao/20 px-2 py-0.5 rounded-full">{{ qual }}</span>
                         {% endfor %}
                     </div>
                     {% endif %}
                     <div class="flex items-center justify-between">
                         <div>
-                            <span class="text-pergaminho/40 text-[11px] block">a partir de</span>
+                            <span class="text-pergaminho/40 text-xs block">a partir de</span>
                             <span class="text-lampiao font-body text-2xl font-bold">R$ {{ quarto.preco_base|floatformat:0 }}</span>
                             <span class="text-pergaminho/40 text-xs"> /noite</span>
                         </div>
-                        <a href="{% url 'core:reservar' %}" class="bg-lampiao/10 text-lampiao text-sm px-4 py-2 rounded-lg border border-lampiao/30 hover:bg-lampiao hover:text-noturno transition">
+                        <span class="bg-lampiao text-noturno text-sm font-semibold px-4 py-2 rounded-lg group-hover:bg-lampiao/90 transition">
                             Reservar
-                        </a>
+                        </span>
                     </div>
                     <div class="flex gap-3 mt-4 pt-4 border-t border-pergaminho/10">
                         <span class="text-pergaminho/40 text-xs flex items-center gap-1">
@@ -66,7 +66,7 @@
                         <span class="text-pergaminho/40 text-xs flex items-center gap-1">★ {{ quarto.nota_avaliacao }}</span>
                     </div>
                 </div>
-            </div>
+            </a>
             {% endfor %}
         </div>
 
