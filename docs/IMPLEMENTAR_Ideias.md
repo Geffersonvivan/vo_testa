@@ -91,18 +91,22 @@ importante** para o Google não indexar o sistema interno.
 
 - [x] 🟡 **Domínio personalizado** — ✅ `www.pousadavotesta.com.br` já no app unificado
       (Railway `Site_CRM_Pousada_Vo_Testa`, auto-deploy no push da main). Cutover feito.
-- [ ] 🟡 **Mídia em object storage (Cloudflare R2)** — **fazer antes de popular fotos reais.**
+- [~] 🟡 **Mídia em object storage (Cloudflare R2)** — **CÓDIGO FEITO, aguarda credenciais.**
       Hoje a mídia vive no filesystem efêmero do Railway → fotos subidas pelo admin em
-      produção **somem no próximo deploy** (por isso as 72 fotos curadas foram commitadas
-      no git como gambiarra). Com R2 (object storage S3-compatível, **sem taxa de egress**,
-      10GB grátis/mês → ~grátis p/ ~2MB de fotos), a mídia persiste e independe de git/deploy.
-      **Código (eu faço):** `django-storages` + `boto3`, `STORAGES` apontando pro R2 (via env
-      vars, sem segredo no git), comando p/ migrar as 72 fotos atuais, e devolver `media/` ao
-      gitignore. **Você (conta externa, ~10min):** criar bucket R2 + gerar API keys (Access
-      Key/Secret) → vão pro `.env`. **Bônus:** casa com o backup 3-2-1 — o NAS QNAP puxa do R2
-      com `rclone` (cópia offsite). Alternativa mais simples: **Railway Volume** (disco
-      persistente, sem conta externa, mas preso ao Railway, sem CDN nem backup offsite) — R2
-      é melhor p/ este caso.
+      produção **somem no próximo deploy** (por isso as fotos curadas foram commitadas
+      no git como gambiarra). Com R2 (S3-compatível, **sem taxa de egress**, 10GB grátis/mês),
+      a mídia persiste e independe de git/deploy.
+      **✅ Código:** `django-storages`+`boto3` no requirements; `STORAGES["default"]` vira R2
+      **só quando as 5 env vars existem** (`R2_BUCKET`, `R2_ACCESS_KEY_ID`,
+      `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT_URL`, `R2_PUBLIC_DOMAIN`) — sem elas cai no
+      filesystem (dev/fallback), nada quebra. Comando `manage.py migrar_media_r2` (idempotente)
+      sobe as fotos atuais. `.env.example` documentado.
+      **▶ Para ativar (você, ~10min):** criar bucket R2 → **ativar acesso público** (pega o
+      domínio `pub-xxxx.r2.dev` ou custom) → gerar **API Token** (Access Key/Secret) → pôr as 5
+      vars no Railway. **Eu:** rodo `railway ssh … migrar_media_r2`, valido as fotos, e então
+      **removo `media/` do git** (volta ao gitignore). **Bônus:** casa com backup 3-2-1 (NAS QNAP
+      puxa do R2 com `rclone`). Alternativa mais simples: **Railway Volume** (sem conta externa,
+      mas preso ao Railway, sem CDN/backup offsite) — R2 é melhor.
 
 ### Atividade contínua (não é "arquivo")
 
@@ -115,6 +119,46 @@ importante** para o Google não indexar o sistema interno.
       imagens/cache. Site rápido ranqueia e converte mais.
 - [ ] 🟡 **SEO keywords** — usar termos de alta intenção local nos títulos/textos:
       "pousada lago de itá", "pesca esportiva itá sc", "day use piscina", "pousada com píer".
+
+---
+
+## 🤖 IA/LLM para convencer o hóspede a reservar (persuadir com verdade)
+
+Uso de LLM (API da Claude) na jornada do site, na página do quarto e no pós-clique.
+Início sugerido: **#2 (descrições geradas)** + **#1 (concierge)**.
+
+> **Regra de ouro (Responsabilidade / CDC / LGPD):** persuadir ≠ enganar. Escassez,
+> urgência e prova social só aparecem se forem **reais** e verificáveis (ver "Selo de
+> escassez" acima — baseado em disponibilidade real). O LLM responde fatos **fundamentado
+> nos dados do CRM** (disponibilidade, tarifa, políticas) via tool-use/RAG, não geração
+> livre. Personalização exige base legal/consentimento. O LLM **não** fabrica selos tipo
+> "Última vaga!" / "Fulano reservou há X".
+
+- [ ] 🟡 **1. Concierge conversacional** (maior impacto) — chat na página do quarto que
+      responde na hora ("aceita pet?", "vista pro lago?", "estacionamento?"), **fundamentado
+      no CRM** (qualidades da UH, tarifa por temporada, disponibilidade, políticas) via
+      RAG/tool-use. Tira objeções e leva ao "Reservar". *Modelo: Claude Haiku + streaming.
+      Integra `reservas.services`.*
+- [ ] 🟢 **2. Copy persuasivo gerado** (storytelling da marca) — LLM escreve descrição e
+      títulos de cada quarto na voz "Vô Testa" (ofícios de outrora) a partir das
+      características reais. **Gera uma vez e salva** (`site.VitrineQuarto.descricao`), custo
+      mínimo. Resolve as descrições vazias/placeholder de hoje. *Modelo: Sonnet/Opus, batch.*
+- [ ] 🟡 **3. Personalização por contexto** — adapta o discurso a sinais **não sensíveis**
+      (datas/temporada, nº de hóspedes, origem, aparelho): "ideal para casais", "perfeito
+      com crianças". *Cuidado LGPD.*
+- [ ] 🟡 **4. Prova social verdadeira + resposta a objeções** — LLM **resume avaliações
+      reais** (NPS/depoimentos) por quarto e responde dúvidas (cancelamento, café, pet).
+      Só sobre dados reais. *Integra `apps/nps` + depoimentos.*
+- [ ] 🟡 **5. Recuperação de pré-reserva (nudge com LLM)** — reforça o item "Recuperação de
+      carrinho" acima: LLM escreve o lembrete pessoal ("seu Oficina do Relojoeiro está
+      guardado por mais X min"). *Integra `reservas.Reserva.expira_em`, `pendentes_de_sinal`.*
+- [ ] 🟡 **6. Assistente de decisão ("me ajuda a escolher")** — com 24 quartos há paralisia
+      de escolha; o LLM faz 2–3 perguntas e recomenda o quarto certo. *Integra a vitrine
+      (`_vitrines_publicadas`), qualidades e faixa de preço.*
+
+**Stack:** API da Claude — Haiku (chat/volume), Sonnet/Opus (geração rica). Sinergia com o
+**Caçador** (Comercial, análise de leads) e services de Reservas/NPS. Cachear copy gerada;
+streaming no chat; escolher o modelo por custo/latência.
 
 ---
 

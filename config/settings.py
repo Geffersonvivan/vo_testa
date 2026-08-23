@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.postgres",  # ExclusionConstraint (antioverbooking)
     "django.contrib.sitemaps",  # sitemap.xml do site público
+    "storages",  # object storage (Cloudflare R2) p/ a mídia — ativa só com credenciais
     # Módulos do sistema
     "apps.nucleo",
     "apps.reservas",
@@ -151,6 +152,38 @@ STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"},
 }
+
+# --- Mídia em object storage (Cloudflare R2) --------------------------------
+# Ativa SÓ quando as 5 variáveis estão no ambiente. Sem elas, usa o filesystem
+# local (dev e fallback) — nada quebra até você configurar o R2 no Railway.
+# O disco do Railway é efêmero: sem R2, fotos subidas pelo admin somem no deploy.
+R2_BUCKET = os.environ.get("R2_BUCKET", "")
+R2_ACCESS_KEY_ID = os.environ.get("R2_ACCESS_KEY_ID", "")
+R2_SECRET_ACCESS_KEY = os.environ.get("R2_SECRET_ACCESS_KEY", "")
+R2_ENDPOINT_URL = os.environ.get("R2_ENDPOINT_URL", "")   # https://<accountid>.r2.cloudflarestorage.com
+R2_PUBLIC_DOMAIN = os.environ.get("R2_PUBLIC_DOMAIN", "")  # pub-xxxx.r2.dev OU media.pousadavotesta.com.br
+
+USE_R2 = all([
+    R2_BUCKET, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT_URL, R2_PUBLIC_DOMAIN,
+])
+if USE_R2:
+    STORAGES["default"] = {
+        "BACKEND": "storages.backends.s3.S3Storage",
+        "OPTIONS": {
+            "bucket_name": R2_BUCKET,
+            "access_key": R2_ACCESS_KEY_ID,
+            "secret_key": R2_SECRET_ACCESS_KEY,
+            "endpoint_url": R2_ENDPOINT_URL,
+            "region_name": "auto",
+            "signature_version": "s3v4",
+            "location": "media",          # keys ficam sob media/…
+            "default_acl": None,          # R2 não usa ACL
+            "querystring_auth": False,    # URLs públicas (sem assinatura)
+            "file_overwrite": False,      # preserva versões (hash no nome)
+            "custom_domain": R2_PUBLIC_DOMAIN,  # serve por https://<domínio público>/media/…
+        },
+    }
+    MEDIA_URL = f"https://{R2_PUBLIC_DOMAIN}/media/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
