@@ -4,98 +4,182 @@
 {% block title %}{{ quarto.nome }} — Pousada Vô Testa{% endblock %}
 {% block meta_description %}{{ quarto.descricao_curta }} — {{ quarto.categoria.nome }} na Pousada Vô Testa, à beira do Lago de Itá. {{ quarto.capacidade }} hóspedes.{% endblock %}
 
+{% block extra_head %}
+<style>
+  .qd {
+    --noturno:#051C2C; --pergaminho:#EFDBB2; --lampiao:#D7A048;
+    --madeira:#4F2C1D; --musgo:#2E483E;
+    background:var(--noturno); color:var(--pergaminho);
+    min-height:100vh; padding:7rem 1.25rem 5rem;
+  }
+  .qd__wrap { max-width:1120px; margin:0 auto; }
+  .qd__back {
+    display:inline-flex; align-items:center; gap:.5rem;
+    color:rgba(239,219,178,.55); font-size:.85rem; text-decoration:none;
+    margin-bottom:1.75rem; transition:color .2s;
+  }
+  .qd__back:hover { color:var(--lampiao); }
+  .qd__back svg { width:1rem; height:1rem; }
+
+  /* Hero — proporção bounded, nunca gigante */
+  .qd__hero {
+    position:relative; width:100%; aspect-ratio:16/9; max-height:min(60vh,560px);
+    border-radius:24px; overflow:hidden;
+    background:linear-gradient(135deg, rgba(79,44,29,.35), rgba(79,44,29,.12));
+    border:1px solid rgba(215,160,72,.18);
+    box-shadow:0 24px 60px -24px rgba(0,0,0,.7);
+  }
+  .qd__hero img { width:100%; height:100%; object-fit:cover; display:block; }
+  .qd__hero-vazio {
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:rgba(239,219,178,.3); font-size:.9rem;
+  }
+
+  /* Corpo em duas colunas no desktop */
+  .qd__grid { display:grid; grid-template-columns:1fr; gap:2rem; margin-top:2rem; }
+  @media (min-width:880px) {
+    .qd__grid { grid-template-columns:1.6fr 1fr; gap:3rem; align-items:start; }
+  }
+
+  .qd__eyebrow {
+    color:rgba(215,160,72,.75); font-size:.72rem; letter-spacing:.18em;
+    text-transform:uppercase; margin-bottom:.5rem;
+  }
+  .qd__title {
+    font-family:'Neco', Georgia, serif; font-weight:900;
+    font-size:clamp(2rem,4.5vw,3.1rem); line-height:1.03; letter-spacing:-.02em;
+    color:var(--pergaminho); margin:0 0 .75rem;
+  }
+  .qd__meta { display:flex; flex-wrap:wrap; gap:.35rem .9rem; color:rgba(239,219,178,.55); font-size:.9rem; margin-bottom:1.25rem; }
+  .qd__meta .star { color:var(--lampiao); }
+
+  .qd__chips { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:1.75rem; }
+  .qd__chip {
+    font-size:.8rem; color:rgba(239,219,178,.75);
+    border:1px solid rgba(215,160,72,.28); border-radius:999px; padding:.32rem .85rem;
+  }
+  .qd__desc { color:rgba(239,219,178,.62); font-size:1rem; line-height:1.75; white-space:pre-line; }
+
+  .qd__tour { margin-top:2rem; }
+  .qd__tour-label { color:rgba(215,160,72,.7); font-size:.72rem; letter-spacing:.16em; text-transform:uppercase; margin-bottom:.6rem; }
+  .qd__tour-frame { aspect-ratio:16/9; border-radius:20px; overflow:hidden; border:1px solid rgba(215,160,72,.18); }
+  .qd__tour-frame iframe { width:100%; height:100%; border:0; display:block; }
+
+  /* Cartão de reserva — material translúcido, elevação */
+  .qd__book {
+    position:sticky; top:6.5rem;
+    background:rgba(239,219,178,.045);
+    border:1px solid rgba(215,160,72,.22); border-radius:22px;
+    padding:1.5rem; box-shadow:0 18px 44px -24px rgba(0,0,0,.65);
+    backdrop-filter:blur(8px);
+  }
+  .qd__price-cap { color:rgba(239,219,178,.45); font-size:.78rem; }
+  .qd__price { font-family:'Neco',Georgia,serif; font-weight:800; color:var(--lampiao); font-size:2.4rem; line-height:1.1; }
+  .qd__price small { color:rgba(239,219,178,.45); font-size:.9rem; font-weight:400; }
+  .qd__cta {
+    display:block; text-align:center; margin-top:1.1rem;
+    background:var(--lampiao); color:var(--noturno); font-weight:700; font-size:.95rem;
+    padding:.85rem 1rem; border-radius:999px; text-decoration:none; transition:transform .12s, filter .2s;
+  }
+  .qd__cta:hover { filter:brightness(1.05); }
+  .qd__cta:active { transform:scale(.985); }
+  .qd__book-note { color:rgba(239,219,178,.35); font-size:.75rem; margin-top:.8rem; text-align:center; }
+
+  /* Outros quartos */
+  .qd__mais { margin-top:4rem; }
+  .qd__mais h2 { font-family:'Neco',Georgia,serif; font-weight:800; color:var(--pergaminho); font-size:1.5rem; margin-bottom:1.25rem; }
+  .qd__mais-grid { display:grid; grid-template-columns:1fr; gap:1.25rem; }
+  @media (min-width:640px){ .qd__mais-grid { grid-template-columns:repeat(3,1fr); } }
+  .qd__card { display:block; text-decoration:none; border:1px solid rgba(215,160,72,.2); border-radius:18px; overflow:hidden; background:rgba(239,219,178,.03); transition:transform .3s, border-color .3s; }
+  .qd__card:hover { transform:translateY(-4px); border-color:rgba(215,160,72,.5); }
+  .qd__card-img { aspect-ratio:4/3; overflow:hidden; background:linear-gradient(135deg, rgba(79,44,29,.35), rgba(79,44,29,.12)); }
+  .qd__card-img img { width:100%; height:100%; object-fit:cover; display:block; }
+  .qd__card-body { padding:.9rem 1rem 1.1rem; }
+  .qd__card-eyebrow { color:rgba(215,160,72,.6); font-size:.68rem; letter-spacing:.14em; text-transform:uppercase; }
+  .qd__card-title { font-family:'Neco',Georgia,serif; font-weight:700; color:var(--pergaminho); font-size:1.05rem; margin:.15rem 0 .35rem; }
+  .qd__card-price { color:var(--lampiao); font-weight:700; font-size:.95rem; }
+  .qd__card-price small { color:rgba(239,219,178,.4); font-weight:400; font-size:.75rem; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .qd__card, .qd__cta { transition:none; }
+    .qd__card:hover, .qd__cta:active { transform:none; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<section class="bg-noturno min-h-screen pt-28 md:pt-32 pb-20">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6">
+<section class="qd">
+  <div class="qd__wrap">
+    <a href="{% url 'core:quartos_todos' %}" class="qd__back">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
+      Todos os quartos
+    </a>
 
-        <a href="{% url 'core:quartos_todos' %}" class="inline-flex items-center gap-2 text-pergaminho/50 hover:text-lampiao transition text-sm mb-6">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
-            Todos os quartos
-        </a>
+    <div class="qd__hero">
+      {% if quarto.foto_principal %}
+      <img src="{{ quarto.foto_principal.url }}" alt="{{ quarto.nome }}">
+      {% else %}
+      <span class="qd__hero-vazio">[ Foto do Quarto ]</span>
+      {% endif %}
+    </div>
 
-        <div class="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
-            <!-- Mídia -->
-            <div>
-                <div class="aspect-[4/3] rounded-2xl overflow-hidden bg-gradient-to-br from-madeira/30 to-madeira/10 flex items-center justify-center border border-lampiao/20">
-                    {% if quarto.foto_principal %}
-                    <img src="{{ quarto.foto_principal.url }}" alt="{{ quarto.nome }}" class="w-full h-full object-cover">
-                    {% else %}
-                    <p class="text-pergaminho/30 text-sm">[ Foto do Quarto ]</p>
-                    {% endif %}
-                </div>
-                {% if quarto.tour_360_url %}
-                <div class="mt-4">
-                    <p class="text-lampiao/70 text-xs uppercase tracking-wider mb-2">Tour 360°</p>
-                    <div class="aspect-video rounded-2xl overflow-hidden border border-lampiao/20">
-                        <iframe src="{{ quarto.tour_360_url }}" class="w-full h-full" frameborder="0" allowfullscreen loading="lazy"></iframe>
-                    </div>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Informações -->
-            <div>
-                <div class="flex items-center gap-3 mb-2">
-                    <span class="text-lampiao/60 text-xs uppercase tracking-wider">{{ quarto.categoria.nome }}</span>
-                    <span class="text-lampiao text-sm">★ {{ quarto.nota_avaliacao }}</span>
-                </div>
-                <h1 class="font-display text-3xl sm:text-4xl font-black text-pergaminho mb-3">{{ quarto.nome }}</h1>
-
-                <div class="flex flex-wrap gap-3 text-pergaminho/50 text-sm mb-5">
-                    <span>{{ quarto.capacidade }} hóspedes</span>
-                    {% if quarto.metragem %}<span>· {{ quarto.metragem }}m²</span>{% endif %}
-                </div>
-
-                {% if quarto.qualidades %}
-                <div class="flex flex-wrap gap-2 mb-6">
-                    {% for qual in quarto.qualidades %}
-                    <span class="text-pergaminho/60 text-sm border border-lampiao/25 px-3 py-1 rounded-full">{{ qual }}</span>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                {% if descricao %}
-                <p class="text-pergaminho/60 text-sm sm:text-base leading-relaxed mb-8 whitespace-pre-line">{{ descricao }}</p>
-                {% endif %}
-
-                <div class="bg-noturno border border-lampiao/20 rounded-2xl p-5 sm:p-6 flex items-end justify-between gap-4">
-                    <div>
-                        <span class="text-pergaminho/40 text-xs block">a partir de</span>
-                        <span class="text-lampiao font-body text-3xl font-bold">R$ {{ quarto.preco_base|floatformat:0 }}</span>
-                        <span class="text-pergaminho/40 text-sm">/noite</span>
-                    </div>
-                    <a href="{% url 'core:reservar' %}?uh={{ quarto.uh_id }}" class="bg-lampiao text-noturno font-bold px-8 py-3 rounded-full hover:bg-lampiao/90 transition text-sm whitespace-nowrap">
-                        Reservar
-                    </a>
-                </div>
-                <p class="text-pergaminho/30 text-xs mt-3">Preço e disponibilidade finais aparecem ao escolher as datas.</p>
-            </div>
+    <div class="qd__grid">
+      <div>
+        <p class="qd__eyebrow">{{ quarto.categoria.nome }}</p>
+        <h1 class="qd__title">{{ quarto.nome }}</h1>
+        <div class="qd__meta">
+          <span class="star">★ {{ quarto.nota_avaliacao }}</span>
+          <span>{{ quarto.capacidade }} hóspedes</span>
+          {% if quarto.metragem %}<span>{{ quarto.metragem }}m²</span>{% endif %}
         </div>
 
-        <!-- Outros quartos -->
-        {% if outros %}
-        <div class="mt-16">
-            <h2 class="font-display text-2xl font-bold text-pergaminho mb-6">Outros quartos</h2>
-            <div class="grid sm:grid-cols-3 gap-6">
-                {% for o in outros %}
-                <a href="{% url 'core:quarto_detalhe' o.uh_id %}" class="group block bg-noturno border border-lampiao/20 rounded-2xl overflow-hidden hover:border-lampiao/50 transition-all duration-500 hover:-translate-y-1">
-                    <div class="aspect-[4/3] bg-gradient-to-br from-madeira/30 to-madeira/10 flex items-center justify-center overflow-hidden">
-                        {% if o.foto_principal %}
-                        <img src="{{ o.foto_principal.url }}" alt="{{ o.nome }}" class="w-full h-full object-cover">
-                        {% else %}
-                        <p class="text-pergaminho/30 text-sm">[ Foto ]</p>
-                        {% endif %}
-                    </div>
-                    <div class="p-4">
-                        <span class="text-lampiao/60 text-xs uppercase tracking-wider">{{ o.categoria.nome }}</span>
-                        <h3 class="font-display text-lg font-bold text-pergaminho">{{ o.nome }}</h3>
-                        <span class="text-lampiao text-sm font-bold">R$ {{ o.preco_base|floatformat:0 }}<span class="text-pergaminho/40 text-xs font-normal"> /noite</span></span>
-                    </div>
-                </a>
-                {% endfor %}
-            </div>
+        {% if quarto.qualidades %}
+        <div class="qd__chips">
+          {% for qual in quarto.qualidades %}<span class="qd__chip">{{ qual }}</span>{% endfor %}
         </div>
         {% endif %}
+
+        {% if descricao %}<p class="qd__desc">{{ descricao }}</p>{% endif %}
+
+        {% if quarto.tour_360_url %}
+        <div class="qd__tour">
+          <p class="qd__tour-label">Tour 360°</p>
+          <div class="qd__tour-frame">
+            <iframe src="{{ quarto.tour_360_url }}" allowfullscreen loading="lazy"></iframe>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <aside>
+        <div class="qd__book">
+          <span class="qd__price-cap">a partir de</span>
+          <div class="qd__price">R$ {{ quarto.preco_base|floatformat:0 }} <small>/noite</small></div>
+          <a href="{% url 'core:reservar' %}?uh={{ quarto.uh_id }}" class="qd__cta">Reservar</a>
+          <p class="qd__book-note">Preço e disponibilidade finais ao escolher as datas.</p>
+        </div>
+      </aside>
     </div>
+
+    {% if outros %}
+    <div class="qd__mais">
+      <h2>Outros quartos</h2>
+      <div class="qd__mais-grid">
+        {% for o in outros %}
+        <a href="{% url 'core:quarto_detalhe' o.uh_id %}" class="qd__card">
+          <div class="qd__card-img">
+            {% if o.foto_principal %}<img src="{{ o.foto_principal.url }}" alt="{{ o.nome }}">{% endif %}
+          </div>
+          <div class="qd__card-body">
+            <p class="qd__card-eyebrow">{{ o.categoria.nome }}</p>
+            <h3 class="qd__card-title">{{ o.nome }}</h3>
+            <span class="qd__card-price">R$ {{ o.preco_base|floatformat:0 }} <small>/noite</small></span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
 </section>
 {% endblock %}
