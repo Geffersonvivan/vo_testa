@@ -21,6 +21,12 @@
             Dia na Pousada
         </a>
     </div>
+    {% if quarto_escolhido %}
+    <p class="mt-5 inline-flex items-center gap-2 bg-lampiao/10 text-madeira text-sm px-4 py-2 rounded-full border border-lampiao/30">
+        <svg class="w-4 h-4 text-lampiao" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-8 8a1 1 0 01-1.4 0l-4-4a1 1 0 011.4-1.4L8 12.6l7.3-7.3a1 1 0 011.4 0z" clip-rule="evenodd"/></svg>
+        Reservando: <strong class="font-semibold">{{ quarto_escolhido }}</strong> — escolha as datas.
+    </p>
+    {% endif %}
 </div>
 
 <form method="get" action="{% url 'core:reservar' %}" id="form-datas" class="grid md:grid-cols-2 gap-6">
@@ -28,6 +34,7 @@
     <input type="hidden" name="checkout" id="f-checkout">
     <input type="hidden" name="hospedes" id="f-hospedes" value="2">
     <input type="hidden" name="modalidade" id="f-modalidade" value="{{ modalidade }}">
+    {% if uh_id %}<input type="hidden" name="uh" value="{{ uh_id }}">{% endif %}
 
     <div class="bg-white rounded-2xl p-5 shadow-sm border border-madeira/5">
         <div id="calendario-inline" data-info-url="{% url 'core:info_datas' %}" data-day-use="{% if eh_day_use %}1{% else %}0{% endif %}"></div>

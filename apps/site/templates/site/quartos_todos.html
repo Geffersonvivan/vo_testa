@@ -38,7 +38,7 @@
                         <span class="text-lampiao/60 text-xs uppercase tracking-wider">{{ quarto.categoria.nome }}</span>
                         <span class="text-lampiao text-xs">★ {{ quarto.nota_avaliacao }}</span>
                     </div>
-                    <a href="{% url 'core:reservar' %}" class="block"><h3 class="font-display text-xl font-bold text-pergaminho mb-2 hover:text-lampiao transition">{{ quarto.nome }}</h3></a>
+                    <a href="{% url 'core:reservar' %}?uh={{ quarto.uh_id }}" class="block"><h3 class="font-display text-xl font-bold text-pergaminho mb-2 hover:text-lampiao transition">{{ quarto.nome }}</h3></a>
                     <p class="text-pergaminho/50 text-sm mb-3">{{ quarto.descricao_curta }}</p>
                     {% if quarto.qualidades %}
                     <div class="flex flex-wrap gap-1.5 mb-4">
@@ -53,7 +53,7 @@
                             <span class="text-lampiao font-body text-2xl font-bold">R$ {{ quarto.preco_base|floatformat:0 }}</span>
                             <span class="text-pergaminho/40 text-xs"> /noite</span>
                         </div>
-                        <a href="{% url 'core:reservar' %}" class="bg-lampiao/10 text-lampiao text-sm px-4 py-2 rounded-lg border border-lampiao/30 hover:bg-lampiao hover:text-noturno transition">
+                        <a href="{% url 'core:reservar' %}?uh={{ quarto.uh_id }}" class="bg-lampiao/10 text-lampiao text-sm px-4 py-2 rounded-lg border border-lampiao/30 hover:bg-lampiao hover:text-noturno transition">
                             Reservar
                         </a>
                     </div>

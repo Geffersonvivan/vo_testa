@@ -155,6 +155,19 @@ class FluxoReservaViewTests(TestCase):
         self.assertContains(resp, 'Vista para o lago')
         self.assertContains(resp, reverse('core:selecionar_unidade', args=[self.uh.pk]))
 
+    def test_deeplink_com_datas_vai_direto_ao_quarto(self):
+        resp = self.client.get(reverse('core:reservar'), {
+            'uh': self.uh.id, 'checkin': self.ci, 'checkout': self.co, 'hospedes': 2,
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn(reverse('core:selecionar_unidade', args=[self.uh.id]), resp['Location'])
+
+    def test_deeplink_sem_datas_carrega_o_quarto_escolhido(self):
+        resp = self.client.get(reverse('core:reservar'), {'uh': self.uh.id})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Cabine do Lago')          # nome temático do quarto
+        self.assertContains(resp, 'name="uh" value="%d"' % self.uh.id)  # carregado no form
+
     def test_finalizar_por_unidade_reserva_o_quarto_exato(self):
         from apps.reservas.models import Reserva as CrmReserva
         resp = self.client.post(reverse('core:finalizar_reserva'), {

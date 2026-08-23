@@ -376,6 +376,17 @@ def _modalidade_do_quarto(quarto):
 def reservar(request):
     """Passo 1 (datas) e Passo 2 (quartos / Dia na Pousada disponíveis)."""
     modalidade = request.GET.get('modalidade', '') or ''
+    # Quarto pré-escolhido no card (deep-link): carrega até as datas e então pula
+    # direto para aquele quarto, se estiver livre.
+    uh_id = request.GET.get('uh', '') or ''
+    quarto_escolhido = ''
+    if uh_id:
+        from apps.nucleo.models import UH
+        _u = UH.objects.filter(pk=uh_id).first()
+        if _u:
+            quarto_escolhido = _u.nome_tematico or f'Quarto {_u.numero}'
+        else:
+            uh_id = ''
     tem_busca = bool(request.GET.get('checkin'))
     if tem_busca:
         form = BuscaDisponibilidadeForm(request.GET)
@@ -392,6 +403,23 @@ def reservar(request):
         checkout = form.cleaned_data['checkout']
         hospedes = form.cleaned_data['hospedes']
         modalidade = form.cleaned_data.get('modalidade') or ''
+        # Deep-link de quarto: com datas válidas, vai direto ao quarto escolhido.
+        if uh_id and modalidade != 'day_use':
+            from apps.nucleo.models import UH
+            from apps.reservas import services as reservas
+            uh = UH.objects.filter(pk=uh_id, status=UH.Status.ATIVA).first()
+            if uh and reservas.uh_disponivel(uh, checkin, checkout):
+                destino = reverse('core:selecionar_unidade', args=[uh.pk])
+                return redirect(
+                    f"{destino}?checkin={checkin:%Y-%m-%d}"
+                    f"&checkout={checkout:%Y-%m-%d}&hospedes={hospedes}"
+                )
+            if uh:
+                messages.info(
+                    request,
+                    f'{uh.nome_tematico or "O quarto escolhido"} não está livre nessas '
+                    'datas — veja as opções disponíveis abaixo.'
+                )
         if modalidade == 'day_use':
             resultados = _buscar_quartos(checkin, checkout, hospedes, modalidade)
         else:
@@ -408,7 +436,8 @@ def reservar(request):
     context = {
         'form': form, 'resultados': resultados, 'busca': busca,
         'passo': passo, 'num_disponiveis': num_disponiveis,
-        'modalidade': modalidade,
+        'modalidade': modalidade, 'uh_id': uh_id,
+        'quarto_escolhido': quarto_escolhido,
         'eh_day_use': modalidade == 'day_use',
     }
     if passo == 2:
