@@ -2689,10 +2689,10 @@ form.filtros:not(.subnav) select:focus {
 .func-grid .v { font-size: .92rem; font-weight: 600; }
 .func-grid .v .selo { margin: 2px 4px 0 0; }
 .func-login { font-size: .9rem; margin: 0 0 10px; }
-.func-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
-.func-card { background: var(--superficie); border: 1px solid var(--fio); border-radius: 11px; padding: 11px 13px; }
-.func-card .v { font-family: var(--fonte-serifada, Georgia), serif; font-size: 1.5rem; font-weight: 700; margin-top: 2px; }
-.func-card .n { font-size: .72rem; color: var(--tinta-suave); }
+.func-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
+.func-card { background: var(--superficie); border: 1px solid var(--fio); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; }
+.func-card .v { display: block; font-family: var(--fonte-serifada, Georgia), serif; font-size: 1.55rem; font-weight: 700; line-height: 1.05; letter-spacing: -.01em; margin: 6px 0 5px; }
+.func-card .n { display: block; font-size: .72rem; color: var(--tinta-suave); line-height: 1.35; }
 .func-duas { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .func-bloco { background: var(--superficie); border: 1px solid var(--fio); border-radius: 11px; padding: 13px 15px; }
 .func-bloco h4 { margin: 0 0 10px; font-size: .68rem; color: var(--tinta-suave); }
@@ -2714,3 +2714,8 @@ form.filtros:not(.subnav) select:focus {
 .func-checks { display: flex; gap: 18px; flex-wrap: wrap; margin: 4px 0 8px; }
 .func-salvo { background: var(--sucesso-bg); color: var(--musgo); border: 1px solid rgba(46,125,91,.28); border-radius: 8px; padding: 6px 12px; font-size: .85rem; font-weight: 600; margin-bottom: 12px; display: inline-block; }
 @media (max-width: 900px) { .func-painel.ficha-func .grid2 { grid-template-columns: 1fr 1fr; } }
+
+/* Histórico Fase 2 — produtividade */
+.func-prod { display: flex; flex-wrap: wrap; gap: 10px; }
+.prod-item { background: var(--musgo-bg); color: var(--musgo); border: 1px solid rgba(46,125,91,.28); border-radius: 999px; padding: 5px 12px; font-size: .84rem; }
+.prod-item b { font-weight: 800; }

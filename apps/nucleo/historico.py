@@ -103,11 +103,61 @@ def presenca(func):
     return {"dias_com_acesso": len(dias)}
 
 
+def _escala_resumo(func, inicio, fim):
+    """Resumo da Escala (dias/horas/ausências/trocas) — só se o módulo estiver ativo."""
+    from apps.nucleo.models import modulo_ativo
+    from apps.nucleo.modulos import Modulo
+    if not modulo_ativo(Modulo.ESCALA):
+        return None
+    from apps.escala.services import resumo_funcionario
+    return resumo_funcionario(func, inicio, fim)
+
+
+def produtividade(func, inicio, fim):
+    """Contagem por papel (faxinas/vendas/comandas), via o usuário do funcionário.
+    Cada módulo só entra se estiver ativo (degradação graciosa)."""
+    if not func.usuario_id:
+        return []
+    from apps.nucleo.models import modulo_ativo
+    from apps.nucleo.modulos import Modulo
+    uid, rng, itens = func.usuario_id, (inicio, fim), []
+    if modulo_ativo(Modulo.GOVERNANCA):
+        from apps.governanca.models import TarefaGovernanca
+        n = TarefaGovernanca.objects.filter(
+            camareira_id=uid, status="concluida", concluida_em__date__range=rng
+        ).count()
+        if n:
+            itens.append({"rotulo": "Faxinas concluídas", "n": n})
+    if modulo_ativo(Modulo.LOJA):
+        from apps.loja.models import Venda
+        n = Venda.objects.filter(
+            criado_por_id=uid, status="fechada", criado_em__date__range=rng
+        ).count()
+        if n:
+            itens.append({"rotulo": "Vendas na Loja", "n": n})
+    if modulo_ativo(Modulo.RESTAURANTE):
+        from apps.restaurante.models import Comanda
+        n = Comanda.objects.filter(
+            criado_por_id=uid, status="fechada", fechada_em__date__range=rng
+        ).count()
+        if n:
+            itens.append({"rotulo": "Comandas", "n": n})
+    return itens
+
+
 def historico_funcionario(func):
+    """Fase 1 (trilha/cálculo) + Fase 2 (Escala + produtividade). Período dos
+    indicadores mensais = mês corrente."""
+    from django.utils import timezone
+    hoje = timezone.localdate()
+    inicio_mes = hoje.replace(day=1)
     return {
         "admissao": func.admissao,
         "tempo_de_casa": tempo_de_casa(func.admissao),
         "progressao": progressao_salarial(func),
         "movimentacoes": movimentacoes(func),
         "presenca": presenca(func),
+        "periodo_rotulo": f"{inicio_mes:%d/%m} a {hoje:%d/%m}",
+        "escala": _escala_resumo(func, inicio_mes, hoje),
+        "produtividade": produtividade(func, inicio_mes, hoje),
     }

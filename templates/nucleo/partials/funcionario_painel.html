@@ -70,10 +70,26 @@
   <div x-show="aba==='historico'" x-cloak class="func-conteudo">
     <div class="func-cards">
       <div class="func-card"><span class="k">⏱ Tempo de casa</span><span class="v">{{ historico.tempo_de_casa|default:"—" }}</span><span class="n">desde {{ historico.admissao|date:"d/m/Y"|default:"—" }}</span></div>
-      <div class="func-card"><span class="k">📅 Dias com acesso</span><span class="v">{% if historico.presenca %}{{ historico.presenca.dias_com_acesso }}{% else %}—{% endif %}</span><span class="n">últimos 30 dias</span></div>
-      <div class="func-card"><span class="k">💰 Reajustes</span><span class="v">{{ historico.progressao|length }}</span><span class="n">registros de salário</span></div>
-      <div class="func-card"><span class="k">🔁 Movimentações</span><span class="v">{{ historico.movimentacoes|length }}</span><span class="n">marcos registrados</span></div>
+      {% if historico.escala %}
+        <div class="func-card"><span class="k">📅 Dias trabalhados</span><span class="v">{{ historico.escala.dias_trabalhados }}</span><span class="n">{{ historico.periodo_rotulo }}</span></div>
+        <div class="func-card"><span class="k">⏳ Horas</span><span class="v">{{ historico.escala.horas_trabalhadas }}h</span><span class="n">escaladas no mês</span></div>
+        <div class="func-card"><span class="k">🏖 Ausências</span><span class="v">{{ historico.escala.dias_ausente }}</span><span class="n">{{ historico.escala.trocas }} troca{{ historico.escala.trocas|pluralize }} de turno</span></div>
+      {% else %}
+        <div class="func-card"><span class="k">📅 Dias com acesso</span><span class="v">{% if historico.presenca %}{{ historico.presenca.dias_com_acesso }}{% else %}—{% endif %}</span><span class="n">últimos 30 dias</span></div>
+        <div class="func-card"><span class="k">💰 Reajustes</span><span class="v">{{ historico.progressao|length }}</span><span class="n">registros de salário</span></div>
+        <div class="func-card"><span class="k">🔁 Movimentações</span><span class="v">{{ historico.movimentacoes|length }}</span><span class="n">marcos registrados</span></div>
+      {% endif %}
     </div>
+
+    {% if historico.produtividade %}
+    <div class="func-bloco" style="margin-bottom:14px">
+      <h4 class="letreiro">Produtividade no mês</h4>
+      <div class="func-prod">
+        {% for p in historico.produtividade %}<span class="prod-item"><b>{{ p.n }}</b> {{ p.rotulo }}</span>{% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <div class="func-duas">
       <div class="func-bloco">
         <h4 class="letreiro">Progressão salarial</h4>
@@ -86,11 +102,13 @@
       <div class="func-bloco">
         <h4 class="letreiro">Movimentações &amp; marcos</h4>
         <ul class="func-tl">
-          {% for m in historico.movimentacoes %}<li><b>{{ m.data|date:"d/m/y" }}</b> {{ m.texto }}</li>{% empty %}<li class="ajuda">Nada registrado ainda.</li>{% endfor %}
+          {% for a in historico.escala.ausencias %}<li><b>{{ a.inicio|date:"d/m/y" }}</b> {{ a.tipo }} ({{ a.dias }} dia{{ a.dias|pluralize }})</li>{% endfor %}
+          {% for m in historico.movimentacoes %}<li><b>{{ m.data|date:"d/m/y" }}</b> {{ m.texto }}</li>{% endfor %}
+          {% if not historico.movimentacoes and not historico.escala.ausencias %}<li class="ajuda">Nada registrado ainda.</li>{% endif %}
         </ul>
       </div>
     </div>
-    <p class="ajuda">Dias/horas trabalhados, ausências e produtividade por papel entram na Fase 2 (via Escala e módulos).</p>
+    {% if not historico.escala %}<p class="ajuda">Ative o módulo <strong>Escala</strong> para ver dias/horas trabalhados e ausências.</p>{% endif %}
   </div>
   {% endif %}
 </form>

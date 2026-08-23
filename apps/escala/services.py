@@ -20,6 +20,52 @@ def ausencia_no_dia(funcionario, data):
     return funcionario.ausencias.filter(inicio__lte=data, fim__gte=data).first()
 
 
+def resumo_funcionario(funcionario, inicio, fim):
+    """Dias/horas trabalhados, ausências e trocas do funcionário no período.
+    Interface pública — o Histórico do funcionário (núcleo) consome daqui."""
+    from datetime import datetime
+
+    from django.db.models import Q
+
+    atribs = (
+        Atribuicao.objects
+        .filter(funcionario=funcionario, data__range=(inicio, fim))
+        .select_related("turno")
+    )
+    horas = 0.0
+    for a in atribs:
+        seg = (
+            datetime.combine(inicio, a.turno.fim)
+            - datetime.combine(inicio, a.turno.inicio)
+        ).total_seconds()
+        if seg <= 0:  # turno que vira a meia-noite
+            seg += 86400
+        horas += seg / 3600
+
+    ausencias = []
+    for au in Ausencia.objects.filter(
+        funcionario=funcionario, inicio__lte=fim, fim__gte=inicio
+    ).order_by("inicio"):
+        di, df = max(au.inicio, inicio), min(au.fim, fim)
+        ausencias.append({
+            "tipo": au.get_tipo_display(), "dias": (df - di).days + 1,
+            "inicio": au.inicio, "fim": au.fim,
+        })
+
+    trocas = TrocaTurno.objects.filter(
+        Q(solicitante=funcionario) | Q(substituto=funcionario),
+        criado_em__date__range=(inicio, fim),
+    ).count()
+
+    return {
+        "dias_trabalhados": atribs.count(),
+        "horas_trabalhadas": round(horas, 1),
+        "ausencias": ausencias,
+        "dias_ausente": sum(a["dias"] for a in ausencias),
+        "trocas": trocas,
+    }
+
+
 def atribuir(turno, funcionario, data, operador):
     if ausencia_no_dia(funcionario, data):
         raise ValidationError(

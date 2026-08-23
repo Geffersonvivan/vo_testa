@@ -95,3 +95,18 @@ class PermissaoTests(EscalaBase):
         Usuario.objects.create_user(username="x", password="senha-forte-123")
         self.client.login(username="x", password="senha-forte-123")
         self.assertEqual(self.client.get(reverse("escala:grade")).status_code, 403)
+
+
+class ResumoFuncionarioTests(EscalaBase):
+    """resumo_funcionario: dias/horas trabalhados + ausências (usado no Histórico)."""
+
+    def test_dias_horas_e_ausencias(self):
+        services.atribuir(self.turno, self.f1, self.hoje, self.op)
+        services.atribuir(self.turno, self.f1, self.hoje - timedelta(days=1), self.op)
+        services.registrar_ausencia(
+            self.f1, "folga", self.hoje - timedelta(days=3), self.hoje - timedelta(days=2), self.op
+        )
+        r = services.resumo_funcionario(self.f1, self.hoje - timedelta(days=30), self.hoje)
+        self.assertEqual(r["dias_trabalhados"], 2)
+        self.assertEqual(r["horas_trabalhadas"], 16.0)  # turno 07–15h = 8h × 2 dias
+        self.assertEqual(r["dias_ausente"], 2)

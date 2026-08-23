@@ -969,3 +969,20 @@ class HistoricoFuncionarioTests(TestCase):
         dono2.refresh_from_db()
         self.assertTrue(dono2.is_active)   # superusuário não é desativado pela ficha
         self.assertTrue(dono2.is_superuser)
+
+    def test_produtividade_conta_faxinas(self):
+        from django.utils import timezone
+        from apps.governanca.models import TarefaGovernanca
+        from apps.nucleo.historico import produtividade
+        from apps.nucleo.models import UH, TipoUH
+        u = Usuario.objects.create_user(username="cam", password="x")
+        self.f.usuario = u
+        self.f.save()
+        tipo = TipoUH.objects.create(nome="T", tarifa_base=Decimal("100"))
+        uh = UH.objects.create(numero="Q1", tipo=tipo)
+        TarefaGovernanca.objects.create(
+            uh=uh, camareira=u, status="concluida", concluida_em=timezone.now()
+        )
+        hoje = timezone.localdate()
+        prod = produtividade(self.f, hoje.replace(day=1), hoje)
+        self.assertTrue(any("Faxina" in p["rotulo"] for p in prod))
