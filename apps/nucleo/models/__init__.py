@@ -49,7 +49,7 @@ from .financeiro import (
     receber_no_caixa,
     registrar_auditoria,
 )
-from .logbook import EntradaLogbook
+from .logbook import ComentarioLogbook, EntradaLogbook
 from .usuarios import ModuloContratado, Usuario, modulo_ativo, modulos_ativos
 
 __all__ = [
@@ -73,6 +73,7 @@ __all__ = [
     "transferir",
     "ContaPagarReceber",
     "EntradaLogbook",
+    "ComentarioLogbook",
     "FormaPagamento",
     "Fornecedor",
     "Funcionario",

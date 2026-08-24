@@ -45,4 +45,6 @@ urlpatterns = [
     path("financeiro/contas/<int:pk>/baixar/", views.conta_baixar, name="conta_baixar"),
     # Logbook
     path("logbook/", views.logbook, name="logbook"),
+    path("logbook/<int:pk>/responder/", views.logbook_comentar, name="logbook_comentar"),
+    path("logbook/<int:pk>/resolver/", views.logbook_resolver, name="logbook_resolver"),
 ]

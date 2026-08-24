@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Recados do turno (novo)</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --canvas:#EEF2F3; --superficie:#FAFCFC; --lampiao:#E2A84A; --lampiao-claro:#F0C97A;
+    --noturno:#04151F; --tinta:#0E1C24; --tinta-suave:#5A6B75;
+    --info:#2A6B78; --info-bg:#E7F0F2; --perigo:#B13A2A; --perigo-bg:#FBF3F1;
+    --sucesso:#2A7A58; --sucesso-bg:#E6F2EC; --aviso:#B8791F; --aviso-bg:#FBF2E1;
+    --raio:12px; --raio-g:18px; --raio-p:8px;
+    --sombra-1:0 1px 2px rgba(4,21,31,.04); --sombra-2:0 4px 14px rgba(4,21,31,.07);
+    --borda:#E2E8EA;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--canvas);color:var(--tinta);padding:32px;line-height:1.5}
+  .wrap{max-width:820px;margin:0 auto}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--info)}
+  h1{font-family:'Playfair Display',serif;font-size:34px;font-weight:800;margin:4px 0 4px}
+  .sub{color:var(--tinta-suave);font-size:15px;margin-bottom:22px}
+
+  .card{background:var(--superficie);border:1px solid var(--borda);border-radius:var(--raio-g);box-shadow:var(--sombra-1)}
+  .compose{padding:20px 22px;margin-bottom:26px}
+  .lbl{font-size:13px;font-weight:600;color:var(--tinta);margin-bottom:6px;display:block}
+  textarea,input[type=text]{width:100%;border:1px solid var(--borda);border-radius:var(--raio);padding:11px 13px;font:inherit;color:var(--tinta);background:#fff;resize:vertical}
+  textarea::placeholder,input::placeholder{color:#9AA7AD}
+  .row{display:flex;align-items:center;gap:9px;margin:14px 0 4px}
+  .row .hint{font-size:12px;color:var(--tinta-suave)}
+  .btn{background:linear-gradient(180deg,var(--lampiao-claro),var(--lampiao));color:#3a2a08;font-weight:700;border:none;border-radius:var(--raio);padding:11px 20px;font-size:14px;cursor:pointer;box-shadow:0 6px 18px rgba(215,160,72,.28)}
+  .btn-ghost{background:#fff;border:1px solid var(--borda);color:var(--tinta);font-weight:600;border-radius:var(--raio-p);padding:7px 14px;font-size:13px;cursor:pointer}
+  .btn-ok{background:var(--sucesso-bg);border:1px solid #Bfe0cf;color:var(--sucesso);font-weight:700;border-radius:var(--raio-p);padding:7px 14px;font-size:13px;cursor:pointer}
+
+  /* filtros */
+  .tabs{display:flex;gap:6px;margin:0 0 16px}
+  .tab{padding:7px 15px;border-radius:999px;font-size:13px;font-weight:600;color:var(--tinta-suave);cursor:pointer;border:1px solid transparent}
+  .tab.on{background:var(--noturno);color:#fff}
+  .tab .n{opacity:.6;margin-left:4px;font-weight:500}
+
+  .seclabel{font-family:'Playfair Display',serif;font-size:20px;font-weight:700;margin:24px 0 12px;display:flex;align-items:center;gap:10px}
+  .seclabel .count{font-family:'Inter';font-size:12px;font-weight:700;color:var(--aviso);background:var(--aviso-bg);padding:2px 9px;border-radius:999px}
+
+  /* ocorrência (thread) */
+  .occ{padding:0;margin-bottom:16px;overflow:hidden}
+  .occ.aberta{border-left:3px solid var(--aviso)}
+  .occ.andamento{border-left:3px solid var(--info)}
+  .occ.resolvida{opacity:.72}
+  .occ.resolvida .occ-head{background:var(--sucesso-bg)}
+  .occ-head{display:flex;align-items:flex-start;gap:12px;padding:16px 20px}
+  .avatar{width:34px;height:34px;border-radius:50%;background:var(--noturno);color:var(--lampiao-claro);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+  .occ-main{flex:1;min-width:0}
+  .meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:13px}
+  .meta .who{font-weight:700}
+  .meta .when{color:var(--tinta-suave)}
+  .badge{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:999px}
+  .b-aberta{background:var(--aviso-bg);color:var(--aviso)}
+  .b-andamento{background:var(--info-bg);color:var(--info)}
+  .b-resolvida{background:var(--sucesso-bg);color:var(--sucesso)}
+  .b-imp{background:var(--perigo-bg);color:var(--perigo)}
+  .occ-text{margin-top:5px;font-size:15px;color:var(--tinta)}
+  .occ-actions{display:flex;gap:8px;margin-left:auto;flex-shrink:0}
+
+  /* respostas */
+  .thread{padding:2px 20px 6px 66px}
+  .reply{display:flex;gap:10px;padding:9px 0;border-top:1px dashed var(--borda)}
+  .reply .av{width:26px;height:26px;font-size:11px;border-radius:50%;background:#DCE4E6;color:var(--tinta);display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0}
+  .reply .rmeta{font-size:12.5px}
+  .reply .rmeta b{font-weight:700}
+  .reply .rmeta .when{color:var(--tinta-suave);margin-left:6px}
+  .reply .rtext{font-size:14px;margin-top:1px}
+  .replybox{display:flex;gap:8px;align-items:center;padding:10px 20px 16px 66px}
+  .replybox input{flex:1;padding:8px 12px;font-size:13.5px}
+  .resolved-by{padding:8px 20px 14px 66px;font-size:12.5px;color:var(--sucesso);display:flex;align-items:center;gap:6px}
+
+  .note{margin-top:26px;font-size:13.5px;color:var(--tinta-suave);background:var(--info-bg);border:1px solid #cfe0e4;border-radius:var(--raio);padding:14px 18px;line-height:1.6}
+  .note b{color:var(--info)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Operação</div>
+  <h1>Recados do turno</h1>
+  <p class="sub">Ocorrências compartilhadas entre turnos — converse no tópico e feche quando resolver.</p>
+
+  <!-- COMPOR -->
+  <div class="card compose">
+    <label class="lbl">Nova ocorrência</label>
+    <textarea rows="2" placeholder="O que o próximo turno precisa saber?"></textarea>
+    <div class="row">
+      <input type="checkbox" style="width:auto"> <span class="lbl" style="margin:0">Marcar como importante</span>
+      <span class="hint">— destaca e envia pro bloco “Precisa de atenção” do painel.</span>
+    </div>
+    <div style="margin-top:12px"><button class="btn">Registrar ocorrência</button></div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="tabs">
+    <span class="tab on">Abertas <span class="n">3</span></span>
+    <span class="tab">Todas <span class="n">18</span></span>
+    <span class="tab">Importantes <span class="n">1</span></span>
+  </div>
+
+  <div class="seclabel">Pendências abertas <span class="count">carregam pro próximo turno</span></div>
+
+  <!-- OCORRÊNCIA IMPORTANTE + THREAD (o "chat") -->
+  <div class="card occ andamento">
+    <div class="occ-head">
+      <div class="avatar">GV</div>
+      <div class="occ-main">
+        <div class="meta">
+          <span class="who">gvivan</span><span class="when">06/07 21:25</span>
+          <span class="badge b-andamento">Em andamento</span>
+          <span class="badge b-imp">Importante</span>
+        </div>
+        <div class="occ-text">Vazamento embaixo da pia do quarto 12 — fechei o registro, precisa de encanador.</div>
+      </div>
+      <div class="occ-actions"><button class="btn-ghost">Responder</button><button class="btn-ok">✓ Resolver</button></div>
+    </div>
+    <div class="thread">
+      <div class="reply"><div class="av">PV</div><div><div class="rmeta"><b>Peterson Vivan</b><span class="when">22/08 09:10</span></div><div class="rtext">Abri OS na Manutenção, prestador vem amanhã cedo. Deixei balde embaixo.</div></div></div>
+      <div class="reply"><div class="av">MJ</div><div><div class="rmeta"><b>Maria (noite)</b><span class="when">22/08 22:40</span></div><div class="rtext">Sem novo vazamento no meu turno. Continua pendente até o encanador vir.</div></div></div>
+    </div>
+    <div class="replybox"><input type="text" placeholder="Responder neste tópico…"><button class="btn-ghost">Enviar</button></div>
+  </div>
+
+  <!-- OCORRÊNCIA ABERTA simples -->
+  <div class="card occ aberta">
+    <div class="occ-head">
+      <div class="avatar">GV</div>
+      <div class="occ-main">
+        <div class="meta"><span class="who">gvivan</span><span class="when">04/07 19:47</span><span class="badge b-aberta">Aberta</span></div>
+        <div class="occ-text">Hóspede do 09 pediu late check-out para as 14h.</div>
+      </div>
+      <div class="occ-actions"><button class="btn-ghost">Responder</button><button class="btn-ok">✓ Resolver</button></div>
+    </div>
+    <div class="replybox"><input type="text" placeholder="Responder neste tópico…"><button class="btn-ghost">Enviar</button></div>
+  </div>
+
+  <!-- OCORRÊNCIA ABERTA simples 2 -->
+  <div class="card occ aberta">
+    <div class="occ-head">
+      <div class="avatar">GV</div>
+      <div class="occ-main">
+        <div class="meta"><span class="who">gvivan</span><span class="when">04/07 19:47</span><span class="badge b-aberta">Aberta</span></div>
+        <div class="occ-text">Chegou entrega de bebidas; conferir com a NF antes de guardar.</div>
+      </div>
+      <div class="occ-actions"><button class="btn-ghost">Responder</button><button class="btn-ok">✓ Resolver</button></div>
+    </div>
+  </div>
+
+  <div class="seclabel" style="font-size:17px;color:var(--tinta-suave)">Resolvidas recentes</div>
+
+  <!-- RESOLVIDA -->
+  <div class="card occ resolvida">
+    <div class="occ-head">
+      <div class="avatar" style="background:#DCE4E6;color:var(--tinta)">PV</div>
+      <div class="occ-main">
+        <div class="meta"><span class="who">Peterson Vivan</span><span class="when">22/08 16:42</span><span class="badge b-resolvida">Resolvida</span></div>
+        <div class="occ-text">Ar-condicionado do 15 fazendo barulho — recepção trocou o filtro.</div>
+      </div>
+    </div>
+    <div class="resolved-by">✓ Fechada por Maria (noite) em 22/08 23:05 — “Testado, sem ruído.”</div>
+  </div>
+
+  <div class="note">
+    <b>Por que assim e não um chat puro:</b> cada recado é um <b>tópico com conversa própria</b> (responder = debater sem criar recado novo) e um <b>ciclo de vida</b> (Aberta → Em andamento → Resolvida, com quem/quando fechou registrado na auditoria). As <b>abertas ficam fixadas no topo e carregam pro próximo turno</b> — nada some sem alguém fechar. As <b>importantes/abertas</b> alimentam o bloco “Precisa de atenção” do painel. Sem tempo-real/WebSocket: responder e resolver são inline via HTMX (recarrega só o cartão).
+  </div>
+</div>
+</body>
+</html>

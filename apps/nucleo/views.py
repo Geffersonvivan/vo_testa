@@ -200,7 +200,11 @@ def dashboard(request):
         indicadores["logbook_hoje"] = EntradaLogbook.objects.filter(
             criado_em__date=hoje
         ).count()
-        recados_turno = list(EntradaLogbook.objects.select_related("autor")[:6])
+        recados_turno = list(
+            EntradaLogbook.objects.select_related("autor")
+            .exclude(status=EntradaLogbook.RESOLVIDA)
+            .order_by("-importante", "-criado_em")[:6]
+        )
 
     return render(
         request,
@@ -971,24 +975,84 @@ def conta_baixar(request, pk):
 
 # ---------- Logbook ----------
 
+from . import logbook_services  # noqa: E402
+
+
+def _contexto_logbook(filtro):
+    base = EntradaLogbook.objects.select_related(
+        "autor", "resolvida_por"
+    ).prefetch_related("comentarios__autor")
+    abertas_qs = base.exclude(status=EntradaLogbook.RESOLVIDA)
+
+    if filtro == "importantes":
+        abertas = list(abertas_qs.filter(importante=True).order_by("-criado_em"))
+    else:
+        abertas = list(abertas_qs.order_by("-importante", "-criado_em"))
+
+    # "Todas" mostra o histórico completo (bate com o contador); "Abertas" mostra
+    # só as últimas resolvidas como contexto. Só consulta quando a seção aparece.
+    mostra_resolvidas = filtro in ("abertas", "todas")
+    resolvidas = []
+    if mostra_resolvidas:
+        resolvidas_qs = base.filter(status=EntradaLogbook.RESOLVIDA)
+        resolvidas = list(resolvidas_qs if filtro == "todas" else resolvidas_qs[:5])
+
+    return {
+        "filtro": filtro,
+        "contagens": {
+            "abertas": abertas_qs.count(),
+            "todas": base.count(),
+            "importantes": abertas_qs.filter(importante=True).count(),
+        },
+        "abertas": abertas,
+        "resolvidas": resolvidas,
+        "mostra_resolvidas": mostra_resolvidas,
+    }
+
 
 @requer_area(Area.LOGBOOK)
 def logbook(request):
     if request.method == "POST":
         form = EntradaLogbookForm(request.POST)
         if form.is_valid():
-            entrada = form.save(commit=False)
-            entrada.autor = request.user
-            entrada.save()
+            logbook_services.registrar_ocorrencia(
+                request.user,
+                form.cleaned_data["texto"],
+                form.cleaned_data.get("importante", False),
+            )
             messages.success(request, "Ocorrência registrada no logbook.")
             return redirect("logbook")
     else:
         form = EntradaLogbookForm()
-    return render(
-        request,
-        "nucleo/logbook.html",
-        {"entradas": EntradaLogbook.objects.select_related("autor")[:100], "form": form},
-    )
+    filtro = request.GET.get("filtro", "abertas")
+    if filtro not in ("abertas", "todas", "importantes"):
+        filtro = "abertas"
+    ctx = {"form": form, **_contexto_logbook(filtro)}
+    return render(request, "nucleo/logbook.html", ctx)
+
+
+@requer_area(Area.LOGBOOK)
+@require_POST
+def logbook_comentar(request, pk):
+    entrada = get_object_or_404(EntradaLogbook, pk=pk)
+    try:
+        logbook_services.comentar(request.user, entrada, request.POST.get("texto", ""))
+    except ValidationError as erro:
+        return render(
+            request, "nucleo/partials/logbook_ocorrencia.html",
+            {"e": entrada, "erro": " ".join(erro.messages)},
+        )
+    entrada.refresh_from_db()
+    return render(request, "nucleo/partials/logbook_ocorrencia.html", {"e": entrada})
+
+
+@requer_area(Area.LOGBOOK)
+@require_POST
+def logbook_resolver(request, pk):
+    entrada = get_object_or_404(EntradaLogbook, pk=pk)
+    logbook_services.resolver(request.user, entrada, request.POST.get("nota", ""))
+    entrada.refresh_from_db()
+    return render(request, "nucleo/partials/logbook_ocorrencia.html", {"e": entrada})
 
 
 # ---------- Funcionários (RH) — Pessoal; Equipe & Acessos deriva daqui ----------

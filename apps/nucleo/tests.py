@@ -3,7 +3,8 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import ModuloContratado, modulo_ativo, modulos_ativos
+from . import logbook_services
+from .models import EntradaLogbook, ModuloContratado, modulo_ativo, modulos_ativos
 from .modulos import Modulo
 
 Usuario = get_user_model()
@@ -986,3 +987,82 @@ class HistoricoFuncionarioTests(TestCase):
         hoje = timezone.localdate()
         prod = produtividade(self.f, hoje.replace(day=1), hoje)
         self.assertTrue(any("Faxina" in p["rotulo"] for p in prod))
+
+
+class LogbookThreadTests(TestCase):
+    """Recados do turno: thread + ciclo de vida (aberta → andamento → resolvida)."""
+
+    def setUp(self):
+        self.autor = Usuario.objects.create_user(
+            username="ana", password="senha-forte-123"
+        )
+        self.colega = Usuario.objects.create_user(
+            username="bru", password="senha-forte-123"
+        )
+
+    def test_registrar_ocorrencia_nasce_aberta(self):
+        e = logbook_services.registrar_ocorrencia(self.autor, "vazamento no 12")
+        self.assertEqual(e.status, EntradaLogbook.ABERTA)
+        self.assertTrue(e.aberta)
+
+    def test_ocorrencia_sem_texto_falha(self):
+        with self.assertRaises(ValidationError):
+            logbook_services.registrar_ocorrencia(self.autor, "   ")
+
+    def test_resposta_de_outro_move_para_em_andamento(self):
+        e = logbook_services.registrar_ocorrencia(self.autor, "conferir NF")
+        logbook_services.comentar(self.colega, e, "já vi, cuido disso")
+        e.refresh_from_db()
+        self.assertEqual(e.status, EntradaLogbook.EM_ANDAMENTO)
+        self.assertEqual(e.comentarios.count(), 1)
+
+    def test_resposta_do_proprio_autor_nao_muda_status(self):
+        e = logbook_services.registrar_ocorrencia(self.autor, "lembrete")
+        logbook_services.comentar(self.autor, e, "complementando")
+        e.refresh_from_db()
+        self.assertEqual(e.status, EntradaLogbook.ABERTA)
+
+    def test_qualquer_operador_resolve_e_registra_autoria(self):
+        e = logbook_services.registrar_ocorrencia(self.autor, "ar do 15 com ruído")
+        logbook_services.resolver(self.colega, e, "trocado o filtro")
+        e.refresh_from_db()
+        self.assertEqual(e.status, EntradaLogbook.RESOLVIDA)
+        self.assertEqual(e.resolvida_por, self.colega)
+        self.assertIsNotNone(e.resolvida_em)
+        self.assertEqual(e.resolucao_nota, "trocado o filtro")
+
+    def test_nao_comenta_em_resolvida(self):
+        e = logbook_services.registrar_ocorrencia(self.autor, "x")
+        logbook_services.resolver(self.colega, e)
+        with self.assertRaises(ValidationError):
+            logbook_services.comentar(self.autor, e, "reabrir?")
+
+    def test_view_lista_so_pendencias_por_padrao(self):
+        logbook_services.registrar_ocorrencia(self.autor, "pendente-aqui")
+        fechada = logbook_services.registrar_ocorrencia(self.autor, "fechada-aqui")
+        logbook_services.resolver(self.colega, fechada)
+        gerente = Usuario.objects.create_superuser(
+            username="ger", password="senha-forte-123"
+        )
+        self.client.force_login(gerente)
+        resp = self.client.get(reverse("logbook"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "pendente-aqui")
+        # a fechada aparece na seção "resolvidas recentes" (filtro padrão mostra ambas)
+        self.assertContains(resp, "Pendências abertas")
+
+    def test_filtro_todas_mostra_historico_e_bate_contador(self):
+        # 6 resolvidas > cap de 5 do filtro "abertas": só "todas" mostra todas.
+        for i in range(6):
+            fechada = logbook_services.registrar_ocorrencia(self.autor, f"fechada-{i}")
+            logbook_services.resolver(self.colega, fechada)
+        gerente = Usuario.objects.create_superuser(
+            username="ger", password="senha-forte-123"
+        )
+        self.client.force_login(gerente)
+        resp = self.client.get(reverse("logbook"), {"filtro": "todas"})
+        self.assertEqual(resp.status_code, 200)
+        # o contador "Todas" conta o histórico inteiro (6) e todas devem estar na página
+        self.assertEqual(resp.context["contagens"]["todas"], 6)
+        for i in range(6):
+            self.assertContains(resp, f"fechada-{i}")

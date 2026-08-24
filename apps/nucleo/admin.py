@@ -143,8 +143,8 @@ class ContaPagarReceberAdmin(admin.ModelAdmin):
 
 @admin.register(EntradaLogbook)
 class EntradaLogbookAdmin(admin.ModelAdmin):
-    list_display = ["criado_em", "autor", "importante"]
-    list_filter = ["importante"]
+    list_display = ["criado_em", "autor", "status", "importante"]
+    list_filter = ["status", "importante"]
 
 
 @admin.register(TrilhaAuditoria)

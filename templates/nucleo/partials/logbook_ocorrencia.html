@@ -1,0 +1,62 @@
+{% comment %}Um tópico do logbook: cabeçalho + status + thread + responder/resolver.
+Usado na lista e como resposta HTMX (troca o próprio <article> via outerHTML).{% endcomment %}
+<article class="lb-occ lb-{{ e.status }}" id="occ-{{ e.pk }}">
+  <div class="lb-head">
+    <span class="lb-avatar">{{ e.autor.get_short_name|default:e.autor|slice:":2"|upper }}</span>
+    <div class="lb-main">
+      <div class="lb-meta">
+        <span class="lb-who">{{ e.autor }}</span>
+        <time class="lb-when">{{ e.criado_em|date:"d/m H:i" }}</time>
+        {% if e.status == 'em_andamento' %}<span class="selo selo-em_andamento">Em andamento</span>
+        {% elif e.status == 'resolvida' %}<span class="selo selo-concluida">Resolvida</span>
+        {% else %}<span class="selo selo-pendente">Aberta</span>{% endif %}
+        {% if e.importante %}<span class="selo selo-alerta">Importante</span>{% endif %}
+      </div>
+      <p class="lb-text">{{ e.texto|linebreaksbr }}</p>
+    </div>
+    {% if e.status != 'resolvida' %}
+    <div class="lb-actions">
+      <button type="button" class="lb-btn-ghost"
+              onclick="this.closest('.lb-occ').querySelector('.lb-replybox input').focus()">Responder</button>
+      <details class="lb-resolver">
+        <summary class="lb-btn-ok">✓ Resolver</summary>
+        <form class="lb-resolver-form" hx-post="{% url 'logbook_resolver' e.pk %}"
+              hx-target="#occ-{{ e.pk }}" hx-swap="outerHTML settle:200ms" hx-disabled-elt="find button">
+          {% csrf_token %}
+          <input type="text" name="nota" maxlength="280" placeholder="Como foi resolvida? (opcional)">
+          <button type="submit" class="lb-btn-ok">Confirmar</button>
+        </form>
+      </details>
+    </div>
+    {% endif %}
+  </div>
+
+  {% with comentarios=e.comentarios.all %}
+  {% if comentarios %}
+  <div class="lb-thread">
+    {% for c in comentarios %}
+    <div class="lb-reply">
+      <span class="lb-av">{{ c.autor.get_short_name|default:c.autor|slice:":2"|upper }}</span>
+      <div>
+        <div class="lb-rmeta"><b>{{ c.autor }}</b><span class="lb-when">{{ c.criado_em|date:"d/m H:i" }}</span></div>
+        <div class="lb-rtext">{{ c.texto|linebreaksbr }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  {% if erro %}<p class="lb-erro">{{ erro }}</p>{% endif %}
+  {% if e.status == 'resolvida' %}
+    <div class="lb-resolved-by">✓ Fechada por {{ e.resolvida_por|default:"—" }}{% if e.resolvida_em %} em {{ e.resolvida_em|date:"d/m H:i" }}{% endif %}{% if e.resolucao_nota %} — “{{ e.resolucao_nota }}”{% endif %}</div>
+  {% else %}
+    <form class="lb-replybox" hx-post="{% url 'logbook_comentar' e.pk %}"
+          hx-target="#occ-{{ e.pk }}" hx-swap="outerHTML settle:200ms" hx-disabled-elt="find button"
+          hx-on::after-request="if(event.detail.successful) this.reset()">
+      {% csrf_token %}
+      <input type="text" name="texto" placeholder="Responder neste tópico…" required>
+      <button type="submit" class="lb-btn-ghost"><span class="lb-btn-lbl">Enviar</span></button>
+    </form>
+  {% endif %}
+</article>

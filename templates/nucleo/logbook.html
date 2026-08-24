@@ -5,29 +5,46 @@
 {% block conteudo %}
 <p class="pagina-eyebrow letreiro">Operação</p>
 <h1>Recados do turno</h1>
-<p class="subtitulo">Recados compartilhados entre os turnos — leia ao assumir o seu.</p>
+<p class="subtitulo">Ocorrências compartilhadas entre turnos — converse no tópico e feche quando resolver.</p>
 
-<form method="post" class="form-cartao">
+<form method="post" class="form-cartao lb-compose">
   {% csrf_token %}
-  {% include "nucleo/partials/campos.html" %}
+  <label class="lb-lbl" for="id_texto">Nova ocorrência</label>
+  {{ form.texto }}
+  <label class="lb-check">
+    {{ form.importante }} <span>Marcar como importante</span>
+    <small>— destaca e envia pro bloco “Precisa de atenção” do painel.</small>
+  </label>
   <div class="acoes">
     <button type="submit" class="botao-primario">Registrar ocorrência</button>
   </div>
 </form>
 
-<h2>Últimas ocorrências</h2>
-<div class="logbook-lista">
-  {% for e in entradas %}
-    <article class="logbook-entrada {% if e.importante %}logbook-importante{% endif %}">
-      <header>
-        <strong>{{ e.autor }}</strong>
-        <time>{{ e.criado_em|date:"d/m/Y H:i" }}</time>
-        {% if e.importante %}<span class="selo selo-alerta">importante</span>{% endif %}
-      </header>
-      <p>{{ e.texto|linebreaksbr }}</p>
-    </article>
+<nav class="lb-tabs">
+  <a href="?filtro=abertas" class="lb-tab {% if filtro == 'abertas' %}on{% endif %}">Abertas <span class="n">{{ contagens.abertas }}</span></a>
+  <a href="?filtro=todas" class="lb-tab {% if filtro == 'todas' %}on{% endif %}">Todas <span class="n">{{ contagens.todas }}</span></a>
+  <a href="?filtro=importantes" class="lb-tab {% if filtro == 'importantes' %}on{% endif %}">Importantes <span class="n">{{ contagens.importantes }}</span></a>
+</nav>
+
+<h2 class="lb-seclabel">
+  {% if filtro == 'importantes' %}Importantes abertas{% else %}Pendências abertas{% endif %}
+  <span class="lb-hint">carregam pro próximo turno</span>
+</h2>
+
+<div class="lb-lista">
+  {% for e in abertas %}
+    {% include "nucleo/partials/logbook_ocorrencia.html" %}
   {% empty %}
-    <p class="vazio">Nenhuma ocorrência registrada ainda. O primeiro turno começa aqui.</p>
+    <p class="vazio">Nenhuma pendência aberta. Turno tranquilo — bom trabalho.</p>
   {% endfor %}
 </div>
+
+{% if mostra_resolvidas and resolvidas %}
+<h2 class="lb-seclabel lb-seclabel-sec">Resolvidas recentes</h2>
+<div class="lb-lista">
+  {% for e in resolvidas %}
+    {% include "nucleo/partials/logbook_ocorrencia.html" %}
+  {% endfor %}
+</div>
+{% endif %}
 {% endblock %}

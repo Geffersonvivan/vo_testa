@@ -2739,3 +2739,93 @@ form.filtros:not(.subnav) select:focus {
 .celula-sub { display: block; font-size: .8rem; color: var(--tinta-suave); margin-top: .15rem; }
 .tabela td.col-acao, .tabela th.col-acao { text-align: right; white-space: nowrap; }
 .tabela td.col-acao .botao-mini { display: inline-block; padding: .3rem .8rem; }
+
+/* ============ Logbook — Recados do turno (tópicos com thread + status) ============ */
+.lb-compose { display: block; }
+.lb-compose .lb-lbl { display: block; font-weight: 600; font-size: .9rem; margin-bottom: .4rem; }
+.lb-compose textarea { width: 100%; min-height: 74px; }
+.lb-check { display: flex; align-items: center; gap: .45rem; margin: .8rem 0 .2rem; font-weight: 600; font-size: .92rem; flex-wrap: wrap; }
+.lb-check input { width: auto; }
+.lb-check small { font-weight: 400; color: var(--tinta-suave); }
+
+.lb-tabs { display: flex; gap: .4rem; margin: 1.4rem 0 .2rem; flex-wrap: wrap; }
+.lb-tab { padding: .42rem .95rem; border-radius: 999px; font-size: .86rem; font-weight: 600; color: var(--tinta-suave); text-decoration: none; border: 1px solid transparent; }
+.lb-tab:hover { background: var(--superficie-2); }
+.lb-tab.on { background: var(--noturno); color: #fff; }
+.lb-tab .n { opacity: .6; margin-left: .25rem; font-weight: 500; }
+
+.lb-seclabel { display: flex; align-items: center; gap: .6rem; margin: 1.5rem 0 .9rem; }
+.lb-seclabel-sec { font-size: 1.05rem; color: var(--tinta-suave); }
+.lb-seclabel .lb-hint { font-family: inherit; font-size: .7rem; font-weight: 700; letter-spacing: .02em; color: var(--alerta); background: var(--alerta-bg); padding: .12rem .55rem; border-radius: 999px; text-transform: none; }
+
+.lb-lista { display: flex; flex-direction: column; gap: 1rem; }
+
+.lb-occ { background: var(--superficie); border: 1px solid var(--fio); border-radius: var(--raio-g); box-shadow: var(--sombra-1); overflow: hidden; border-left-width: 3px; }
+.lb-occ.lb-aberta { border-left-color: var(--alerta); }
+.lb-occ.lb-em_andamento { border-left-color: var(--info); }
+.lb-occ.lb-resolvida { border-left-color: var(--sucesso); opacity: .78; }
+.lb-occ.lb-resolvida .lb-head { background: var(--sucesso-bg); }
+
+.lb-head { display: flex; align-items: flex-start; gap: .75rem; padding: 1rem 1.15rem; }
+.lb-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--noturno); color: var(--lampiao-claro); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .78rem; flex-shrink: 0; }
+.lb-resolvida .lb-avatar { background: var(--superficie-2); color: var(--tinta); }
+.lb-main { flex: 1; min-width: 0; }
+.lb-meta { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: .85rem; }
+.lb-who { font-weight: 700; }
+.lb-when { color: var(--tinta-suave); }
+.lb-text { margin: .3rem 0 0; font-size: .96rem; }
+
+.lb-actions { display: flex; align-items: center; gap: .5rem; margin-left: auto; flex-shrink: 0; }
+.lb-btn-ghost { background: #fff; border: 1px solid var(--fio); color: var(--tinta); font-weight: 600; border-radius: var(--raio-p); padding: .4rem .85rem; font-size: .82rem; cursor: pointer; }
+.lb-btn-ghost:hover { background: var(--superficie-2); }
+.lb-btn-ok { background: var(--sucesso-bg); border: 1px solid rgba(46,125,91,.28); color: var(--sucesso); font-weight: 700; border-radius: var(--raio-p); padding: .4rem .85rem; font-size: .82rem; cursor: pointer; list-style: none; }
+.lb-btn-ok:hover { filter: brightness(.98); }
+.lb-resolver { position: relative; }
+.lb-resolver summary { display: inline-block; }
+.lb-resolver summary::-webkit-details-marker { display: none; }
+.lb-resolver-form { display: flex; gap: .4rem; margin-top: .5rem; }
+.lb-resolver-form input { padding: .45rem .6rem; font-size: .85rem; min-width: 220px; }
+
+.lb-thread { padding: .1rem 1.15rem .3rem 3.6rem; }
+.lb-reply { display: flex; gap: .6rem; padding: .55rem 0; border-top: 1px dashed var(--fio); }
+.lb-av { width: 26px; height: 26px; font-size: .68rem; border-radius: 50%; background: var(--superficie-2); color: var(--tinta); display: flex; align-items: center; justify-content: center; font-weight: 700; flex-shrink: 0; border: 1px solid var(--fio); }
+.lb-rmeta { font-size: .8rem; }
+.lb-rmeta .lb-when { margin-left: .4rem; }
+.lb-rtext { font-size: .9rem; margin-top: .05rem; }
+
+.lb-replybox { display: flex; gap: .5rem; align-items: center; padding: .6rem 1.15rem 1rem 3.6rem; }
+.lb-replybox input { flex: 1; padding: .5rem .75rem; font-size: .88rem; }
+.lb-resolved-by { padding: .5rem 1.15rem .9rem 3.6rem; font-size: .82rem; color: var(--sucesso); }
+.lb-erro { padding: 0 1.15rem; color: var(--perigo); font-size: .85rem; margin: .2rem 0; }
+
+@media (max-width: 640px) {
+  .lb-head { flex-wrap: wrap; }
+  .lb-actions { margin-left: 0; width: 100%; }
+  .lb-thread, .lb-replybox, .lb-resolved-by { padding-left: 1.15rem; }
+}
+
+/* ---- Logbook: polish apple-design (Response, Craft, Reduced motion) ---- */
+/* §1 Response — feedback instantâneo no toque (press-down, 100ms) */
+.lb-btn-ghost, .lb-btn-ok, .lb-tab, .lb-resolver summary {
+  transition: transform .1s ease, background-color .12s ease, filter .12s ease;
+}
+.lb-btn-ghost:active, .lb-btn-ok:active, .lb-resolver summary:active, .lb-tab:active {
+  transform: scale(.97);
+}
+/* estado pendente durante o HTMX — sem tempo morto, sem duplo-envio */
+form.htmx-request .lb-btn-ghost, form.htmx-request .lb-btn-ok { opacity: .55; cursor: progress; }
+form.htmx-request input { opacity: .7; }
+
+/* §12/§17 Craft — cartão MATERIALIZA ao trocar (não corta seco); só em swaps HTMX */
+@keyframes lb-card-in { from { opacity: .35; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+.lb-occ.htmx-settling { animation: lb-card-in .2s ease-out; }
+/* form de resolver surge suave ao abrir o disclosure */
+@keyframes lb-reveal { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+.lb-resolver[open] .lb-resolver-form { animation: lb-reveal .16s ease-out; }
+
+/* §14 Acessibilidade — sem movimento vestibular quando o usuário pede */
+@media (prefers-reduced-motion: reduce) {
+  .lb-occ.htmx-settling, .lb-resolver[open] .lb-resolver-form { animation: none; }
+  .lb-btn-ghost:active, .lb-btn-ok:active, .lb-resolver summary:active, .lb-tab:active { transform: none; }
+  .lb-btn-ghost, .lb-btn-ok, .lb-tab, .lb-resolver summary { transition: background-color .12s ease; }
+}
