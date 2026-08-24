@@ -557,8 +557,10 @@
       const resp = await fetch(bloco.dataset.url, { method: 'POST', headers: { 'X-CSRFToken': csrf }, body: dados });
       const dado = await resp.json();
       if (!resp.ok) { erro.textContent = dado.erro || 'Não foi possível salvar.'; return; }
-      const sel = document.querySelector('#modal-conteudo [name=hospede]');
-      sel.add(new Option(dado.nome, dado.id, true, true));
+      // O campo hóspede é o combobox de pessoa (comboPessoa), não um <select>:
+      // adiciona a pessoa recém-criada à lista do combo e já a seleciona.
+      const comboEl = document.querySelector('#modal-conteudo [name=hospede]').closest('.combo');
+      Alpine.$data(comboEl).adicionar({ id: dado.id, nome: dado.nome, grupo: 'Hóspedes' });
       fecharNovoHospede();
       toast('Hóspede cadastrado.', 'success');
     } catch (e) { erro.textContent = 'Falha de conexão. Tente de novo.'; }
