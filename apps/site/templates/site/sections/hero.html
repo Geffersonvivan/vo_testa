@@ -7,14 +7,14 @@
 
     <!-- Conteúdo Hero: ocupa o espaço e centraliza; a barra de números abaixo
          fica no fluxo normal (não sobrepõe em telas de altura menor). -->
-    <div class="relative z-10 flex-1 flex items-center justify-center px-4 sm:px-6 py-24 sm:py-20">
+    <div class="relative z-10 flex-1 flex items-center justify-center px-4 sm:px-6 pt-24 pb-12 sm:pt-28 sm:pb-16">
       <div class="text-center max-w-4xl w-full mx-auto">
         <p class="text-pergaminho/60 text-xs sm:text-sm tracking-[0.3em] sm:tracking-[0.4em] uppercase mb-4 sm:mb-6 font-medium">{{ config.texto_boas_vindas }}</p>
 
-        <!-- Logo oficial centralizada -->
-        <img src="{% static 'site/img/logo-hero.png' %}" alt="Pousada Vô Testa" class="h-44 sm:h-64 md:h-80 lg:h-96 xl:h-[32rem] w-auto mx-auto mb-4 sm:mb-6">
+        <!-- Logo oficial centralizada (PNG recortado: sem padding transparente) -->
+        <img src="{% static 'site/img/logo-hero.png' %}" alt="Pousada Vô Testa" class="h-32 sm:h-40 md:h-48 lg:h-56 xl:h-60 w-auto mx-auto mb-6 sm:mb-8">
 
-        <p class="text-pergaminho/80 text-base sm:text-lg md:text-xl mb-6 sm:mb-10 max-w-2xl mx-auto leading-relaxed px-2">
+        <p class="text-pergaminho/80 text-base sm:text-lg md:text-xl mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed px-2">
             {{ config.frase_hero }}
         </p>
 

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Hero Vô Testa</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=EB+Garamond:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root{ --noturno:#051C2C; --madeira:#4F2C1D; --lampiao:#D7A048; --pergaminho:#EFDBB2; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'EB Garamond',serif;background:#1a120b;color:var(--pergaminho);padding:24px;display:flex;gap:24px;flex-wrap:wrap;justify-content:center}
+  .col{flex:1;min-width:420px;max-width:520px}
+  .tag{text-align:center;font-family:'Cinzel',serif;font-weight:700;letter-spacing:.1em;font-size:13px;margin-bottom:10px;text-transform:uppercase}
+  .tag.now{color:#e06a5a}.tag.new{color:#7bd88f}
+  .hero{position:relative;border-radius:16px;overflow:hidden;border:1px solid rgba(215,160,72,.25);height:720px;display:flex;flex-direction:column}
+  .bg{position:absolute;inset:0;background:linear-gradient(135deg,var(--noturno) 0%,var(--madeira) 55%,var(--noturno) 100%)}
+  .nav{position:relative;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:14px 22px;background:rgba(5,28,44,.95);border-bottom:1px solid rgba(215,160,72,.2)}
+  .nav .brand{font-family:'Cinzel',serif;font-weight:900;color:var(--lampiao);font-size:16px;letter-spacing:.05em}
+  .nav .links{display:flex;gap:14px;font-size:11px;color:rgba(239,219,178,.8)}
+  .content{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:26px 18px 14px;text-align:center}
+  .eyebrow{color:rgba(239,219,178,.6);font-family:'Cinzel',serif;font-weight:700;font-size:12px;letter-spacing:.35em;text-transform:uppercase}
+  .logo{width:auto;display:block;margin-left:auto;margin-right:auto}
+  .frase{color:rgba(239,219,178,.85);font-size:17px;line-height:1.5;max-width:340px;margin-left:auto;margin-right:auto}
+  .busca{background:rgba(5,28,44,.6);border:1px solid rgba(215,160,72,.2);border-radius:14px;padding:14px;display:grid;grid-template-columns:1fr 1fr .7fr .9fr;gap:10px;align-items:end;max-width:460px;margin:0 auto;width:100%}
+  .fld label{display:block;font-family:'Cinzel',serif;font-size:9px;letter-spacing:.08em;color:rgba(239,219,178,.6);text-transform:uppercase;margin-bottom:4px;text-align:left}
+  .fld .inp{background:rgba(5,28,44,.5);border:1px solid rgba(239,219,178,.1);border-radius:8px;padding:9px 10px;font-size:12px;color:rgba(239,219,178,.5);text-align:left}
+  .btn{background:var(--lampiao);color:var(--noturno);font-family:'Cinzel',serif;font-weight:700;font-size:11px;border-radius:8px;padding:10px;text-align:center;line-height:1.2}
+
+  /* ---- ATUAL: PNG original (com padding transparente) + margens folgadas ---- */
+  .now .eyebrow{margin-bottom:24px}
+  .now .logo{height:300px;margin-bottom:24px}
+  .now .frase{margin-bottom:34px}
+
+  /* ---- PROPOSTO: PNG recortado + espaçamento apple (deliberado, compacto) ---- */
+  .new .eyebrow{margin-bottom:14px}
+  .new .logo{height:210px;margin-bottom:18px}   /* recortada: mesma presença visual, sem o vazio */
+  .new .frase{margin-bottom:30px}
+
+  .note{max-width:1080px;margin:20px auto 0;font-size:14px;line-height:1.6;color:rgba(239,219,178,.75);background:rgba(5,28,44,.5);border:1px solid rgba(215,160,72,.2);border-radius:12px;padding:16px 20px}
+  .note b{color:var(--lampiao)}
+</style>
+</head>
+<body>
+  <div class="col">
+    <div class="tag now">● ATUAL</div>
+    <div class="hero">
+      <div class="bg"></div>
+      <div class="nav"><span class="brand">🎩 VÔ TESTA</span><span class="links">Início · Quartos · Contato</span></div>
+      <div class="content now">
+        <p class="eyebrow">Bem-vindo(a), viajante ao</p>
+        <img class="logo" src="logo-hero-orig.png" alt="logo">
+        <p class="frase">As engrenagens do tempo desaceleraram para você apreciar a beleza da natureza</p>
+        <div class="busca">
+          <div class="fld"><label>Check-in</label><div class="inp">Selecione</div></div>
+          <div class="fld"><label>Check-out</label><div class="inp">Selecione</div></div>
+          <div class="fld"><label>Hóspedes</label><div class="inp">2</div></div>
+          <div class="btn">Ver Disponibilidade</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="tag new">● PROPOSTO</div>
+    <div class="hero">
+      <div class="bg"></div>
+      <div class="nav"><span class="brand">🎩 VÔ TESTA</span><span class="links">Início · Quartos · Contato</span></div>
+      <div class="content new">
+        <p class="eyebrow">Bem-vindo(a), viajante ao</p>
+        <img class="logo" src="logo-hero-trim.png" alt="logo">
+        <p class="frase">As engrenagens do tempo desaceleraram para você apreciar a beleza da natureza</p>
+        <div class="busca">
+          <div class="fld"><label>Check-in</label><div class="inp">Selecione</div></div>
+          <div class="fld"><label>Check-out</label><div class="inp">Selecione</div></div>
+          <div class="fld"><label>Hóspedes</label><div class="inp">2</div></div>
+          <div class="btn">Ver Disponibilidade</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>O que muda:</b> o <b>logo-hero.png</b> tem ~15,8% de área transparente embutida em cima e embaixo — é ela que cria os dois vazios marcados de vermelho. No proposto eu <b>recorto esse padding do PNG</b> (a arte fica idêntica, mesma presença) e deixo o espaçamento por conta do layout, com margens deliberadas e enxutas (princípio apple: <i>craft</i> — todo espaço é intencional). Resultado: eyebrow → logo → frase ficam coesos, o conjunto respira sem buracos e cabe folgado abaixo do header fixo.
+  </div>
+</body>
+</html>
