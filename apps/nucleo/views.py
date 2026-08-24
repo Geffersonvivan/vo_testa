@@ -983,26 +983,29 @@ def _contexto_logbook(filtro):
         "autor", "resolvida_por"
     ).prefetch_related("comentarios__autor")
     abertas_qs = base.exclude(status=EntradaLogbook.RESOLVIDA)
+    resolvidas_qs = base.filter(status=EntradaLogbook.RESOLVIDA)
 
     if filtro == "importantes":
+        # "Importantes" é o histórico dos importantes: pendentes em cima,
+        # resolvidos embaixo — bate com o contador.
         abertas = list(abertas_qs.filter(importante=True).order_by("-criado_em"))
+        resolvidas = list(resolvidas_qs.filter(importante=True))
+        mostra_resolvidas = True
     else:
+        # "Todas" mostra o histórico completo (bate com o contador); "Abertas"
+        # mostra só as últimas resolvidas como contexto.
         abertas = list(abertas_qs.order_by("-importante", "-criado_em"))
-
-    # "Todas" mostra o histórico completo (bate com o contador); "Abertas" mostra
-    # só as últimas resolvidas como contexto. Só consulta quando a seção aparece.
-    mostra_resolvidas = filtro in ("abertas", "todas")
-    resolvidas = []
-    if mostra_resolvidas:
-        resolvidas_qs = base.filter(status=EntradaLogbook.RESOLVIDA)
-        resolvidas = list(resolvidas_qs if filtro == "todas" else resolvidas_qs[:5])
+        mostra_resolvidas = filtro in ("abertas", "todas")
+        resolvidas = []
+        if mostra_resolvidas:
+            resolvidas = list(resolvidas_qs if filtro == "todas" else resolvidas_qs[:5])
 
     return {
         "filtro": filtro,
         "contagens": {
             "abertas": abertas_qs.count(),
             "todas": base.count(),
-            "importantes": abertas_qs.filter(importante=True).count(),
+            "importantes": base.filter(importante=True).count(),
         },
         "abertas": abertas,
         "resolvidas": resolvidas,
@@ -1050,9 +1053,15 @@ def logbook_comentar(request, pk):
 @require_POST
 def logbook_resolver(request, pk):
     entrada = get_object_or_404(EntradaLogbook, pk=pk)
+    ja_resolvida = entrada.status == EntradaLogbook.RESOLVIDA
     logbook_services.resolver(request.user, entrada, request.POST.get("nota", ""))
     entrada.refresh_from_db()
-    return render(request, "nucleo/partials/logbook_ocorrencia.html", {"e": entrada})
+    ctx = {"e": entrada}
+    if ja_resolvida:
+        # Alguém fechou antes (resolver é idempotente, mantém o 1º) — avisa o 2º
+        # para ele saber que a nota dele não foi gravada.
+        ctx["erro"] = f"Já havia sido resolvida por {entrada.resolvida_por or '—'}."
+    return render(request, "nucleo/partials/logbook_ocorrencia.html", ctx)
 
 
 # ---------- Funcionários (RH) — Pessoal; Equipe & Acessos deriva daqui ----------

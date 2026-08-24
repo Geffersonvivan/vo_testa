@@ -1066,3 +1066,39 @@ class LogbookThreadTests(TestCase):
         self.assertEqual(resp.context["contagens"]["todas"], 6)
         for i in range(6):
             self.assertContains(resp, f"fechada-{i}")
+
+    def test_importantes_inclui_resolvidos_e_conta_todos(self):
+        # #2: aba Importantes é histórico (aberto + resolvido), contador bate.
+        pendente = logbook_services.registrar_ocorrencia(
+            self.autor, "importante-pendente", importante=True
+        )
+        fechado = logbook_services.registrar_ocorrencia(
+            self.autor, "importante-fechado", importante=True
+        )
+        logbook_services.resolver(self.colega, fechado)
+        logbook_services.registrar_ocorrencia(self.autor, "comum-aberto")  # não importa
+        gerente = Usuario.objects.create_superuser(
+            username="ger", password="senha-forte-123"
+        )
+        self.client.force_login(gerente)
+        resp = self.client.get(reverse("logbook"), {"filtro": "importantes"})
+        self.assertEqual(resp.context["contagens"]["importantes"], 2)
+        self.assertContains(resp, "importante-pendente")
+        self.assertContains(resp, "importante-fechado")
+        self.assertNotContains(resp, "comum-aberto")
+
+    def test_resolver_concorrente_avisa_o_segundo(self):
+        # #6: quem resolve depois é avisado; vale o 1º (autoria + nota).
+        e = logbook_services.registrar_ocorrencia(self.autor, "trocar lâmpada")
+        logbook_services.resolver(self.autor, e, "primeira nota")
+        self.colega.areas = ["logbook"]
+        self.colega.save()
+        self.client.force_login(self.colega)
+        resp = self.client.post(
+            reverse("logbook_resolver", args=[e.pk]), {"nota": "segunda nota"}
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Já havia sido resolvida por")
+        e.refresh_from_db()
+        self.assertEqual(e.resolvida_por, self.autor)
+        self.assertEqual(e.resolucao_nota, "primeira nota")
