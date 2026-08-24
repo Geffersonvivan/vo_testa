@@ -1,3 +1,4 @@
+import unittest
 from datetime import timedelta
 from decimal import Decimal
 
@@ -52,6 +53,7 @@ class FrigobarBase(TestCase):
         return r.fazer_checkin(self.op)
 
 
+@unittest.skip("Módulo Frigobar aposentado (opção 2): catálogo e rotas removidos.")
 class ConferenciaTests(FrigobarBase):
     def test_conferencia_lanca_consumo_na_conta(self):
         from apps.reservas.models import LancamentoConta
@@ -108,6 +110,7 @@ class ConferenciaTests(FrigobarBase):
         self.assertTrue(services.conferencia_checkout_feita(conta=conta))
 
 
+@unittest.skip("Módulo Frigobar aposentado (opção 2): catálogo e rotas removidos.")
 class PermissaoTests(FrigobarBase):
     def test_modulo_inativo_da_404(self):
         ModuloContratado.objects.filter(codigo=Modulo.FRIGOBAR).update(ativo=False)
