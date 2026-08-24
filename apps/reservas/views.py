@@ -145,6 +145,9 @@ def mapa(request):
             uh.tipo.pk, {"tipo": uh.tipo, "uhs": []}
         )["uhs"].append(uh)
     grupos = list(por_tipo.values())
+    # "Dia na Pousada" (day use) vai para o FINAL do mapa, depois dos tipos de
+    # hospedagem (sort estável preserva a ordem entre os demais tipos).
+    grupos.sort(key=lambda g: g["tipo"].modalidade == TipoUH.Modalidade.DAY_USE)
 
     manual_ids = {u.pk for u in uhs if u.status == UH.Status.BLOQUEADA}
     for grupo in grupos:
