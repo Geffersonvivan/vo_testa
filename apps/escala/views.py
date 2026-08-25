@@ -1,10 +1,13 @@
+import json
 from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from apps.nucleo.models import Funcionario
 from apps.nucleo.modulos import Modulo
@@ -21,27 +24,61 @@ def _data(txt, default=None):
         return default
 
 
-def _funcionarios():
-    return Funcionario.objects.select_related("pessoa").order_by("pessoa__nome")
+def _funcionarios(setor=None):
+    qs = Funcionario.objects.select_related("pessoa").order_by("pessoa__nome")
+    return qs
+
+
+def _contexto_grade(inicio, setor):
+    """Contexto compartilhado pela grade (página cheia e refresh do editor)."""
+    return {
+        "grade": services.grade_semana(inicio, setor),
+        "inicio": inicio,
+        "setor": setor,
+        "hoje": timezone.localdate(),
+        "validacao": services.validar_semana(inicio, setor),
+    }
 
 
 @requer_modulo(Modulo.ESCALA)
 def escala(request):
     inicio = services.inicio_da_semana(_data(request.GET.get("inicio")))
     setor = request.GET.get("setor") or None
-    grade = services.grade_semana(inicio, setor)
-    return render(request, "escala/grade.html", {
-        "grade": grade,
-        "inicio": inicio,
+    ctx = _contexto_grade(inicio, setor)
+    ctx.update({
         "anterior": inicio - timedelta(days=7),
         "proximo": inicio + timedelta(days=7),
-        "setor": setor,
         "setores": Turno.Setor.choices,
-        "funcionarios": _funcionarios(),
+        "funcionarios": _funcionarios(setor),
         "turnos": Turno.objects.filter(ativo=True),
-        "hoje": timezone.localdate(),
-        "validacao": services.validar_semana(inicio, setor),
+        "ausencias_json": json.dumps(services.ausencias_da_semana(inicio)),
     })
+    return render(request, "escala/grade.html", ctx)
+
+
+@requer_modulo(Modulo.ESCALA)
+@require_POST
+def escala_editar(request):
+    """Add/mover/remover por arrasto. Devolve o partial da grade (validação +
+    tabela) já atualizado; erro de regra volta como JSON 400 (vira toast)."""
+    inicio = services.inicio_da_semana(_data(request.POST.get("inicio")))
+    setor = request.POST.get("setor") or None
+    acao = request.POST.get("acao")
+    try:
+        if acao == "add":
+            turno = get_object_or_404(Turno, pk=request.POST.get("turno"))
+            func = get_object_or_404(Funcionario, pk=request.POST.get("funcionario"))
+            services.atribuir(turno, func, _data(request.POST.get("data")), request.user)
+        elif acao == "mover":
+            atrib = get_object_or_404(Atribuicao, pk=request.POST.get("atribuicao"))
+            turno = get_object_or_404(Turno, pk=request.POST.get("turno"))
+            services.mover(atrib, turno, _data(request.POST.get("data")), request.user)
+        elif acao == "remover":
+            atrib = get_object_or_404(Atribuicao, pk=request.POST.get("atribuicao"))
+            services.desatribuir(atrib)
+    except ValidationError as erro:
+        return JsonResponse({"erro": " ".join(erro.messages)}, status=400)
+    return render(request, "escala/partials/grade_conteudo.html", _contexto_grade(inicio, setor))
 
 
 @requer_gerencia

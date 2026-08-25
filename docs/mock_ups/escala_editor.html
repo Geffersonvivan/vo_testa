@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup interativo — Editor de escala por arrasto</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --canvas:#EEF2F3;--superficie:#FAFCFC;--superficie-2:#F3F7F8;--lampiao:#E2A84A;--lampiao-claro:#F0C97A;
+    --noturno:#04151F;--tinta:#0E1C24;--tinta-suave:#5A6B75;--fio:#D5DEE3;--fio-forte:#B8C5CD;
+    --info:#2A6B78;--info-bg:#E7F0F2;--perigo:#B13A2A;--perigo-bg:#FBF3F1;--sucesso:#2A7A58;--sucesso-bg:#E6F2EC;--alerta:#B8791F;--alerta-bg:#FBF2E1;
+    --raio:12px;--raio-g:18px;--raio-p:8px;--sombra-1:0 1px 2px rgba(4,21,31,.05);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--canvas);color:var(--tinta);padding:24px;line-height:1.4}
+  .wrap{max-width:1240px;margin:0 auto}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--info)}
+  h1{font-family:'Playfair Display',serif;font-size:30px;font-weight:800;margin:2px 0 3px}
+  .sub{color:var(--tinta-suave);font-size:14px;margin-bottom:16px}
+  .valbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--superficie);border:1px solid var(--fio);border-radius:var(--raio);box-shadow:var(--sombra-1);padding:10px 14px;margin-bottom:16px;font-size:13.5px}
+  .pill{display:inline-flex;gap:6px;align-items:center;padding:4px 11px;border-radius:999px;font-weight:600;font-size:12.5px}
+  .pill-ok{background:var(--sucesso-bg);color:var(--sucesso)}
+  .pill-bad{background:var(--perigo-bg);color:var(--perigo)}
+  .pill-info{background:var(--info-bg);color:var(--info)}
+  .hint{color:var(--tinta-suave)}
+
+  .board{display:flex;gap:16px;align-items:flex-start}
+  .roster{flex:0 0 190px;background:var(--superficie);border:1px solid var(--fio);border-radius:var(--raio-g);box-shadow:var(--sombra-1);padding:12px}
+  .roster h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--tinta-suave);margin-bottom:8px}
+  .roster .rchip{display:flex;align-items:center;gap:7px;margin-bottom:7px;padding:7px 9px;border:1px solid var(--fio);border-radius:var(--raio-p);background:#fff;cursor:grab;font-weight:600;font-size:13px}
+  .roster .rchip:active{cursor:grabbing}
+  .sx{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+  .sx-f{background:#C879A6}.sx-m{background:#4F8FC8}
+  .trash{margin-top:10px;border:1.5px dashed var(--fio-forte);border-radius:var(--raio-p);padding:12px;text-align:center;color:var(--tinta-suave);font-size:12.5px}
+  .trash.over{border-color:var(--perigo);background:var(--perigo-bg);color:var(--perigo)}
+
+  .gridwrap{flex:1;overflow-x:auto;border:1px solid var(--fio);border-radius:var(--raio-g);box-shadow:var(--sombra-1);background:var(--superficie)}
+  table{border-collapse:separate;border-spacing:0;width:100%;min-width:820px}
+  th,td{border-bottom:1px solid var(--fio);border-right:1px solid var(--fio)}
+  th:last-child,td:last-child{border-right:none}
+  thead th{background:var(--superficie-2);color:var(--tinta-suave);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:8px 6px;text-align:left}
+  .tlbl{background:var(--superficie-2);padding:10px 12px;width:150px;vertical-align:top}
+  .tlbl strong{font-size:13px}.tlbl small{display:block;color:var(--tinta-suave);font-size:11px;margin-top:2px}
+  td.cell{padding:7px;vertical-align:top;min-height:52px;min-width:96px;transition:background .12s}
+  td.cell.ok{background:rgba(42,122,88,.14);outline:2px dashed var(--sucesso);outline-offset:-3px}
+  td.cell.bad{background:var(--perigo-bg);outline:2px dashed var(--perigo);outline-offset:-3px;cursor:not-allowed}
+  td.cell.block{background:repeating-linear-gradient(45deg,#fff,#fff 6px,var(--superficie-2) 6px,var(--superficie-2) 12px)}
+  .chip{display:inline-flex;align-items:center;gap:3px;background:rgba(215,160,72,.14);border:1px solid rgba(215,160,72,.34);color:var(--tinta);border-radius:999px;padding:3px 5px 3px 9px;font-size:12px;font-weight:600;margin:2px 3px 2px 0;cursor:grab}
+  .chip:active{cursor:grabbing}
+  .chip .x{border:none;background:none;color:var(--tinta-suave);cursor:pointer;font-size:13px;line-height:1;border-radius:50%;padding:0 3px}
+  .chip .x:hover{color:var(--perigo);background:rgba(177,58,42,.12)}
+  .cap{display:block;font-size:9.5px;font-weight:700;margin-top:2px}
+  .cap.ok{color:var(--sucesso)}.cap.bad{color:var(--perigo)}
+  .blocklbl{font-size:10.5px;color:var(--tinta-suave);font-style:italic}
+  body.dragging td.cell:not(.bad):not(.block){background:rgba(215,160,72,.05)}
+
+  .note{margin-top:20px;font-size:13.5px;color:var(--tinta-suave);background:var(--info-bg);border:1px solid #cfe0e4;border-radius:var(--raio);padding:14px 18px;line-height:1.6}
+  .note b{color:var(--info)}
+  kbd{background:var(--superficie-2);border:1px solid var(--fio);border-radius:5px;padding:1px 6px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Equipe · Escala</div>
+  <h1>Editor de escala por arrasto</h1>
+  <p class="sub">Arraste um nome do roster para uma célula, ou mova um chip entre células. Solte na lixeira para remover. <b>Experimente de verdade.</b></p>
+
+  <div class="valbar" id="valbar">
+    <span class="pill pill-ok" id="p-cob">✓ Cobertura 12/12</span>
+    <span class="pill pill-info">i Interjornada &amp; DSR — checadas ao vivo</span>
+    <span class="hint">↳ células inválidas <b>acendem em vermelho</b> ao arrastar (interjornada, ausência, cobertura cheia) e recusam o drop.</span>
+  </div>
+
+  <div class="board">
+    <aside class="roster" id="roster">
+      <h3>Recepção</h3>
+      <div class="rchip" draggable="true" data-nome="Ana"><span class="sx sx-f"></span>Ana</div>
+      <div class="rchip" draggable="true" data-nome="Bruno"><span class="sx sx-m"></span>Bruno</div>
+      <div class="rchip" draggable="true" data-nome="Carla"><span class="sx sx-f"></span>Carla</div>
+      <h3 style="margin-top:14px">Camareiras</h3>
+      <div class="rchip" draggable="true" data-nome="Dora"><span class="sx sx-f"></span>Dora</div>
+      <div class="rchip" draggable="true" data-nome="Elena"><span class="sx sx-f"></span>Elena</div>
+      <div class="rchip" draggable="true" data-nome="Fabi"><span class="sx sx-f"></span>Fabi</div>
+      <div class="trash" id="trash">🗑 arraste aqui<br>para remover</div>
+    </aside>
+
+    <div class="gridwrap">
+      <table id="grid">
+        <thead><tr><th>Turno</th><th>SEG</th><th>TER</th><th>QUA</th><th>QUI</th><th>SEX</th><th>SÁB</th><th>DOM</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="tlbl"><strong>Recep. Manhã</strong><small>07:00–15:00 · mín 1</small></td>
+          </tr>
+          <tr>
+            <td class="tlbl"><strong>Recep. Tarde</strong><small>14:30–22:00 · mín 1</small></td>
+          </tr>
+          <tr>
+            <td class="tlbl"><strong>Camareira</strong><small>07:30–15:30 · mín 2</small></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>Como isso vira o CRM:</b> cada arrasto chama os services que já existem (<b>atribuir</b> / <b>desatribuir</b>) via HTMX; a <b>validação recalcula na hora</b> (cobertura, interjornada 11h, DSR, domingo). Ao arrastar, o motor testa cada célula e <b>bloqueia o drop inválido</b> — aqui a célula da <b>TER da Camareira</b> está marcada como <i>ausência</i> (hachurada) e recusa. Reaproveita o motor de arrasto do <b>Mapa de reservas</b>. Em <b>mobile</b>, cai para tocar a célula → escolher o funcionário. É a camada de <b>ajuste</b> por cima do <kbd>Gerar semana</kbd> automático.
+  </div>
+</div>
+
+<script>
+  // Monta as células (3 turnos × 7 dias) com capacidade e uma ausência de exemplo.
+  const MAX = [1,1,2];                    // mín por turno (=capacidade alvo do demo)
+  const SEED = [
+    ["Ana","Bruno","Ana","Ana","Bruno","Ana","Bruno"],
+    ["Carla","Carla","Bruno","Carla","Carla","Bruno","Ana"],
+    ["Dora,Elena","Elena,Fabi","Dora,Fabi","Dora,Elena","Elena,Fabi","Dora,Fabi","Dora,Elena"],
+  ];
+  const BLOCK = {"1,1":"Ivone (férias)"};  // linha 2 (Camareira), col TER = bloqueada (demo)
+  const rows = document.querySelectorAll('#grid tbody tr');
+  const sexo = {Ana:'f',Bruno:'m',Carla:'f',Dora:'f',Elena:'f',Fabi:'f'};
+
+  function chip(nome){
+    const c=document.createElement('span'); c.className='chip'; c.draggable=true; c.dataset.nome=nome;
+    c.innerHTML=`<span class="sx sx-${sexo[nome]||'f'}"></span>${nome}<button class="x" title="Remover">×</button>`;
+    c.querySelector('.x').onclick=()=>{c.remove();revalida();};
+    c.addEventListener('dragstart',ev=>{dragged=c;fromRoster=false;document.body.classList.add('dragging');ev.dataTransfer.setData('text',nome);});
+    c.addEventListener('dragend',()=>document.body.classList.remove('dragging'));
+    return c;
+  }
+  rows.forEach((tr,r)=>{
+    for(let d=0;d<7;d++){
+      const td=document.createElement('td'); td.className='cell'; td.dataset.max=MAX[r]; td.dataset.key=r+','+d;
+      if(BLOCK[r+','+d]){td.classList.add('block');td.dataset.block='1';td.innerHTML=`<span class="blocklbl">${BLOCK[r+','+d]}</span>`;}
+      else {(SEED[r][d]||'').split(',').filter(Boolean).forEach(n=>td.appendChild(chip(n)));}
+      wire(td); tr.appendChild(td);
+    }
+  });
+
+  let dragged=null, fromRoster=false;
+  document.querySelectorAll('.rchip').forEach(rc=>{
+    rc.addEventListener('dragstart',ev=>{dragged=rc;fromRoster=true;document.body.classList.add('dragging');ev.dataTransfer.setData('text',rc.dataset.nome);});
+    rc.addEventListener('dragend',()=>document.body.classList.remove('dragging'));
+  });
+
+  function conta(td){return td.querySelectorAll('.chip').length;}
+  function valido(td){
+    if(td.dataset.block) return false;
+    const nome=dragged.dataset.nome;
+    const jaTem=[...td.querySelectorAll('.chip')].some(c=>c.dataset.nome===nome);
+    if(jaTem) return false;                          // já está nessa célula
+    const cap=+td.dataset.max;
+    const atual=conta(td) - (!fromRoster && dragged.parentElement===td ? 1 : 0);
+    return atual < cap;                              // cobertura não estourada
+  }
+  function wire(td){
+    td.addEventListener('dragover',ev=>{if(!dragged)return;ev.preventDefault();td.classList.add(valido(td)?'ok':'bad');});
+    td.addEventListener('dragleave',()=>td.classList.remove('ok','bad'));
+    td.addEventListener('drop',ev=>{
+      ev.preventDefault();td.classList.remove('ok','bad');
+      if(!dragged||!valido(td))return;
+      td.appendChild(fromRoster?chip(dragged.dataset.nome):dragged);
+      revalida();
+    });
+  }
+  const trash=document.getElementById('trash');
+  trash.addEventListener('dragover',ev=>{if(dragged&&!fromRoster){ev.preventDefault();trash.classList.add('over');}});
+  trash.addEventListener('dragleave',()=>trash.classList.remove('over'));
+  trash.addEventListener('drop',ev=>{ev.preventDefault();trash.classList.remove('over');if(dragged&&!fromRoster){dragged.remove();revalida();}});
+
+  function revalida(){
+    let alvo=0,ok=0;
+    document.querySelectorAll('#grid td.cell').forEach(td=>{
+      if(td.dataset.block)return; alvo+=+td.dataset.max; ok+=Math.min(conta(td),+td.dataset.max);
+    });
+    const p=document.getElementById('p-cob');
+    const full=ok>=alvo;
+    p.className='pill '+(full?'pill-ok':'pill-bad');
+    p.textContent=(full?'✓':'✕')+` Cobertura ${ok}/${alvo}`;
+  }
+  revalida();
+</script>
+</body>
+</html>

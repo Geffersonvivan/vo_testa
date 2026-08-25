@@ -3,115 +3,150 @@
 {% block titulo %}Escala — CRM Vô Testa{% endblock %}
 
 {% block conteudo %}
-<p class="pagina-eyebrow letreiro">Equipe</p>
-<div class="pagina-cabecalho">
-  <h1>Escala da equipe</h1>
-  <div class="pagina-acoes">
-    <a href="{% url 'escala:minha' %}" class="botao-neutro">Minha escala</a>
-    <a href="{% url 'escala:trocas' %}" class="botao-neutro">Trocas</a>
-    <a href="{% url 'escala:ausencias' %}" class="botao-neutro">Ausências</a>
-    <a href="{% url 'escala:turnos' %}" class="botao-neutro">Turnos</a>
-  </div>
-</div>
+<div id="escala-page" data-editar-url="{% url 'escala:editar' %}"
+     data-inicio="{{ inicio|date:'Y-m-d' }}" data-setor="{{ setor|default:'' }}">
 
-<div class="escala-topo">
-  <div class="escala-semana">
-    <a href="?inicio={{ anterior|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro" aria-label="Semana anterior">‹</a>
-    <span class="escala-periodo">{{ inicio|date:"d/m" }} – {{ grade.dias|last|date:"d/m/Y" }}</span>
-    <a href="?inicio={{ proximo|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro" aria-label="Próxima semana">›</a>
+  <p class="pagina-eyebrow letreiro">Equipe</p>
+  <div class="pagina-cabecalho">
+    <h1>Escala da equipe</h1>
+    <div class="pagina-acoes">
+      <a href="{% url 'escala:minha' %}" class="botao-neutro">Minha escala</a>
+      <a href="{% url 'escala:trocas' %}" class="botao-neutro">Trocas</a>
+      <a href="{% url 'escala:ausencias' %}" class="botao-neutro">Ausências</a>
+      <a href="{% url 'escala:turnos' %}" class="botao-neutro">Turnos</a>
+    </div>
   </div>
-  <div class="escala-controles">
-    <form method="get" class="escala-setor">
-      <input type="hidden" name="inicio" value="{{ inicio|date:'Y-m-d' }}">
-      <label for="f-setor">Setor</label>
-      <select id="f-setor" name="setor" onchange="this.form.submit()">
-        <option value="">Todos os setores</option>
-        {% for v, r in setores %}<option value="{{ v }}" {% if setor == v %}selected{% endif %}>{{ r }}</option>{% endfor %}
-      </select>
-    </form>
-    {% if eh_gerente %}
-    <form method="post" action="{% url 'escala:gerar' %}"
-          onsubmit="return confirm('Gerar a escala desta semana automaticamente? As atribuições atuais do(s) setor(es) serão refeitas.');">
+
+  <div class="escala-topo">
+    <div class="escala-semana">
+      <a href="?inicio={{ anterior|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro" aria-label="Semana anterior">‹</a>
+      <span class="escala-periodo">{{ inicio|date:"d/m" }} – {{ grade.dias|last|date:"d/m/Y" }}</span>
+      <a href="?inicio={{ proximo|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro" aria-label="Próxima semana">›</a>
+    </div>
+    <div class="escala-controles">
+      <form method="get" class="escala-setor">
+        <input type="hidden" name="inicio" value="{{ inicio|date:'Y-m-d' }}">
+        <label for="f-setor">Setor</label>
+        <select id="f-setor" name="setor" onchange="this.form.submit()">
+          <option value="">Todos os setores</option>
+          {% for v, r in setores %}<option value="{{ v }}" {% if setor == v %}selected{% endif %}>{{ r }}</option>{% endfor %}
+        </select>
+      </form>
+      {% if eh_gerente %}
+      <form method="post" action="{% url 'escala:gerar' %}"
+            onsubmit="return confirm('Gerar a escala desta semana automaticamente? As atribuições atuais do(s) setor(es) serão refeitas.');">
+        {% csrf_token %}
+        <input type="hidden" name="semana" value="{{ inicio|date:'Y-m-d' }}">
+        {% if setor %}<input type="hidden" name="setor" value="{{ setor }}">{% endif %}
+        <button type="submit" class="botao-primario">⟳ Gerar semana</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  {{ ausencias_json|json_script:"escala-ausencias" }}
+
+  <div class="escala-roster" id="escala-roster">
+    <span class="escala-roster-lbl">Arraste para a grade:</span>
+    <div class="escala-roster-pills">
+      {% for f in funcionarios %}
+        <span class="rpill" draggable="true" data-func="{{ f.pk }}" title="{{ f.cargo }}{% if f.setor %} · {{ f.setor }}{% endif %}">{{ f.pessoa.nome }}</span>
+      {% endfor %}
+    </div>
+    <span class="escala-trash" id="escala-trash">🗑 soltar aqui para remover</span>
+  </div>
+
+  <div id="escala-conteudo">
+    {% include "escala/partials/grade_conteudo.html" %}
+  </div>
+
+  <section class="escala-escalar">
+    <h2>Escalar funcionário</h2>
+    <p class="escala-escalar-dica">Também pode arrastar os nomes acima direto para a grade.</p>
+    <form method="post" action="{% url 'escala:atribuir' %}">
       {% csrf_token %}
       <input type="hidden" name="semana" value="{{ inicio|date:'Y-m-d' }}">
-      {% if setor %}<input type="hidden" name="setor" value="{{ setor }}">{% endif %}
-      <button type="submit" class="botao-primario">⟳ Gerar semana</button>
+      <select name="funcionario" required aria-label="Funcionário">
+        <option value="">Funcionário…</option>
+        {% for f in funcionarios %}<option value="{{ f.pk }}">{{ f.pessoa.nome }} ({{ f.cargo }})</option>{% endfor %}
+      </select>
+      <select name="turno" required aria-label="Turno">
+        <option value="">Turno…</option>
+        {% for t in turnos %}<option value="{{ t.pk }}">{{ t }}</option>{% endfor %}
+      </select>
+      <input type="date" name="data" value="{{ hoje|date:'Y-m-d' }}" required>
+      <button type="submit" class="botao-primario">Escalar</button>
     </form>
-    {% endif %}
-  </div>
+  </section>
 </div>
 
-{% if validacao %}
-<section class="escala-val">
-  <h3>Validação</h3>
-  {% for a in validacao %}
-    <div class="escala-al escala-al-{{ a.nivel }}">
-      <span class="ic">{% if a.nivel == 'ok' %}✓{% elif a.nivel == 'perigo' %}✕{% elif a.nivel == 'aviso' %}!{% else %}i{% endif %}</span>
-      <span>{{ a.texto }}</span>
-    </div>
-  {% endfor %}
-</section>
-{% endif %}
+<script>
+(function () {
+  const page = document.getElementById('escala-page');
+  if (!page) return;
+  const url = page.dataset.editarUrl, inicio = page.dataset.inicio, setor = page.dataset.setor;
+  const csrf = () => page.querySelector('[name=csrfmiddlewaretoken]').value;
+  const ausencias = JSON.parse(document.getElementById('escala-ausencias').textContent || '[]');
+  const bloqueado = (func, data) => ausencias.some(a => String(a.func) === String(func) && a.data === data);
+  let dragged = null;  // { func, atribuicao|null }
 
-{% if grade.linhas %}
-<div class="escala-grade-wrap">
-<table class="tabela escala-grade">
-  <thead>
-    <tr>
-      <th class="escala-col-turno">Turno</th>
-      {% for d in grade.dias %}
-        <th class="{% if d == hoje %}col-hoje{% endif %}">
-          <span class="escala-dia-sem">{{ d|date:"D" }}</span>
-          <span class="escala-dia-num">{{ d|date:"d/m" }}</span>
-        </th>
-      {% endfor %}
-    </tr>
-  </thead>
-  <tbody>
-    {% for linha in grade.linhas %}
-      <tr>
-        <td class="escala-turno">
-          <strong>{{ linha.turno.nome }}</strong>
-          <small>{{ linha.turno.get_setor_display }} · {{ linha.turno.inicio|time:"H:i" }}–{{ linha.turno.fim|time:"H:i" }}</small>
-        </td>
-        {% for c in linha.celulas %}
-          <td class="escala-celula {% if c.data == hoje %}col-hoje{% endif %}">
-            {% for a in c.atribs %}
-              <span class="escala-chip">
-                <span class="escala-chip-nome">{{ a.funcionario.pessoa.nome }}</span>
-                <form method="post" action="{% url 'escala:remover_atribuicao' a.pk %}">
-                  {% csrf_token %}
-                  <input type="hidden" name="voltar" value="?inicio={{ inicio|date:'Y-m-d' }}">
-                  <button type="submit" class="chip-x" title="Remover" aria-label="Remover">&times;</button>
-                </form>
-              </span>
-            {% empty %}<span class="escala-vazio">—</span>{% endfor %}
-          </td>
-        {% endfor %}
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
-</div>
-{% else %}
-  <p class="bloco-vazio">Nenhum turno ativo. Cadastre em <a href="{% url 'escala:turnos' %}">Turnos</a>.</p>
-{% endif %}
+  function post(params) {
+    const fd = new FormData();
+    fd.append('inicio', inicio); if (setor) fd.append('setor', setor);
+    for (const k in params) fd.append(k, params[k]);
+    return fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrf() }, body: fd })
+      .then(async r => {
+        if (r.status === 400) { const j = await r.json().catch(() => ({})); throw new Error(j.erro || 'Não foi possível.'); }
+        if (!r.ok) throw new Error('Falha na operação. Tente de novo.');
+        return r.text();
+      });
+  }
+  function aplicar(html) { document.getElementById('escala-conteudo').innerHTML = html; bindConteudo(); }
+  function falhou(e) { if (window.toast) toast(e.message, 'error'); else alert(e.message); }
 
-<section class="escala-escalar">
-  <h2>Escalar funcionário</h2>
-  <form method="post" action="{% url 'escala:atribuir' %}">
-    {% csrf_token %}
-    <input type="hidden" name="semana" value="{{ inicio|date:'Y-m-d' }}">
-    <select name="funcionario" required aria-label="Funcionário">
-      <option value="">Funcionário…</option>
-      {% for f in funcionarios %}<option value="{{ f.pk }}">{{ f.pessoa.nome }} ({{ f.cargo }})</option>{% endfor %}
-    </select>
-    <select name="turno" required aria-label="Turno">
-      <option value="">Turno…</option>
-      {% for t in turnos %}<option value="{{ t.pk }}">{{ t }}</option>{% endfor %}
-    </select>
-    <input type="date" name="data" value="{{ hoje|date:'Y-m-d' }}" required>
-    <button type="submit" class="botao-primario">Escalar</button>
-  </form>
-</section>
+  function bindRoster() {
+    document.querySelectorAll('#escala-roster .rpill').forEach(p => {
+      p.addEventListener('dragstart', () => { dragged = { func: p.dataset.func, atribuicao: null }; document.body.classList.add('escala-dragging'); });
+      p.addEventListener('dragend', () => document.body.classList.remove('escala-dragging'));
+    });
+    const trash = document.getElementById('escala-trash');
+    trash.addEventListener('dragover', e => { if (dragged && dragged.atribuicao) { e.preventDefault(); trash.classList.add('over'); } });
+    trash.addEventListener('dragleave', () => trash.classList.remove('over'));
+    trash.addEventListener('drop', e => {
+      e.preventDefault(); trash.classList.remove('over');
+      if (dragged && dragged.atribuicao) post({ acao: 'remover', atribuicao: dragged.atribuicao }).then(aplicar).catch(falhou);
+    });
+  }
+  function bindConteudo() {
+    document.querySelectorAll('#escala-conteudo .escala-chip').forEach(c => {
+      c.addEventListener('dragstart', e => { dragged = { func: c.dataset.func, atribuicao: c.dataset.atribuicao }; document.body.classList.add('escala-dragging'); });
+      c.addEventListener('dragend', () => document.body.classList.remove('escala-dragging'));
+    });
+    document.querySelectorAll('#escala-conteudo .chip-x').forEach(b => {
+      b.addEventListener('click', () => post({ acao: 'remover', atribuicao: b.dataset.remover }).then(aplicar).catch(falhou));
+    });
+    document.querySelectorAll('#escala-conteudo .escala-drop').forEach(td => {
+      td.addEventListener('dragover', e => {
+        if (!dragged) return; e.preventDefault();
+        const dup = [...td.querySelectorAll('.escala-chip')].some(c => c.dataset.func === dragged.func);
+        const bad = dup || bloqueado(dragged.func, td.dataset.data);
+        td.classList.toggle('drop-bad', bad); td.classList.toggle('drop-ok', !bad);
+      });
+      td.addEventListener('dragleave', () => td.classList.remove('drop-ok', 'drop-bad'));
+      td.addEventListener('drop', e => {
+        e.preventDefault(); td.classList.remove('drop-ok', 'drop-bad');
+        if (!dragged) return;
+        const dup = [...td.querySelectorAll('.escala-chip')].some(c => c.dataset.func === dragged.func);
+        if (dup) { dragged = null; return; }
+        const params = dragged.atribuicao
+          ? { acao: 'mover', atribuicao: dragged.atribuicao, turno: td.dataset.turno, data: td.dataset.data }
+          : { acao: 'add', funcionario: dragged.func, turno: td.dataset.turno, data: td.dataset.data };
+        post(params).then(aplicar).catch(falhou);
+        dragged = null;
+      });
+    });
+  }
+  bindRoster(); bindConteudo();
+})();
+</script>
 {% endblock %}

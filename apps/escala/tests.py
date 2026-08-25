@@ -193,3 +193,54 @@ class RemoverAtribuicaoTests(TestCase):
         self.assertIn("/crm/escala/", resp.url)
         self.assertIn("inicio=2026-08-31", resp.url)
         self.assertFalse(Atribuicao.objects.filter(pk=self.a.pk).exists())
+
+
+class EditorArrastoTests(TestCase):
+    def setUp(self):
+        self.op = Usuario.objects.create_superuser(username="ed", password="senha-forte-123")
+        self.manha = Turno.objects.create(nome="Manhã", setor="recepcao",
+                                           inicio=time(7, 0), fim=time(15, 0), min_pessoas=1)
+        self.tarde = Turno.objects.create(nome="Tarde", setor="recepcao",
+                                           inicio=time(14, 30), fim=time(22, 0), min_pessoas=1)
+        p = Pessoa.objects.create(nome="Ana")
+        self.f = Funcionario.objects.create(pessoa=p, cargo="Recepção", setor="Recepção", sexo="F")
+        self.inicio = services.inicio_da_semana()
+        self.client.force_login(self.op)
+
+    def _post(self, **kw):
+        kw.setdefault("inicio", self.inicio.strftime("%Y-%m-%d"))
+        return self.client.post(reverse("escala:editar"), kw)
+
+    def test_add_por_arrasto(self):
+        r = self._post(acao="add", funcionario=self.f.pk, turno=self.manha.pk,
+                       data=self.inicio.strftime("%Y-%m-%d"))
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(Atribuicao.objects.filter(funcionario=self.f, turno=self.manha).exists())
+
+    def test_mover_entre_turnos(self):
+        a = services.atribuir(self.manha, self.f, self.inicio, self.op)
+        r = self._post(acao="mover", atribuicao=a.pk, turno=self.tarde.pk,
+                       data=self.inicio.strftime("%Y-%m-%d"))
+        self.assertEqual(r.status_code, 200)
+        a.refresh_from_db()
+        self.assertEqual(a.turno, self.tarde)
+
+    def test_remover_por_arrasto(self):
+        a = services.atribuir(self.manha, self.f, self.inicio, self.op)
+        r = self._post(acao="remover", atribuicao=a.pk)
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(Atribuicao.objects.filter(pk=a.pk).exists())
+
+    def test_add_em_ausente_retorna_erro_json(self):
+        services.registrar_ausencia(self.f, "ferias", self.inicio, self.inicio, self.op)
+        r = self._post(acao="add", funcionario=self.f.pk, turno=self.manha.pk,
+                       data=self.inicio.strftime("%Y-%m-%d"))
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("erro", r.json())
+
+    def test_mover_para_ausente_bloqueia(self):
+        a = services.atribuir(self.manha, self.f, self.inicio, self.op)
+        d1 = self.inicio + timedelta(days=1)
+        services.registrar_ausencia(self.f, "atestado", d1, d1, self.op)
+        with self.assertRaises(ValidationError):
+            services.mover(a, self.tarde, d1, self.op)

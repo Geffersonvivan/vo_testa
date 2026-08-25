@@ -1,0 +1,56 @@
+{% comment %}Validação + grade. Devolvido tal-qual pelo editor (escala:editar)
+para atualizar a tela após cada arrasto. Elementos com data-* alimentam o DnD.{% endcomment %}
+{% if validacao %}
+<section class="escala-val">
+  <h3>Validação</h3>
+  {% for a in validacao %}
+    <div class="escala-al escala-al-{{ a.nivel }}">
+      <span class="ic">{% if a.nivel == 'ok' %}✓{% elif a.nivel == 'perigo' %}✕{% elif a.nivel == 'aviso' %}!{% else %}i{% endif %}</span>
+      <span>{{ a.texto }}</span>
+    </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+{% if grade.linhas %}
+<div class="escala-grade-wrap">
+<table class="tabela escala-grade">
+  <thead>
+    <tr>
+      <th class="escala-col-turno">Turno</th>
+      {% for d in grade.dias %}
+        <th class="{% if d == hoje %}col-hoje{% endif %}">
+          <span class="escala-dia-sem">{{ d|date:"D" }}</span>
+          <span class="escala-dia-num">{{ d|date:"d/m" }}</span>
+        </th>
+      {% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for linha in grade.linhas %}
+      <tr>
+        <td class="escala-turno">
+          <strong>{{ linha.turno.nome }}</strong>
+          <small>{{ linha.turno.get_setor_display }} · {{ linha.turno.inicio|time:"H:i" }}–{{ linha.turno.fim|time:"H:i" }}</small>
+        </td>
+        {% for c in linha.celulas %}
+          <td class="escala-celula escala-drop {% if c.data == hoje %}col-hoje{% endif %}"
+              data-turno="{{ linha.turno.pk }}" data-data="{{ c.data|date:'Y-m-d' }}">
+            {% for a in c.atribs %}
+              <span class="escala-chip" draggable="true"
+                    data-atribuicao="{{ a.pk }}" data-func="{{ a.funcionario.pk }}">
+                <span class="escala-chip-nome">{{ a.funcionario.pessoa.nome }}</span>
+                <button type="button" class="chip-x" title="Remover" aria-label="Remover"
+                        data-remover="{{ a.pk }}">&times;</button>
+              </span>
+            {% endfor %}
+          </td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+  <p class="bloco-vazio">Nenhum turno ativo. Cadastre em <a href="{% url 'escala:turnos' %}">Turnos</a>.</p>
+{% endif %}

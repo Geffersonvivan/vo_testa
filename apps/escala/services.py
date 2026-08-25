@@ -83,6 +83,40 @@ def desatribuir(atribuicao):
     atribuicao.delete()
 
 
+def mover(atribuicao, novo_turno, nova_data, operador=None):
+    """Move uma atribuição para outro turno/dia (arrasto na grade). Bloqueia
+    ausência e duplicata (o mesmo funcionário no mesmo turno×dia)."""
+    if ausencia_no_dia(atribuicao.funcionario, nova_data):
+        raise ValidationError(
+            f"{atribuicao.funcionario.pessoa.nome} está ausente em {nova_data:%d/%m}."
+        )
+    duplicata = (
+        Atribuicao.objects
+        .filter(turno=novo_turno, funcionario=atribuicao.funcionario, data=nova_data)
+        .exclude(pk=atribuicao.pk).exists()
+    )
+    if duplicata:
+        raise ValidationError("Esse funcionário já está nesse turno neste dia.")
+    atribuicao.turno = novo_turno
+    atribuicao.data = nova_data
+    atribuicao.save(update_fields=["turno", "data"])
+    return atribuicao
+
+
+def ausencias_da_semana(inicio):
+    """[(funcionario_id, 'YYYY-MM-DD')] das ausências que tocam a semana — o
+    editor usa para acender de vermelho a célula inválida ao arrastar."""
+    fim = inicio + timedelta(days=6)
+    bloqueios = []
+    for au in Ausencia.objects.filter(inicio__lte=fim, fim__gte=inicio):
+        d = max(au.inicio, inicio)
+        ate = min(au.fim, fim)
+        while d <= ate:
+            bloqueios.append({"func": au.funcionario_id, "data": d.strftime("%Y-%m-%d")})
+            d += timedelta(days=1)
+    return bloqueios
+
+
 def grade_semana(inicio, setor=None):
     """Estrutura para a grade: por turno (linha) × 7 dias, com os funcionários."""
     from .models import Turno

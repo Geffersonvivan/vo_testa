@@ -2913,3 +2913,38 @@ form.htmx-request input { opacity: .7; }
 .escala-al-perigo { background: var(--perigo-bg); color: var(--perigo); border-color: rgba(177,58,42,.25); }
 .escala-al-aviso { background: var(--alerta-bg); color: var(--alerta); border-color: rgba(184,121,31,.25); }
 .escala-al-info { background: var(--info-bg); color: var(--info); border-color: rgba(42,107,120,.2); }
+
+/* ============ Escala — editor por arrasto (roster + drop states) ============ */
+.escala-roster {
+  display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+  background: var(--superficie); border: 1px solid var(--fio); border-radius: var(--raio-g);
+  box-shadow: var(--sombra-1); padding: .7rem .9rem; margin-bottom: 1rem;
+}
+.escala-roster-lbl { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--tinta-suave); }
+.escala-roster-pills { display: flex; gap: .4rem; flex-wrap: wrap; flex: 1; }
+.rpill {
+  display: inline-flex; align-items: center; background: #fff; border: 1px solid var(--fio);
+  color: var(--tinta); border-radius: 999px; padding: .32rem .8rem; font-size: .82rem; font-weight: 600;
+  cursor: grab; transition: box-shadow .12s, transform .1s, border-color .12s;
+}
+.rpill:hover { border-color: var(--lampiao); box-shadow: 0 2px 8px rgba(215,160,72,.18); }
+.rpill:active { cursor: grabbing; transform: scale(.97); }
+.escala-trash {
+  display: inline-flex; align-items: center; gap: .3rem; font-size: .78rem; color: var(--tinta-suave);
+  border: 1.5px dashed var(--fio-forte); border-radius: var(--raio-p); padding: .45rem .8rem; transition: all .12s;
+}
+.escala-trash.over { border-color: var(--perigo); background: var(--perigo-bg); color: var(--perigo); }
+
+/* célula alvo durante o arrasto */
+.escala-drop { transition: background .1s, box-shadow .1s; }
+body.escala-dragging .escala-drop { cursor: copy; }
+.escala-drop.drop-ok { background: rgba(42,122,88,.14); box-shadow: inset 0 0 0 2px var(--sucesso); }
+.escala-drop.drop-bad { background: var(--perigo-bg); box-shadow: inset 0 0 0 2px var(--perigo); cursor: not-allowed; }
+.escala-chip[draggable="true"] { cursor: grab; }
+.escala-chip[draggable="true"]:active { cursor: grabbing; }
+.escala-escalar-dica { color: var(--tinta-suave); font-size: .82rem; margin: -.4rem 0 .7rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rpill { transition: box-shadow .12s, border-color .12s; }
+  .rpill:active { transform: none; }
+}
