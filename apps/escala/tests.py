@@ -110,3 +110,63 @@ class ResumoFuncionarioTests(EscalaBase):
         self.assertEqual(r["dias_trabalhados"], 2)
         self.assertEqual(r["horas_trabalhadas"], 16.0)  # turno 07–15h = 8h × 2 dias
         self.assertEqual(r["dias_ausente"], 2)
+
+
+class GeradorTests(TestCase):
+    """Motor de escala: cobertura, interjornada 11h, DSR, domingo por sexo."""
+
+    def setUp(self):
+        self.op = Usuario.objects.create_superuser(username="gestor", password="senha-forte-123")
+        self.manha = Turno.objects.create(nome="Manhã", setor="recepcao",
+                                           inicio=time(7, 0), fim=time(15, 0), min_pessoas=1)
+        self.tarde = Turno.objects.create(nome="Tarde", setor="recepcao",
+                                           inicio=time(14, 30), fim=time(22, 0), min_pessoas=1)
+        self.funcs = []
+        for nome, sx in [("Ana", "F"), ("Bruno", "M"), ("Carla", "F")]:
+            p = Pessoa.objects.create(nome=nome)
+            self.funcs.append(Funcionario.objects.create(
+                pessoa=p, cargo="Recepção", setor="Recepção", sexo=sx))
+        self.inicio = services.inicio_da_semana()
+        self.dias = [self.inicio + timedelta(days=n) for n in range(7)]
+
+    def test_gera_cobertura_completa(self):
+        services.gerar_semana(self.inicio, self.op)
+        for t in (self.manha, self.tarde):
+            for d in self.dias:
+                tem = Atribuicao.objects.filter(turno=t, data=d).count()
+                self.assertGreaterEqual(tem, t.min_pessoas, f"{t.nome} {d} descoberto")
+
+    def test_nunca_tarde_seguido_de_manha(self):
+        services.gerar_semana(self.inicio, self.op)
+        for f in self.funcs:
+            por_data = {a.data: a.turno_id for a in Atribuicao.objects.filter(funcionario=f)}
+            for d in self.dias[:-1]:
+                if por_data.get(d) == self.tarde.pk:
+                    self.assertNotEqual(por_data.get(d + timedelta(days=1)), self.manha.pk,
+                                        f"{f.pessoa.nome}: tarde→manhã viola interjornada")
+
+    def test_todos_tem_folga_na_semana(self):
+        services.gerar_semana(self.inicio, self.op)
+        for f in self.funcs:
+            dias_trab = Atribuicao.objects.filter(funcionario=f).values("data").distinct().count()
+            self.assertLessEqual(dias_trab, 6, f"{f.pessoa.nome} sem folga (DSR)")
+
+    def test_folga_domingo_por_sexo(self):
+        # ♀ folga 2 de 4 domingos; ♂ folga 1 de 4 — em qualquer ciclo.
+        mulher, homem = self.funcs[0], self.funcs[1]
+        f_count = sum(services.folga_domingo(mulher, i) for i in range(4))
+        m_count = sum(services.folga_domingo(homem, i) for i in range(4))
+        self.assertEqual(f_count, 2)
+        self.assertEqual(m_count, 1)
+
+    def test_respeita_ausencia_na_geracao(self):
+        services.registrar_ausencia(self.funcs[0], "ferias", self.dias[0], self.dias[6], self.op)
+        services.gerar_semana(self.inicio, self.op)
+        self.assertFalse(Atribuicao.objects.filter(funcionario=self.funcs[0]).exists())
+
+    def test_validacao_acusa_cobertura_faltando(self):
+        # 1 só funcionário para 2 turnos/dia → algum dia fica descoberto.
+        Funcionario.objects.exclude(pk=self.funcs[0].pk).delete()
+        services.gerar_semana(self.inicio, self.op)
+        alertas = services.validar_semana(self.inicio)
+        self.assertTrue(any(a["nivel"] == "perigo" for a in alertas))

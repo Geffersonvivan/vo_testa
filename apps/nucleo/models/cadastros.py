@@ -148,6 +148,34 @@ class Funcionario(models.Model):
     salario = models.DecimalField(
         "salário base (R$)", max_digits=10, decimal_places=2, null=True, blank=True
     )
+
+    # Escala — parâmetros usados pelo gerador (regra de domingo por sexo e a
+    # forma de compensar excedente/feriado, definida com o colaborador).
+    class Sexo(models.TextChoices):
+        FEMININO = "F", "Feminino"
+        MASCULINO = "M", "Masculino"
+
+    class RegimeHoras(models.TextChoices):
+        BANCO = "banco", "Banco de horas"
+        EXTRA = "extra", "Hora extra"
+
+    class CompensacaoFeriado(models.TextChoices):
+        FOLGA = "folga", "Folga compensatória"
+        DOBRO = "dobro", "Pagamento em dobro"
+
+    sexo = models.CharField(
+        "sexo", max_length=1, choices=Sexo.choices, blank=True,
+        help_text="Regra de domingo na escala: ♀ folga 2 de 4, ♂ folga 1 de 4.",
+    )
+    regime_horas = models.CharField(
+        "excedente de jornada", max_length=6, choices=RegimeHoras.choices,
+        default=RegimeHoras.BANCO,
+    )
+    compensacao_feriado = models.CharField(
+        "feriado trabalhado", max_length=6, choices=CompensacaoFeriado.choices,
+        default=CompensacaoFeriado.FOLGA,
+    )
+
     usuario = models.OneToOneField(
         "nucleo.Usuario", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="funcionario", verbose_name="usuário do sistema",

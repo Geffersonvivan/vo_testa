@@ -28,7 +28,28 @@
       </select>
     </div>
   </form>
+  {% if eh_gerente %}
+  <form method="post" action="{% url 'escala:gerar' %}"
+        onsubmit="return confirm('Gerar a escala desta semana automaticamente? As atribuições atuais do(s) setor(es) serão refeitas.');">
+    {% csrf_token %}
+    <input type="hidden" name="semana" value="{{ inicio|date:'Y-m-d' }}">
+    {% if setor %}<input type="hidden" name="setor" value="{{ setor }}">{% endif %}
+    <button type="submit" class="botao-primario">⟳ Gerar semana</button>
+  </form>
+  {% endif %}
 </div>
+
+{% if validacao %}
+<section class="escala-val">
+  <h3>Validação</h3>
+  {% for a in validacao %}
+    <div class="escala-al escala-al-{{ a.nivel }}">
+      <span class="ic">{% if a.nivel == 'ok' %}✓{% elif a.nivel == 'perigo' %}✕{% elif a.nivel == 'aviso' %}!{% else %}i{% endif %}</span>
+      <span>{{ a.texto }}</span>
+    </div>
+  {% endfor %}
+</section>
+{% endif %}
 
 {% if grade.linhas %}
 <table class="tabela escala-grade">

@@ -40,7 +40,22 @@ def escala(request):
         "funcionarios": _funcionarios(),
         "turnos": Turno.objects.filter(ativo=True),
         "hoje": timezone.localdate(),
+        "validacao": services.validar_semana(inicio, setor),
     })
+
+
+@requer_gerencia
+def gerar_semana(request):
+    """Gera a escala da semana automaticamente (gestão) e mostra o resultado."""
+    inicio = services.inicio_da_semana(_data(request.POST.get("semana")))
+    setor = request.POST.get("setor") or None
+    if request.method == "POST":
+        n = services.gerar_semana(inicio, request.user, setor)
+        messages.success(request, f"Escala gerada: {n} atribuições. Ajuste o que precisar.")
+    destino = f"{reverse('escala:grade')}?inicio={inicio:%Y-%m-%d}"
+    if setor:
+        destino += f"&setor={setor}"
+    return redirect(destino)
 
 
 @requer_modulo(Modulo.ESCALA)

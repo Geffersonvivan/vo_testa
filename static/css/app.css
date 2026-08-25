@@ -2829,3 +2829,14 @@ form.htmx-request input { opacity: .7; }
   .lb-btn-ghost:active, .lb-btn-ok:active, .lb-resolver summary:active, .lb-tab:active { transform: none; }
   .lb-btn-ghost, .lb-btn-ok, .lb-tab, .lb-resolver summary { transition: background-color .12s ease; }
 }
+
+/* ============ Escala — painel de validação ============ */
+.escala-val { background: var(--superficie); border: 1px solid var(--fio); border-radius: var(--raio-g); box-shadow: var(--sombra-1); padding: .9rem 1.1rem; margin: 1.1rem 0; }
+.escala-val h3 { margin: 0 0 .6rem; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--tinta-suave); }
+.escala-al { display: flex; gap: .55rem; align-items: flex-start; font-size: .88rem; padding: .45rem .7rem; border-radius: var(--raio-p); border: 1px solid transparent; margin-bottom: .4rem; }
+.escala-al:last-child { margin-bottom: 0; }
+.escala-al .ic { font-weight: 800; flex-shrink: 0; }
+.escala-al-ok { background: var(--sucesso-bg); color: var(--sucesso); border-color: rgba(42,122,88,.2); }
+.escala-al-perigo { background: var(--perigo-bg); color: var(--perigo); border-color: rgba(177,58,42,.25); }
+.escala-al-aviso { background: var(--alerta-bg); color: var(--alerta); border-color: rgba(184,121,31,.25); }
+.escala-al-info { background: var(--info-bg); color: var(--info); border-color: rgba(42,107,120,.2); }

@@ -1,12 +1,18 @@
 from django.contrib import admin
 
-from .models import Atribuicao, Ausencia, TrocaTurno, Turno
+from .models import Atribuicao, Ausencia, Feriado, TrocaTurno, Turno
 
 
 @admin.register(Turno)
 class TurnoAdmin(admin.ModelAdmin):
-    list_display = ("nome", "setor", "inicio", "fim", "ativo")
+    list_display = ("nome", "setor", "inicio", "fim", "min_pessoas", "ativo")
     list_filter = ("setor", "ativo")
+
+
+@admin.register(Feriado)
+class FeriadoAdmin(admin.ModelAdmin):
+    list_display = ("data", "nome", "municipal")
+    list_filter = ("municipal",)
 
 
 @admin.register(Atribuicao)

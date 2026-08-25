@@ -6,6 +6,7 @@ app_name = "escala"
 
 urlpatterns = [
     path("", views.escala, name="grade"),
+    path("gerar/", views.gerar_semana, name="gerar"),
     path("atribuir/", views.atribuir, name="atribuir"),
     path("atribuicao/<int:pk>/remover/", views.remover_atribuicao, name="remover_atribuicao"),
     path("minha/", views.minha_escala, name="minha"),

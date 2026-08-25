@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Escala da semana</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --canvas:#EEF2F3; --superficie:#FAFCFC; --superficie-2:#F3F7F8; --lampiao:#E2A84A; --lampiao-claro:#F0C97A;
+    --noturno:#04151F; --tinta:#0E1C24; --tinta-suave:#5A6B75; --fio:#D5DEE3; --fio-forte:#B8C5CD;
+    --info:#2A6B78; --info-bg:#E7F0F2; --perigo:#B13A2A; --perigo-bg:#FBF3F1;
+    --sucesso:#2A7A58; --sucesso-bg:#E6F2EC; --alerta:#B8791F; --alerta-bg:#FBF2E1;
+    --raio:12px; --raio-g:18px; --raio-p:8px; --sombra-1:0 1px 2px rgba(4,21,31,.05); --sombra-2:0 4px 14px rgba(4,21,31,.07);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--canvas);color:var(--tinta);padding:28px;line-height:1.45}
+  .wrap{max-width:1160px;margin:0 auto}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--info)}
+  h1{font-family:'Playfair Display',serif;font-size:32px;font-weight:800;margin:3px 0 3px}
+  .sub{color:var(--tinta-suave);font-size:14.5px;margin-bottom:18px}
+  .topbar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
+  .nav{display:flex;gap:6px}
+  .btn{border:1px solid var(--fio);background:#fff;color:var(--tinta);font-weight:600;border-radius:var(--raio-p);padding:8px 14px;font-size:13px;cursor:pointer}
+  .btn-primary{background:linear-gradient(180deg,var(--lampiao-claro),var(--lampiao));border:none;color:#3a2a08;box-shadow:0 6px 16px rgba(215,160,72,.28)}
+  .sem{font-weight:700;font-size:15px;margin-left:6px}
+  .sem small{color:var(--tinta-suave);font-weight:500}
+
+  .painel{background:var(--superficie);border:1px solid var(--fio);border-radius:var(--raio-g);box-shadow:var(--sombra-1);padding:14px 18px;margin-bottom:18px}
+  .painel h3{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--tinta-suave);margin-bottom:10px}
+  .alertas{display:flex;flex-direction:column;gap:7px}
+  .al{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;padding:7px 11px;border-radius:var(--raio-p);border:1px solid transparent}
+  .al .ic{font-weight:800;flex-shrink:0}
+  .al-ok{background:var(--sucesso-bg);color:var(--sucesso);border-color:rgba(42,122,88,.2)}
+  .al-warn{background:var(--alerta-bg);color:var(--alerta);border-color:rgba(184,121,31,.25)}
+  .al-info{background:var(--info-bg);color:var(--info);border-color:rgba(42,107,120,.2)}
+
+  .setor{margin-bottom:22px}
+  .setor-tit{font-family:'Playfair Display',serif;font-size:19px;font-weight:700;margin:6px 0 10px;display:flex;align-items:center;gap:9px}
+  .setor-tit .cob{font-family:'Inter';font-size:11px;font-weight:700;color:var(--info);background:var(--info-bg);padding:2px 9px;border-radius:999px}
+  table{width:100%;border-collapse:separate;border-spacing:0;background:var(--superficie);border:1px solid var(--fio);border-radius:var(--raio-g);overflow:hidden;box-shadow:var(--sombra-1)}
+  th,td{padding:0;text-align:center;font-size:12.5px;border-right:1px solid var(--fio);border-bottom:1px solid var(--fio)}
+  th:last-child,td:last-child{border-right:none}
+  thead th{background:var(--superficie-2);color:var(--tinta-suave);font-weight:700;padding:9px 4px;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em}
+  thead th.dom{color:var(--alerta)}
+  .turno-lbl{text-align:left;padding:10px 12px;font-weight:700;background:var(--superficie-2);min-width:150px}
+  .turno-lbl small{display:block;color:var(--tinta-suave);font-weight:500;font-size:11px}
+  td.cell{padding:8px 6px;vertical-align:top;min-height:56px}
+  td.dom{background:rgba(184,121,31,.05)}
+  td.falta{background:var(--perigo-bg)}
+  .chip{display:inline-flex;align-items:center;gap:5px;background:var(--superficie-2);border:1px solid var(--fio);border-radius:999px;padding:3px 9px 3px 4px;margin:2px;font-weight:600;font-size:12px}
+  .av{width:19px;height:19px;border-radius:50%;background:var(--noturno);color:var(--lampiao-claro);display:inline-flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:700}
+  .sx{width:7px;height:7px;border-radius:50%;display:inline-block;margin-left:2px}
+  .sx-f{background:#C879A6}.sx-m{background:#4F8FC8}
+  .folga{color:var(--tinta-suave);font-size:11px;font-style:italic}
+  .ferias{color:var(--info);font-size:11px}
+  .cob-ok{font-size:10px;color:var(--sucesso);font-weight:700;display:block;margin-top:3px}
+  .cob-bad{font-size:10px;color:var(--perigo);font-weight:700;display:block;margin-top:3px}
+  .domrule{font-size:10px;color:var(--alerta);display:block;margin-top:4px;font-weight:600}
+
+  .legenda{display:flex;gap:18px;flex-wrap:wrap;font-size:12.5px;color:var(--tinta-suave);margin-top:8px}
+  .legenda b{color:var(--tinta)}
+  .note{margin-top:22px;font-size:13.5px;color:var(--tinta-suave);background:var(--info-bg);border:1px solid #cfe0e4;border-radius:var(--raio);padding:14px 18px;line-height:1.6}
+  .note b{color:var(--info)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Equipe · Escala</div>
+  <h1>Escala da semana</h1>
+  <p class="sub">Puxa os funcionários por setor e monta o calendário aplicando as regras. Domingo se adapta ao sexo (♀ 2 de 4 · ♂ 3 de 4).</p>
+
+  <div class="topbar">
+    <div class="nav"><button class="btn">← Anterior</button><button class="btn">Hoje</button><button class="btn">Seguinte →</button></div>
+    <span class="sem">Semana 09–15/mar <small>· ciclo 2 de 4</small></span>
+    <span style="flex:1"></span>
+    <button class="btn">Validar</button>
+    <button class="btn btn-primary">⟳ Gerar semana</button>
+  </div>
+
+  <!-- PAINEL DE VALIDAÇÃO -->
+  <div class="painel">
+    <h3>Validação</h3>
+    <div class="alertas">
+      <div class="al al-ok"><span class="ic">✓</span><span><b>Cobertura completa</b> nos 7 dias — recepção 1/turno e camareira 2/turno atendidas.</span></div>
+      <div class="al al-ok"><span class="ic">✓</span><span><b>Interjornada 11h respeitada</b> — nenhuma sequência tarde→manhã. DSR ok (ninguém 7 dias seguidos).</span></div>
+      <div class="al al-ok"><span class="ic">✓</span><span><b>Domingo</b> — Carla (♀) folga (2ª quinzena, art. 386); Bruno (♂) trabalha (folga 22/mar, 1/mês).</span></div>
+      <div class="al al-warn"><span class="ic">!</span><span><b>Atenção — férias em 23/mar:</b> Ana entra de férias; com 3 recepcionistas sobram 2 → cobertura cai abaixo do mínimo. Acione um coringa/diarista para a semana 23–29.</span></div>
+      <div class="al al-info"><span class="ic">i</span><span><b>Feriado 21/mar (municipal Itá-SC):</b> tratar como domingo — Elena optou por <b>pagamento em dobro</b>; Dora por <b>folga compensatória</b> (config por funcionário).</span></div>
+    </div>
+  </div>
+
+  <!-- RECEPÇÃO -->
+  <div class="setor">
+    <div class="setor-tit">Recepção <span class="cob">mín. 1 por turno · 3 funcionários</span></div>
+    <table>
+      <thead><tr><th></th><th>SEG 09</th><th>TER 10</th><th>QUA 11</th><th>QUI 12</th><th>SEX 13</th><th>SÁB 14</th><th class="dom">DOM 15</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="turno-lbl">Manhã<small>07:00–15:00</small></td>
+          <td class="cell"><span class="chip"><span class="av">AN</span>Ana<span class="sx sx-f"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell"><span class="chip"><span class="av">BR</span>Bruno<span class="sx sx-m"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell"><span class="chip"><span class="av">AN</span>Ana<span class="sx sx-f"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell"><span class="chip"><span class="av">AN</span>Ana<span class="sx sx-f"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell"><span class="chip"><span class="av">BR</span>Bruno<span class="sx sx-m"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell"><span class="chip"><span class="av">AN</span>Ana<span class="sx sx-f"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell dom"><span class="chip"><span class="av">BR</span>Bruno<span class="sx sx-m"></span></span><span class="cob-ok">1/1</span><span class="domrule">♂ 3/4 domingos</span></td>
+        </tr>
+        <tr>
+          <td class="turno-lbl">Tarde<small>14:30–22:00</small></td>
+          <td class="cell"><span class="chip"><span class="av">CA</span>Carla<span class="sx sx-f"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell"><span class="chip"><span class="av">CA</span>Carla<span class="sx sx-f"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell"><span class="chip"><span class="av">BR</span>Bruno<span class="sx sx-m"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell"><span class="chip"><span class="av">CA</span>Carla<span class="sx sx-f"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell"><span class="chip"><span class="av">CA</span>Carla<span class="sx sx-f"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell"><span class="chip"><span class="av">BR</span>Bruno<span class="sx sx-m"></span></span><span class="cob-ok">1/1</span></td>
+          <td class="cell dom"><span class="chip"><span class="av">AN</span>Ana<span class="sx sx-f"></span></span><span class="cob-ok">1/1</span><span class="domrule">♀ 2/4 · Carla folga</span></td>
+        </tr>
+        <tr>
+          <td class="turno-lbl" style="color:var(--tinta-suave)">Folga</td>
+          <td class="cell"><span class="folga">Bruno</span></td>
+          <td class="cell"><span class="folga">Ana</span></td>
+          <td class="cell"><span class="folga">Carla</span></td>
+          <td class="cell"><span class="folga">Bruno</span></td>
+          <td class="cell"><span class="folga">Ana</span></td>
+          <td class="cell"><span class="folga">Carla</span></td>
+          <td class="cell dom"><span class="folga">Carla</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- CAMAREIRAS -->
+  <div class="setor">
+    <div class="setor-tit">Camareiras <span class="cob">mín. 2 por turno · 3 funcionárias</span></div>
+    <table>
+      <thead><tr><th></th><th>SEG 09</th><th>TER 10</th><th>QUA 11</th><th>QUI 12</th><th>SEX 13</th><th>SÁB 14</th><th class="dom">DOM 15</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="turno-lbl">Diurno<small>07:30–15:30</small></td>
+          <td class="cell"><span class="chip"><span class="av">DO</span>Dora<span class="sx sx-f"></span></span><span class="chip"><span class="av">EL</span>Elena<span class="sx sx-f"></span></span><span class="cob-ok">2/2</span></td>
+          <td class="cell"><span class="chip"><span class="av">EL</span>Elena<span class="sx sx-f"></span></span><span class="chip"><span class="av">FA</span>Fabi<span class="sx sx-f"></span></span><span class="cob-ok">2/2</span></td>
+          <td class="cell"><span class="chip"><span class="av">DO</span>Dora<span class="sx sx-f"></span></span><span class="chip"><span class="av">FA</span>Fabi<span class="sx sx-f"></span></span><span class="cob-ok">2/2</span></td>
+          <td class="cell"><span class="chip"><span class="av">DO</span>Dora<span class="sx sx-f"></span></span><span class="chip"><span class="av">EL</span>Elena<span class="sx sx-f"></span></span><span class="cob-ok">2/2</span></td>
+          <td class="cell"><span class="chip"><span class="av">EL</span>Elena<span class="sx sx-f"></span></span><span class="chip"><span class="av">FA</span>Fabi<span class="sx sx-f"></span></span><span class="cob-ok">2/2</span></td>
+          <td class="cell"><span class="chip"><span class="av">DO</span>Dora<span class="sx sx-f"></span></span><span class="chip"><span class="av">FA</span>Fabi<span class="sx sx-f"></span></span><span class="cob-ok">2/2</span></td>
+          <td class="cell dom"><span class="chip"><span class="av">DO</span>Dora<span class="sx sx-f"></span></span><span class="chip"><span class="av">EL</span>Elena<span class="sx sx-f"></span></span><span class="cob-ok">2/2</span><span class="domrule">♀ 2/4 · Fabi folga</span></td>
+        </tr>
+        <tr>
+          <td class="turno-lbl" style="color:var(--tinta-suave)">Folga</td>
+          <td class="cell"><span class="folga">Fabi</span></td>
+          <td class="cell"><span class="folga">Dora</span></td>
+          <td class="cell"><span class="folga">Elena</span></td>
+          <td class="cell"><span class="folga">Fabi</span></td>
+          <td class="cell"><span class="folga">Dora</span></td>
+          <td class="cell"><span class="folga">Elena</span></td>
+          <td class="cell dom"><span class="folga">Fabi</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="legenda">
+    <span><span class="sx sx-f" style="width:9px;height:9px"></span> <b>♀</b> mulher (2/4 domingos)</span>
+    <span><span class="sx sx-m" style="width:9px;height:9px"></span> <b>♂</b> homem (3/4 domingos)</span>
+    <span><b>Folga</b> · descanso semanal</span>
+    <span><b>1/1 · 2/2</b> cobertura atingida</span>
+    <span style="color:var(--alerta)"><b>♀/♂ x/4</b> regra de domingo aplicada</span>
+  </div>
+
+  <div class="note">
+    <b>O que a tela faz:</b> puxa os funcionários por setor, aplica o <b>IF de domingo por sexo</b> (♀ 2/4, ♂ 3/4, girando no ciclo de 4 semanas), respeita <b>cobertura mínima</b> (recepção 1, camareira 2), <b>interjornada de 11h</b> (nunca tarde→manhã), <b>DSR</b> e <b>ausências/férias</b>. O <b>painel de validação</b> acende alerta quando algo fura — inclusive o aviso de <b>cobertura em risco nas férias</b> (3 pessoas não cobrem 30 dias de férias sozinhas). <b>Banco de horas × extra</b> e <b>folga × dobro no feriado</b> são escolhas por funcionário, configuráveis. Este é o mockup do comportamento; ao aprovar, implemento o motor (campos + gerador + validação) no módulo Escala.
+  </div>
+</div>
+</body>
+</html>

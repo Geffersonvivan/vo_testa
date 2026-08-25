@@ -20,6 +20,10 @@ class Turno(models.Model):
                              default=Setor.GERAL)
     inicio = models.TimeField("início")
     fim = models.TimeField("fim")
+    min_pessoas = models.PositiveSmallIntegerField(
+        "cobertura mínima", default=1,
+        help_text="Quantos funcionários o gerador deve alocar neste turno por dia.",
+    )
     ativo = models.BooleanField("ativo", default=True)
 
     class Meta:
@@ -29,6 +33,25 @@ class Turno(models.Model):
 
     def __str__(self):
         return f"{self.get_setor_display()} · {self.nome} ({self.inicio:%H:%M}–{self.fim:%H:%M})"
+
+
+class Feriado(models.Model):
+    """Feriado que o gerador/validador tratam como domingo (folga compensatória
+    ou dobro, conforme a escolha de cada funcionário)."""
+
+    data = models.DateField("data", unique=True)
+    nome = models.CharField("nome", max_length=80)
+    municipal = models.BooleanField(
+        "municipal", default=False, help_text="Feriado municipal de Itá/SC (não nacional)."
+    )
+
+    class Meta:
+        verbose_name = "feriado"
+        verbose_name_plural = "feriados"
+        ordering = ["data"]
+
+    def __str__(self):
+        return f"{self.data:%d/%m/%Y} — {self.nome}"
 
 
 class Atribuicao(models.Model):
