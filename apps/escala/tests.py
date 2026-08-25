@@ -170,3 +170,26 @@ class GeradorTests(TestCase):
         services.gerar_semana(self.inicio, self.op)
         alertas = services.validar_semana(self.inicio)
         self.assertTrue(any(a["nivel"] == "perigo" for a in alertas))
+
+
+class RemoverAtribuicaoTests(TestCase):
+    def setUp(self):
+        self.op = Usuario.objects.create_superuser(username="ch2", password="senha-forte-123")
+        self.t = Turno.objects.create(nome="Manhã", setor="recepcao",
+                                      inicio=time(7, 0), fim=time(15, 0))
+        p = Pessoa.objects.create(nome="Zé")
+        self.f = Funcionario.objects.create(pessoa=p, cargo="Recepção")
+        self.hoje = timezone.localdate()
+        self.a = services.atribuir(self.t, self.f, self.hoje, self.op)
+        self.client.force_login(self.op)
+
+    def test_remover_com_voltar_query_redireciona(self):
+        # regressão: "voltar" = "?inicio=…" não pode virar NoReverseMatch
+        resp = self.client.post(
+            reverse("escala:remover_atribuicao", args=[self.a.pk]),
+            {"voltar": "?inicio=2026-08-31"},
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/crm/escala/", resp.url)
+        self.assertIn("inicio=2026-08-31", resp.url)
+        self.assertFalse(Atribuicao.objects.filter(pk=self.a.pk).exists())

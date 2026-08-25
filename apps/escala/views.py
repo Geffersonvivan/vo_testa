@@ -79,7 +79,10 @@ def remover_atribuicao(request, pk):
     if request.method == "POST":
         services.desatribuir(atrib)
         messages.success(request, "Atribuição removida.")
-    destino = request.POST.get("voltar") or "escala:grade"
+    # "voltar" vem como query string (?inicio=…); redirect() reverte nome de rota,
+    # então prefixa a URL base da grade para não dar NoReverseMatch.
+    voltar = request.POST.get("voltar", "")
+    destino = reverse("escala:grade") + voltar if voltar.startswith("?") else reverse("escala:grade")
     return redirect(destino)
 
 
