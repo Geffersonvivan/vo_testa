@@ -2254,21 +2254,94 @@ form.filtros:not(.subnav) select:focus {
 .filtro-aplicar { margin-left: auto; align-self: flex-end; height: 40px; }
 .filtro-aplicar:active { transform: scale(.98); }
 
-/* Escala — grade semanal */
-.escala-grade td, .escala-grade th { vertical-align: top; }
-.escala-grade .col-hoje { background: var(--pergaminho); }
-.escala-turno small { display: block; color: var(--tinta-suave); font-size: .72rem; }
+/* ============ Escala — barra de topo, grade e controles (alinhado) ============ */
+.escala-topo {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1rem; flex-wrap: wrap; margin: .2rem 0 1.2rem;
+}
+.escala-semana { display: flex; align-items: center; gap: .5rem; }
+.escala-semana .botao-neutro {
+  min-width: 2.2rem; padding: .5rem .7rem; text-align: center; font-size: 1.05rem; line-height: 1;
+}
+.escala-periodo {
+  font-weight: 700; font-size: .95rem; color: var(--tinta);
+  font-variant-numeric: tabular-nums; letter-spacing: .01em; min-width: 12.5rem; text-align: center;
+}
+.escala-controles { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+.escala-setor { display: flex; align-items: center; gap: .5rem; }
+.escala-setor label {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--tinta-suave);
+}
+
+/* Selects/data desta tela no padrão do sistema (borda, raio, foco lampião) */
+.escala-setor select,
+.escala-escalar select,
+.escala-escalar input[type="date"] {
+  border: 1px solid var(--fio); border-radius: var(--raio-p); background: #fff;
+  color: var(--tinta); font: inherit; font-size: .88rem; padding: .5rem .7rem;
+  transition: border-color .15s, box-shadow .15s;
+}
+.escala-setor select:focus,
+.escala-escalar select:focus,
+.escala-escalar input[type="date"]:focus {
+  outline: none; border-color: var(--lampiao); box-shadow: 0 0 0 3px rgba(215,160,72,.22);
+}
+
+/* Grade */
+.escala-grade-wrap { overflow-x: auto; border-radius: var(--raio-g); border: 1px solid var(--fio); box-shadow: var(--sombra-1); }
+.escala-grade { margin: 0; border: none; box-shadow: none; min-width: 900px; }
+.escala-grade thead th {
+  background: var(--superficie-2); color: var(--tinta-suave);
+  font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  padding: .7rem .6rem; text-align: left; vertical-align: middle; border-bottom: 1px solid var(--fio);
+}
+.escala-grade thead th.escala-col-turno { width: 168px; }
+.escala-dia-sem { display: block; color: var(--tinta); }
+.escala-dia-num { display: block; font-weight: 500; opacity: .7; }
+.escala-grade td { vertical-align: top; padding: .55rem .6rem; border-bottom: 1px solid var(--fio); }
+.escala-grade tbody tr:last-child td { border-bottom: none; }
+.escala-turno { background: var(--superficie-2); }
+.escala-turno strong { font-size: .9rem; }
+.escala-turno small { display: block; color: var(--tinta-suave); font-size: .72rem; margin-top: .1rem; }
+.escala-celula { min-height: 54px; }
+.escala-grade .col-hoje { background: rgba(215,160,72,.08); }
+.escala-grade thead th.col-hoje { background: rgba(215,160,72,.14); }
+
+/* Chips — elegantes: warm suave, nome em destaque, × discreto que fica vermelho */
 .escala-chip {
-  display: inline-flex; align-items: center; gap: .25rem;
-  background: var(--lampiao-claro, #F3E4C4); color: var(--noturno);
-  border-radius: 999px; padding: .15rem .2rem .15rem .55rem;
-  font-size: .78rem; margin: .12rem .12rem 0 0;
+  display: inline-flex; align-items: center; gap: .1rem;
+  background: rgba(215,160,72,.12); border: 1px solid rgba(215,160,72,.32);
+  color: var(--tinta); border-radius: 999px;
+  padding: .18rem .25rem .18rem .6rem; font-size: .78rem; font-weight: 600;
+  margin: .12rem .16rem .12rem 0; transition: transform .1s ease, box-shadow .12s ease;
 }
+.escala-chip:hover { box-shadow: 0 2px 6px rgba(4,21,31,.08); }
+.escala-chip form { display: inline-flex; margin: 0; }
+.escala-chip-nome { white-space: nowrap; }
 .chip-x {
-  border: none; background: none; cursor: pointer; color: var(--perigo);
-  font-size: .95rem; line-height: 1; padding: 0 .2rem;
+  border: none; background: none; cursor: pointer; color: var(--tinta-suave);
+  font-size: .9rem; line-height: 1; padding: 0 .18rem; border-radius: 50%;
+  transition: color .12s ease, background .12s ease, transform .1s ease;
 }
+.chip-x:hover { color: var(--perigo); background: rgba(177,58,42,.12); }
+.chip-x:active { transform: scale(.9); }
 .escala-vazio { color: var(--fio-forte); }
+
+/* Escalar funcionário — cartão limpo com controles no padrão */
+.escala-escalar {
+  background: var(--superficie); border: 1px solid var(--fio); border-radius: var(--raio-g);
+  box-shadow: var(--sombra-1); padding: 1.1rem 1.2rem; margin-top: 1.4rem; max-width: 760px;
+}
+.escala-escalar h2 { margin: 0 0 .8rem; font-size: 1.05rem; }
+.escala-escalar form { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+.escala-escalar select { flex: 1; min-width: 160px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .escala-chip, .chip-x { transition: color .12s ease, background .12s ease; }
+  .escala-chip:hover { transform: none; }
+  .chip-x:active { transform: none; }
+}
 
 .pagina-acoes { display: flex; gap: .5rem; }
 .tabela .num { text-align: right; font-variant-numeric: tabular-nums; }

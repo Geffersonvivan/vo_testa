@@ -14,29 +14,31 @@
   </div>
 </div>
 
-<div class="subnav" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
-  <a href="?inicio={{ anterior|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro">‹ Semana anterior</a>
-  <strong>{{ inicio|date:"d/m" }} – {{ grade.dias|last|date:"d/m/Y" }}</strong>
-  <a href="?inicio={{ proximo|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro">Próxima semana ›</a>
-  <form method="get" class="filtro-barra filtro-inline" style="margin-left:auto">
-    <input type="hidden" name="inicio" value="{{ inicio|date:'Y-m-d' }}">
-    <div class="filtro-campo">
-      <label>Setor</label>
-      <select name="setor" onchange="this.form.submit()">
+<div class="escala-topo">
+  <div class="escala-semana">
+    <a href="?inicio={{ anterior|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro" aria-label="Semana anterior">‹</a>
+    <span class="escala-periodo">{{ inicio|date:"d/m" }} – {{ grade.dias|last|date:"d/m/Y" }}</span>
+    <a href="?inicio={{ proximo|date:'Y-m-d' }}{% if setor %}&setor={{ setor }}{% endif %}" class="botao-neutro" aria-label="Próxima semana">›</a>
+  </div>
+  <div class="escala-controles">
+    <form method="get" class="escala-setor">
+      <input type="hidden" name="inicio" value="{{ inicio|date:'Y-m-d' }}">
+      <label for="f-setor">Setor</label>
+      <select id="f-setor" name="setor" onchange="this.form.submit()">
         <option value="">Todos os setores</option>
         {% for v, r in setores %}<option value="{{ v }}" {% if setor == v %}selected{% endif %}>{{ r }}</option>{% endfor %}
       </select>
-    </div>
-  </form>
-  {% if eh_gerente %}
-  <form method="post" action="{% url 'escala:gerar' %}"
-        onsubmit="return confirm('Gerar a escala desta semana automaticamente? As atribuições atuais do(s) setor(es) serão refeitas.');">
-    {% csrf_token %}
-    <input type="hidden" name="semana" value="{{ inicio|date:'Y-m-d' }}">
-    {% if setor %}<input type="hidden" name="setor" value="{{ setor }}">{% endif %}
-    <button type="submit" class="botao-primario">⟳ Gerar semana</button>
-  </form>
-  {% endif %}
+    </form>
+    {% if eh_gerente %}
+    <form method="post" action="{% url 'escala:gerar' %}"
+          onsubmit="return confirm('Gerar a escala desta semana automaticamente? As atribuições atuais do(s) setor(es) serão refeitas.');">
+      {% csrf_token %}
+      <input type="hidden" name="semana" value="{{ inicio|date:'Y-m-d' }}">
+      {% if setor %}<input type="hidden" name="setor" value="{{ setor }}">{% endif %}
+      <button type="submit" class="botao-primario">⟳ Gerar semana</button>
+    </form>
+    {% endif %}
+  </div>
 </div>
 
 {% if validacao %}
@@ -52,11 +54,17 @@
 {% endif %}
 
 {% if grade.linhas %}
+<div class="escala-grade-wrap">
 <table class="tabela escala-grade">
   <thead>
     <tr>
-      <th>Turno</th>
-      {% for d in grade.dias %}<th class="{% if d == hoje %}col-hoje{% endif %}">{{ d|date:"D d/m" }}</th>{% endfor %}
+      <th class="escala-col-turno">Turno</th>
+      {% for d in grade.dias %}
+        <th class="{% if d == hoje %}col-hoje{% endif %}">
+          <span class="escala-dia-sem">{{ d|date:"D" }}</span>
+          <span class="escala-dia-num">{{ d|date:"d/m" }}</span>
+        </th>
+      {% endfor %}
     </tr>
   </thead>
   <tbody>
@@ -67,14 +75,14 @@
           <small>{{ linha.turno.get_setor_display }} · {{ linha.turno.inicio|time:"H:i" }}–{{ linha.turno.fim|time:"H:i" }}</small>
         </td>
         {% for c in linha.celulas %}
-          <td class="{% if c.data == hoje %}col-hoje{% endif %}">
+          <td class="escala-celula {% if c.data == hoje %}col-hoje{% endif %}">
             {% for a in c.atribs %}
               <span class="escala-chip">
-                {{ a.funcionario.pessoa.nome }}
-                <form method="post" action="{% url 'escala:remover_atribuicao' a.pk %}" style="display:inline">
+                <span class="escala-chip-nome">{{ a.funcionario.pessoa.nome }}</span>
+                <form method="post" action="{% url 'escala:remover_atribuicao' a.pk %}">
                   {% csrf_token %}
                   <input type="hidden" name="voltar" value="?inicio={{ inicio|date:'Y-m-d' }}">
-                  <button type="submit" class="chip-x" title="Remover">&times;</button>
+                  <button type="submit" class="chip-x" title="Remover" aria-label="Remover">&times;</button>
                 </form>
               </span>
             {% empty %}<span class="escala-vazio">—</span>{% endfor %}
@@ -84,20 +92,21 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
 {% else %}
   <p class="bloco-vazio">Nenhum turno ativo. Cadastre em <a href="{% url 'escala:turnos' %}">Turnos</a>.</p>
 {% endif %}
 
-<section class="painel-bloco" style="max-width:720px;margin-top:1.4rem">
-  <h2 style="margin-top:0">Escalar funcionário</h2>
-  <form method="post" action="{% url 'escala:atribuir' %}" class="abrir-comanda">
+<section class="escala-escalar">
+  <h2>Escalar funcionário</h2>
+  <form method="post" action="{% url 'escala:atribuir' %}">
     {% csrf_token %}
     <input type="hidden" name="semana" value="{{ inicio|date:'Y-m-d' }}">
-    <select name="funcionario" required>
+    <select name="funcionario" required aria-label="Funcionário">
       <option value="">Funcionário…</option>
       {% for f in funcionarios %}<option value="{{ f.pk }}">{{ f.pessoa.nome }} ({{ f.cargo }})</option>{% endfor %}
     </select>
-    <select name="turno" required>
+    <select name="turno" required aria-label="Turno">
       <option value="">Turno…</option>
       {% for t in turnos %}<option value="{{ t.pk }}">{{ t }}</option>{% endfor %}
     </select>
