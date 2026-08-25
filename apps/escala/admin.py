@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Atribuicao, Ausencia, Feriado, TrocaTurno, Turno
+from .models import Atribuicao, Ausencia, Feriado, SemanaPublicada, TrocaTurno, Turno
 
 
 @admin.register(Turno)
@@ -34,3 +34,9 @@ class TrocaTurnoAdmin(admin.ModelAdmin):
     list_display = ("id", "atribuicao", "solicitante", "substituto", "status")
     list_filter = ("status",)
     raw_id_fields = ("atribuicao", "solicitante", "substituto", "decidido_por")
+
+
+@admin.register(SemanaPublicada)
+class SemanaPublicadaAdmin(admin.ModelAdmin):
+    list_display = ("inicio", "setor", "publicado_por", "publicado_em", "forcado")
+    list_filter = ("forcado", "setor")

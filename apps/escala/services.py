@@ -254,31 +254,60 @@ def gerar_semana(inicio, operador, setor=None, limpar=True):
     return criadas
 
 
-def validar_semana(inicio, setor=None):
-    """Alertas da semana: cobertura, interjornada, DSR, domingo e feriados.
-    Cada item = {nivel: ok|aviso|perigo|info, texto}."""
+def conflito_interjornada(funcionario, turno, data, ignora_pk=None):
+    """A escala de `funcionario` no `turno`/`data` deixa <11h de descanso em
+    relação ao dia anterior ou seguinte? (usado no drop, para pedir confirmação)."""
+    from datetime import datetime
+    viz = Atribuicao.objects.filter(
+        funcionario=funcionario, data__in=[data - timedelta(days=1), data + timedelta(days=1)]
+    ).select_related("turno")
+    if ignora_pk:
+        viz = viz.exclude(pk=ignora_pk)
+    for a in viz:
+        if a.data < data:
+            gap = datetime.combine(data, turno.inicio) - datetime.combine(a.data, a.turno.fim)
+        else:
+            gap = datetime.combine(a.data, a.turno.inicio) - datetime.combine(data, turno.fim)
+        if gap.total_seconds() / 3600 < INTERJORNADA_MIN_H:
+            return True
+    return False
+
+
+def analisar_semana(inicio, setor=None):
+    """Análise completa da semana. Devolve:
+      alertas    — lista para o painel ({nivel, texto})
+      violacoes  — {atribuicao_id: [{nivel, texto}]} para o selo em cada chip
+      bloqueios  — violações de nível legal (barram a publicação)."""
+    from datetime import datetime
+
     from .models import Feriado, Turno
 
     dias = [inicio + timedelta(days=n) for n in range(7)]
+    domingo = dias[6]
     turnos = Turno.objects.filter(ativo=True)
     if setor:
         turnos = turnos.filter(setor=setor)
     turnos = list(turnos)
+    setores = sorted({t.setor for t in turnos})
 
-    atribs = list(
-        Atribuicao.objects.filter(data__range=(dias[0], dias[-1]),
-                                  turno__in=turnos)
-        .select_related("funcionario__pessoa", "turno")
+    # Semana + 1 dia de borda (interjornada na virada domingo↔segunda).
+    borda = list(
+        Atribuicao.objects.filter(
+            data__range=(dias[0] - timedelta(days=1), dias[-1] + timedelta(days=1)),
+            turno__in=turnos,
+        ).select_related("funcionario__pessoa", "turno")
     )
-    por_slot = {}
-    por_func = {}
-    for a in atribs:
-        por_slot.setdefault((a.turno_id, a.data), []).append(a)
-        por_func.setdefault(a.funcionario_id, []).append(a)
+    atribs = [a for a in borda if dias[0] <= a.data <= dias[-1]]
 
-    alertas = []
+    violacoes, alertas, bloqueios = {}, [], []
+
+    def marca(pk, nivel, texto):
+        violacoes.setdefault(pk, []).append({"nivel": nivel, "texto": texto})
 
     # 1) Cobertura mínima por turno × dia
+    por_slot = {}
+    for a in atribs:
+        por_slot.setdefault((a.turno_id, a.data), []).append(a)
     faltas = []
     for t in turnos:
         for d in dias:
@@ -286,67 +315,81 @@ def validar_semana(inicio, setor=None):
             if tem < t.min_pessoas:
                 faltas.append(f"{t.get_setor_display()} {t.nome} {d:%d/%m} ({tem}/{t.min_pessoas})")
     if faltas:
-        alertas.append({"nivel": "perigo",
-                        "texto": "Cobertura abaixo do mínimo: " + "; ".join(faltas) + "."})
+        alertas.append({"nivel": "perigo", "texto": "Cobertura abaixo do mínimo: " + "; ".join(faltas) + "."})
+        bloqueios.append("cobertura abaixo do mínimo")
     else:
-        alertas.append({"nivel": "ok",
-                        "texto": "Cobertura completa nos 7 dias (mínimo por turno atendido)."})
+        alertas.append({"nivel": "ok", "texto": "Cobertura completa nos 7 dias (mínimo por turno atendido)."})
 
-    # 2) Interjornada 11h e 3) DSR — por funcionário
-    problemas_inter, sem_folga = [], []
+    # 2) Interjornada 11h (por chip) e 3) DSR (por funcionário)
+    por_func = {}
+    for a in borda:
+        por_func.setdefault(a.funcionario_id, []).append(a)
+    inter_nomes, dsr_nomes = [], []
     for fid, lista in por_func.items():
         nome = lista[0].funcionario.pessoa.nome
         por_data = {}
         for a in lista:
             por_data.setdefault(a.data, []).append(a)
-        # interjornada: fim de ontem × início de hoje
-        from datetime import datetime
-        for d in dias:
-            hoje = por_data.get(d, [])
-            ontem = por_data.get(d - timedelta(days=1), [])
-            if hoje and ontem:
-                fim_ontem = max(a.turno.fim for a in ontem)
-                ini_hoje = min(a.turno.inicio for a in hoje)
-                gap = (datetime.combine(d, ini_hoje)
-                       - datetime.combine(d - timedelta(days=1), fim_ontem))
+        for a in atribs:
+            if a.funcionario_id != fid:
+                continue
+            ontem = por_data.get(a.data - timedelta(days=1), [])
+            if ontem:
+                fim_ontem = max(x.turno.fim for x in ontem)
+                gap = (datetime.combine(a.data, a.turno.inicio)
+                       - datetime.combine(a.data - timedelta(days=1), fim_ontem))
                 if gap.total_seconds() / 3600 < INTERJORNADA_MIN_H:
-                    problemas_inter.append(f"{nome} ({d:%d/%m})")
-        if len(por_data) >= 7:
-            sem_folga.append(nome)
-    if problemas_inter:
-        alertas.append({"nivel": "perigo",
-                        "texto": "Interjornada <11h (descanso curto entre turnos): "
-                                 + "; ".join(problemas_inter) + "."})
-    if sem_folga:
-        alertas.append({"nivel": "perigo",
-                        "texto": "Sem folga na semana (DSR): " + ", ".join(sem_folga) + "."})
-    if not problemas_inter and not sem_folga:
-        alertas.append({"nivel": "ok",
-                        "texto": "Interjornada de 11h respeitada e DSR ok (todos com folga)."})
+                    marca(a.pk, "perigo", "Interjornada <11h")
+                    if nome not in inter_nomes:
+                        inter_nomes.append(nome)
+        dias_semana = {a.data for a in atribs if a.funcionario_id == fid}
+        if len(dias_semana) >= 7:
+            dsr_nomes.append(nome)
+            for a in atribs:
+                if a.funcionario_id == fid:
+                    marca(a.pk, "perigo", "Sem folga na semana (DSR)")
+    if inter_nomes:
+        alertas.append({"nivel": "perigo", "texto": "Interjornada <11h: " + ", ".join(inter_nomes) + "."})
+        bloqueios.append("interjornada <11h")
+    if dsr_nomes:
+        alertas.append({"nivel": "perigo", "texto": "Sem folga na semana (DSR): " + ", ".join(dsr_nomes) + "."})
+        bloqueios.append("DSR (sem folga)")
+    if not inter_nomes and not dsr_nomes:
+        alertas.append({"nivel": "ok", "texto": "Interjornada de 11h respeitada e DSR ok (todos com folga)."})
 
-    # 4) Domingo — folga real (regra por sexo, respeitando a cobertura) e aviso
-    #    quando a cobertura obrigou alguém que "deveria" folgar a trabalhar.
+    # 4) Domingo — folga real + memória dos últimos 4 domingos (rodízio)
     idx = semana_idx(inicio)
-    domingo = dias[6]
-    trabalham_dom = {a.funcionario_id for a in atribs if a.data == domingo}
-    folgam, forcados = [], []
-    for st in sorted({t.setor for t in turnos}):
+    domingos = [domingo - timedelta(days=7 * k) for k in range(4)]
+    dom_hist = Atribuicao.objects.filter(data__in=domingos, turno__in=turnos)
+    trab_por_dom = {}
+    for a in dom_hist:
+        trab_por_dom.setdefault(a.funcionario_id, set()).add(a.data)
+    trab_este = {a.funcionario_id: a for a in atribs if a.data == domingo}
+    folgam, forcados, rodizio = [], [], []
+    for st in setores:
         for f in funcionarios_do_setor(st):
             if not f.sexo:
                 continue
-            marca = "♀ 2/4" if f.sexo == "F" else "♂ 1/4"
             deveria = folga_domingo(f, idx)
-            if f.pk not in trabalham_dom:
-                folgam.append(f"{f.pessoa.nome} ({marca})")
+            if f.pk not in trab_este:
+                folgam.append(f"{f.pessoa.nome} ({'♀ 2/4' if f.sexo == 'F' else '♂ 1/4'})")
             elif deveria:
                 forcados.append(f.pessoa.nome)
+            qtd = len(trab_por_dom.get(f.pk, set()))
+            limite = 4 if f.sexo == "M" else 3      # ♂: nunca folgou no mês; ♀: só 1 folga em 4
+            if qtd >= limite and f.pk in trab_este:
+                rodizio.append(f.pessoa.nome)
+                marca(trab_este[f.pk].pk, "aviso", f"{qtd}º domingo — rodízio")
     if folgam:
-        alertas.append({"nivel": "info",
-                        "texto": f"Domingo {domingo:%d/%m} — folga pela regra: " + "; ".join(folgam) + "."})
+        alertas.append({"nivel": "info", "texto": f"Domingo {domingo:%d/%m} — folga pela regra: " + "; ".join(folgam) + "."})
     if forcados:
         alertas.append({"nivel": "aviso",
-                        "texto": f"Domingo {domingo:%d/%m} — folga dominical não pôde ser respeitada "
-                                 f"por falta de gente: {', '.join(forcados)}. Considere um coringa."})
+                        "texto": f"Domingo {domingo:%d/%m} — folga dominical não coube por falta de gente: "
+                                 f"{', '.join(forcados)}. Considere um coringa."})
+    if rodizio:
+        alertas.append({"nivel": "aviso",
+                        "texto": "Rodízio de domingo quebrado (poucas folgas no mês): "
+                                 + ", ".join(sorted(set(rodizio))) + "."})
 
     # 5) Feriado na semana
     for fe in Feriado.objects.filter(data__range=(dias[0], dias[-1])):
@@ -354,7 +397,36 @@ def validar_semana(inicio, setor=None):
                         "texto": f"Feriado {fe.data:%d/%m} ({fe.nome}) — tratar como domingo; "
                                  "compensação (folga/dobro) por funcionário."})
 
-    return alertas
+    return {"alertas": alertas, "violacoes": violacoes, "bloqueios": bloqueios}
+
+
+def validar_semana(inicio, setor=None):
+    """Compat: só os alertas do painel (usa analisar_semana)."""
+    return analisar_semana(inicio, setor)["alertas"]
+
+
+def publicar_semana(inicio, setor, operador, justificativa=""):
+    """Publica a semana. Barra se houver violação legal em aberto, salvo se a
+    gerência justificar (força). Registra na auditoria."""
+    from apps.nucleo.models.financeiro import registrar_auditoria
+
+    from .models import SemanaPublicada
+
+    bloqueios = analisar_semana(inicio, setor)["bloqueios"]
+    if bloqueios and not (justificativa or "").strip():
+        raise ValidationError(
+            "Há violação legal em aberto (" + ", ".join(bloqueios) + "). "
+            "Corrija ou justifique para publicar mesmo assim."
+        )
+    pub, _ = SemanaPublicada.objects.update_or_create(
+        inicio=inicio, setor=setor or "",
+        defaults={"publicado_por": operador, "forcado": bool(bloqueios),
+                  "justificativa": justificativa.strip()[:240]},
+    )
+    registrar_auditoria(operador, "publicar_escala", pub,
+                        {"forcado": bool(bloqueios), "bloqueios": bloqueios,
+                         "justificativa": pub.justificativa})
+    return pub
 
 
 def registrar_ausencia(funcionario, tipo, inicio, fim, operador, observacao=""):

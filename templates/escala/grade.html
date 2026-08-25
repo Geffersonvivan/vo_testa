@@ -40,9 +40,23 @@
         {% if setor %}<input type="hidden" name="setor" value="{{ setor }}">{% endif %}
         <button type="submit" class="botao-primario">⟳ Gerar semana</button>
       </form>
+      <form method="post" action="{% url 'escala:publicar' %}" id="form-publicar" data-bloqueios="{{ bloqueios|length }}">
+        {% csrf_token %}
+        <input type="hidden" name="inicio" value="{{ inicio|date:'Y-m-d' }}">
+        {% if setor %}<input type="hidden" name="setor" value="{{ setor }}">{% endif %}
+        <input type="hidden" name="justificativa" id="pub-just">
+        <button type="submit" class="botao-neutro">{% if publicacao %}✓ Publicada{% else %}Publicar semana{% endif %}</button>
+      </form>
       {% endif %}
     </div>
   </div>
+
+  {% if publicacao %}
+  <p class="escala-pub {% if publicacao.forcado %}escala-pub-forcado{% endif %}">
+    {% if publicacao.forcado %}⚠ Publicada com violação{% else %}✓ Publicada{% endif %}
+    em {{ publicacao.publicado_em|date:"d/m H:i" }} por {{ publicacao.publicado_por }}{% if publicacao.justificativa %} — “{{ publicacao.justificativa }}”{% endif %}.
+  </p>
+  {% endif %}
 
   {{ ausencias_json|json_script:"escala-ausencias" }}
 
@@ -96,13 +110,27 @@
     for (const k in params) fd.append(k, params[k]);
     return fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrf() }, body: fd })
       .then(async r => {
+        if (r.status === 409) {  // violação legal (interjornada) — confirma e força
+          const j = await r.json().catch(() => ({}));
+          if (confirm(j.confirmar || 'Confirmar mesmo assim?')) return post({ ...params, forcar: 1 });
+          throw new Error('__cancelado__');
+        }
         if (r.status === 400) { const j = await r.json().catch(() => ({})); throw new Error(j.erro || 'Não foi possível.'); }
         if (!r.ok) throw new Error('Falha na operação. Tente de novo.');
         return r.text();
       });
   }
   function aplicar(html) { document.getElementById('escala-conteudo').innerHTML = html; bindConteudo(); }
-  function falhou(e) { if (window.toast) toast(e.message, 'error'); else alert(e.message); }
+  function falhou(e) { if (e.message === '__cancelado__') return; if (window.toast) toast(e.message, 'error'); else alert(e.message); }
+
+  const formPub = document.getElementById('form-publicar');
+  if (formPub) formPub.addEventListener('submit', e => {
+    if (+formPub.dataset.bloqueios > 0) {
+      const j = prompt('Há violação legal em aberto. Justifique para publicar mesmo assim (ou cancele):');
+      if (!j || !j.trim()) { e.preventDefault(); return; }
+      document.getElementById('pub-just').value = j.trim();
+    } else if (!confirm('Publicar a escala desta semana?')) { e.preventDefault(); }
+  });
 
   function bindRoster() {
     document.querySelectorAll('#escala-roster .rpill').forEach(p => {

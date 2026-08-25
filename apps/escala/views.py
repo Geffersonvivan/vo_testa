@@ -31,12 +31,24 @@ def _funcionarios(setor=None):
 
 def _contexto_grade(inicio, setor):
     """Contexto compartilhado pela grade (página cheia e refresh do editor)."""
+    from .models import SemanaPublicada
+
+    grade = services.grade_semana(inicio, setor)
+    analise = services.analisar_semana(inicio, setor)
+    viol = analise["violacoes"]
+    for linha in grade["linhas"]:                       # selo de violação por chip
+        for cel in linha["celulas"]:
+            for a in cel["atribs"]:
+                a.violacoes = viol.get(a.pk, [])
+    pub = SemanaPublicada.objects.filter(inicio=inicio, setor=setor or "").first()
     return {
-        "grade": services.grade_semana(inicio, setor),
+        "grade": grade,
         "inicio": inicio,
         "setor": setor,
         "hoje": timezone.localdate(),
-        "validacao": services.validar_semana(inicio, setor),
+        "validacao": analise["alertas"],
+        "bloqueios": analise["bloqueios"],
+        "publicacao": pub,
     }
 
 
@@ -64,21 +76,56 @@ def escala_editar(request):
     inicio = services.inicio_da_semana(_data(request.POST.get("inicio")))
     setor = request.POST.get("setor") or None
     acao = request.POST.get("acao")
+    forcar = request.POST.get("forcar") == "1"
+    data = _data(request.POST.get("data"))
     try:
-        if acao == "add":
+        if acao in ("add", "mover"):
             turno = get_object_or_404(Turno, pk=request.POST.get("turno"))
-            func = get_object_or_404(Funcionario, pk=request.POST.get("funcionario"))
-            services.atribuir(turno, func, _data(request.POST.get("data")), request.user)
-        elif acao == "mover":
-            atrib = get_object_or_404(Atribuicao, pk=request.POST.get("atribuicao"))
-            turno = get_object_or_404(Turno, pk=request.POST.get("turno"))
-            services.mover(atrib, turno, _data(request.POST.get("data")), request.user)
+            if acao == "add":
+                func = get_object_or_404(Funcionario, pk=request.POST.get("funcionario"))
+                atrib = None
+            else:
+                atrib = get_object_or_404(Atribuicao, pk=request.POST.get("atribuicao"))
+                func = atrib.funcionario
+            # Interjornada <11h é risco legal: barra o drop e pede confirmação.
+            if not forcar and services.conflito_interjornada(
+                func, turno, data, ignora_pk=atrib.pk if atrib else None
+            ):
+                return JsonResponse(
+                    {"confirmar": f"{func.pessoa.nome} ficaria com menos de 11h de descanso "
+                                  "(interjornada). Escalar mesmo assim?"}, status=409,
+                )
+            if acao == "add":
+                services.atribuir(turno, func, data, request.user)
+            else:
+                services.mover(atrib, turno, data, request.user)
+            if forcar:
+                from apps.nucleo.models.financeiro import registrar_auditoria
+                registrar_auditoria(request.user, "escala_forcar_interjornada",
+                                    func, {"turno": str(turno), "data": str(data)})
         elif acao == "remover":
             atrib = get_object_or_404(Atribuicao, pk=request.POST.get("atribuicao"))
             services.desatribuir(atrib)
     except ValidationError as erro:
         return JsonResponse({"erro": " ".join(erro.messages)}, status=400)
     return render(request, "escala/partials/grade_conteudo.html", _contexto_grade(inicio, setor))
+
+
+@requer_gerencia
+@require_POST
+def publicar(request):
+    inicio = services.inicio_da_semana(_data(request.POST.get("inicio")))
+    setor = request.POST.get("setor") or None
+    try:
+        services.publicar_semana(inicio, setor, request.user,
+                                 request.POST.get("justificativa", ""))
+        messages.success(request, "Escala da semana publicada.")
+    except ValidationError as erro:
+        messages.error(request, " ".join(erro.messages))
+    destino = f"{reverse('escala:grade')}?inicio={inicio:%Y-%m-%d}"
+    if setor:
+        destino += f"&setor={setor}"
+    return redirect(destino)
 
 
 @requer_gerencia

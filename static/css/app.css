@@ -2948,3 +2948,12 @@ body.escala-dragging .escala-drop { cursor: copy; }
   .rpill { transition: box-shadow .12s, border-color .12s; }
   .rpill:active { transform: none; }
 }
+
+/* Escala — selo de violação no chip + estado de publicação */
+.escala-chip.tem-viol.viol-perigo { border-color: rgba(177,58,42,.55); background: rgba(177,58,42,.09); }
+.escala-chip.tem-viol.viol-aviso { border-color: rgba(184,121,31,.55); background: rgba(184,121,31,.10); }
+.viol-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin-right: 1px; }
+.viol-perigo .viol-dot { background: var(--perigo); }
+.viol-aviso .viol-dot { background: var(--alerta); }
+.escala-pub { font-size: .85rem; color: var(--sucesso); font-weight: 600; margin: -.5rem 0 1rem; }
+.escala-pub-forcado { color: var(--alerta); }

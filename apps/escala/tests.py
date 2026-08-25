@@ -244,3 +244,60 @@ class EditorArrastoTests(TestCase):
         services.registrar_ausencia(self.f, "atestado", d1, d1, self.op)
         with self.assertRaises(ValidationError):
             services.mover(a, self.tarde, d1, self.op)
+
+
+class RegrasAvancadasTests(TestCase):
+    def setUp(self):
+        self.op = Usuario.objects.create_superuser(username="rg", password="senha-forte-123")
+        self.manha = Turno.objects.create(nome="Manhã", setor="recepcao",
+                                           inicio=time(7, 0), fim=time(15, 0), min_pessoas=1)
+        self.tarde = Turno.objects.create(nome="Tarde", setor="recepcao",
+                                           inicio=time(14, 30), fim=time(22, 0), min_pessoas=1)
+        p = Pessoa.objects.create(nome="Ana")
+        self.f = Funcionario.objects.create(pessoa=p, cargo="Recepção", setor="Recepção", sexo="F")
+        self.inicio = services.inicio_da_semana()
+        self.d0 = self.inicio
+        self.d1 = self.inicio + timedelta(days=1)
+
+    def test_conflito_interjornada_detecta(self):
+        services.atribuir(self.tarde, self.f, self.d0, self.op)   # 14:30–22:00
+        self.assertTrue(services.conflito_interjornada(self.f, self.manha, self.d1))  # 07:00 = 9h
+
+    def test_analise_marca_violacao_no_chip(self):
+        services.atribuir(self.tarde, self.f, self.d0, self.op)
+        a_manha = services.atribuir(self.manha, self.f, self.d1, self.op)
+        analise = services.analisar_semana(self.inicio)
+        self.assertIn(a_manha.pk, analise["violacoes"])
+        self.assertIn("interjornada <11h", analise["bloqueios"])
+
+    def test_publicar_barra_com_violacao_e_libera_com_justificativa(self):
+        services.atribuir(self.tarde, self.f, self.d0, self.op)
+        services.atribuir(self.manha, self.f, self.d1, self.op)   # interjornada
+        with self.assertRaises(ValidationError):
+            services.publicar_semana(self.inicio, None, self.op)  # sem justificativa
+        pub = services.publicar_semana(self.inicio, None, self.op, "ciente, emergência")
+        self.assertTrue(pub.forcado)
+
+    def test_publicar_semana_limpa(self):
+        self.tarde.ativo = False       # só a Manhã (mín 1) nesta semana
+        self.tarde.save()
+        p2 = Pessoa.objects.create(nome="Bia")
+        f2 = Funcionario.objects.create(pessoa=p2, cargo="Recepção", setor="Recepção", sexo="F")
+        for i in range(6):             # f cobre seg–sáb, f2 cobre domingo → 7/7
+            services.atribuir(self.manha, self.f, self.inicio + timedelta(days=i), self.op)
+        services.atribuir(self.manha, f2, self.inicio + timedelta(days=6), self.op)
+        pub = services.publicar_semana(self.inicio, None, self.op)
+        self.assertFalse(pub.forcado)
+
+    def test_editar_pede_confirmacao_e_forca(self):
+        self.client.force_login(self.op)
+        services.atribuir(self.tarde, self.f, self.d0, self.op)
+        base = {"inicio": self.inicio.strftime("%Y-%m-%d"), "acao": "add",
+                "funcionario": self.f.pk, "turno": self.manha.pk,
+                "data": self.d1.strftime("%Y-%m-%d")}
+        r = self.client.post(reverse("escala:editar"), base)
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("confirmar", r.json())
+        r2 = self.client.post(reverse("escala:editar"), {**base, "forcar": "1"})
+        self.assertEqual(r2.status_code, 200)
+        self.assertTrue(Atribuicao.objects.filter(funcionario=self.f, turno=self.manha, data=self.d1).exists())

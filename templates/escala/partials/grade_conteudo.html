@@ -37,8 +37,10 @@ para atualizar a tela após cada arrasto. Elementos com data-* alimentam o DnD.{
           <td class="escala-celula escala-drop {% if c.data == hoje %}col-hoje{% endif %}"
               data-turno="{{ linha.turno.pk }}" data-data="{{ c.data|date:'Y-m-d' }}">
             {% for a in c.atribs %}
-              <span class="escala-chip" draggable="true"
-                    data-atribuicao="{{ a.pk }}" data-func="{{ a.funcionario.pk }}">
+              <span class="escala-chip {% if a.violacoes %}tem-viol viol-{{ a.violacoes.0.nivel }}{% endif %}"
+                    draggable="true" data-atribuicao="{{ a.pk }}" data-func="{{ a.funcionario.pk }}"
+                    {% if a.violacoes %}title="{% for v in a.violacoes %}{{ v.texto }}{% if not forloop.last %} · {% endif %}{% endfor %}"{% endif %}>
+                {% if a.violacoes %}<span class="viol-dot"></span>{% endif %}
                 <span class="escala-chip-nome">{{ a.funcionario.pessoa.nome }}</span>
                 <button type="button" class="chip-x" title="Remover" aria-label="Remover"
                         data-remover="{{ a.pk }}">&times;</button>

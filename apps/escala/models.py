@@ -35,6 +35,30 @@ class Turno(models.Model):
         return f"{self.get_setor_display()} · {self.nome} ({self.inicio:%H:%M}–{self.fim:%H:%M})"
 
 
+class SemanaPublicada(models.Model):
+    """Marca uma semana (por setor) como publicada. A publicação é barrada se
+    houver violação legal em aberto — a menos que a gerência justifique (força)."""
+
+    inicio = models.DateField("segunda-feira da semana")
+    setor = models.CharField("setor", max_length=12, blank=True, help_text="Vazio = todos.")
+    publicado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                                      related_name="semanas_publicadas")
+    publicado_em = models.DateTimeField("publicada em", auto_now=True)
+    forcado = models.BooleanField("publicada com violação", default=False)
+    justificativa = models.CharField("justificativa", max_length=240, blank=True)
+
+    class Meta:
+        verbose_name = "semana publicada"
+        verbose_name_plural = "semanas publicadas"
+        ordering = ["-inicio"]
+        constraints = [
+            models.UniqueConstraint(fields=["inicio", "setor"], name="escala_semana_unica"),
+        ]
+
+    def __str__(self):
+        return f"Semana {self.inicio:%d/%m} · {self.setor or 'todos'}"
+
+
 class Feriado(models.Model):
     """Feriado que o gerador/validador tratam como domingo (folga compensatória
     ou dobro, conforme a escolha de cada funcionário)."""
