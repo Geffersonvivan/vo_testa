@@ -301,3 +301,28 @@ class RegrasAvancadasTests(TestCase):
         r2 = self.client.post(reverse("escala:editar"), {**base, "forcar": "1"})
         self.assertEqual(r2.status_code, 200)
         self.assertTrue(Atribuicao.objects.filter(funcionario=self.f, turno=self.manha, data=self.d1).exists())
+
+
+class PrepararEscalaSeedTests(TestCase):
+    def test_setor_do_cargo_e_sexo_do_nome(self):
+        from apps.escala.management.commands.preparar_escala import setor_do_cargo, sexo_do_nome
+        self.assertEqual(setor_do_cargo("Recepcionista"), "Recepção")
+        self.assertEqual(setor_do_cargo("Camareira"), "Governança")
+        self.assertEqual(setor_do_cargo("Cozinheiro"), "Cozinha/Restaurante")
+        self.assertEqual(setor_do_cargo("Piloto"), "")            # não reconhecido
+        self.assertEqual(sexo_do_nome("Marta Kuhn")[0], "F")      # termina em a
+        self.assertEqual(sexo_do_nome("Pedro Boff")[0], "M")
+        self.assertEqual(sexo_do_nome("Ivone Santos")[0], "F")    # exceção
+        self.assertTrue(sexo_do_nome("Rosana")[1])                # ambíguo (regra do 'a')
+        self.assertFalse(sexo_do_nome("Ivone")[1])                # exceção = confiável
+
+    def test_comando_preenche_blanks(self):
+        from django.core.management import call_command
+
+        from apps.nucleo.models import Funcionario, Pessoa
+        f = Funcionario.objects.create(pessoa=Pessoa.objects.create(nome="Bruno Lima"),
+                                       cargo="Recepcionista")
+        call_command("preparar_escala")
+        f.refresh_from_db()
+        self.assertEqual(f.setor, "Recepção")
+        self.assertEqual(f.sexo, "M")
