@@ -1098,14 +1098,25 @@ def funcionario_novo(request):
     if request.method == "POST":
         nome = (request.POST.get("nome") or "").strip()
         cargo = (request.POST.get("cargo") or "").strip()
+        setor = (request.POST.get("setor") or "").strip()
+        sexo = request.POST.get("sexo") or ""
+        turno = request.POST.get("turno") or ""
+        if sexo not in dict(Funcionario.Sexo.choices):
+            sexo = ""
+        if turno not in dict(Funcionario.Turno.choices):
+            turno = ""
         if not nome:
             messages.error(request, "Informe o nome do funcionário.")
         else:
             pessoa = Pessoa.objects.create(nome=nome)
-            f = Funcionario.objects.create(pessoa=pessoa, cargo=cargo or "—")
+            f = Funcionario.objects.create(
+                pessoa=pessoa, cargo=cargo or "—", setor=setor, sexo=sexo, turno=turno
+            )
             messages.success(request, f"Funcionário “{nome}” criado. Complete a ficha.")
             return redirect("funcionario_editar", pk=f.pk)
-    return render(request, "nucleo/funcionario_form.html", {"modo": "novo"})
+    return render(request, "nucleo/funcionario_form.html", {
+        "modo": "novo", "form": FuncionarioForm(ver_salario=False),
+    })
 
 
 def _aplicar_acesso_funcionario(request, f, modulos_ativos_qs):
