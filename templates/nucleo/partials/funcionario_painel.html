@@ -17,6 +17,7 @@
       <div class="campo"><label>CPF/CNPJ</label><input type="text" name="documento" value="{{ f.pessoa.documento }}"></div>
       <div class="campo"><label>Cargo</label>{{ form.cargo }}</div>
       <div class="campo"><label>Setor</label>{{ form.setor }}</div>
+      <div class="campo"><label>Sexo <span class="ajuda-inline">(regra de domingo)</span></label>{{ form.sexo }}</div>
       <div class="campo"><label>Admissão</label>{{ form.admissao }}</div>
       <div class="campo"><label>Vínculo</label>{{ form.vinculo }}</div>
       <div class="campo"><label>Turno</label>{{ form.turno }}</div>
@@ -25,6 +26,8 @@
       <div class="campo"><label>Fim do expediente</label>{{ form.expediente_fim }}</div>
       <div class="campo"><label>Início do intervalo</label>{{ form.intervalo_inicio }}</div>
       <div class="campo"><label>Fim do intervalo</label>{{ form.intervalo_fim }}</div>
+      <div class="campo"><label>Excedente de jornada</label>{{ form.regime_horas }}</div>
+      <div class="campo"><label>Feriado trabalhado</label>{{ form.compensacao_feriado }}</div>
       {% if form.salario %}<div class="campo"><label>Salário base 🔒 (só gerência)</label>{{ form.salario }}</div>{% endif %}
     </div>
   </div>
