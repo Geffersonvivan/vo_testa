@@ -5,40 +5,21 @@
 {% block conteudo %}
 <p class="pagina-eyebrow letreiro">Cadastros · Pessoal</p>
 
-{% if modo == 'novo' %}
-<h1>Novo funcionário</h1>
-<p class="subtitulo">Dados básicos + escala (setor, sexo e turno); jornada, remuneração e acesso você completa na próxima tela.</p>
-<form method="post" action="{% url 'funcionario_novo' %}" class="form-cartao" style="max-width:620px">
-  {% csrf_token %}
-  <div class="grid2">
-    <div class="campo"><label for="nome">Nome</label><input type="text" id="nome" name="nome" required></div>
-    <div class="campo"><label>Cargo</label>{{ form.cargo }}</div>
-    <div class="campo"><label>Setor</label>{{ form.setor }}</div>
-    <div class="campo"><label>Sexo <span class="ajuda-inline">(regra de domingo na escala)</span></label>{{ form.sexo }}</div>
-    <div class="campo"><label>Turno</label>{{ form.turno }}</div>
-  </div>
-  <div class="acoes">
-    <button type="submit" class="botao-primario">Criar funcionário</button>
-    <a href="{% url 'funcionarios' %}" class="botao-neutro">Cancelar</a>
-  </div>
-</form>
-
-{% else %}
 <div class="pagina-cabecalho">
-  <h1>{{ f.pessoa.nome }}</h1>
+  <h1>{% if modo == 'novo' %}Novo funcionário{% else %}{{ f.pessoa.nome }}{% endif %}</h1>
   <a href="{% url 'funcionarios' %}" class="botao-neutro">Voltar</a>
 </div>
-<p class="subtitulo">Ficha de RH e acesso ao sistema.{% if proprio %} <span class="selo selo-neutro">é você</span>{% endif %}</p>
+<p class="subtitulo">{% if modo == 'novo' %}Cadastre a ficha completa — dados de RH, escala e acesso, tudo numa etapa.{% else %}Ficha de RH e acesso ao sistema.{% endif %}{% if proprio %} <span class="selo selo-neutro">é você</span>{% endif %}</p>
 
-<form method="post" action="{% url 'funcionario_editar' f.pk %}" class="ficha-func">
+<form method="post" action="{% if modo == 'novo' %}{% url 'funcionario_novo' %}{% else %}{% url 'funcionario_editar' f.pk %}{% endif %}" class="ficha-func">
   {% csrf_token %}
   <div class="ficha-cols">
 
     <div class="bloco-ficha">
       <h4 class="letreiro">Dados profissionais</h4>
       <div class="grid2">
-        <div class="campo"><label>Nome</label><input type="text" name="nome" value="{{ f.pessoa.nome }}" required></div>
-        <div class="campo"><label>CPF/CNPJ</label><input type="text" name="documento" value="{{ f.pessoa.documento }}"></div>
+        <div class="campo"><label>Nome</label><input type="text" name="nome" value="{{ f.pessoa.nome|default:'' }}" required></div>
+        <div class="campo"><label>CPF/CNPJ</label><input type="text" name="documento" value="{{ f.pessoa.documento|default:'' }}"></div>
         <div class="campo"><label>Cargo</label>{{ form.cargo }}</div>
         <div class="campo"><label>Setor</label>{{ form.setor }}</div>
         <div class="campo"><label>Sexo <span class="ajuda-inline">(regra de domingo na escala)</span></label>{{ form.sexo }}</div>
@@ -59,7 +40,7 @@
       </div>
 
       {% if form.salario %}
-      <h4 class="letreiro" style="margin-top:1.1rem">Remuneração <span class="selo selo-alerta" style="font-size:.58rem">🔒 só gerência</span></h4>
+      <h4 class="letreiro" style="margin-top:1.1rem">Remuneração <span class="selo selo-alerta" style="font-size:.58rem">🔒 requer flag Remuneração</span></h4>
       <div class="grid2">
         <div class="campo"><label>Salário base (R$)</label>{{ form.salario }}</div>
       </div>
@@ -80,10 +61,14 @@
           <p class="ajuda">Você não pode rebaixar/desativar a si mesmo.</p>
           {% endif %}
         {% else %}
-          <p class="ajuda">Este funcionário ainda não tem login. Defina um usuário e senha para conceder acesso.</p>
+          <p class="ajuda">{% if modo == 'novo' %}Opcional — deixe em branco para cadastrar sem login.{% else %}Este funcionário ainda não tem login.{% endif %} Defina um usuário e senha para conceder acesso.</p>
           <div class="grid2">
             <div class="campo"><label>Login (usuário)</label><input type="text" name="username" autocomplete="off"></div>
             <div class="campo"><label>Senha (mín. 8)</label><input type="password" name="password" minlength="8" autocomplete="new-password"></div>
+          </div>
+          <div class="campo">
+            <label class="filtro-check"><input type="checkbox" name="gerente"> É gerência (ações sensíveis)</label>
+            <label class="filtro-check"><input type="checkbox" name="ativo" checked> Ativo (pode entrar)</label>
           </div>
         {% endif %}
 
@@ -111,9 +96,8 @@
 
   </div>
   <div class="acoes" style="margin-top:1rem">
-    <button type="submit" class="botao-primario">Salvar ficha</button>
+    <button type="submit" class="botao-primario">{% if modo == 'novo' %}Criar funcionário{% else %}Salvar ficha{% endif %}</button>
     <a href="{% url 'funcionarios' %}" class="botao-neutro">Cancelar</a>
   </div>
 </form>
-{% endif %}
 {% endblock %}

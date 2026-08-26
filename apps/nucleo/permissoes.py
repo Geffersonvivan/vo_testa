@@ -24,6 +24,15 @@ def eh_gerente(user) -> bool:
     return user.is_authenticated and (user.is_superuser or user.is_staff)
 
 
+def pode_ver_salario(user) -> bool:
+    """Salário é dado sensível: só superusuário (bypass) ou quem tem a flag
+    de área Remuneração. Não basta ser gerente — precisa da flag explícita."""
+    from .areas import Area
+    return user.is_authenticated and (
+        user.is_superuser or user.pode_area(Area.REMUNERACAO)
+    )
+
+
 def requer_gerencia(view):
     """403 para quem não é gerência. Usar em estorno, reabertura de caixa etc."""
 

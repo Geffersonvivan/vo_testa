@@ -1103,3 +1103,45 @@ class LogbookThreadTests(TestCase):
         e.refresh_from_db()
         self.assertEqual(e.resolvida_por, self.autor)
         self.assertEqual(e.resolucao_nota, "primeira nota")
+
+
+class SalarioFlagETela1EtapaTests(TestCase):
+    def setUp(self):
+        self.gestor = Usuario.objects.create_superuser(username="chefia", password="senha-forte-123")
+
+    def test_pode_ver_salario_por_flag(self):
+        from apps.nucleo.permissoes import pode_ver_salario
+        from apps.nucleo.areas import Area
+        u = Usuario.objects.create_user(username="rh", password="senha-forte-123")
+        self.assertFalse(pode_ver_salario(u))          # sem flag
+        u.areas = [Area.REMUNERACAO]; u.save()
+        self.assertTrue(pode_ver_salario(u))            # com flag
+        self.assertTrue(pode_ver_salario(self.gestor))  # superusuário bypassa
+
+    def test_form_esconde_salario_sem_flag(self):
+        from apps.nucleo.forms import FuncionarioForm
+        self.assertNotIn("salario", FuncionarioForm(ver_salario=False).fields)
+        self.assertIn("salario", FuncionarioForm(ver_salario=True).fields)
+
+    def test_cadastro_em_uma_etapa_cria_tudo(self):
+        from apps.nucleo.models import Funcionario
+        self.client.force_login(self.gestor)
+        resp = self.client.post(reverse("funcionario_novo"), {
+            "nome": "Tião Silva", "cargo": "Manutenção", "setor": "Manutenção",
+            "sexo": "M", "turno": "integral",
+            "username": "tiao", "password": "senha-forte-123",
+            "areas": ["remuneracao"], "modulos": [], "ativo": "on",
+        })
+        self.assertRedirects(resp, reverse("funcionarios"))
+        f = Funcionario.objects.get(pessoa__nome="Tião Silva")
+        self.assertEqual(f.setor, "Manutenção")
+        self.assertEqual(f.sexo, "M")
+        self.assertTrue(f.usuario.is_active)
+        self.assertIn("remuneracao", f.usuario.areas)
+
+    def test_cadastro_so_nome_obrigatorio(self):
+        from apps.nucleo.models import Funcionario
+        self.client.force_login(self.gestor)
+        resp = self.client.post(reverse("funcionario_novo"), {"nome": "Só Nome"})
+        self.assertRedirects(resp, reverse("funcionarios"))
+        self.assertTrue(Funcionario.objects.filter(pessoa__nome="Só Nome").exists())

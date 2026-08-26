@@ -100,10 +100,19 @@ class FuncionarioForm(forms.ModelForm):
 
     def __init__(self, *args, ver_salario=True, **kwargs):
         super().__init__(*args, **kwargs)
+        # Só o nome é obrigatório no cadastro; RH/escala completam-se depois.
+        for campo in ("cargo", "regime_horas", "compensacao_feriado"):
+            self.fields[campo].required = False
         if not ver_salario:
-            self.fields.pop("salario", None)  # salário só p/ gerência
+            self.fields.pop("salario", None)  # salário só p/ quem tem a flag
         elif getattr(self.instance, "salario", None) is not None:
             self.initial["salario"] = _brl(self.instance.salario)
+
+    def clean_regime_horas(self):
+        return self.cleaned_data.get("regime_horas") or Funcionario.RegimeHoras.BANCO
+
+    def clean_compensacao_feriado(self):
+        return self.cleaned_data.get("compensacao_feriado") or Funcionario.CompensacaoFeriado.FOLGA
 
     def clean_salario(self):
         raw = (self.cleaned_data.get("salario") or "").strip()

@@ -47,7 +47,7 @@ from .models import (
 )
 from .modulos import APRESENTACAO
 from .areas import Area, areas_catalogo
-from .permissoes import eh_gerente, requer_area, requer_gerencia
+from .permissoes import eh_gerente, pode_ver_salario, requer_area, requer_gerencia
 
 # ---------- Dashboard ----------
 
@@ -1093,30 +1093,46 @@ def funcionarios(request):
     })
 
 
+def _contexto_novo(request, gerente, form=None):
+    """Ficha em branco para o cadastro em uma etapa (mesmo layout da edição)."""
+    modulos_qs = ModuloContratado.objects.filter(ativo=True).order_by("codigo")
+    return {
+        "modo": "novo", "f": None, "usuario": None, "gerente": gerente,
+        "proprio": False, "historico": None,
+        "form": form or FuncionarioForm(ver_salario=pode_ver_salario(request.user)),
+        "modulos": [{"codigo": m.codigo, "nome": m.get_codigo_display(), "tem": False}
+                    for m in modulos_qs],
+        "areas": [{"codigo": c, "nome": rot, "tem": False} for c, rot in areas_catalogo()],
+    }
+
+
 @requer_area(Area.FUNCIONARIOS, Area.EQUIPE)
 def funcionario_novo(request):
+    """Cadastro do funcionário em UMA etapa: ficha de RH + escala + acesso."""
+    gerente = eh_gerente(request.user)
     if request.method == "POST":
         nome = (request.POST.get("nome") or "").strip()
-        cargo = (request.POST.get("cargo") or "").strip()
-        setor = (request.POST.get("setor") or "").strip()
-        sexo = request.POST.get("sexo") or ""
-        turno = request.POST.get("turno") or ""
-        if sexo not in dict(Funcionario.Sexo.choices):
-            sexo = ""
-        if turno not in dict(Funcionario.Turno.choices):
-            turno = ""
+        form = FuncionarioForm(request.POST, ver_salario=pode_ver_salario(request.user))
         if not nome:
             messages.error(request, "Informe o nome do funcionário.")
+        elif not form.is_valid():
+            messages.error(request, "Revise os campos da ficha.")
         else:
-            pessoa = Pessoa.objects.create(nome=nome)
-            f = Funcionario.objects.create(
-                pessoa=pessoa, cargo=cargo or "—", setor=setor, sexo=sexo, turno=turno
+            pessoa = Pessoa.objects.create(
+                nome=nome, documento=(request.POST.get("documento") or "").strip()
             )
-            messages.success(request, f"Funcionário “{nome}” criado. Complete a ficha.")
-            return redirect("funcionario_editar", pk=f.pk)
-    return render(request, "nucleo/funcionario_form.html", {
-        "modo": "novo", "form": FuncionarioForm(ver_salario=False),
-    })
+            f = form.save(commit=False)
+            f.pessoa = pessoa
+            f.save()
+            if gerente:  # login/módulos/áreas só gerência define
+                _aplicar_acesso_funcionario(
+                    request, f, ModuloContratado.objects.filter(ativo=True).order_by("codigo")
+                )
+            messages.success(request, f"Funcionário “{nome}” cadastrado.")
+            return redirect("funcionarios")
+        return render(request, "nucleo/funcionario_form.html",
+                      _contexto_novo(request, gerente, form))
+    return render(request, "nucleo/funcionario_form.html", _contexto_novo(request, gerente))
 
 
 def _aplicar_acesso_funcionario(request, f, modulos_ativos_qs):
@@ -1159,9 +1175,10 @@ def _ficha_contexto(request, f, gerente, form=None):
 
     modulos_qs = ModuloContratado.objects.filter(ativo=True).order_by("codigo")
     u = f.usuario
+    ver_salario = pode_ver_salario(request.user)
     return {
         "f": f, "gerente": gerente, "usuario": u,
-        "form": form or FuncionarioForm(instance=f, ver_salario=gerente),
+        "form": form or FuncionarioForm(instance=f, ver_salario=ver_salario),
         "modulos": [
             {"codigo": m.codigo, "nome": m.get_codigo_display(),
              "tem": bool(u and u.modulos.filter(pk=m.pk).exists())}
@@ -1178,7 +1195,7 @@ def _ficha_contexto(request, f, gerente, form=None):
 
 def _salvar_ficha(request, f, gerente):
     """Aplica a ficha (dados pessoais + RH + acesso). Retorna (ok, form)."""
-    form = FuncionarioForm(request.POST, instance=f, ver_salario=gerente)
+    form = FuncionarioForm(request.POST, instance=f, ver_salario=pode_ver_salario(request.user))
     if not form.is_valid():
         return False, form
     f.pessoa.nome = (request.POST.get("nome") or f.pessoa.nome).strip()

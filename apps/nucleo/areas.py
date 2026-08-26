@@ -17,6 +17,9 @@ class Area(models.TextChoices):
     FINANCEIRO = "financeiro", "Financeiro (contas/gestão)"
     PESSOAS = "pessoas", "Pessoas"
     FUNCIONARIOS = "funcionarios", "Funcionários (RH)"
+    # Ver/editar salário na ficha do funcionário (dado sensível). Superusuário
+    # sempre vê; os demais só com esta flag marcada.
+    REMUNERACAO = "remuneracao", "Remuneração (ver salários)"
     LOGBOOK = "logbook", "Recados do turno"
     NPS = "nps", "NPS"
     EQUIPE = "equipe", "Equipe & Acessos"
