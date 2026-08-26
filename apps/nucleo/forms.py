@@ -87,9 +87,10 @@ class FuncionarioForm(forms.ModelForm):
     class Meta:
         model = Funcionario
         fields = [
-            "cargo", "setor", "admissao", "vinculo",
+            "cargo", "setor", "sexo", "admissao", "vinculo",
             "turno", "expediente_inicio", "expediente_fim",
-            "intervalo_inicio", "intervalo_fim", "carga_semanal", "salario",
+            "intervalo_inicio", "intervalo_fim", "carga_semanal",
+            "regime_horas", "compensacao_feriado", "salario",
         ]
         widgets = {
             "admissao": DataInput(),
