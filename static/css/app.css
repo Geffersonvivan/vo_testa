@@ -2989,3 +2989,11 @@ body.escala-dragging .escala-drop { cursor: copy; }
 .he-form .acoes { display: flex; gap: 6px; }
 .he-form .btn-ok { border: none; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; background: linear-gradient(180deg,var(--lampiao-claro),var(--lampiao)); color: #3a2a08; }
 .he-form .btn-x { border: 1px solid var(--fio); border-radius: 6px; padding: 5px 11px; font-size: 12px; font-weight: 700; cursor: pointer; background: #fff; color: var(--tinta); }
+
+/* Escala — feriado trabalhado (marca + toggle folga/dobro) */
+.escala-drop.eh-feriado { background: repeating-linear-gradient(45deg, rgba(215,160,72,.06), rgba(215,160,72,.06) 8px, transparent 8px, transparent 16px); }
+.feriado-tag { display:inline-block; font-size:10px; font-weight:700; color:var(--alerta); background:var(--alerta-bg); border:1px solid rgba(184,121,31,.3); border-radius:999px; padding:1px 7px; margin-bottom:4px; }
+.fer-comp { display:inline-flex; gap:0; margin:2px 3px 3px 0; border:1px solid var(--fio); border-radius:999px; overflow:hidden; }
+.fer-comp .fc { border:none; background:#fff; color:var(--tinta-suave); font-size:10.5px; font-weight:700; padding:2px 9px; cursor:pointer; }
+.fer-comp .fc.on { background:var(--noturno); color:var(--lampiao-claro); }
+.fer-comp .fc:not(.on):hover { background:var(--superficie-2); }

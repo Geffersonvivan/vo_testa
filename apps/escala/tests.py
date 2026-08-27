@@ -380,3 +380,39 @@ class HoraExtraTests(TestCase):
         an = services.analisar_semana(self.inicio)
         self.assertIn(a1.pk, an["violacoes"])
         self.assertIn("interjornada <11h", an["bloqueios"])
+
+
+class FeriadoCompTests(TestCase):
+    def setUp(self):
+        self.op = Usuario.objects.create_superuser(username="fc", password="senha-forte-123")
+        self.turno = Turno.objects.create(nome="Manhã", setor="recepcao",
+                                           inicio=time(7, 0), fim=time(15, 0), min_pessoas=1)
+        p = Pessoa.objects.create(nome="Gefferson")
+        self.f = Funcionario.objects.create(pessoa=p, cargo="Recepção", setor="Recepção",
+                                            sexo="M", compensacao_feriado="folga")
+        self.inicio = services.inicio_da_semana()
+
+    def test_definir_compensacao(self):
+        a = services.atribuir(self.turno, self.f, self.inicio, self.op)
+        services.definir_compensacao_feriado(a, "dobro")
+        a.refresh_from_db()
+        self.assertEqual(a.compensacao_feriado, "dobro")
+        with self.assertRaises(ValidationError):
+            services.definir_compensacao_feriado(a, "xyz")
+
+    def test_endpoint_feriado_comp(self):
+        a = services.atribuir(self.turno, self.f, self.inicio, self.op)
+        self.client.force_login(self.op)
+        r = self.client.post(reverse("escala:editar"), {
+            "inicio": self.inicio.strftime("%Y-%m-%d"), "acao": "feriado_comp",
+            "atribuicao": a.pk, "valor": "dobro",
+        })
+        self.assertEqual(r.status_code, 200)
+        a.refresh_from_db()
+        self.assertEqual(a.compensacao_feriado, "dobro")
+
+    def test_feriados_no_periodo(self):
+        from apps.escala.models import Feriado
+        Feriado.objects.create(data=self.inicio, nome="Teste")
+        fer = services.feriados_no_periodo(self.inicio, self.inicio + timedelta(days=6))
+        self.assertIn(self.inicio, fer)

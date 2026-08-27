@@ -178,6 +178,10 @@
       b.addEventListener('click', () => abrirHoraExtra(b)));
     document.querySelectorAll('#escala-conteudo .he-x').forEach(b =>
       b.addEventListener('click', () => post({ acao: 'he_remover', hora_extra: b.dataset.he }).then(aplicar).catch(falhou)));
+    // Feriado trabalhado: escolher folga × dobro
+    document.querySelectorAll('#escala-conteudo .fer-comp .fc').forEach(b =>
+      b.addEventListener('click', () => post({ acao: 'feriado_comp',
+        atribuicao: b.closest('.fer-comp').dataset.atrib, valor: b.dataset.valor }).then(aplicar).catch(falhou)));
   }
   function difHoras(ini, fim) {
     const [ah, am] = ini.split(':').map(Number), [bh, bm] = fim.split(':').map(Number);

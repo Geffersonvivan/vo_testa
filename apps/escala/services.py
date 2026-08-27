@@ -118,6 +118,22 @@ def remover_hora_extra(hora_extra):
     hora_extra.delete()
 
 
+def definir_compensacao_feriado(atribuicao, valor):
+    """Marca, no dia de feriado trabalhado, se compensa com folga ou dobro."""
+    from .models import Atribuicao
+    if valor not in dict(Atribuicao.Compensacao.choices):
+        raise ValidationError("Compensação inválida.")
+    atribuicao.compensacao_feriado = valor
+    atribuicao.save(update_fields=["compensacao_feriado"])
+    return atribuicao
+
+
+def feriados_no_periodo(inicio, fim):
+    """Set de datas que são feriado no período (para marcar na grade/relatório)."""
+    from .models import Feriado
+    return set(Feriado.objects.filter(data__range=(inicio, fim)).values_list("data", flat=True))
+
+
 def ausencias_da_semana(inicio):
     """[(funcionario_id, 'YYYY-MM-DD')] das ausências que tocam a semana — o
     editor usa para acender de vermelho a célula inválida ao arrastar."""

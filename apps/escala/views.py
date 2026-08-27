@@ -48,11 +48,17 @@ def _contexto_grade(inicio, setor):
     hx_por = {}
     for he in hx:
         hx_por.setdefault((he.funcionario_id, he.data), []).append(he)
-    for linha in grade["linhas"]:                       # selo de violação + horas extras por chip
+    feriados = services.feriados_no_periodo(inicio, fim)
+    for linha in grade["linhas"]:                       # selo de violação + horas extras + feriado por chip
         for cel in linha["celulas"]:
+            cel["eh_feriado"] = cel["data"] in feriados
             for a in cel["atribs"]:
                 a.violacoes = viol.get(a.pk, [])
                 a.horas_extras = hx_por.get((a.funcionario_id, a.data), [])
+                a.eh_feriado = a.data in feriados
+                a.compensacao_efetiva = (
+                    a.compensacao_feriado or a.funcionario.compensacao_feriado or "folga"
+                )
     pub = SemanaPublicada.objects.filter(inicio=inicio, setor=setor or "").first()
     return {
         "grade": grade,
@@ -128,6 +134,9 @@ def escala_editar(request):
         elif acao == "he_remover":
             he = get_object_or_404(HoraExtra, pk=request.POST.get("hora_extra"))
             services.remover_hora_extra(he)
+        elif acao == "feriado_comp":
+            atrib = get_object_or_404(Atribuicao, pk=request.POST.get("atribuicao"))
+            services.definir_compensacao_feriado(atrib, request.POST.get("valor"))
     except ValidationError as erro:
         return JsonResponse({"erro": " ".join(erro.messages)}, status=400)
     return render(request, "escala/partials/grade_conteudo.html", _contexto_grade(inicio, setor))

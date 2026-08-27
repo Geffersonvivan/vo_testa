@@ -119,11 +119,18 @@ class Feriado(models.Model):
 
 
 class Atribuicao(models.Model):
+    class Compensacao(models.TextChoices):
+        FOLGA = "folga", "Folga compensatória"
+        DOBRO = "dobro", "Pagamento em dobro"
+
     turno = models.ForeignKey(Turno, on_delete=models.CASCADE,
                               related_name="atribuicoes", verbose_name="turno")
     funcionario = models.ForeignKey("nucleo.Funcionario", on_delete=models.CASCADE,
                                     related_name="atribuicoes", verbose_name="funcionário")
     data = models.DateField("data")
+    # Só relevante quando o dia é feriado: como compensar (padrão vem da ficha).
+    compensacao_feriado = models.CharField("feriado — compensação", max_length=6,
+                                           choices=Compensacao.choices, blank=True)
     criado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
                                    related_name="atribuicoes_escala", null=True, blank=True)
     criado_em = models.DateTimeField("criada em", auto_now_add=True)

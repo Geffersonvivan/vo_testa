@@ -34,8 +34,9 @@ para atualizar a tela após cada arrasto. Elementos com data-* alimentam o DnD.{
           <small>{{ linha.turno.get_setor_display }} · {{ linha.turno.inicio|time:"H:i" }}–{{ linha.turno.fim|time:"H:i" }}</small>
         </td>
         {% for c in linha.celulas %}
-          <td class="escala-celula escala-drop {% if c.data == hoje %}col-hoje{% endif %}"
+          <td class="escala-celula escala-drop {% if c.data == hoje %}col-hoje{% endif %} {% if c.eh_feriado %}eh-feriado{% endif %}"
               data-turno="{{ linha.turno.pk }}" data-data="{{ c.data|date:'Y-m-d' }}">
+            {% if c.eh_feriado %}<span class="feriado-tag">🎌 Feriado</span>{% endif %}
             {% for a in c.atribs %}
               <span class="escala-chip {% if a.violacoes %}tem-viol viol-{{ a.violacoes.0.nivel }}{% endif %}"
                     draggable="true" data-atribuicao="{{ a.pk }}" data-func="{{ a.funcionario.pk }}"
@@ -53,6 +54,12 @@ para atualizar a tela após cada arrasto. Elementos com data-* alimentam o DnD.{
                   <button type="button" class="he-x" data-he="{{ he.pk }}" title="Remover" aria-label="Remover">&times;</button>
                 </span>
               {% endfor %}
+              {% if a.eh_feriado %}
+                <span class="fer-comp" data-atrib="{{ a.pk }}" title="Feriado trabalhado — como compensar">
+                  <button type="button" class="fc {% if a.compensacao_efetiva == 'folga' %}on{% endif %}" data-valor="folga">folga</button>
+                  <button type="button" class="fc {% if a.compensacao_efetiva == 'dobro' %}on{% endif %}" data-valor="dobro">dobro</button>
+                </span>
+              {% endif %}
             {% endfor %}
           </td>
         {% endfor %}
