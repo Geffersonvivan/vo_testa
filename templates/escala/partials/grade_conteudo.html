@@ -39,12 +39,20 @@ para atualizar a tela após cada arrasto. Elementos com data-* alimentam o DnD.{
             {% for a in c.atribs %}
               <span class="escala-chip {% if a.violacoes %}tem-viol viol-{{ a.violacoes.0.nivel }}{% endif %}"
                     draggable="true" data-atribuicao="{{ a.pk }}" data-func="{{ a.funcionario.pk }}"
+                    data-nome="{{ a.funcionario.pessoa.nome }}" data-padrao="{{ a.funcionario.regime_horas|default:'banco' }}"
                     {% if a.violacoes %}title="{% for v in a.violacoes %}{{ v.texto }}{% if not forloop.last %} · {% endif %}{% endfor %}"{% endif %}>
                 {% if a.violacoes %}<span class="viol-dot"></span>{% endif %}
                 <span class="escala-chip-nome">{{ a.funcionario.pessoa.nome }}</span>
+                <button type="button" class="he-add" title="Adicionar hora extra" aria-label="Hora extra">+</button>
                 <button type="button" class="chip-x" title="Remover" aria-label="Remover"
                         data-remover="{{ a.pk }}">&times;</button>
               </span>
+              {% for he in a.horas_extras %}
+                <span class="he-selo {{ he.tipo }}" title="Hora extra {{ he.get_tipo_display }}">
+                  ⏱ +{{ he.total_txt }} · {{ he.inicio|time:'H:i' }}–{{ he.fim|time:'H:i' }} · {{ he.tipo }}
+                  <button type="button" class="he-x" data-he="{{ he.pk }}" title="Remover" aria-label="Remover">&times;</button>
+                </span>
+              {% endfor %}
             {% endfor %}
           </td>
         {% endfor %}

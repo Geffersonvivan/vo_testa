@@ -173,6 +173,43 @@
         dragged = null;
       });
     });
+    // Hora extra: "+" no chip abre o mini-form; × do selo remove.
+    document.querySelectorAll('#escala-conteudo .he-add').forEach(b =>
+      b.addEventListener('click', () => abrirHoraExtra(b)));
+    document.querySelectorAll('#escala-conteudo .he-x').forEach(b =>
+      b.addEventListener('click', () => post({ acao: 'he_remover', hora_extra: b.dataset.he }).then(aplicar).catch(falhou)));
+  }
+  function difHoras(ini, fim) {
+    const [ah, am] = ini.split(':').map(Number), [bh, bm] = fim.split(':').map(Number);
+    let m = (bh * 60 + bm) - (ah * 60 + am); if (m < 0) m += 1440;
+    return `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}`;
+  }
+  function abrirHoraExtra(btn) {
+    const chip = btn.closest('.escala-chip'), cell = btn.closest('.escala-drop');
+    if (cell.querySelector('.he-form')) return;
+    const nome = chip.dataset.nome, func = chip.dataset.func, padrao = chip.dataset.padrao, data = cell.dataset.data;
+    const f = document.createElement('div'); f.className = 'he-form';
+    f.innerHTML = `<div class="tit">Hora extra — ${nome}</div>
+      <div class="lin">
+        <div><label>Início</label><input type="time" class="ini" value="18:00"></div>
+        <div><label>Fim</label><input type="time" class="fim" value="22:00"></div>
+        <div class="total">Total: <span class="tt">4h00</span></div>
+      </div>
+      <div class="tipo">
+        <label><input type="radio" name="tp" value="banco" ${padrao === 'banco' ? 'checked' : ''}> Banco</label>
+        <label><input type="radio" name="tp" value="extra" ${padrao !== 'banco' ? 'checked' : ''}> Hora extra</label>
+      </div>
+      <div class="acoes"><button type="button" class="btn-ok ok">Salvar</button><button type="button" class="btn-x cancel">Cancelar</button></div>`;
+    const ini = f.querySelector('.ini'), fim = f.querySelector('.fim'), tt = f.querySelector('.tt');
+    const upd = () => tt.textContent = difHoras(ini.value, fim.value);
+    ini.oninput = upd; fim.oninput = upd; upd();
+    f.querySelector('.cancel').onclick = () => f.remove();
+    f.querySelector('.ok').onclick = () => {
+      const tipo = f.querySelector('input[type=radio]:checked').value;
+      post({ acao: 'he_add', funcionario: func, data: data, he_inicio: ini.value, he_fim: fim.value, tipo: tipo })
+        .then(aplicar).catch(falhou);
+    };
+    cell.appendChild(f);
   }
   bindRoster(); bindConteudo();
 })();

@@ -103,6 +103,21 @@ def mover(atribuicao, novo_turno, nova_data, operador=None):
     return atribuicao
 
 
+def adicionar_hora_extra(funcionario, data, inicio, fim, tipo, operador=None):
+    """Lança uma hora extra planejada (banco/extra) num dia do colaborador."""
+    from .models import HoraExtra
+    he = HoraExtra(funcionario=funcionario, data=data, inicio=inicio, fim=fim,
+                   tipo=tipo or HoraExtra.Tipo.BANCO, criado_por=operador)
+    if he.total_minutos <= 0:
+        raise ValidationError("Fim deve ser depois do início.")
+    he.save()
+    return he
+
+
+def remover_hora_extra(hora_extra):
+    hora_extra.delete()
+
+
 def ausencias_da_semana(inicio):
     """[(funcionario_id, 'YYYY-MM-DD')] das ausências que tocam a semana — o
     editor usa para acender de vermelho a célula inválida ao arrastar."""
@@ -320,33 +335,40 @@ def analisar_semana(inicio, setor=None):
     else:
         alertas.append({"nivel": "ok", "texto": "Cobertura completa nos 7 dias (mínimo por turno atendido)."})
 
-    # 2) Interjornada 11h (por chip) e 3) DSR (por funcionário)
-    por_func = {}
+    # 2) Interjornada 11h + 3) DSR — por funcionário, considerando turno E hora extra.
+    from .models import HoraExtra
+    he_borda = list(HoraExtra.objects.filter(
+        data__range=(dias[0] - timedelta(days=1), dias[-1] + timedelta(days=1))
+    ).select_related("funcionario__pessoa"))
+
+    spans, atribs_por_dia, nomes_func = {}, {}, {}
     for a in borda:
-        por_func.setdefault(a.funcionario_id, []).append(a)
+        spans.setdefault((a.funcionario_id, a.data), []).append((a.turno.inicio, a.turno.fim))
+        atribs_por_dia.setdefault((a.funcionario_id, a.data), []).append(a)
+        nomes_func[a.funcionario_id] = a.funcionario.pessoa.nome
+    for he in he_borda:
+        spans.setdefault((he.funcionario_id, he.data), []).append((he.inicio, he.fim))
+        nomes_func[he.funcionario_id] = he.funcionario.pessoa.nome
+
     inter_nomes, dsr_nomes = [], []
-    for fid, lista in por_func.items():
-        nome = lista[0].funcionario.pessoa.nome
-        por_data = {}
-        for a in lista:
-            por_data.setdefault(a.data, []).append(a)
-        for a in atribs:
-            if a.funcionario_id != fid:
-                continue
-            ontem = por_data.get(a.data - timedelta(days=1), [])
-            if ontem:
-                fim_ontem = max(x.turno.fim for x in ontem)
-                gap = (datetime.combine(a.data, a.turno.inicio)
-                       - datetime.combine(a.data - timedelta(days=1), fim_ontem))
+    for fid in {f for (f, _d) in spans}:
+        nome = nomes_func.get(fid, "")
+        for d in dias:
+            hoje = spans.get((fid, d), [])
+            ontem = spans.get((fid, d - timedelta(days=1)), [])
+            if hoje and ontem:
+                gap = (datetime.combine(d, min(s[0] for s in hoje))
+                       - datetime.combine(d - timedelta(days=1), max(s[1] for s in ontem)))
                 if gap.total_seconds() / 3600 < INTERJORNADA_MIN_H:
-                    marca(a.pk, "perigo", "Interjornada <11h")
                     if nome not in inter_nomes:
                         inter_nomes.append(nome)
-        dias_semana = {a.data for a in atribs if a.funcionario_id == fid}
-        if len(dias_semana) >= 7:
+                    for a in atribs_por_dia.get((fid, d), []):
+                        marca(a.pk, "perigo", "Interjornada <11h")
+        dias_trab = {d for d in dias if spans.get((fid, d))}
+        if len(dias_trab) >= 7:
             dsr_nomes.append(nome)
-            for a in atribs:
-                if a.funcionario_id == fid:
+            for d in dias:
+                for a in atribs_por_dia.get((fid, d), []):
                     marca(a.pk, "perigo", "Sem folga na semana (DSR)")
     if inter_nomes:
         alertas.append({"nivel": "perigo", "texto": "Interjornada <11h: " + ", ".join(inter_nomes) + "."})
@@ -356,6 +378,18 @@ def analisar_semana(inicio, setor=None):
         bloqueios.append("DSR (sem folga)")
     if not inter_nomes and not dsr_nomes:
         alertas.append({"nivel": "ok", "texto": "Interjornada de 11h respeitada e DSR ok (todos com folga)."})
+
+    # Total de horas extras da semana (prévia do relatório mensal)
+    he_sem = [he for he in he_borda if dias[0] <= he.data <= dias[-1]]
+    if he_sem:
+        def _fmt(m):
+            return f"{m // 60}h{m % 60:02d}"
+        tot = sum(he.total_minutos for he in he_sem)
+        banco = sum(he.total_minutos for he in he_sem if he.tipo == "banco")
+        extra = sum(he.total_minutos for he in he_sem if he.tipo == "extra")
+        alertas.append({"nivel": "info",
+                        "texto": f"Horas extras planejadas na semana: {_fmt(tot)} "
+                                 f"(banco {_fmt(banco)} · extra {_fmt(extra)})."})
 
     # 4) Domingo — folga real + memória dos últimos 4 domingos (rodízio)
     idx = semana_idx(inicio)

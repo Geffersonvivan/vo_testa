@@ -326,3 +326,57 @@ class PrepararEscalaSeedTests(TestCase):
         f.refresh_from_db()
         self.assertEqual(f.setor, "Recepção")
         self.assertEqual(f.sexo, "M")
+
+
+class HoraExtraTests(TestCase):
+    def setUp(self):
+        self.op = Usuario.objects.create_superuser(username="he", password="senha-forte-123")
+        self.manha = Turno.objects.create(nome="Manhã", setor="recepcao",
+                                           inicio=time(7, 0), fim=time(15, 0), min_pessoas=1)
+        p = Pessoa.objects.create(nome="Gefferson")
+        self.f = Funcionario.objects.create(pessoa=p, cargo="Recepção", setor="Recepção",
+                                            sexo="M", regime_horas="extra")
+        self.inicio = services.inicio_da_semana()
+
+    def test_total_calculado(self):
+        from apps.escala.models import HoraExtra
+        he = HoraExtra(funcionario=self.f, data=self.inicio, inicio=time(18, 0), fim=time(22, 0))
+        self.assertEqual(he.total_minutos, 240)
+        self.assertEqual(he.total_txt, "4h00")
+        he2 = HoraExtra(funcionario=self.f, data=self.inicio, inicio=time(22, 0), fim=time(2, 0))
+        self.assertEqual(he2.total_txt, "4h00")   # cruzou a meia-noite
+
+    def test_service_valida_total_positivo(self):
+        with self.assertRaises(ValidationError):
+            services.adicionar_hora_extra(self.f, self.inicio, time(20, 0), time(20, 0), "extra", self.op)
+
+    def test_endpoint_add_e_remover(self):
+        from apps.escala.models import HoraExtra
+        self.client.force_login(self.op)
+        semana = self.inicio.strftime("%Y-%m-%d")
+        r = self.client.post(reverse("escala:editar"), {
+            "inicio": semana, "acao": "he_add", "funcionario": self.f.pk,
+            "data": semana, "he_inicio": "18:00", "he_fim": "22:00", "tipo": "extra",
+        })
+        self.assertEqual(r.status_code, 200)
+        he = HoraExtra.objects.get(funcionario=self.f)
+        self.assertEqual(he.total_txt, "4h00")
+        self.assertEqual(he.tipo, "extra")
+        r = self.client.post(reverse("escala:editar"), {
+            "inicio": semana, "acao": "he_remover", "hora_extra": he.pk,
+        })
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(HoraExtra.objects.exists())
+
+    def test_hora_extra_entra_na_interjornada(self):
+        # turno manhã no dia D e D+1, + hora extra 20-23 no dia D → D(23h)→D+1(07h)=8h
+        d0, d1 = self.inicio, self.inicio + timedelta(days=1)
+        services.atribuir(self.manha, self.f, d0, self.op)
+        a1 = services.atribuir(self.manha, self.f, d1, self.op)
+        # sem hora extra: sem violação de interjornada
+        an = services.analisar_semana(self.inicio)
+        self.assertNotIn(a1.pk, an["violacoes"])
+        services.adicionar_hora_extra(self.f, d0, time(20, 0), time(23, 0), "extra", self.op)
+        an = services.analisar_semana(self.inicio)
+        self.assertIn(a1.pk, an["violacoes"])
+        self.assertIn("interjornada <11h", an["bloqueios"])

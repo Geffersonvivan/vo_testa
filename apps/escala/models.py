@@ -35,6 +35,46 @@ class Turno(models.Model):
         return f"{self.get_setor_display()} · {self.nome} ({self.inicio:%H:%M}–{self.fim:%H:%M})"
 
 
+class HoraExtra(models.Model):
+    """Hora extra planejada de um colaborador num dia (além do turno normal).
+    Decidida no dia do evento: banco de horas ou hora extra (padrão vem da ficha,
+    mas pode divergir aqui). Base do relatório mensal do colaborador."""
+
+    class Tipo(models.TextChoices):
+        BANCO = "banco", "Banco de horas"
+        EXTRA = "extra", "Hora extra"
+
+    funcionario = models.ForeignKey("nucleo.Funcionario", on_delete=models.CASCADE,
+                                    related_name="horas_extras", verbose_name="funcionário")
+    data = models.DateField("data")
+    inicio = models.TimeField("início")
+    fim = models.TimeField("fim")
+    tipo = models.CharField("tipo", max_length=6, choices=Tipo.choices, default=Tipo.BANCO)
+    criado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+                                   related_name="horas_extras_lancadas", null=True, blank=True)
+    criado_em = models.DateTimeField("lançada em", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "hora extra"
+        verbose_name_plural = "horas extras"
+        ordering = ["data", "inicio"]
+
+    @property
+    def total_minutos(self) -> int:
+        from datetime import datetime
+        d = datetime.combine(self.data, self.fim) - datetime.combine(self.data, self.inicio)
+        min_ = int(d.total_seconds() // 60)
+        return min_ + 1440 if min_ < 0 else min_   # cruzou a meia-noite
+
+    @property
+    def total_txt(self) -> str:
+        m = self.total_minutos
+        return f"{m // 60}h{m % 60:02d}"
+
+    def __str__(self):
+        return f"{self.funcionario.pessoa.nome} · {self.data} · +{self.total_txt} ({self.tipo})"
+
+
 class SemanaPublicada(models.Model):
     """Marca uma semana (por setor) como publicada. A publicação é barrada se
     houver violação legal em aberto — a menos que a gerência justifique (força)."""

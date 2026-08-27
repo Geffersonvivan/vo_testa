@@ -2957,3 +2957,35 @@ body.escala-dragging .escala-drop { cursor: copy; }
 .viol-aviso .viol-dot { background: var(--alerta); }
 .escala-pub { font-size: .85rem; color: var(--sucesso); font-weight: 600; margin: -.5rem 0 1rem; }
 .escala-pub-forcado { color: var(--alerta); }
+
+/* ============ Escala — hora extra (chip +, selo, mini-form) ============ */
+.escala-chip .he-add {
+  border: none; background: var(--noturno); color: var(--lampiao-claro);
+  width: 16px; height: 16px; border-radius: 50%; font-size: 13px; line-height: 1;
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+.escala-chip .he-add:hover { filter: brightness(1.15); }
+
+.he-selo {
+  display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+  padding: 2px 6px 2px 8px; font-size: 11px; font-weight: 600; margin: 2px 3px 3px 0;
+}
+.he-selo.extra { background: var(--alerta-bg); color: var(--alerta); border: 1px solid rgba(184,121,31,.4); }
+.he-selo.banco { background: var(--info-bg); color: var(--info); border: 1px solid rgba(42,107,120,.35); }
+.he-selo .he-x { border: none; background: none; color: inherit; cursor: pointer; font-size: 12px; opacity: .7; padding: 0 1px; }
+.he-selo .he-x:hover { opacity: 1; }
+
+.he-form {
+  margin-top: 4px; background: #fff; border: 1px solid var(--fio); border-radius: var(--raio-p);
+  box-shadow: 0 8px 24px rgba(4,21,31,.14); padding: 9px 10px; font-size: 12px; width: 232px;
+}
+.he-form .tit { font-weight: 700; margin-bottom: 7px; }
+.he-form .lin { display: flex; gap: 6px; align-items: end; margin-bottom: 7px; }
+.he-form label { display: block; font-size: 10px; color: var(--tinta-suave); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; font-weight: 700; }
+.he-form input[type=time] { border: 1px solid var(--fio); border-radius: 6px; padding: 4px 6px; font: inherit; font-size: 12px; width: 82px; }
+.he-form .total { font-weight: 700; padding-bottom: 4px; }
+.he-form .tipo { display: flex; gap: 12px; margin-bottom: 8px; }
+.he-form .tipo label { text-transform: none; font-weight: 600; font-size: 11.5px; color: var(--tinta); display: inline-flex; gap: 4px; align-items: center; margin: 0; }
+.he-form .acoes { display: flex; gap: 6px; }
+.he-form .btn-ok { border: none; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; background: linear-gradient(180deg,var(--lampiao-claro),var(--lampiao)); color: #3a2a08; }
+.he-form .btn-x { border: 1px solid var(--fio); border-radius: 6px; padding: 5px 11px; font-size: 12px; font-weight: 700; cursor: pointer; background: #fff; color: var(--tinta); }

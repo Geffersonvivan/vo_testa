@@ -14,7 +14,7 @@ from apps.nucleo.modulos import Modulo
 from apps.nucleo.permissoes import eh_gerente, requer_gerencia, requer_modulo
 
 from . import services
-from .models import Atribuicao, Ausencia, TrocaTurno, Turno
+from .models import Atribuicao, Ausencia, HoraExtra, TrocaTurno, Turno
 
 
 def _data(txt, default=None):
@@ -22,6 +22,13 @@ def _data(txt, default=None):
         return datetime.strptime(txt, "%Y-%m-%d").date()
     except (TypeError, ValueError):
         return default
+
+
+def _hora(txt):
+    try:
+        return datetime.strptime(txt, "%H:%M").time()
+    except (TypeError, ValueError):
+        return None
 
 
 def _funcionarios(setor=None):
@@ -36,10 +43,16 @@ def _contexto_grade(inicio, setor):
     grade = services.grade_semana(inicio, setor)
     analise = services.analisar_semana(inicio, setor)
     viol = analise["violacoes"]
-    for linha in grade["linhas"]:                       # selo de violação por chip
+    fim = inicio + timedelta(days=6)
+    hx = HoraExtra.objects.filter(data__range=(inicio, fim)).select_related("funcionario")
+    hx_por = {}
+    for he in hx:
+        hx_por.setdefault((he.funcionario_id, he.data), []).append(he)
+    for linha in grade["linhas"]:                       # selo de violação + horas extras por chip
         for cel in linha["celulas"]:
             for a in cel["atribs"]:
                 a.violacoes = viol.get(a.pk, [])
+                a.horas_extras = hx_por.get((a.funcionario_id, a.data), [])
     pub = SemanaPublicada.objects.filter(inicio=inicio, setor=setor or "").first()
     return {
         "grade": grade,
@@ -106,6 +119,15 @@ def escala_editar(request):
         elif acao == "remover":
             atrib = get_object_or_404(Atribuicao, pk=request.POST.get("atribuicao"))
             services.desatribuir(atrib)
+        elif acao == "he_add":
+            func = get_object_or_404(Funcionario, pk=request.POST.get("funcionario"))
+            services.adicionar_hora_extra(
+                func, data, _hora(request.POST.get("he_inicio")), _hora(request.POST.get("he_fim")),
+                request.POST.get("tipo"), request.user,
+            )
+        elif acao == "he_remover":
+            he = get_object_or_404(HoraExtra, pk=request.POST.get("hora_extra"))
+            services.remover_hora_extra(he)
     except ValidationError as erro:
         return JsonResponse({"erro": " ".join(erro.messages)}, status=400)
     return render(request, "escala/partials/grade_conteudo.html", _contexto_grade(inicio, setor))
