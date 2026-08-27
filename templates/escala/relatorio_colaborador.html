@@ -3,15 +3,28 @@
 {% block titulo %}Relatório do colaborador — CRM Vô Testa{% endblock %}
 
 {% block conteudo %}
+<style media="print">
+  .sidebar, .topbar, .sidebar-backdrop, .pagina-acoes, .filtro-barra { display: none !important; }
+  .conteudo { margin: 0 !important; padding: 0 !important; }
+  .app, #app { display: block !important; }
+  body { background: #fff !important; }
+  .rel-kpi, .rel-bloco { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
+  .rel-print-info { display: block !important; }
+</style>
+
 <p class="pagina-eyebrow letreiro">Equipe · Escala</p>
 <div class="pagina-cabecalho">
   <h1>Relatório mensal do colaborador</h1>
   <div class="pagina-acoes">
     <a href="{% url 'escala:grade' %}" class="botao-neutro">Escala</a>
-    {% if func %}<a href="?funcionario={{ func.pk }}&mes={{ mes_sel }}&ano={{ ano_sel }}&export=csv" class="botao-neutro">Exportar CSV</a>{% endif %}
+    {% if func %}
+      <a href="?funcionario={{ func.pk }}&mes={{ mes_sel }}&ano={{ ano_sel }}&export=csv" class="botao-neutro">Exportar CSV</a>
+      <button type="button" class="botao-neutro" onclick="window.print()">Exportar PDF</button>
+    {% endif %}
   </div>
 </div>
 <p class="subtitulo">Horas, extras, feriados e ausências por colaborador no mês (base: escala planejada).</p>
+{% if func %}<p class="rel-print-info" style="display:none">Colaborador: <strong>{{ func.pessoa.nome }}</strong> · Período: <strong>{{ rotulo }}</strong></p>{% endif %}
 
 <form method="get" class="filtro-barra filtro-inline">
   <div class="filtro-campo">
