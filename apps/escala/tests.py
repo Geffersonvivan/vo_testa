@@ -416,3 +416,45 @@ class FeriadoCompTests(TestCase):
         Feriado.objects.create(data=self.inicio, nome="Teste")
         fer = services.feriados_no_periodo(self.inicio, self.inicio + timedelta(days=6))
         self.assertIn(self.inicio, fer)
+
+
+class RelatorioColaboradorTests(TestCase):
+    def setUp(self):
+        from datetime import date
+        self.op = Usuario.objects.create_superuser(username="rel", password="senha-forte-123")
+        self.turno = Turno.objects.create(nome="Manhã", setor="recepcao",
+                                           inicio=time(7, 0), fim=time(15, 0))  # 8h
+        p = Pessoa.objects.create(nome="Gefferson")
+        self.f = Funcionario.objects.create(pessoa=p, cargo="Recepção",
+                                            compensacao_feriado="dobro")
+        self.ini = date(2026, 3, 1)
+        self.fim = date(2026, 3, 31)
+
+    def test_agrega(self):
+        from datetime import date
+
+        from apps.escala.models import Feriado
+        services.atribuir(self.turno, self.f, date(2026, 3, 2), self.op)   # 8h
+        services.atribuir(self.turno, self.f, date(2026, 3, 3), self.op)   # 8h
+        Feriado.objects.create(data=date(2026, 3, 3), nome="Feriado")
+        services.adicionar_hora_extra(self.f, date(2026, 3, 2), time(18, 0), time(22, 0), "extra", self.op)
+        services.adicionar_hora_extra(self.f, date(2026, 3, 4), time(19, 0), time(21, 0), "banco", self.op)
+        services.registrar_ausencia(self.f, "folga", date(2026, 3, 10), date(2026, 3, 10), self.op)
+
+        d = services.relatorio_colaborador(self.f, self.ini, self.fim)
+        self.assertEqual(d["dias_trabalhados"], 2)
+        self.assertEqual(d["horas_normais_txt"], "16h00")
+        self.assertEqual(d["extra_txt"], "4h00")
+        self.assertEqual(d["banco_txt"], "2h00")
+        self.assertEqual(len(d["feriados_trabalhados"]), 1)
+        self.assertEqual(d["feriados_trabalhados"][0]["compensacao"], "Pagamento em dobro")
+        self.assertEqual(d["dias_ausente"], 1)
+
+    def test_view_e_csv(self):
+        self.client.force_login(self.op)
+        r = self.client.get(reverse("escala:relatorio"), {"funcionario": self.f.pk, "mes": 3, "ano": 2026})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Gefferson")
+        c = self.client.get(reverse("escala:relatorio"),
+                            {"funcionario": self.f.pk, "mes": 3, "ano": 2026, "export": "csv"})
+        self.assertEqual(c["Content-Type"].split(";")[0], "text/csv")

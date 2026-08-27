@@ -134,6 +134,60 @@ def feriados_no_periodo(inicio, fim):
     return set(Feriado.objects.filter(data__range=(inicio, fim)).values_list("data", flat=True))
 
 
+def _fmt_min(m):
+    return f"{m // 60}h{m % 60:02d}"
+
+
+def _min_turno(turno):
+    from datetime import date, datetime
+    d = datetime.combine(date.today(), turno.fim) - datetime.combine(date.today(), turno.inicio)
+    m = int(d.total_seconds() // 60)
+    return m + 1440 if m < 0 else m
+
+
+def relatorio_colaborador(funcionario, inicio, fim):
+    """Relatório mensal do colaborador: horas normais, extras (banco/extra),
+    feriados trabalhados e ausências no período. Base = escala planejada
+    (quando houver ponto, passa a usar o realizado)."""
+    from .models import Atribuicao, Ausencia, HoraExtra
+
+    atribs = list(
+        Atribuicao.objects.filter(funcionario=funcionario, data__range=(inicio, fim))
+        .select_related("turno")
+    )
+    feriados = feriados_no_periodo(inicio, fim)
+    horas_normais = sum(_min_turno(a.turno) for a in atribs)
+
+    fer_trab = []
+    for a in atribs:
+        if a.data in feriados:
+            comp = a.compensacao_feriado or funcionario.compensacao_feriado or "folga"
+            fer_trab.append({"data": a.data, "turno": a.turno.nome,
+                             "compensacao": "Folga compensatória" if comp == "folga" else "Pagamento em dobro"})
+
+    hx = list(HoraExtra.objects.filter(funcionario=funcionario, data__range=(inicio, fim)).order_by("data", "inicio"))
+    banco = sum(h.total_minutos for h in hx if h.tipo == "banco")
+    extra = sum(h.total_minutos for h in hx if h.tipo == "extra")
+
+    ausencias = []
+    for au in Ausencia.objects.filter(funcionario=funcionario, inicio__lte=fim, fim__gte=inicio).order_by("inicio"):
+        di, df = max(au.inicio, inicio), min(au.fim, fim)
+        ausencias.append({"tipo": au.get_tipo_display(), "dias": (df - di).days + 1,
+                          "inicio": au.inicio, "fim": au.fim})
+
+    return {
+        "dias_trabalhados": len({a.data for a in atribs}),
+        "horas_normais_txt": _fmt_min(horas_normais),
+        "banco_txt": _fmt_min(banco),
+        "extra_txt": _fmt_min(extra),
+        "hx_total_txt": _fmt_min(banco + extra),
+        "horas_extras": hx,
+        "feriados_trabalhados": fer_trab,
+        "ausencias": ausencias,
+        "dias_ausente": sum(a["dias"] for a in ausencias),
+    }
+
+
 def ausencias_da_semana(inicio):
     """[(funcionario_id, 'YYYY-MM-DD')] das ausências que tocam a semana — o
     editor usa para acender de vermelho a célula inválida ao arrastar."""

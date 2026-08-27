@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block titulo %}Relatório do colaborador — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Equipe · Escala</p>
+<div class="pagina-cabecalho">
+  <h1>Relatório mensal do colaborador</h1>
+  <div class="pagina-acoes">
+    <a href="{% url 'escala:grade' %}" class="botao-neutro">Escala</a>
+    {% if func %}<a href="?funcionario={{ func.pk }}&mes={{ mes_sel }}&ano={{ ano_sel }}&export=csv" class="botao-neutro">Exportar CSV</a>{% endif %}
+  </div>
+</div>
+<p class="subtitulo">Horas, extras, feriados e ausências por colaborador no mês (base: escala planejada).</p>
+
+<form method="get" class="filtro-barra filtro-inline">
+  <div class="filtro-campo">
+    <label>Colaborador</label>
+    <select name="funcionario" onchange="this.form.submit()">
+      {% for f in funcionarios %}<option value="{{ f.pk }}" {% if func and f.pk == func.pk %}selected{% endif %}>{{ f.pessoa.nome }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="filtro-campo">
+    <label>Mês</label>
+    <select name="mes" onchange="this.form.submit()">
+      {% for v, r in meses %}<option value="{{ v }}" {% if v == mes_sel %}selected{% endif %}>{{ r }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="filtro-campo">
+    <label>Ano</label>
+    <select name="ano" onchange="this.form.submit()">
+      {% for a in anos %}<option value="{{ a }}" {% if a == ano_sel %}selected{% endif %}>{{ a }}</option>{% endfor %}
+    </select>
+  </div>
+</form>
+
+{% if not func %}
+  <p class="bloco-vazio">Nenhum funcionário cadastrado.</p>
+{% else %}
+  <div class="rel-kpis">
+    <div class="rel-kpi"><span class="k">Dias trabalhados</span><span class="v">{{ dados.dias_trabalhados }}</span></div>
+    <div class="rel-kpi"><span class="k">Horas normais</span><span class="v">{{ dados.horas_normais_txt }}</span></div>
+    <div class="rel-kpi"><span class="k">Hora extra</span><span class="v">{{ dados.hx_total_txt }}</span><span class="n">banco {{ dados.banco_txt }} · extra {{ dados.extra_txt }}</span></div>
+    <div class="rel-kpi"><span class="k">Dias ausente</span><span class="v">{{ dados.dias_ausente }}</span></div>
+  </div>
+
+  <div class="rel-blocos">
+    <section class="rel-bloco">
+      <h2>Horas extras</h2>
+      {% if dados.horas_extras %}
+      <table class="tabela">
+        <thead><tr><th>Data</th><th>Período</th><th>Total</th><th>Tipo</th></tr></thead>
+        <tbody>
+          {% for he in dados.horas_extras %}
+          <tr><td>{{ he.data|date:"d/m" }}</td><td>{{ he.inicio|time:"H:i" }}–{{ he.fim|time:"H:i" }}</td><td>+{{ he.total_txt }}</td>
+              <td><span class="selo {% if he.tipo == 'banco' %}selo-info{% else %}selo-alerta{% endif %}">{{ he.get_tipo_display }}</span></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="ajuda">Sem horas extras no mês.</p>{% endif %}
+      {% if dados.banco_txt != '0h00' %}<p class="ajuda">💡 Saldo de banco de horas a compensar: <strong>{{ dados.banco_txt }}</strong>.</p>{% endif %}
+    </section>
+
+    <section class="rel-bloco">
+      <h2>Feriados trabalhados</h2>
+      {% if dados.feriados_trabalhados %}
+      <table class="tabela">
+        <thead><tr><th>Data</th><th>Turno</th><th>Compensação</th></tr></thead>
+        <tbody>
+          {% for fe in dados.feriados_trabalhados %}
+          <tr><td>{{ fe.data|date:"d/m" }}</td><td>{{ fe.turno }}</td><td>{{ fe.compensacao }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="ajuda">Nenhum feriado trabalhado no mês.</p>{% endif %}
+    </section>
+
+    <section class="rel-bloco">
+      <h2>Ausências</h2>
+      {% if dados.ausencias %}
+      <table class="tabela">
+        <thead><tr><th>Tipo</th><th>Período</th><th>Dias</th></tr></thead>
+        <tbody>
+          {% for au in dados.ausencias %}
+          <tr><td>{{ au.tipo }}</td><td>{{ au.inicio|date:"d/m" }}–{{ au.fim|date:"d/m" }}</td><td>{{ au.dias }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="ajuda">Sem ausências no mês.</p>{% endif %}
+    </section>
+  </div>
+{% endif %}
+{% endblock %}

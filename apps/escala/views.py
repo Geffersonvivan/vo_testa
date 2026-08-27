@@ -142,6 +142,47 @@ def escala_editar(request):
     return render(request, "escala/partials/grade_conteudo.html", _contexto_grade(inicio, setor))
 
 
+@requer_modulo(Modulo.ESCALA)
+@requer_gerencia
+def relatorio_colaborador(request):
+    """Relatório mensal do colaborador (filtros: colaborador + mês/ano)."""
+    import csv
+
+    from django.http import HttpResponse
+
+    from apps.nucleo import periodos
+
+    inicio, fim, rotulo = periodos.periodo(request)
+    funcs = Funcionario.objects.select_related("pessoa").order_by("pessoa__nome")
+    fid = request.GET.get("funcionario")
+    func = (funcs.filter(pk=fid).first() if fid else funcs.first())
+    dados = services.relatorio_colaborador(func, inicio, fim) if func else None
+
+    if request.GET.get("export") == "csv" and dados:
+        resp = HttpResponse(content_type="text/csv; charset=utf-8")
+        resp.write("﻿")
+        resp["Content-Disposition"] = f'attachment; filename="relatorio_{func.pessoa.nome}_{inicio}.csv"'
+        w = csv.writer(resp, delimiter=";")
+        w.writerow(["Colaborador", func.pessoa.nome])
+        w.writerow(["Período", rotulo])
+        w.writerow(["Dias trabalhados", dados["dias_trabalhados"]])
+        w.writerow(["Horas normais", dados["horas_normais_txt"]])
+        w.writerow(["Hora extra (banco)", dados["banco_txt"]])
+        w.writerow(["Hora extra (extra)", dados["extra_txt"]])
+        w.writerow(["Dias ausente", dados["dias_ausente"]])
+        w.writerow([])
+        w.writerow(["Feriado", "Turno", "Compensação"])
+        for fe in dados["feriados_trabalhados"]:
+            w.writerow([fe["data"].strftime("%d/%m/%Y"), fe["turno"], fe["compensacao"]])
+        return resp
+
+    return render(request, "escala/relatorio_colaborador.html", {
+        "funcionarios": funcs, "func": func, "dados": dados,
+        "inicio": inicio, "fim": fim, "rotulo": rotulo,
+        **periodos.selecao_periodo(request),
+    })
+
+
 @requer_gerencia
 @require_POST
 def publicar(request):

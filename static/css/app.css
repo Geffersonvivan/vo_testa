@@ -2997,3 +2997,15 @@ body.escala-dragging .escala-drop { cursor: copy; }
 .fer-comp .fc { border:none; background:#fff; color:var(--tinta-suave); font-size:10.5px; font-weight:700; padding:2px 9px; cursor:pointer; }
 .fer-comp .fc.on { background:var(--noturno); color:var(--lampiao-claro); }
 .fer-comp .fc:not(.on):hover { background:var(--superficie-2); }
+
+/* ============ Escala — relatório mensal do colaborador ============ */
+.rel-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0 18px; }
+.rel-kpi { background: var(--superficie); border: 1px solid var(--fio); border-radius: var(--raio-g); box-shadow: var(--sombra-1); padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.rel-kpi .k { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--tinta-suave); font-weight: 700; }
+.rel-kpi .v { font-size: 1.7rem; font-weight: 800; color: var(--tinta); line-height: 1.1; }
+.rel-kpi .n { font-size: .72rem; color: var(--tinta-suave); }
+.rel-blocos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.rel-bloco { background: var(--superficie); border: 1px solid var(--fio); border-radius: var(--raio-g); box-shadow: var(--sombra-1); padding: 14px 16px; }
+.rel-bloco h2 { font-size: 1.02rem; margin: 0 0 10px; }
+.rel-bloco .tabela { margin: 0; box-shadow: none; border: none; }
+@media (max-width: 820px) { .rel-blocos { grid-template-columns: 1fr; } }
