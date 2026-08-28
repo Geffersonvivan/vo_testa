@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Escala com hora extra</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --canvas:#EEF2F3;--superficie:#FAFCFC;--superficie-2:#F3F7F8;--lampiao:#E2A84A;--lampiao-claro:#F0C97A;
+    --noturno:#04151F;--tinta:#0E1C24;--tinta-suave:#5A6B75;--fio:#D5DEE3;--fio-forte:#B8C5CD;
+    --info:#2A6B78;--info-bg:#E7F0F2;--perigo:#B13A2A;--perigo-bg:#FBF3F1;--sucesso:#2A7A58;--sucesso-bg:#E6F2EC;--alerta:#B8791F;--alerta-bg:#FBF2E1;
+    --raio:12px;--raio-g:18px;--raio-p:8px;--sombra-1:0 1px 2px rgba(4,21,31,.05);--sombra-2:0 8px 24px rgba(4,21,31,.14);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--canvas);color:var(--tinta);padding:26px;line-height:1.4}
+  .wrap{max-width:1100px;margin:0 auto}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--info)}
+  h1{font-family:'Playfair Display',serif;font-size:30px;font-weight:800;margin:2px 0 3px}
+  .sub{color:var(--tinta-suave);font-size:14px;margin-bottom:16px}
+  .val{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--superficie);border:1px solid var(--fio);border-radius:var(--raio);box-shadow:var(--sombra-1);padding:10px 14px;margin-bottom:14px;font-size:13.5px}
+  .pill{display:inline-flex;gap:6px;align-items:center;padding:4px 11px;border-radius:999px;font-weight:600;font-size:12.5px}
+  .pill-ok{background:var(--sucesso-bg);color:var(--sucesso)}
+  .pill-info{background:var(--info-bg);color:var(--info)}
+  .pill-warn{background:var(--perigo-bg);color:var(--perigo)}
+
+  .gridwrap{overflow-x:auto;border:1px solid var(--fio);border-radius:var(--raio-g);box-shadow:var(--sombra-1);background:var(--superficie)}
+  table{border-collapse:separate;border-spacing:0;width:100%;min-width:760px}
+  th,td{border-bottom:1px solid var(--fio);border-right:1px solid var(--fio);vertical-align:top}
+  th:last-child,td:last-child{border-right:none}
+  thead th{background:var(--superficie-2);color:var(--tinta-suave);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:8px 6px;text-align:left}
+  .tlbl{background:var(--superficie-2);padding:10px 12px;width:150px}
+  .tlbl strong{font-size:13px}.tlbl small{display:block;color:var(--tinta-suave);font-size:11px;margin-top:2px}
+  td.cell{padding:7px;min-width:150px}
+
+  .chip{display:inline-flex;align-items:center;gap:4px;background:rgba(215,160,72,.14);border:1px solid rgba(215,160,72,.34);color:var(--tinta);border-radius:999px;padding:3px 5px 3px 9px;font-size:12.5px;font-weight:600;margin:0 0 3px}
+  .chip .he-add{border:none;background:var(--noturno);color:var(--lampiao-claro);width:17px;height:17px;border-radius:50%;font-size:13px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+  .chip .x{border:none;background:none;color:var(--tinta-suave);cursor:pointer;font-size:13px;padding:0 2px}
+
+  /* selo de hora extra */
+  .he-selo{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 6px 2px 8px;font-size:11px;font-weight:600;margin:2px 3px 2px 0}
+  .he-selo.extra{background:var(--alerta-bg);color:var(--alerta);border:1px solid rgba(184,121,31,.4)}
+  .he-selo.banco{background:var(--info-bg);color:var(--info);border:1px solid rgba(42,107,120,.35)}
+  .he-selo .x{border:none;background:none;color:inherit;cursor:pointer;font-size:12px;opacity:.7}
+
+  /* mini-form */
+  .he-form{margin-top:4px;background:#fff;border:1px solid var(--fio);border-radius:var(--raio-p);box-shadow:var(--sombra-2);padding:9px 10px;font-size:12px;width:230px}
+  .he-form .tit{font-weight:700;font-size:12px;margin-bottom:7px}
+  .he-form .lin{display:flex;gap:6px;align-items:end;margin-bottom:7px}
+  .he-form label{display:block;font-size:10px;color:var(--tinta-suave);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px;font-weight:700}
+  .he-form input[type=time]{border:1px solid var(--fio);border-radius:6px;padding:4px 6px;font:inherit;font-size:12px;width:78px}
+  .he-form .total{font-weight:700;color:var(--tinta);padding-bottom:4px}
+  .he-form .tipo{display:flex;gap:10px;margin-bottom:8px}
+  .he-form .tipo label{display:inline-flex;gap:4px;align-items:center;text-transform:none;font-weight:600;font-size:11.5px;color:var(--tinta)}
+  .he-form .acoes{display:flex;gap:6px}
+  .btn{border:none;border-radius:6px;padding:5px 11px;font-size:12px;font-weight:700;cursor:pointer}
+  .btn-ok{background:linear-gradient(180deg,var(--lampiao-claro),var(--lampiao));color:#3a2a08}
+  .btn-x{background:#fff;border:1px solid var(--fio);color:var(--tinta)}
+
+  .note{margin-top:20px;font-size:13.5px;color:var(--tinta-suave);background:var(--info-bg);border:1px solid #cfe0e4;border-radius:var(--raio);padding:14px 18px;line-height:1.6}
+  .note b{color:var(--info)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Equipe · Escala</div>
+  <h1>Escala com hora extra</h1>
+  <p class="sub">Cada colaborador tem o turno normal. No chip, o <b>+</b> adiciona <b>hora extra planejada</b> naquele dia (início, fim, total). <b>Clique num "+" e experimente.</b></p>
+
+  <div class="val" id="val">
+    <span class="pill pill-ok">✓ Interjornada &amp; DSR — checadas</span>
+    <span class="pill pill-info" id="p-he">⏱ Hora extra no mês: 0h00</span>
+    <span style="color:var(--tinta-suave)">↳ a hora extra soma no <b>relatório mensal</b> do colaborador e entra na validação de descanso.</span>
+  </div>
+
+  <div class="gridwrap">
+    <table>
+      <thead><tr><th>Turno</th><th>SEG 24/08</th><th>TER 25/08</th><th>QUA 26/08</th><th>QUI 27/08</th></tr></thead>
+      <tbody id="grid">
+        <tr>
+          <td class="tlbl"><strong>Recep. Manhã</strong><small>07:00–15:00 · mín 1</small></td>
+        </tr>
+        <tr>
+          <td class="tlbl"><strong>Recep. Tarde</strong><small>14:30–22:00 · mín 1</small></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <b>Como isso vira o CRM:</b> a hora extra é um registro por <b>(colaborador × data)</b> com <b>início, fim, total e tipo</b> (banco/extra, já pré-marcado pelo padrão da ficha). O total é <b>automático</b>; se cruzar a meia-noite, avisa. Ela <b>entra na interjornada 11h e no DSR</b> (o turno normal + a extra) — se ferir, acende alerta (você confirma se quiser). E <b>alimenta o relatório mensal</b>: horas normais, horas extras por período, saldo de banco de horas a compensar. <b>Feriado</b> usa o mesmo mecanismo, com o seletor folga × dobro no lugar do banco × extra.
+  </div>
+</div>
+
+<script>
+  const PESSOAS = {
+    "Recep. Manhã": {SEG:["Gefferson"],TER:["Gefferson"],QUA:["Rosana"],QUI:["Gefferson"]},
+    "Recep. Tarde": {SEG:["Rosana"],TER:["Peterson"],QUA:["Peterson"],QUI:["Rosana"]},
+  };
+  const PADRAO = {Gefferson:"extra", Rosana:"banco", Peterson:"extra"};  // padrão da ficha
+  const DIAS = ["SEG","TER","QUA","QUI"];
+  const grid = document.getElementById("grid");
+  const rows = grid.querySelectorAll("tr");
+
+  function selo(nome, ini, fim, tot, tipo){
+    const s=document.createElement("span"); s.className="he-selo "+tipo;
+    s.innerHTML=`⏱ +${tot} · ${ini}–${fim} · ${tipo}<button class="x">×</button>`;
+    s.querySelector(".x").onclick=()=>{s.remove();recalc();};
+    return s;
+  }
+  function difH(ini,fim){
+    const [ah,am]=ini.split(":").map(Number),[bh,bm]=fim.split(":").map(Number);
+    let min=(bh*60+bm)-(ah*60+am); if(min<0)min+=1440;
+    return {min, txt:`${Math.floor(min/60)}h${String(min%60).padStart(2,"0")}`};
+  }
+  function abrirForm(cell, nome){
+    if(cell.querySelector(".he-form"))return;
+    const f=document.createElement("div"); f.className="he-form";
+    f.innerHTML=`<div class="tit">Hora extra — ${nome}</div>
+      <div class="lin">
+        <div><label>Início</label><input type="time" class="ini" value="18:00"></div>
+        <div><label>Fim</label><input type="time" class="fim" value="22:00"></div>
+        <div class="total">Total: <span class="tt">4h00</span></div>
+      </div>
+      <div class="tipo">
+        <label><input type="radio" name="tp" value="banco" ${PADRAO[nome]==="banco"?"checked":""}> Banco</label>
+        <label><input type="radio" name="tp" value="extra" ${PADRAO[nome]!=="banco"?"checked":""}> Hora extra</label>
+      </div>
+      <div class="acoes"><button class="btn btn-ok ok">Salvar</button><button class="btn btn-x cancel">Cancelar</button></div>`;
+    const ini=f.querySelector(".ini"),fim=f.querySelector(".fim"),tt=f.querySelector(".tt");
+    const upd=()=>tt.textContent=difH(ini.value,fim.value).txt;
+    ini.oninput=upd; fim.oninput=upd; upd();
+    f.querySelector(".cancel").onclick=()=>f.remove();
+    f.querySelector(".ok").onclick=()=>{
+      const tipo=f.querySelector("input[name=tp]:checked").value;
+      cell.querySelector(".he-list").appendChild(selo(nome,ini.value,fim.value,difH(ini.value,fim.value).txt,tipo));
+      f.remove(); recalc();
+    };
+    cell.appendChild(f);
+  }
+  function chip(nome, cell){
+    const c=document.createElement("span"); c.className="chip";
+    c.innerHTML=`<span>${nome}</span><button class="he-add" title="Adicionar hora extra">+</button><button class="x">×</button>`;
+    c.querySelector(".he-add").onclick=()=>abrirForm(cell,nome);
+    return c;
+  }
+  Object.keys(PESSOAS).forEach((turno,r)=>{
+    const tr=rows[r];
+    DIAS.forEach(d=>{
+      const td=document.createElement("td"); td.className="cell";
+      (PESSOAS[turno][d]||[]).forEach(n=>td.appendChild(chip(n,td)));
+      const list=document.createElement("div"); list.className="he-list"; td.appendChild(list);
+      tr.appendChild(td);
+    });
+  });
+  function recalc(){
+    let min=0;
+    document.querySelectorAll(".he-selo").forEach(s=>{
+      const m=s.textContent.match(/\+(\d+)h(\d+)/); if(m)min+=(+m[1])*60+(+m[2]);
+    });
+    document.getElementById("p-he").textContent=`⏱ Hora extra no mês: ${Math.floor(min/60)}h${String(min%60).padStart(2,"0")}`;
+  }
+</script>
+</body>
+</html>
