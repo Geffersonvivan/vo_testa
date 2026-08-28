@@ -170,21 +170,54 @@ def relatorio_colaborador(funcionario, inicio, fim):
     extra = sum(h.total_minutos for h in hx if h.tipo == "extra")
 
     ausencias = []
+    aus_por_dia = {}
     for au in Ausencia.objects.filter(funcionario=funcionario, inicio__lte=fim, fim__gte=inicio).order_by("inicio"):
         di, df = max(au.inicio, inicio), min(au.fim, fim)
         ausencias.append({"tipo": au.get_tipo_display(), "dias": (df - di).days + 1,
                           "inicio": au.inicio, "fim": au.fim})
+        d = di
+        while d <= df:
+            aus_por_dia[d] = au.get_tipo_display()
+            d += timedelta(days=1)
+
+    # Calendário: status por dia do período (herói do relatório).
+    dias_atrib = {a.data for a in atribs}
+    he_min_dia = {}
+    for h in hx:
+        he_min_dia[h.data] = he_min_dia.get(h.data, 0) + h.total_minutos
+    dias = []
+    d = inicio
+    while d <= fim:
+        aus = aus_por_dia.get(d, "")
+        trabalhou = d in dias_atrib
+        dias.append({
+            "dia": d.day, "data": d, "domingo": d.weekday() == 6,
+            "trabalhou": trabalhou and not aus,
+            "feriado": trabalhou and d in feriados,
+            "extra_txt": ("+" + _fmt_min(he_min_dia[d])) if d in he_min_dia else "",
+            "ausencia": "" if trabalhou else aus,   # ausência só marca dia sem turno
+        })
+        d += timedelta(days=1)
+    # semanas para a grade do calendário (blanks à frente + fecha em múltiplos de 7)
+    celulas = [None] * inicio.weekday() + dias
+    while len(celulas) % 7:
+        celulas.append(None)
+    semanas = [celulas[i:i + 7] for i in range(0, len(celulas), 7)]
 
     return {
-        "dias_trabalhados": len({a.data for a in atribs}),
+        "dias_trabalhados": len(dias_atrib),
         "horas_normais_txt": _fmt_min(horas_normais),
         "banco_txt": _fmt_min(banco),
         "extra_txt": _fmt_min(extra),
         "hx_total_txt": _fmt_min(banco + extra),
         "horas_extras": hx,
         "feriados_trabalhados": fer_trab,
+        "feriados_count": len(fer_trab),
         "ausencias": ausencias,
         "dias_ausente": sum(a["dias"] for a in ausencias),
+        "dias": dias,
+        "semanas": semanas,
+        "primeiro_dow": inicio.weekday(),
     }
 
 

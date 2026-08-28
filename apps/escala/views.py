@@ -176,8 +176,11 @@ def relatorio_colaborador(request):
             w.writerow([fe["data"].strftime("%d/%m/%Y"), fe["turno"], fe["compensacao"]])
         return resp
 
+    iniciais = ""
+    if func:
+        iniciais = "".join(p[0] for p in func.pessoa.nome.split()[:2]).upper()
     return render(request, "escala/relatorio_colaborador.html", {
-        "funcionarios": funcs, "func": func, "dados": dados,
+        "funcionarios": funcs, "func": func, "dados": dados, "iniciais": iniciais,
         "inicio": inicio, "fim": fim, "rotulo": rotulo,
         **periodos.selecao_periodo(request),
     })

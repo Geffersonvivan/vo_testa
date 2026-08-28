@@ -458,3 +458,22 @@ class RelatorioColaboradorTests(TestCase):
         c = self.client.get(reverse("escala:relatorio"),
                             {"funcionario": self.f.pk, "mes": 3, "ano": 2026, "export": "csv"})
         self.assertEqual(c["Content-Type"].split(";")[0], "text/csv")
+
+
+class RelatorioCalendarioTests(TestCase):
+    def test_dias_e_semanas(self):
+        from datetime import date
+        op = Usuario.objects.create_superuser(username="cal", password="senha-forte-123")
+        t = Turno.objects.create(nome="M", setor="recepcao", inicio=time(7, 0), fim=time(15, 0))
+        f = Funcionario.objects.create(pessoa=Pessoa.objects.create(nome="Zé Silva"), cargo="Recep")
+        ini, fim = date(2026, 3, 1), date(2026, 3, 31)
+        services.atribuir(t, f, date(2026, 3, 3), op)
+        services.adicionar_hora_extra(f, date(2026, 3, 3), time(18, 0), time(22, 0), "extra", op)
+        d = services.relatorio_colaborador(f, ini, fim)
+        self.assertEqual(len(d["dias"]), 31)
+        dia3 = next(x for x in d["dias"] if x["dia"] == 3)
+        self.assertTrue(dia3["trabalhou"])
+        self.assertEqual(dia3["extra_txt"], "+4h00")
+        # semanas: cada uma com 7 células, 1º de março (domingo) → 6 blanks à frente
+        self.assertTrue(all(len(s) == 7 for s in d["semanas"]))
+        self.assertEqual(d["semanas"][0][:6], [None] * 6)

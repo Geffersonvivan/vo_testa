@@ -1,106 +1,119 @@
 {% extends "base.html" %}
 
-{% block titulo %}Relatório do colaborador — CRM Vô Testa{% endblock %}
+{% block titulo %}Relatório · {{ func.pessoa.nome|default:"colaborador" }} — CRM Vô Testa{% endblock %}
 
 {% block conteudo %}
 <style media="print">
-  .sidebar, .topbar, .sidebar-backdrop, .pagina-acoes, .filtro-barra { display: none !important; }
+  .sidebar, .topbar, .sidebar-backdrop, .rc-toolbar { display: none !important; }
   .conteudo { margin: 0 !important; padding: 0 !important; }
-  .app, #app { display: block !important; }
   body { background: #fff !important; }
-  .rel-kpi, .rel-bloco { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
-  .rel-print-info { display: block !important; }
+  .rc-cal, .rc-razao, .rc-bloco { box-shadow: none !important; border: 1px solid #ccc !important; break-inside: avoid; }
 </style>
 
-<p class="pagina-eyebrow letreiro">Equipe · Escala</p>
-<div class="pagina-cabecalho">
-  <h1>Relatório mensal do colaborador</h1>
-  <div class="pagina-acoes">
-    <a href="{% url 'escala:grade' %}" class="botao-neutro">Escala</a>
-    {% if func %}
-      <a href="?funcionario={{ func.pk }}&mes={{ mes_sel }}&ano={{ ano_sel }}&export=csv" class="botao-neutro">Exportar CSV</a>
-      <button type="button" class="botao-neutro" onclick="window.print()">Exportar PDF</button>
-    {% endif %}
-  </div>
-</div>
-<p class="subtitulo">Horas, extras, feriados e ausências por colaborador no mês (base: escala planejada).</p>
-{% if func %}<p class="rel-print-info" style="display:none">Colaborador: <strong>{{ func.pessoa.nome }}</strong> · Período: <strong>{{ rotulo }}</strong></p>{% endif %}
-
-<form method="get" class="filtro-barra filtro-inline">
-  <div class="filtro-campo">
-    <label>Colaborador</label>
-    <select name="funcionario" onchange="this.form.submit()">
-      {% for f in funcionarios %}<option value="{{ f.pk }}" {% if func and f.pk == func.pk %}selected{% endif %}>{{ f.pessoa.nome }}</option>{% endfor %}
-    </select>
-  </div>
-  <div class="filtro-campo">
-    <label>Mês</label>
-    <select name="mes" onchange="this.form.submit()">
-      {% for v, r in meses %}<option value="{{ v }}" {% if v == mes_sel %}selected{% endif %}>{{ r }}</option>{% endfor %}
-    </select>
-  </div>
-  <div class="filtro-campo">
-    <label>Ano</label>
-    <select name="ano" onchange="this.form.submit()">
-      {% for a in anos %}<option value="{{ a }}" {% if a == ano_sel %}selected{% endif %}>{{ a }}</option>{% endfor %}
-    </select>
-  </div>
-</form>
-
-{% if not func %}
-  <p class="bloco-vazio">Nenhum funcionário cadastrado.</p>
-{% else %}
-  <div class="rel-kpis">
-    <div class="rel-kpi"><span class="k">Dias trabalhados</span><span class="v">{{ dados.dias_trabalhados }}</span></div>
-    <div class="rel-kpi"><span class="k">Horas normais</span><span class="v">{{ dados.horas_normais_txt }}</span></div>
-    <div class="rel-kpi"><span class="k">Hora extra</span><span class="v">{{ dados.hx_total_txt }}</span><span class="n">banco {{ dados.banco_txt }} · extra {{ dados.extra_txt }}</span></div>
-    <div class="rel-kpi"><span class="k">Dias ausente</span><span class="v">{{ dados.dias_ausente }}</span></div>
+<div class="rc">
+  <p class="pagina-eyebrow letreiro">Equipe · Escala · Relatório do mês</p>
+  <div class="rc-head">
+    <div class="rc-who">
+      {% if func %}<span class="rc-avatar">{{ iniciais }}</span>{% endif %}
+      <div>
+        <h1 class="rc-name">{{ func.pessoa.nome|default:"—" }}</h1>
+        <div class="rc-meta">{% if func.setor %}<b>{{ func.setor }}</b> · {% endif %}{{ rotulo }}</div>
+      </div>
+    </div>
+    <form method="get" class="rc-toolbar">
+      <div class="rc-campo">
+        <label>Colaborador</label>
+        <select name="funcionario" onchange="this.form.submit()">
+          {% for f in funcionarios %}<option value="{{ f.pk }}" {% if func and f.pk == func.pk %}selected{% endif %}>{{ f.pessoa.nome }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="rc-campo">
+        <label>Mês</label>
+        <select name="mes" onchange="this.form.submit()">{% for v, r in meses %}<option value="{{ v }}" {% if v == mes_sel %}selected{% endif %}>{{ r }}</option>{% endfor %}</select>
+      </div>
+      <div class="rc-campo">
+        <label>Ano</label>
+        <select name="ano" onchange="this.form.submit()">{% for a in anos %}<option value="{{ a }}" {% if a == ano_sel %}selected{% endif %}>{{ a }}</option>{% endfor %}</select>
+      </div>
+      {% if func %}
+      <a class="botao-neutro" href="?funcionario={{ func.pk }}&mes={{ mes_sel }}&ano={{ ano_sel }}&export=csv">CSV</a>
+      <button type="button" class="botao-neutro" onclick="window.print()">PDF</button>
+      {% endif %}
+    </form>
   </div>
 
-  <div class="rel-blocos">
-    <section class="rel-bloco">
+  {% if not func %}
+    <p class="bloco-vazio">Nenhum funcionário cadastrado.</p>
+  {% else %}
+  <div class="rc-regua"></div>
+
+  <div class="rc-mescab">
+    <span class="t">O mês de {{ func.pessoa.nome|truncatewords:1|cut:"…" }}</span>
+    <div class="rc-leg">
+      <span><i class="rc-dot trab"></i>trabalhado</span>
+      <span><i class="rc-dot extra"></i>hora extra</span>
+      <span><i class="rc-dot fer"></i>feriado</span>
+      <span><i class="rc-dot aus"></i>ausência</span>
+      <span><i class="rc-dot folga"></i>folga</span>
+    </div>
+  </div>
+
+  <div class="rc-cal">
+    <div class="rc-dows"><div>seg</div><div>ter</div><div>qua</div><div>qui</div><div>sex</div><div>sáb</div><div>dom</div></div>
+    {% for semana in dados.semanas %}
+    <div class="rc-week">
+      {% for c in semana %}
+        {% if c %}
+        <div class="rc-dia{% if c.domingo %} dom{% endif %}{% if c.trabalhou %} trab{% endif %}{% if c.extra_txt %} extra{% endif %}{% if c.feriado %} feriado{% endif %}{% if c.ausencia %} aus{% endif %}">
+          <span class="n">{{ c.dia }}</span>
+          {% if c.feriado %}<span class="ferm">🎌</span>{% endif %}
+          <span class="barra"></span>
+          {% if c.extra_txt %}<span class="he">{{ c.extra_txt }}</span>{% endif %}
+          {% if c.ausencia %}<span class="austxt">{{ c.ausencia|lower }}</span>{% endif %}
+        </div>
+        {% else %}<div class="rc-dia vazio"></div>{% endif %}
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="rc-razao">
+    <div class="item"><div class="rot">Dias trabalhados</div><div class="val num">{{ dados.dias_trabalhados }}</div></div>
+    <div class="item"><div class="rot">Horas normais</div><div class="val num">{{ dados.horas_normais_txt }}</div></div>
+    <div class="item"><div class="rot">Hora extra</div><div class="val num">{{ dados.hx_total_txt }}</div><div class="sub"><span class="bk">banco {{ dados.banco_txt }}</span> · <span class="ex">extra {{ dados.extra_txt }}</span></div></div>
+    <div class="item"><div class="rot">Feriados · Ausências</div><div class="val num">{{ dados.feriados_count }} · {{ dados.dias_ausente }}</div><div class="sub">{{ dados.feriados_count }} feriado{{ dados.feriados_count|pluralize }} · {{ dados.dias_ausente }} dia{{ dados.dias_ausente|pluralize }} ausente</div></div>
+  </div>
+
+  <div class="rc-cols">
+    <section class="rc-bloco">
       <h2>Horas extras</h2>
       {% if dados.horas_extras %}
-      <table class="tabela">
-        <thead><tr><th>Data</th><th>Período</th><th>Total</th><th>Tipo</th></tr></thead>
-        <tbody>
-          {% for he in dados.horas_extras %}
-          <tr><td>{{ he.data|date:"d/m" }}</td><td>{{ he.inicio|time:"H:i" }}–{{ he.fim|time:"H:i" }}</td><td>+{{ he.total_txt }}</td>
-              <td><span class="selo {% if he.tipo == 'banco' %}selo-info{% else %}selo-alerta{% endif %}">{{ he.get_tipo_display }}</span></td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}<p class="ajuda">Sem horas extras no mês.</p>{% endif %}
-      {% if dados.banco_txt != '0h00' %}<p class="ajuda">💡 Saldo de banco de horas a compensar: <strong>{{ dados.banco_txt }}</strong>.</p>{% endif %}
+      <div class="rc-lista">
+        {% for he in dados.horas_extras %}
+        <div class="rc-row"><span class="data">{{ he.data|date:"d/m" }}</span><span class="per">{{ he.inicio|time:"H:i" }}–{{ he.fim|time:"H:i" }}</span>
+          <span class="tot">+{{ he.total_txt }}</span><span class="tag {{ he.tipo }}">{{ he.get_tipo_display }}</span></div>
+        {% endfor %}
+      </div>
+      {% if dados.banco_txt != '0h00' %}<div class="rc-saldo">💡 Saldo de <b>banco de horas</b> a compensar: <b>{{ dados.banco_txt }}</b>.</div>{% endif %}
+      {% else %}<p class="rc-vazio">Sem horas extras no mês.</p>{% endif %}
     </section>
 
-    <section class="rel-bloco">
-      <h2>Feriados trabalhados</h2>
-      {% if dados.feriados_trabalhados %}
-      <table class="tabela">
-        <thead><tr><th>Data</th><th>Turno</th><th>Compensação</th></tr></thead>
-        <tbody>
-          {% for fe in dados.feriados_trabalhados %}
-          <tr><td>{{ fe.data|date:"d/m" }}</td><td>{{ fe.turno }}</td><td>{{ fe.compensacao }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}<p class="ajuda">Nenhum feriado trabalhado no mês.</p>{% endif %}
-    </section>
-
-    <section class="rel-bloco">
-      <h2>Ausências</h2>
-      {% if dados.ausencias %}
-      <table class="tabela">
-        <thead><tr><th>Tipo</th><th>Período</th><th>Dias</th></tr></thead>
-        <tbody>
-          {% for au in dados.ausencias %}
-          <tr><td>{{ au.tipo }}</td><td>{{ au.inicio|date:"d/m" }}–{{ au.fim|date:"d/m" }}</td><td>{{ au.dias }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}<p class="ajuda">Sem ausências no mês.</p>{% endif %}
+    <section class="rc-bloco">
+      <h2>Feriados &amp; ausências</h2>
+      {% if dados.feriados_trabalhados or dados.ausencias %}
+      <div class="rc-lista">
+        {% for fe in dados.feriados_trabalhados %}
+        <div class="rc-row"><span class="data">{{ fe.data|date:"d/m" }}</span><span class="per">🎌 Feriado · {{ fe.turno }}</span>
+          <span class="tag {% if fe.compensacao == 'Pagamento em dobro' %}dobro{% else %}folga{% endif %}">{{ fe.compensacao }}</span></div>
+        {% endfor %}
+        {% for au in dados.ausencias %}
+        <div class="rc-row"><span class="data">{{ au.inicio|date:"d/m" }}</span><span class="per">{{ au.tipo }}{% if au.dias > 1 %} · {{ au.inicio|date:"d/m" }}–{{ au.fim|date:"d/m" }}{% endif %}</span>
+          <span class="tag folga">{{ au.dias }} dia{{ au.dias|pluralize }}</span></div>
+        {% endfor %}
+      </div>
+      {% else %}<p class="rc-vazio">Sem feriados trabalhados nem ausências no mês.</p>{% endif %}
     </section>
   </div>
-{% endif %}
+  {% endif %}
+</div>
 {% endblock %}
