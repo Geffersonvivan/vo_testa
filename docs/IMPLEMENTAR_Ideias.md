@@ -162,6 +162,30 @@ streaming no chat; escolher o modelo por custo/latência.
 
 ---
 
+## 🌦️ Previsão do tempo no CRM (ferramenta pro vendedor + precificação)
+
+Pousada de lago/ao ar livre = o **tempo é o fator nº 1** da experiência e da demanda.
+Ter isso na mão do **vendedor** (informar o hóspede + ajustar a oferta) é acionável.
+*Relacionado: o clima como **fator de precificação** está em
+[`docs/Precificação/precificação.md`](./Precificação/precificação.md).*
+
+- [ ] 🟢 **Widget de clima — curto prazo (até ~14 dias)** — sol/chuva/temperatura no
+      **dashboard** e na **tela de reserva/lead**. Fonte **Open-Meteo** (grátis, sem chave),
+      coordenada de Itá; cache diário via cron. *Feature real e barata; preciso o bastante p/ operar.*
+- [ ] 🟡 **Card de panorama sazonal — longo prazo (3–6 meses)** — **ENSO (El Niño/La Niña)**
+      + tendência da estação, **probabilístico** (não é previsão diária). Fontes NOAA/CPC,
+      INMET, CPTEC; atualização ~mensal (manual ou API). Contexto pra **precificar a alta**.
+      *Médio prazo (2–6 semanas) = tendência, não certeza.*
+- [ ] 🟡 **Gatilhos de venda** — "chuva no fim de semana → sugerir **cancelamento flexível /
+      last-minute**"; "sol + feriado → **segurar tarifa**".
+- ⚠️ **Regra de ouro:** nunca vender previsão como **certeza** ao hóspede — sempre
+      "previsão, sujeita a mudança" (senão vira reclamação).
+
+**Conclusão:** curto prazo é feature real e barata; longo prazo é panorama probabilístico
+(bem enquadrado, ainda muito útil pra precificar).
+
+---
+
 ## ⛔ Não replicar (é rede/serviço da Foco, não software)
 
 - **Rede de 800 canais / 500 agências / Abracorp** (R$ 15/reserva) — é o *negócio* deles.

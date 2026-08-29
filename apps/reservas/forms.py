@@ -1,8 +1,9 @@
 from decimal import Decimal
 
 from django import forms
+from django.db.models import Case, IntegerField, Value, When
 
-from apps.nucleo.models import UH, FormaPagamento, Pessoa
+from apps.nucleo.models import UH, FormaPagamento, Pessoa, TipoUH
 
 from .models import Acompanhante, FichaFNRH, GrupoReserva, LancamentoConta, Reserva
 
@@ -28,7 +29,18 @@ class ReservaForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["hospede"].queryset = Pessoa.objects.filter(ativo=True)
-        self.fields["uh"].queryset = UH.objects.filter(status=UH.Status.ATIVA)
+        # Day use sempre por último (senão "DAY-01" sobe na frente de "Quarto…").
+        self.fields["uh"].queryset = (
+            UH.objects.filter(status=UH.Status.ATIVA)
+            .annotate(
+                _day_use=Case(
+                    When(tipo__modalidade=TipoUH.Modalidade.DAY_USE, then=Value(1)),
+                    default=Value(0),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("_day_use", "numero")
+        )
         # Titular só faz sentido quando não é particular; queryset = agências/empresas.
         self.fields["titular"].queryset = Pessoa.objects.filter(
             ativo=True, agencia__isnull=False

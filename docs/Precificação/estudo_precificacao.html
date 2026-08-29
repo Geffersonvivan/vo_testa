@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Estudo de Precificação — Pousada Vô Testa</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: Georgia, 'Times New Roman', serif; color: #1a1a1a; line-height: 1.45; font-size: 10.5pt; margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 2px; letter-spacing: -.01em; }
+  h2 { font-size: 13pt; margin: 20px 0 7px; padding-bottom: 4px; border-bottom: 2px solid #E2A84A; }
+  h3 { font-size: 11pt; margin: 12px 0 3px; }
+  .eyebrow { font-family: Arial, sans-serif; font-size: 8.5pt; letter-spacing: .18em; text-transform: uppercase; color: #8a7a52; font-weight: bold; }
+  .sub { color: #555; font-size: 10pt; margin: 2px 0 0; }
+  .rule { height: 3px; background: #04151F; margin: 10px 0 0; }
+  p { margin: 5px 0; }
+  small, .fonte { font-size: 8.5pt; color: #666; }
+  table { width: 100%; border-collapse: collapse; margin: 7px 0 4px; font-size: 9.5pt; }
+  th, td { border: 1px solid #cfcfcf; padding: 4px 7px; text-align: left; vertical-align: top; }
+  th { background: #f3efe6; font-family: Arial, sans-serif; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .03em; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .destaque { background: #fbf2e1; }
+  table.mini { font-size: 8.8pt; }
+  table.mini th, table.mini td { padding: 3px 6px; }
+  .fonte-lista { font-family: Arial, sans-serif; font-size: 8.5pt; color: #555; line-height: 1.5; }
+  .nota { background: #f6f8f8; border-left: 3px solid #E2A84A; padding: 7px 11px; margin: 9px 0; font-size: 9.5pt; }
+  .selo { display: inline-block; background: #E7F0F2; color: #2A6B78; font-family: Arial, sans-serif; font-size: 8pt; font-weight: bold; padding: 1px 7px; border-radius: 3px; }
+  .rodape { margin-top: 22px; padding-top: 8px; border-top: 1px solid #ddd; font-family: Arial, sans-serif; font-size: 8pt; color: #888; }
+  ul { margin: 3px 0 5px 17px; padding: 0; }
+  li { margin: 1px 0; }
+  .amen { columns: 2; column-gap: 22px; font-size: 9.5pt; }
+  .amen li { break-inside: avoid; }
+  .pb { page-break-before: always; }
+</style>
+</head>
+<body>
+
+  <p class="eyebrow">Pousada Vô Testa · Itá / SC — Lago de Itá</p>
+  <h1>Estudo de Precificação</h1>
+  <p class="sub">Tarifas dos 24 quartos, diferenciais e projeção de ocupação — ancorado em pesquisa de mercado · Agosto de 2026</p>
+  <div class="rule"></div>
+
+  <h2>1. Como o preço foi construído</h2>
+  <p>Cada quarto tem preço a partir de <b>três âncoras</b>: o <b>mercado da região</b> (§2), a
+  <b>demanda</b> (meta de ocupação média de <b>80% ao ano</b>) e um <b>piso de custo</b> (guardrail
+  para descontos, a refinar). Os quartos entram em <b>4 categorias</b> (Padrão, Intermediário,
+  Cabana Intermediária, Cabana Hobbit) e o preço sobe com o <b>valor percebido</b> — vista para o
+  lago, cozinha própria, espaço (dois ambientes), varanda, pé-direito. Onde há diferença <b>dentro</b>
+  da categoria, o preço é <b>por quarto</b> (§3). Sobre a base de <b>baixa temporada</b> aplica-se a
+  escada sazonal: <b>Média +25%</b>, <b>Alta +45%</b>, <b>Feriado-pico +80%</b>.</p>
+
+  <h2>2. Pesquisa de mercado — Itá e região</h2>
+  <p>As “médias” de agregadores vêm <b>infladas pelos resorts termais</b>; por isso os dados estão
+  <b>segmentados</b>. Valores em R$/noite (US$ convertido a ~R$ 5,4).</p>
+  <table>
+    <thead><tr><th>Segmento</th><th class="num">Diária</th><th>Referências de mercado</th></tr></thead>
+    <tbody>
+      <tr><td>Pousada econômica (simples, sem vista)</td><td class="num">R$ 99 – 250</td><td>pousadas de Itá “a partir de R$ 99”; hotéis de Piratuba “a partir de R$ 118”</td></tr>
+      <tr><td>Pousada padrão (a maioria)</td><td class="num">R$ 250 – 450</td><td>Pousada Encantos de Itá ~US$ 61 (≈ R$ 330); faixa Piratuba R$ 222 – 475</td></tr>
+      <tr class="destaque"><td>Superior / vista / cabana diferenciada</td><td class="num">R$ 450 – 700+</td><td>chalés à beira do Lago de Itá (vista + hidromassagem)</td></tr>
+      <tr><td>Resort termal (Itá Thermas 4★)</td><td class="num">R$ 950 – 1.300</td><td>US$ 177 – 235/noite — <b>outro segmento</b>, não é benchmark de pousada</td></tr>
+    </tbody>
+  </table>
+  <p><small><b>Cabanas/chalés do Lago de Itá</b> são produto <b>premium e experiencial</b>: chalés lakefront
+  com vista + hidromassagem + cozinha e cesta de café (ex.: <i>Lake Paradise Chalets</i>, <i>Cabana Paradise
+  Black</i>); a referência de cabana romântica na <b>Serra Catarinense parte de ~R$ 1.090</b>/noite. Sazonalidade
+  (Piratuba, indicativo): julho ~R$ 511; fevereiro ~R$ 1.243 (puxada pelos resorts).</small></p>
+
+  <h2>3. Inventário de quartos, diferenciais e valores</h2>
+  <p>Preço <b>por quarto</b> quando há diferença dentro da categoria. Valores em R$/noite.</p>
+  <table class="mini">
+    <thead><tr><th>Categoria</th><th>Quartos</th><th>Principais diferenciais</th>
+      <th class="num">Baixa</th><th class="num">Média</th><th class="num">Alta</th><th class="num">Feriado</th></tr></thead>
+    <tbody>
+      <tr><td>Padrão</td><td>03–08, 10–14</td><td>Experiências inclusas (§abaixo). <b>04 e 14 = PCD</b> (acessíveis). <b>03–08</b> no Corredor Vô Testa.</td>
+        <td class="num">250</td><td class="num">310</td><td class="num">360</td><td class="num">450</td></tr>
+      <tr><td>Intermediário</td><td>09, 15</td><td>Mais espaço/conforto. <b>09</b> no Corredor Vô Testa.</td>
+        <td class="num">350</td><td class="num">440</td><td class="num">510</td><td class="num">630</td></tr>
+      <tr><td>Intermediário +</td><td>01, 02</td><td><b>Dois ambientes</b>, sofá-cama, lavabo (acomoda família).</td>
+        <td class="num">400</td><td class="num">500</td><td class="num">580</td><td class="num">720</td></tr>
+      <tr class="destaque"><td>Cabana Intermediária</td><td>19, 20, 21</td><td><b>Vista do lago + piso aquecido</b>, cozinha (fogão 2 bocas, freezer, TV 50"), dois ambientes, sofá-cama, lavabo.</td>
+        <td class="num">490</td><td class="num">610</td><td class="num">710</td><td class="num">880</td></tr>
+      <tr class="destaque"><td>Cabana Intermediária +</td><td>16, 17, 18</td><td>Tudo da Cabana <b>+ varanda + pé-direito alto</b>.</td>
+        <td class="num">540</td><td class="num">680</td><td class="num">780</td><td class="num">970</td></tr>
+      <tr class="destaque"><td>Cabana Hobbit</td><td>22, 23, 24</td><td>Tudo da Cabana <b>+ temática Hobbit</b> (experiência + escassez: só 3).</td>
+        <td class="num">650</td><td class="num">810</td><td class="num">940</td><td class="num">1.170</td></tr>
+      <tr><td>Dia na Pousada (day use)</td><td>DAY 01–04</td><td>Uso diurno, sem pernoite (produto à parte).</td>
+        <td class="num">180</td><td class="num">210</td><td class="num">240</td><td class="num">270</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Experiências &amp; comodidades inclusas (todos os hóspedes)</h3>
+  <ul class="amen">
+    <li>Piscina <b>coberta aquecida</b> + <b>hidromassagem para até 12 pessoas</b></li>
+    <li>Piscina <b>aberta com borda infinita e vista para o lago</b></li>
+    <li><b>Café servido na área da piscina</b> com vista para o lago</li>
+    <li><b>Trilhas</b> pela pousada com interação com mata e animais</li>
+    <li>Acesso à <b>caldeira temática</b></li>
+    <li><b>1 toalha de piscina por dia</b> por hóspede</li>
+  </ul>
+  <p><small><b>Corredor Vô Testa</b> (quartos 03–09): cabine telefônica com telefone interativo, painéis de
+  pedra, tela tensionada do “laboratório Vô Testa”, engrenagens e outras atrações — experiência temática
+  que valoriza esses quartos de entrada.</small></p>
+
+  <h2 class="pb">4. Projeção de ocupação e receita</h2>
+  <p>Sobre os <b>24 quartos de pernoite</b> (day use é produto à parte). Casa cheia (100%) por temporada,
+  já com o preço por quarto: <b>Baixa R$ 9.290/noite</b> (diária média R$ 387) · <b>Média R$ 11.590</b>
+  (R$ 483) · <b>Alta R$ 13.430</b> (R$ 560).</p>
+  <table>
+    <thead><tr><th>Ocupação</th><th class="num">Quartos</th><th class="num">Baixa</th><th class="num">Média (+25%)</th><th class="num">Alta (+45%)</th></tr></thead>
+    <tbody>
+      <tr><td>25%</td><td class="num">6</td><td class="num">R$ 2.323</td><td class="num">R$ 2.898</td><td class="num">R$ 3.358</td></tr>
+      <tr><td>50%</td><td class="num">12</td><td class="num">R$ 4.645</td><td class="num">R$ 5.795</td><td class="num">R$ 6.715</td></tr>
+      <tr class="destaque"><td><b>80% — meta</b></td><td class="num">19</td><td class="num"><b>R$ 7.432</b></td><td class="num"><b>R$ 9.272</b></td><td class="num"><b>R$ 10.744</b></td></tr>
+      <tr><td>100%</td><td class="num">24</td><td class="num">R$ 9.290</td><td class="num">R$ 11.590</td><td class="num">R$ 13.430</td></tr>
+    </tbody>
+  </table>
+  <p><small>Valores por <b>noite</b>. Receita/mês ≈ coluna × 30. Na <b>meta de 80%</b>: <b>Baixa ~R$ 223 mil/mês</b>
+  · <b>Média ~R$ 278 mil</b> · <b>Alta ~R$ 322 mil</b>. <b>RevPAR</b> (receita por quarto disponível) na meta:
+  R$ 310 (baixa) · R$ 386 (média) · R$ 448 (alta). A receita <b>anual</b> depende do calendário (quantos dias em
+  cada temporada) — fecha quando cadastrarmos as temporadas. Não inclui <b>receita ancilar</b> (restaurante da
+  piscina, bar, loja, day use), que soma por cima.</small></p>
+
+  <h2>5. Justificativa dos números</h2>
+  <ul>
+    <li><b>Base ancorada no mercado</b> — Padrão a R$ 250 (piso da faixa padrão de Itá) e Intermediário a
+      R$ 350 (mediana, ≈ Encantos de Itá R$ 330).</li>
+    <li><b>Cabanas subiram e ainda estão conservadoras</b> — com <b>vista de lago, piso aquecido, cozinha
+      completa (fogão/freezer/TV 50"), dois ambientes, sofá-cama e lavabo</b>, não são “quarto de pousada”:
+      são <b>chalés/apartamentos de temporada</b>. Frente aos chalés lakefront premium de Itá e à cabana
+      romântica da Serra (R$ 1.090+), R$ 490–650 na baixa tem folga.</li>
+    <li><b>Prêmio por quarto (dentro da categoria)</b> — <b>16–18</b> ganham <b>varanda + pé-direito alto</b>
+      (+R$ 50 sobre 19–21); <b>01–02</b> têm <b>dois ambientes + sofá-cama + lavabo</b> (+R$ 50 sobre 09/15).</li>
+    <li><b>Cabana Hobbit no topo</b> — além da cabana completa, <b>tema exclusivo</b> e <b>escassez</b> (só 3
+      unidades) sustentam o maior preço.</li>
+    <li><b>Quartos PCD (04 e 14)</b> — mesmo preço do Padrão: acessibilidade é <b>inclusão</b>, não item de
+      upsell.</li>
+    <li><b>Experiências inclusas</b> (piscinas, hidromassagem para 12, café com vista, trilhas, caldeira,
+      Corredor Vô Testa) elevam o valor percebido de <b>todas</b> as categorias — sustentam até a base.</li>
+    <li><b>Escada de temporada</b> — Média +25% (fins de semana, pontes, férias “ombro”), Alta +45% (verão,
+      feriados prolongados), Feriado-pico +80% (Réveillon/Carnaval). Calibrar pela ocupação real: bateu 80%
+      fácil → subir os prêmios; encalhou → revisar marketing/reputação, não a base.</li>
+  </ul>
+
+  <div class="nota">
+    <b>Regras complementares:</b> <span class="selo">mínimo de noites</span> em Réveillon e Carnaval (3–4 noites);
+    <span class="selo">piso de custo</span> a confirmar (limpeza + café + energia + enxoval + comissão de canal ~17%)
+    para definir o limite de descontos; preço no <b>site</b> pode ser inferior ao das OTAs (economiza comissão).
+  </div>
+
+  <h2>Fontes</h2>
+  <ol class="fonte-lista">
+    <li>Pousadas em Itá — Tripadvisor: tripadvisor.com.br/Hotels-g3175964-c2-Ita_State_of_Santa_Catarina-Hotels.html · ferias.tur.br/pousadas/8504/ita-sc.html</li>
+    <li>Itá Thermas Resort &amp; Spa — Booking.com/hotel/br/ita-thermas-resort-e-spa.html · KAYAK (from US$ 177)</li>
+    <li>Hotéis em Piratuba a partir de R$ 118 — kayak.com.br/Piratuba-Hoteis · Hoteis.com (a partir de R$ 301)</li>
+    <li>Chalés/cabanas à beira do Lago de Itá — Airbnb (Lake Paradise Chalets; Cabana Paradise Black, Itá/SC)</li>
+    <li>Cabanas românticas com hidromassagem na Serra Catarinense (a partir de ~R$ 1.090) — holmy.com.br; camaecafe.com.br</li>
+  </ol>
+
+  <div class="rodape">
+    Pousada Vô Testa · Estudo de Precificação · Agosto/2026 · Documento interno de apoio à decisão de tarifas.
+    Valores de mercado coletados em ago/2026, sujeitos a variação por data e disponibilidade. Tarifas já
+    carregadas no CRM (comando <code>carregar_tarifas</code>).
+  </div>
+</body>
+</html>
