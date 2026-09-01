@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ campanha.nome }} — Impulsionamento{% endblock %}
+
+{% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
+<div class="eleg">
+  <p class="pagina-eyebrow letreiro">Comercial · Impulsionamento</p>
+  <div class="pagina-cabecalho">
+    <h1>{{ campanha.nome }}</h1>
+    <div class="eleg-acoes">
+      <a href="{% url 'comercial:impulsionamento' %}" class="botao-neutro">Voltar</a>
+      <a href="{% url 'comercial:campanha_editar' campanha.pk %}" class="botao-neutro">Editar</a>
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><span class="n">R$&nbsp;{{ campanha.gasto_total }}</span><span class="l">Gasto</span></div>
+    <div class="kpi"><span class="n">{{ campanha.leads }}</span><span class="l">Leads</span></div>
+    <div class="kpi"><span class="n">R$&nbsp;{{ campanha.custo_por_lead }}</span><span class="l">Custo por lead</span></div>
+    <div class="kpi"><span class="n">{{ campanha.reservas }}</span><span class="l">Reservas</span></div>
+    <div class="kpi kpi-destaque"><span class="n">{{ campanha.retorno }}×</span><span class="l">Retorno</span></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;align-items:start">
+    <!-- Link com UTM -->
+    <div class="cartao-el">
+      <h3>Link do anúncio <span class="rot">(com rastreio)</span></h3>
+      {% if url_utm %}
+        <div class="linha-copia">
+          <input type="text" id="urlutm" value="{{ url_utm }}" readonly>
+          <button class="botao-mini" onclick="navigator.clipboard.writeText(document.getElementById('urlutm').value);this.textContent='Copiado!'">Copiar</button>
+        </div>
+        <p class="eleg-intro" style="font-size:.85em;margin-top:.6rem">Use este endereço como destino do anúncio — os leads caem etiquetados nesta campanha.</p>
+      {% else %}
+        <p class="eleg-intro">Vincule uma <strong>Página de Captação</strong> na edição da campanha para gerar o link com rastreio.</p>
+      {% endif %}
+    </div>
+
+    <!-- Gasto -->
+    <div class="cartao-el">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem">
+        <h3 style="margin:0">Gasto</h3>
+        <form method="post" action="{% url 'comercial:campanha_sincronizar' campanha.pk %}" style="margin:0">
+          {% csrf_token %}
+          <button type="submit" class="botao-mini" title="Puxa o gasto da plataforma (Fase C — exige API configurada e ID da campanha)">Sincronizar da plataforma</button>
+        </form>
+      </div>
+      <form method="post" action="{% url 'comercial:campanha_gasto' campanha.pk %}" style="display:flex;gap:.5rem;align-items:end;flex-wrap:wrap">
+        {% csrf_token %}
+        <label style="flex:1;min-width:120px"><span class="rot">Data</span>{{ gasto_form.data }}</label>
+        <label style="flex:1;min-width:120px"><span class="rot">Valor (R$)</span>{{ gasto_form.valor }}</label>
+        <button type="submit" class="botao-primario">Lançar manual</button>
+      </form>
+      <table style="margin-top:.9rem">
+        <thead><tr><th>Data</th><th class="num">Valor</th><th>Origem</th></tr></thead>
+        <tbody>
+          {% for g in gastos %}
+            <tr><td>{{ g.data|date:"d/m/Y" }}</td><td class="num">R$&nbsp;{{ g.valor }}</td><td>{{ g.get_origem_display }}</td></tr>
+          {% empty %}<tr><td colspan="3" class="vazio-el">Nenhum gasto lançado.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <h3 style="margin:1.5rem 0 .6rem">Leads desta campanha</h3>
+  <div class="quadro">
+    <table>
+      <thead><tr><th>Quando</th><th>Lead</th><th>Etapa</th><th>Status</th><th class="acao"></th></tr></thead>
+      <tbody>
+        {% for op in leads %}
+          <tr class="clic" onclick="location.href='{% url 'comercial:oportunidade' op.pk %}'">
+            <td>{{ op.criado_em|date:"d/m H:i" }}</td>
+            <td class="camp-nome" style="font-weight:600">{{ op.pessoa.nome }}</td>
+            <td>{{ op.etapa.nome }}</td>
+            <td>{{ op.get_status_display }}</td>
+            <td class="acao"><a href="{% url 'comercial:oportunidade' op.pk %}" class="botao-mini" onclick="event.stopPropagation()">Abrir</a></td>
+          </tr>
+        {% empty %}<tr><td colspan="5" class="vazio-el">Nenhum lead ainda. Rode o anúncio com o link acima. 📣</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

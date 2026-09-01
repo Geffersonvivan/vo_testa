@@ -1,0 +1,102 @@
+{% comment %}
+Kit de estilo elegante compartilhado (Impulsionamento + LP Páginas).
+Princípios Apple: números tabulares, tracking negativo nos grandes, materiais suaves
+(hairline + sombra leve), hover sutil, feedback no toque. Envolva a tela em <div class="eleg">.
+{% endcomment %}
+<style>
+  .eleg{
+    --hairline: var(--fio);
+    --sombra: var(--sombra-cartao);
+  }
+  .eleg a{ text-decoration:none; }
+  .eleg-acoes{ display:flex; gap:.5rem; align-items:center; }
+  .eleg-intro{ color:var(--tinta-suave); max-width:64ch; margin:.35rem 0 0; line-height:1.55; }
+  .eleg code{ font-size:.86em; background:rgba(40,30,15,.05); padding:.05em .35em; border-radius:.35em; }
+
+  /* Botões padronizados (sem sublinhado, raio e feedback consistentes) */
+  .eleg .botao-primario, .eleg .botao-neutro, .eleg .botao-mini{
+    display:inline-flex; align-items:center; gap:.4rem; text-decoration:none; font-weight:600;
+    border-radius:var(--raio-p); cursor:pointer; transition:transform .1s ease, background .2s ease,
+    border-color .2s ease, filter .2s ease; line-height:1;
+  }
+  .eleg .botao-primario{
+    background:var(--lampiao,#c8912f); color:#241a08; padding:.6rem 1.05rem; font-weight:700;
+    font-size:.92rem; border:1px solid rgba(0,0,0,.06); box-shadow:0 1px 2px rgba(40,30,15,.14);
+  }
+  .eleg .botao-primario:hover{ filter:brightness(1.04); }
+  .eleg .botao-neutro{
+    background:var(--superficie,#fff); color:var(--tinta,#2a251f); padding:.55rem .95rem;
+    font-size:.9rem; border:1px solid var(--hairline);
+  }
+  .eleg .botao-neutro:hover{ background:rgba(40,30,15,.035); border-color:rgba(40,30,15,.14); }
+  .eleg .botao-mini{
+    background:var(--superficie,#fff); color:var(--tinta,#2a251f); padding:.34rem .72rem;
+    font-size:.82rem; border:1px solid var(--hairline);
+  }
+  .eleg .botao-mini:hover{ background:rgba(40,30,15,.035); }
+  .eleg .botao-primario:active, .eleg .botao-neutro:active, .eleg .botao-mini:active{ transform:scale(.97); }
+
+  /* KPIs */
+  .eleg .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(158px,1fr)); gap:.9rem; margin:1.5rem 0; }
+  .eleg .kpi{
+    background:var(--superficie,#fff); border:1px solid var(--hairline); border-radius:var(--raio-g);
+    padding:1.15rem 1.25rem; box-shadow:var(--sombra); display:flex; flex-direction:column; gap:.4rem;
+    text-align:left;
+  }
+  .eleg .kpi .n{
+    font-size:clamp(1.55rem,2.4vw,2rem); font-weight:700; letter-spacing:-.025em; line-height:1;
+    font-variant-numeric:tabular-nums; color:var(--tinta,#2a251f);
+  }
+  .eleg .kpi .l{ font-size:.7rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--tinta-suave); }
+  .eleg .kpi-destaque{ background:linear-gradient(180deg,rgba(200,145,47,.10),rgba(200,145,47,.03)); border-color:rgba(200,145,47,.35); }
+  .eleg .kpi-destaque .n{ color:#a5701a; }
+
+  /* Cartões de seção */
+  .eleg .cartao-el{ background:var(--superficie,#fff); border:1px solid var(--hairline); border-radius:var(--raio-g); box-shadow:var(--sombra); padding:1.2rem 1.3rem; }
+  .eleg .cartao-el h3{ margin:0 0 .7rem; font-size:1rem; }
+  .eleg .rot{ font-size:.7rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--tinta-suave); }
+
+  /* Quadro (tabela) */
+  .eleg .quadro{ background:var(--superficie,#fff); border:1px solid var(--hairline); border-radius:var(--raio-g); box-shadow:var(--sombra); overflow:hidden; }
+  .eleg table{ width:100%; border-collapse:collapse; }
+  .eleg thead th{
+    text-align:left; padding:.85rem 1rem; font-size:.68rem; font-weight:600; letter-spacing:.07em;
+    text-transform:uppercase; color:var(--tinta-suave); border-bottom:1px solid var(--hairline); white-space:nowrap;
+  }
+  .eleg th.num, .eleg td.num{ text-align:right; font-variant-numeric:tabular-nums; }
+  .eleg th.acao, .eleg td.acao{ text-align:right; width:1%; }
+  .eleg tbody td{ padding:.85rem 1rem; border-top:1px solid var(--hairline); font-size:.92rem; vertical-align:middle; }
+  .eleg tbody tr:first-child td{ border-top:none; }
+  .eleg tbody tr.clic{ cursor:pointer; transition:background .16s ease; }
+  .eleg tbody tr.clic:hover{ background:rgba(200,145,47,.055); }
+  .eleg .camp-nome{ display:block; font-weight:600; color:var(--tinta); }
+  .eleg .camp-sub{ display:block; margin-top:.15rem; font-size:.76rem; color:var(--tinta-suave); font-variant-numeric:tabular-nums; }
+  .eleg td.forte{ font-weight:600; }
+  .eleg .prov{ display:inline-flex; align-items:center; gap:.45rem; white-space:nowrap; }
+  .eleg .prov .dot{ width:8px; height:8px; border-radius:50%; flex:none; }
+  .eleg .dot.meta{ background:#1877f2; } .eleg .dot.google{ background:#ea4335; } .eleg .dot.outro{ background:#9aa0a6; }
+  .eleg .vazio-el{ text-align:center; padding:2.5rem 1rem; color:var(--tinta-suave); }
+
+  /* Selos de status */
+  .eleg .selo{ display:inline-flex; align-items:center; gap:.35rem; font-size:.72rem; font-weight:600; padding:.2rem .55rem; border-radius:100px; }
+  .eleg .selo::before{ content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+  .eleg .selo-pub{ background:rgba(34,120,75,.12); color:#1c7a4b; }
+  .eleg .selo-rasc{ background:rgba(200,145,47,.15); color:#a5701a; }
+  .eleg .selo-enc{ background:rgba(40,30,15,.07); color:var(--tinta-suave); }
+
+  /* Formulários e caixa de link */
+  .eleg input[type=text], .eleg input[type=number], .eleg input[type=date],
+  .eleg input[type=datetime-local], .eleg select, .eleg textarea{
+    width:100%; padding:.6rem .75rem; border:1px solid var(--hairline); border-radius:var(--raio-p);
+    background:var(--superficie,#fff); color:var(--tinta,#2a251f); font:inherit; margin-top:.25rem;
+  }
+  .eleg input:focus, .eleg select:focus, .eleg textarea:focus{ outline:none; border-color:rgba(200,145,47,.6); box-shadow:0 0 0 3px rgba(200,145,47,.15); }
+  .eleg .linha-copia{ display:flex; gap:.5rem; align-items:center; }
+  .eleg .linha-copia input{ flex:1; margin-top:0; }
+  .eleg .qr-el{ width:100%; max-width:180px; border-radius:12px; }
+
+  @media (max-width:820px){ .eleg .quadro{ overflow-x:auto; } .eleg table{ min-width:720px; } }
+  @media (prefers-reduced-motion: reduce){
+    .eleg tbody tr, .eleg .botao-mini, .eleg .botao-primario, .eleg .botao-neutro{ transition:none; }
+  }
+</style>

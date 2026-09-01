@@ -3,6 +3,31 @@
 {% block titulo %}Funil de vendas — Comercial{% endblock %}
 
 {% block conteudo %}
+<style>
+  .funil-card{position:relative}
+  .card-nome{display:flex;align-items:center;gap:6px;margin:0;font-size:15px;font-weight:700;
+    letter-spacing:-.01em;color:var(--tinta);line-height:1.25}
+  .card-nome svg{width:15px;height:15px;flex:0 0 auto;color:var(--tinta-suave)}
+  .card-proposta{margin:.15rem 0 0;font-size:12.5px;color:var(--tinta-suave);line-height:1.3}
+  .card-novo{position:absolute;top:-7px;right:8px;background:var(--lampiao);color:#241a08;font-size:10px;
+    font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:100px;box-shadow:var(--sombra-1,0 2px 6px rgba(0,0,0,.15))}
+  .card-chips{display:flex;flex-wrap:wrap;gap:5px;margin:.35rem 0}
+  .mchip{font-size:11px;background:rgba(0,0,0,.06);color:var(--tinta-suave);padding:2px 7px;border-radius:6px;white-space:nowrap}
+  .mchip-lp{background:rgba(215,160,72,.18);color:#7a5310;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .temp-quente{background:#fdece8;color:#b3261e}
+  .temp-morno{background:#fff3d6;color:#8a6d12}
+  .temp-frio{background:#e7eef5;color:#3a5a7a}
+  .card-linha{font-size:12px;color:var(--tinta-suave);margin:.15rem 0}
+  .card-obs{font-size:12px;color:var(--tinta-suave);font-style:italic;margin:.2rem 0;
+    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+  .card-parado{font-size:11px;color:#b3261e;margin:.15rem 0;font-weight:600}
+  .card-acao{display:flex;align-items:center;gap:8px;justify-content:space-between;margin-top:.45rem;
+    padding-top:.4rem;border-top:1px solid rgba(0,0,0,.06)}
+  .card-dono{font-size:12px;color:var(--tinta-suave);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .card-assumir{background:var(--lampiao);color:#241a08;border:none;font-weight:700}
+  .card-wpp{font-size:12px;font-weight:700;color:#128c4b;text-decoration:none;white-space:nowrap}
+  .card-wpp:hover{text-decoration:underline}
+</style>
 <div x-data="{ nova: false, perda: false, perdaOp: null, perdaEtapa: null }">
   <div class="pagina-cabecalho">
     <div>
@@ -50,20 +75,38 @@
             <article class="funil-card fat-{{ op.faturamento }}" draggable="true" data-op="{{ op.id }}"
                      ondragstart="cardDragStart(event, '{{ op.id }}')" ondragend="cardDragEnd(event)"
                      onclick="location.href='{% url 'comercial:oportunidade' op.pk %}'">
-              <p class="titulo">{{ op.titulo }}</p>
-              <p class="pessoa">
+              {% if op.eh_novo %}<span class="card-novo">novo</span>{% endif %}
+              <p class="card-nome">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
                 {{ op.pessoa.nome }}
               </p>
+              {% if op.titulo_curto %}<p class="card-proposta">{{ op.titulo_curto }}</p>{% endif %}
+
+              {# 1 origem · 2 campanha/LP · 4 temperatura #}
+              <div class="card-chips">
+                <span class="mchip">{{ op.get_origem_display }}</span>
+                {% if op.pagina_captacao %}<span class="mchip mchip-lp" title="Campanha">🎯 {{ op.pagina_captacao.nome }}</span>{% endif %}
+                {% if op.temperatura %}<span class="mchip temp-{{ op.temperatura }}">{{ op.temperatura_display }}</span>{% endif %}
+              </div>
+
+              {# 5 datas + pessoas #}
+              {% if op.checkin_previsto %}
+                <p class="card-linha">📅 {{ op.checkin_previsto|date:"d/m" }}{% if op.checkout_previsto %}→{{ op.checkout_previsto|date:"d/m" }}{% endif %} · {{ op.hospedes }}p</p>
+              {% endif %}
+
               <div class="rodape">
                 <span class="valor">R$ {{ op.valor_estimado }}</span>
                 <span class="fchip fchip-{{ op.faturamento }}">{{ op.get_faturamento_display }}</span>
               </div>
-              <p class="tarefa" style="opacity:.75">score {{ op.score }}</p>
+
+              {# 9 última observação #}
+              {% if op.observacao %}<p class="card-obs">“{{ op.observacao|truncatechars:64 }}”</p>{% endif %}
+
+              {# 6 SLA / próxima tarefa #}
               {% if op.proxima_tarefa %}
-                <p class="tarefa">
+                <p class="tarefa {% if op.proxima_tarefa.quando < agora %}alerta{% endif %}">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-                  {{ op.proxima_tarefa.quando|date:"d/m H:i" }}
+                  {% if op.proxima_tarefa.quando < agora %}⏰ atrasado — {% endif %}{{ op.proxima_tarefa.quando|date:"d/m H:i" }}
                 </p>
               {% else %}
                 <p class="tarefa alerta">
@@ -71,6 +114,21 @@
                   sem próxima ação
                 </p>
               {% endif %}
+
+              {# 8 tempo parado #}
+              {% if op.dias_parado >= 3 %}<p class="card-parado">parado há {{ op.dias_parado }} dia{{ op.dias_parado|pluralize }}</p>{% endif %}
+
+              {# 3 WhatsApp · 7 responsável / assumir #}
+              <div class="card-acao" onclick="event.stopPropagation()">
+                {% if op.responsavel %}
+                  <span class="card-dono" title="Responsável">👤 {{ op.responsavel.get_full_name|default:op.responsavel.username }}</span>
+                {% else %}
+                  <form method="post" action="{% url 'comercial:assumir' op.pk %}" style="display:inline">{% csrf_token %}
+                    <button type="submit" class="botao-mini card-assumir">Assumir</button>
+                  </form>
+                {% endif %}
+                {% if op.whatsapp_url %}<a href="{{ op.whatsapp_url }}" target="_blank" rel="noopener" class="card-wpp" title="Falar no WhatsApp">WhatsApp</a>{% endif %}
+              </div>
             </article>
           {% empty %}
             <div class="funil-vazio">{% if col.etapa.tipo == 'ganho' %}Ganho só via converter{% else %}Solte um card aqui{% endif %}</div>

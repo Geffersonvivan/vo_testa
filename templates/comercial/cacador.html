@@ -4,6 +4,7 @@
 {% block titulo %}Caçador — Comercial{% endblock %}
 
 {% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
 <style>
   .cac-hero { max-width: 70ch; }
   .cac-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .9rem; margin: 1.2rem 0 1.6rem; }
@@ -62,8 +63,12 @@
   .cac-plano summary { cursor: pointer; font-family: var(--fonte-titulo); font-size: 1.05rem; font-weight: 600; color: var(--noturno); padding: .3rem 0; }
   .cac-plano ol { margin: .6rem 0 0; padding-left: 1.2rem; line-height: 1.7; color: var(--tinta-suave); font-size: .9rem; }
   .cac-plano code { font-family: var(--fonte-mono); font-size: .82rem; color: var(--madeira); }
+  /* Refinos do kit elegante */
+  .eleg .kpi.quente .n { color: var(--perigo); }
+  .cac-score .n { font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 </style>
 
+<div class="eleg">
 <p class="pagina-eyebrow letreiro">Comercial · Máquina de Vendas</p>
 <div class="pagina-cabecalho">
   <h1>Caçador</h1>
@@ -74,10 +79,10 @@
   do mais quente ao mais frio. Você revisa, copia e dispara — e o seu retorno ensina o Caçador.
 </p>
 
-<div class="cac-kpis">
-  <div class="cac-kpi"><div class="v">{{ kpi.total }}</div><div class="r">leads na fila</div></div>
-  <div class="cac-kpi quente"><div class="v">{{ kpi.quentes }}</div><div class="r">quentes</div></div>
-  <div class="cac-kpi"><div class="v">{{ kpi.a_revisar }}</div><div class="r">a revisar</div></div>
+<div class="kpis">
+  <div class="kpi"><span class="n">{{ kpi.total }}</span><span class="l">Leads na fila</span></div>
+  <div class="kpi quente"><span class="n">{{ kpi.quentes }}</span><span class="l">Quentes</span></div>
+  <div class="kpi"><span class="n">{{ kpi.a_revisar }}</span><span class="l">A revisar</span></div>
 </div>
 
 {% if origens %}
@@ -170,4 +175,5 @@
     });
   }
 </script>
+</div>
 {% endblock %}

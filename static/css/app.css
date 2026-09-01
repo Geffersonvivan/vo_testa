@@ -48,8 +48,10 @@
   --sombra-2: 0 4px 14px rgba(4, 21, 31, .07);
   --sombra-3: 0 18px 44px rgba(4, 21, 31, .16);
   --glow: 0 0 28px rgba(226, 168, 74, .35);
+  /* Float suave dos cartões (pegada elegante — igual ao Comercial) */
+  --sombra-cartao: 0 1px 2px rgba(4, 21, 31, .04), 0 10px 28px -16px rgba(4, 21, 31, .18);
 
-  --raio-p: 8px;  --raio: 12px;  --raio-g: 18px;
+  --raio-p: 10px;  --raio: 14px;  --raio-g: 20px;
 
   --fonte-titulo: 'Fraunces', Georgia, 'Times New Roman', serif;
   --fonte-ui: 'Hanken Grotesk', -apple-system, 'Segoe UI', sans-serif;
@@ -175,7 +177,7 @@ body {
   text-decoration: none;  /* como <a>, não herda o sublinhado de link */
   background: linear-gradient(180deg, var(--lampiao-claro), var(--lampiao));
   border: 1px solid rgba(79, 44, 29, .4);
-  border-radius: 6px;
+  border-radius: var(--raio-p);
   cursor: pointer;
   transition: filter .15s, transform .1s;
 }
@@ -466,8 +468,8 @@ h2 {
   padding: 1.15rem 1.2rem;
   background: var(--superficie);
   border: 1px solid var(--fio);
-  border-radius: var(--raio);
-  box-shadow: var(--sombra-1);
+  border-radius: var(--raio-g);
+  box-shadow: var(--sombra-cartao);
   transition: border-color .15s, box-shadow .15s, transform .15s;
 }
 
@@ -569,6 +571,23 @@ a.cartao-link:hover, .cartao-link:hover {
 .barra-busca select:focus,
 .form-inline input:focus,
 .form-inline select:focus {
+  outline: none;
+  border-color: var(--lampiao);
+  box-shadow: 0 0 0 3px rgba(215, 160, 72, .22);
+}
+
+/* Foco dourado da marca em TODOS os campos do conteúdo do CRM (uniformidade). */
+.conteudo input[type="text"]:focus,
+.conteudo input[type="tel"]:focus,
+.conteudo input[type="email"]:focus,
+.conteudo input[type="number"]:focus,
+.conteudo input[type="date"]:focus,
+.conteudo input[type="datetime-local"]:focus,
+.conteudo input[type="search"]:focus,
+.conteudo input[type="password"]:focus,
+.conteudo input:not([type]):focus,
+.conteudo select:focus,
+.conteudo textarea:focus {
   outline: none;
   border-color: var(--lampiao);
   box-shadow: 0 0 0 3px rgba(215, 160, 72, .22);
@@ -1287,10 +1306,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--lampiao); }
   color: var(--madeira);
   background: rgba(215, 160, 72, .14);
   border: 1px solid rgba(215, 160, 72, .5);
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
+  text-decoration: none;  /* como <a>, não herda o sublinhado de link */
+  transition: background .15s, transform .1s;
 }
 .botao-mini:hover { background: rgba(215, 160, 72, .24); }
+.botao-mini:active { transform: translateY(1px); }
 
 /* Bloco de cadastro rápido embutido */
 .bloco-inline {
@@ -2617,11 +2639,14 @@ form.filtros:not(.subnav) select:focus {
 .op-det summary {
   list-style: none; cursor: pointer; user-select: none; text-align: center;
   padding: .62rem .9rem; border-radius: var(--raio-p); font-weight: 600; font-size: .92rem;
-  transition: filter .12s;
+  transition: filter .12s, background .15s;
+  background: var(--superficie); color: var(--tinta); border: 1px solid var(--fio-forte);
 }
 .op-det summary::-webkit-details-marker { display: none; }
-.op-det summary:hover { filter: brightness(.97); }
-.op-det-ganhar summary { background: var(--lampiao); color: var(--noturno); box-shadow: var(--sombra-1); }
+.op-det summary::after { content: " ›"; opacity: .5; font-weight: 700; }
+.op-det[open] > summary::after { content: " ⌄"; }
+.op-det summary:hover { filter: brightness(.97); background: var(--superficie-2); }
+.op-det-ganhar summary { background: var(--lampiao); color: var(--noturno); border-color: transparent; box-shadow: var(--sombra-1); }
 .op-det-perder summary { background: var(--superficie); color: var(--tinta); border: 1px solid var(--fio-forte); }
 .op-det[open] > summary { margin-bottom: .7rem; }
 .op-det .campo { margin-bottom: .55rem; }

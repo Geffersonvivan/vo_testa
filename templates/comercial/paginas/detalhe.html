@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ pagina.nome }} — Páginas de Captação{% endblock %}
+
+{% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
+<div class="eleg">
+  <p class="pagina-eyebrow letreiro">Comercial · Páginas de Captação</p>
+  <div class="pagina-cabecalho">
+    <h1>{{ pagina.nome }}</h1>
+    <div class="eleg-acoes">
+      <a href="{% url 'comercial:paginas' %}" class="botao-neutro">Voltar</a>
+      <a href="{% url 'comercial:pagina_editar' pagina.pk %}" class="botao-neutro">Editar</a>
+      {% if pagina.publicada %}
+        <a href="{{ url_publica }}" target="_blank" rel="noopener" class="botao-primario">Abrir página ↗</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><span class="n">{{ pagina.visitas }}</span><span class="l">Visitas</span></div>
+    <div class="kpi"><span class="n">{{ pagina.leads }}</span><span class="l">Leads no funil</span></div>
+    <div class="kpi kpi-destaque"><span class="n">{{ pagina.conversao }}%</span><span class="l">Conversão</span></div>
+    <div class="kpi"><span class="n">{{ pagina.reservas_geradas }}</span><span class="l">Reservas geradas</span></div>
+    {% if pagina.meta_leads %}
+    <div class="kpi"><span class="n">{{ pagina.leads }}/{{ pagina.meta_leads }}</span><span class="l">Meta de leads</span></div>
+    {% endif %}
+  </div>
+
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem;align-items:start">
+    <div class="cartao-el">
+      <h3>Link público</h3>
+      <div class="linha-copia">
+        <input type="text" id="urlpub" value="{{ url_publica }}" readonly>
+        <button class="botao-mini" onclick="navigator.clipboard.writeText(document.getElementById('urlpub').value);this.textContent='Copiado!'">Copiar</button>
+      </div>
+      {% if not pagina.publicada %}
+        <p class="eleg-intro" style="margin-top:.6rem">A página está em <strong>{{ pagina.get_status_display|lower }}</strong> — o link só funciona depois de publicar.</p>
+      {% endif %}
+      <div class="eleg-acoes" style="margin-top:1rem">
+        {% if pagina.status != 'publicada' %}
+        <form method="post" action="{% url 'comercial:pagina_status' pagina.pk %}">{% csrf_token %}
+          <input type="hidden" name="status" value="publicada"><button class="botao-primario">Publicar</button>
+        </form>
+        {% else %}
+        <form method="post" action="{% url 'comercial:pagina_status' pagina.pk %}">{% csrf_token %}
+          <input type="hidden" name="status" value="rascunho"><button class="botao-neutro">Despublicar</button>
+        </form>
+        <form method="post" action="{% url 'comercial:pagina_status' pagina.pk %}">{% csrf_token %}
+          <input type="hidden" name="status" value="encerrada"><button class="botao-neutro">Encerrar</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="cartao-el" style="text-align:center">
+      <h3>QR Code</h3>
+      <img src="{% url 'comercial:pagina_qr' pagina.pk %}" alt="QR Code" class="qr-el">
+      <p class="eleg-intro" style="font-size:.85em;margin-top:.5rem">Para cartazes e o convite do coquetel.</p>
+    </div>
+  </div>
+
+  <h3 style="margin:1.5rem 0 .6rem">Leads desta campanha</h3>
+  <div class="quadro">
+    <table>
+      <thead><tr><th>Quando</th><th>Lead</th><th>Etapa</th><th>Status</th><th class="acao"></th></tr></thead>
+      <tbody>
+        {% for op in leads %}
+          <tr class="clic" onclick="location.href='{% url 'comercial:oportunidade' op.pk %}'">
+            <td>{{ op.criado_em|date:"d/m H:i" }}</td>
+            <td class="camp-nome" style="font-weight:600">{{ op.pessoa.nome }}{% if op.pessoa.telefone %} · {{ op.pessoa.telefone }}{% endif %}</td>
+            <td>{{ op.etapa.nome }}</td>
+            <td>{{ op.get_status_display }}</td>
+            <td class="acao"><a href="{% url 'comercial:oportunidade' op.pk %}" class="botao-mini" onclick="event.stopPropagation()">Abrir</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="vazio-el">Nenhum lead ainda. Divulgue o link. 📣</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

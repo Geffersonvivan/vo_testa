@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block titulo %}{{ op.titulo }} — Comercial{% endblock %}
 
@@ -6,38 +7,59 @@
 <div class="pagina-cabecalho">
   <div>
     <p class="pagina-eyebrow letreiro">Comercial · Oportunidade</p>
-    <h1>{{ op.titulo }}</h1>
+    <h1>{{ op.pessoa.nome }}</h1>
+    {% if op.titulo_curto %}<p class="subtitulo">{{ op.titulo_curto }}</p>{% endif %}
   </div>
   <a href="{% url 'comercial:funil' %}" class="botao-mini">Voltar ao funil</a>
 </div>
 
 <div class="op-layout">
-  <main style="display:flex; flex-direction:column; gap:1.1rem">
-    <section class="cartao op-resumo">
-      <div class="op-resumo-topo">
-        <div>
-          <span class="op-lead">{{ op.pessoa.nome }}</span>
-          <span class="op-sub">{{ op.get_faturamento_display }} · {{ op.get_tipo_interesse_display }} · origem {{ op.get_origem_display }} · score {{ op.score }}</span>
+  <!-- ESQUERDA: conversa + cotações + linha do tempo -->
+  <main class="op-esq" style="display:flex; flex-direction:column; gap:1.1rem">
+
+    <!-- WhatsApp no funil (MVP) -->
+    <section class="cartao wpp-secao" style="padding:1.1rem 1.2rem">
+      <div class="wpp-topo">
+        <span class="wpp-av">{{ op.pessoa.nome|first|upper }}</span>
+        <div class="wpp-ident">
+          <span class="wpp-nome">{{ op.pessoa.nome }}</span>
+          <span class="wpp-tel-sub">{% if op.pessoa.telefone %}{{ op.pessoa.telefone }}{% else %}sem telefone{% endif %}{% if op.campanha %} · via {{ op.campanha.nome }}{% endif %}</span>
         </div>
-        <span class="selo {% if op.status == 'ganha' %}selo-limpa{% elif op.status == 'perdida' %}selo-alerta{% else %}selo-em_andamento{% endif %}">{{ op.get_status_display }}</span>
+        <div class="wpp-topo-dir">
+          <span class="wpp-tag">{% if conversa_wpp.janela_aberta %}🟢 janela 24h aberta{% else %}🔒 fora da janela{% endif %}</span>
+          {% if whatsapp_simulado %}<span class="wpp-sim">modo simulado</span>{% endif %}
+        </div>
       </div>
-      <div class="op-campos">
-        <div class="op-campo"><span class="rot">Etapa</span><span class="val">{{ op.etapa.nome }}</span></div>
-        <div class="op-campo"><span class="rot">Valor estimado</span><span class="val">R$ {{ op.valor_estimado }}</span></div>
-        <div class="op-campo"><span class="rot">Previsão ponderada</span><span class="val">R$ {{ op.valor_ponderado }}</span></div>
-        <div class="op-campo"><span class="rot">Responsável</span><span class="val">{% if op.responsavel %}{{ op.responsavel.get_full_name|default:op.responsavel.username }}{% else %}—{% endif %}</span></div>
-        <div class="op-campo"><span class="rot">Período previsto</span><span class="val">{% if op.checkin_previsto %}{{ op.checkin_previsto|date:"d/m/Y" }} → {{ op.checkout_previsto|date:"d/m/Y" }}{% else %}—{% endif %}</span></div>
-        <div class="op-campo"><span class="rot">Quartos / Hóspedes</span><span class="val">{{ op.quartos }} / {{ op.hospedes }}</span></div>
+
+      <div class="wpp-thread">
+        {% for m in mensagens_wpp %}
+          <div class="wpp-msg wpp-{{ m.direcao }}">{{ m.texto|linebreaksbr }}<span class="wpp-h">{{ m.horario|date:"d/m H:i" }}{% if m.direcao == 'saida' %} · {{ m.get_status_display|lower }}{% endif %}</span></div>
+        {% empty %}
+          <p class="wpp-vazio">Sem mensagens ainda. As conversas do WhatsApp aparecem aqui.</p>
+        {% endfor %}
       </div>
-      {% if op.observacao %}<p class="op-obs">{{ op.observacao }}</p>{% endif %}
-      {% if op.reserva_id %}
-        <p class="aviso-inline op-aviso">Convertida na reserva <a href="{% url 'reservas:detalhe' op.reserva_id %}">#{{ op.reserva_id }}</a>{% if op.cobranca_sinal_id %} · sinal #{{ op.cobranca_sinal_id }}{% endif %}.</p>
+
+      {% if respostas_rapidas %}
+      <div class="wpp-rapidas">
+        {% for r in respostas_rapidas %}
+          <button type="button" class="wpp-chip" data-texto="{{ r.texto }}" onclick="wppInserir(this)">{{ r.titulo }}</button>
+        {% endfor %}
+        <a href="{% url 'comercial:respostas' %}" class="wpp-chip wpp-chip-add" title="Gerenciar respostas rápidas">⚙️ Gerenciar</a>
+      </div>
       {% endif %}
-      {% if op.nps_convidado_em %}
-        <p class="aviso-inline op-aviso">Hand-off NPS registrado em {{ op.nps_convidado_em|date:"d/m/Y H:i" }}.</p>
-      {% endif %}
-      {% if op.status == 'perdida' and op.motivo_perda %}
-        <p class="aviso-inline op-aviso">Perdida — motivo: {{ op.motivo_perda.nome }}.</p>
+
+      <form method="post" action="{% url 'comercial:whatsapp_enviar' op.pk %}" class="wpp-form">
+        {% csrf_token %}
+        <input type="text" name="texto" id="wpp-texto" placeholder="Escreva uma resposta…" autocomplete="off">
+        <button type="submit" class="botao-primario">Enviar</button>
+      </form>
+
+      {% if whatsapp_simulado %}
+      <form method="post" action="{% url 'comercial:whatsapp_simular' op.pk %}" class="wpp-sim-form">
+        {% csrf_token %}
+        <input type="text" name="texto" placeholder="(simular) mensagem do cliente…" autocomplete="off">
+        <button type="submit" class="botao-mini">Simular recebida</button>
+      </form>
       {% endif %}
     </section>
 
@@ -45,7 +67,7 @@
     <section class="cartao" style="padding:1.1rem 1.2rem">
       <div class="cartao-cabeca"><h2>Cotações</h2></div>
       <table class="tabela">
-        <thead><tr><th>Quando</th><th>Tipo</th><th>Período</th><th>Diária</th><th>Total</th><th>Validade</th></tr></thead>
+        <thead><tr><th>Quando</th><th>Tipo</th><th>Período</th><th class="num">Diária</th><th class="num">Total</th><th>Validade</th></tr></thead>
         <tbody>
           {% for c in cotacoes %}
             <tr>
@@ -63,26 +85,7 @@
     {% endif %}
 
     <section class="cartao" style="padding:1.1rem 1.2rem">
-      <div class="cartao-cabeca"><h2>Templates (copiar)</h2></div>
-      <div class="form-grade">
-        <div class="campo col-2">
-          <label>WhatsApp — proposta</label>
-          <textarea rows="5" readonly onclick="this.select()">{{ templates.whatsapp_proposta }}</textarea>
-        </div>
-        <div class="campo col-2">
-          <label>E-mail — proposta</label>
-          <textarea rows="5" readonly onclick="this.select()">{{ templates.email_proposta }}</textarea>
-        </div>
-        <div class="campo col-2">
-          <label>WhatsApp — obrigado / NPS</label>
-          <textarea rows="3" readonly onclick="this.select()">{{ templates.whatsapp_obrigado }}</textarea>
-        </div>
-      </div>
-    </section>
-
-    <section class="cartao" style="padding:1.1rem 1.2rem">
       <div class="cartao-cabeca"><h2>Linha do tempo</h2></div>
-
       {% if op.aberta %}
         <form method="post" action="{% url 'comercial:atividade' op.pk %}" class="op-nova-atividade">
           {% csrf_token %}
@@ -95,13 +98,13 @@
           <button type="submit" class="botao-primario">Adicionar</button>
         </form>
       {% endif %}
-
       <table class="tabela">
-        <thead><tr><th>Quando</th><th>Tipo</th><th>Descrição</th><th></th></tr></thead>
+        <thead><tr><th>Quando</th><th>Quem</th><th>Tipo</th><th>Descrição</th><th></th></tr></thead>
         <tbody>
           {% for at in atividades %}
             <tr class="{% if not at.concluida %}linha-pendente{% endif %}">
               <td>{{ at.quando|date:"d/m/Y H:i" }}</td>
+              <td>{% with quem=at.criado_por|default:at.responsavel %}{% if quem %}{{ quem.get_full_name|default:quem.username }}{% else %}—{% endif %}{% endwith %}</td>
               <td>{{ at.get_tipo_display }}</td>
               <td>{{ at.descricao }}{% if not at.concluida %} <span class="selo selo-em_andamento">tarefa</span>{% endif %}</td>
               <td class="num">
@@ -111,69 +114,167 @@
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="4" class="vazio">Nenhuma atividade ainda. Registre a primeira acima.</td></tr>
+            <tr><td colspan="5" class="vazio">Nenhuma atividade ainda. Registre a primeira acima.</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </section>
   </main>
 
-  {% if op.aberta %}
-    <aside class="op-rail">
-      <div class="cartao op-acoes">
-        <p class="rot-secao">Mover etapa</p>
-        <form method="post" action="{% url 'comercial:mover' op.pk %}">
-          {% csrf_token %}
-          <input type="hidden" name="next" value="{% url 'comercial:oportunidade' op.pk %}">
-          <select name="etapa" onchange="this.form.submit()">
-            {% for e in etapas %}<option value="{{ e.id }}" {% if e.id == op.etapa_id %}selected{% endif %}>{{ e.nome }}</option>{% endfor %}
-          </select>
-        </form>
-
-        <div class="sep"></div>
-
-        <details class="op-det" open>
-          <summary>Registrar cotação</summary>
-          <form method="post" action="{% url 'comercial:cotar' op.pk %}">
-            {% csrf_token %}
-            <div class="campo">{{ cotacao_form.tipo_uh.label_tag }}{{ cotacao_form.tipo_uh }}</div>
-            <div class="campo">{{ cotacao_form.checkin.label_tag }}{{ cotacao_form.checkin }}</div>
-            <div class="campo">{{ cotacao_form.checkout.label_tag }}{{ cotacao_form.checkout }}</div>
-            <div class="campo">{{ cotacao_form.valor_diaria.label_tag }}{{ cotacao_form.valor_diaria }}</div>
-            <div class="campo">{{ cotacao_form.validade.label_tag }}{{ cotacao_form.validade }}</div>
-            <div class="campo">{{ cotacao_form.observacao.label_tag }}{{ cotacao_form.observacao }}</div>
-            <button type="submit" class="botao-neutro botao-largo">Salvar cotação</button>
-          </form>
-        </details>
-
-        <div class="sep"></div>
-
-        <details class="op-det op-det-ganhar">
-          <summary>Ganhar → criar reserva</summary>
-          <form method="post" action="{% url 'comercial:converter' op.pk %}">
-            {% csrf_token %}
-            <div class="campo">{{ conversao_form.tipo_uh.label_tag }}{{ conversao_form.tipo_uh }}</div>
-            <div class="campo">{{ conversao_form.checkin.label_tag }}{{ conversao_form.checkin }}</div>
-            <div class="campo">{{ conversao_form.checkout.label_tag }}{{ conversao_form.checkout }}</div>
-            <div class="campo">{{ conversao_form.valor_diaria.label_tag }}{{ conversao_form.valor_diaria }}</div>
-            {% if pagamentos_ativo %}
-              <label class="check-inline">{{ conversao_form.criar_sinal }} {{ conversao_form.criar_sinal.label }}</label>
-              <div class="campo">{{ conversao_form.valor_sinal.label_tag }}{{ conversao_form.valor_sinal }}</div>
-            {% endif %}
-            <button type="submit" class="botao-primario botao-largo">Criar reserva</button>
-          </form>
-        </details>
-
-        <details class="op-det op-det-perder">
-          <summary>Marcar como perdida</summary>
-          <form method="post" action="{% url 'comercial:perder' op.pk %}">
-            {% csrf_token %}
-            <div class="campo">{{ perda_form.motivo.label_tag }}{{ perda_form.motivo }}</div>
-            <button type="submit" class="botao-neutro botao-largo">Confirmar perda</button>
-          </form>
-        </details>
+  <!-- DIREITA: informações + ações -->
+  <aside class="op-rail">
+    <!-- Este lead -->
+    <div class="cartao" style="padding:1.05rem 1.15rem">
+      <div class="op-resumo-topo" style="margin-bottom:.5rem">
+        <div>
+          <span class="op-lead">{{ op.pessoa.nome }}</span>
+          <span class="op-sub">{{ op.get_faturamento_display }} · {{ op.get_tipo_interesse_display }}</span>
+        </div>
+        <span class="selo {% if op.status == 'ganha' %}selo-limpa{% elif op.status == 'perdida' %}selo-alerta{% else %}selo-em_andamento{% endif %}">{{ op.get_status_display }}</span>
       </div>
-    </aside>
-  {% endif %}
+      <div class="lead-info">
+        {% if op.temperatura %}<div class="l"><span>Temperatura</span><b>{% if op.temperatura == 'quente' %}🔥 {% endif %}{{ op.temperatura_display }}</b></div>{% endif %}
+        {% if op.pessoa.telefone %}<div class="l"><span>Telefone</span>{% if op.whatsapp_url %}<b><a href="{{ op.whatsapp_url }}" target="_blank" rel="noopener" class="tel-wpp">{{ op.pessoa.telefone }} ↗</a></b>{% else %}<b>{{ op.pessoa.telefone }}</b>{% endif %}</div>{% endif %}
+        {% if op.campanha %}<div class="l"><span>Campanha</span><b>{{ op.campanha.nome }}</b></div>{% endif %}
+        <div class="l"><span>Origem</span><b>{{ op.get_origem_display }}</b></div>
+        {% if op.checkin_previsto %}<div class="l"><span>Datas</span><b>{{ op.checkin_previsto|date:"d/m" }} → {{ op.checkout_previsto|date:"d/m/Y" }}</b></div>{% endif %}
+        <div class="l"><span>Pessoas / quartos</span><b>{{ op.hospedes }} / {{ op.quartos }}</b></div>
+        <div class="l"><span>Valor estimado</span><b>R$ {{ op.valor_estimado }}</b></div>
+        <div class="l"><span>Previsão ponderada</span><b>R$ {{ op.valor_ponderado }}</b></div>
+        <div class="l"><span>Etapa</span><b>{{ op.etapa.nome }}</b></div>
+        <div class="l"><span>Responsável</span><b>{% if op.responsavel %}{{ op.responsavel.get_full_name|default:op.responsavel.username }}{% else %}—{% endif %}</b></div>
+        <div class="l"><span>Score</span><b>{{ op.score }}/100</b></div>
+      </div>
+      {% if op.observacao %}<p class="op-obs" style="margin-top:.6rem">{{ op.observacao }}</p>{% endif %}
+      {% if op.reserva_id %}<p class="aviso-inline op-aviso">Convertida na reserva <a href="{% url 'reservas:detalhe' op.reserva_id %}">#{{ op.reserva_id }}</a>{% if op.cobranca_sinal_id %} · sinal #{{ op.cobranca_sinal_id }}{% endif %}.</p>{% endif %}
+      {% if op.nps_convidado_em %}<p class="aviso-inline op-aviso">Hand-off NPS em {{ op.nps_convidado_em|date:"d/m/Y H:i" }}.</p>{% endif %}
+      {% if op.status == 'perdida' and op.motivo_perda %}<p class="aviso-inline op-aviso">Perdida — motivo: {{ op.motivo_perda.nome }}.</p>{% endif %}
+    </div>
+
+    {% if op.aberta %}
+    <div class="cartao op-acoes">
+      <p class="rot-secao">Ações rápidas</p>
+      {% if pagamentos_ativo %}
+      <form method="post" action="{% url 'comercial:enviar_proposta_sinal' op.pk %}" onsubmit="return confirm('Gerar o sinal (30% do valor) e enviar no WhatsApp?')" style="margin:0">
+        {% csrf_token %}
+        <button type="submit" class="botao-primario botao-largo">Enviar proposta + sinal (Safrapay)</button>
+      </form>
+      {% endif %}
+      <details class="op-det op-det-ganhar">
+        <summary>Ganhar → criar reserva</summary>
+        <form method="post" action="{% url 'comercial:converter' op.pk %}">
+          {% csrf_token %}
+          <div class="campo">{{ conversao_form.tipo_uh.label_tag }}{{ conversao_form.tipo_uh }}</div>
+          <div class="campo">{{ conversao_form.checkin.label_tag }}{{ conversao_form.checkin }}</div>
+          <div class="campo">{{ conversao_form.checkout.label_tag }}{{ conversao_form.checkout }}</div>
+          <div class="campo">{{ conversao_form.valor_diaria.label_tag }}{{ conversao_form.valor_diaria }}</div>
+          {% if pagamentos_ativo %}
+            <label class="check-inline">{{ conversao_form.criar_sinal }} {{ conversao_form.criar_sinal.label }}</label>
+            <div class="campo">{{ conversao_form.valor_sinal.label_tag }}{{ conversao_form.valor_sinal }}</div>
+          {% endif %}
+          <button type="submit" class="botao-primario botao-largo">Criar reserva</button>
+        </form>
+      </details>
+    </div>
+    {% endif %}
+
+    {% if op.aberta %}
+    <div class="cartao op-acoes">
+      <p class="rot-secao">Mover etapa</p>
+      <form method="post" action="{% url 'comercial:mover' op.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'comercial:oportunidade' op.pk %}">
+        <select name="etapa" onchange="this.form.submit()">
+          {% for e in etapas %}<option value="{{ e.id }}" {% if e.id == op.etapa_id %}selected{% endif %}>{{ e.nome }}</option>{% endfor %}
+        </select>
+      </form>
+
+      <div class="sep"></div>
+
+      <details class="op-det">
+        <summary>Registrar cotação</summary>
+        <form method="post" action="{% url 'comercial:cotar' op.pk %}">
+          {% csrf_token %}
+          <div class="campo">{{ cotacao_form.tipo_uh.label_tag }}{{ cotacao_form.tipo_uh }}</div>
+          <div class="campo">{{ cotacao_form.checkin.label_tag }}{{ cotacao_form.checkin }}</div>
+          <div class="campo">{{ cotacao_form.checkout.label_tag }}{{ cotacao_form.checkout }}</div>
+          <div class="campo">{{ cotacao_form.valor_diaria.label_tag }}{{ cotacao_form.valor_diaria }}</div>
+          <div class="campo">{{ cotacao_form.validade.label_tag }}{{ cotacao_form.validade }}</div>
+          <div class="campo">{{ cotacao_form.observacao.label_tag }}{{ cotacao_form.observacao }}</div>
+          <button type="submit" class="botao-neutro botao-largo">Salvar cotação</button>
+        </form>
+      </details>
+
+      <details class="op-det op-det-perder">
+        <summary>Marcar como perdida</summary>
+        <form method="post" action="{% url 'comercial:perder' op.pk %}">
+          {% csrf_token %}
+          <div class="campo">{{ perda_form.motivo.label_tag }}{{ perda_form.motivo }}</div>
+          <button type="submit" class="botao-neutro botao-largo">Confirmar perda</button>
+        </form>
+      </details>
+    </div>
+    {% endif %}
+
+    {% if op.origem_rastreio or op.campanha %}
+    <div class="cartao" style="padding:1rem 1.2rem">
+      <p class="rot-secao">Impulsionamento</p>
+      {% if op.campanha %}<p style="font-size:.9em">🎯 {{ op.campanha.nome }}</p>{% endif %}
+      {% if op.origem_rastreio.utm_campaign %}<p style="font-size:.82em;color:var(--tinta-suave)">utm: {{ op.origem_rastreio.utm_source|default:"?" }} / {{ op.origem_rastreio.utm_campaign }}</p>{% endif %}
+      {% if op.origem_rastreio.fbclid %}<p style="font-size:.8em;color:var(--tinta-suave)">fbclid ✓ (Meta)</p>{% endif %}
+      {% if op.origem_rastreio.gclid %}<p style="font-size:.8em;color:var(--tinta-suave)">gclid ✓ (Google)</p>{% endif %}
+      {% for c in op.conversoes_enviadas.all %}
+        <p style="font-size:.82em">{{ c.get_evento_display }} → {{ c.provedor }} · {% if c.status == 'enviada' %}✅ enviada{% else %}⚠️ erro{% endif %} · {{ c.enviado_em|date:"d/m H:i" }}</p>
+      {% endfor %}
+      {% if op.origem_rastreio.fbclid or op.origem_rastreio.gclid %}
+      <form method="post" action="{% url 'comercial:conversao_reenviar' op.pk %}" style="margin-top:.4rem">{% csrf_token %}
+        <button type="submit" class="botao-mini">Reenviar conversão</button>
+      </form>
+      {% else %}
+      <p style="font-size:.78em;color:var(--tinta-suave);margin-top:.3rem">Sem clique rastreado — nada a enviar às plataformas.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </aside>
 </div>
+
+<style>
+  .wpp-topo{display:flex;align-items:center;gap:.7rem;padding-bottom:.7rem;border-bottom:1px solid var(--fio);margin-bottom:.2rem}
+  .wpp-av{width:40px;height:40px;flex:none;border-radius:50%;background:var(--lampiao);color:var(--noturno);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px}
+  .wpp-ident{min-width:0} .wpp-nome{display:block;font-weight:700;color:var(--madeira);line-height:1.2}
+  .wpp-tel-sub{display:block;font-size:12.5px;color:var(--tinta-suave);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wpp-topo-dir{margin-left:auto;display:flex;align-items:center;gap:.4rem;flex:none}
+  .tel-wpp{color:var(--sucesso);text-decoration:none;font-weight:700} .tel-wpp:hover{text-decoration:underline}
+  .wpp-tag{font-size:12px;font-weight:600;color:var(--sucesso);background:var(--sucesso-bg);padding:2px 9px;border-radius:100px}
+  .wpp-sim{font-size:11px;font-weight:700;color:var(--madeira);background:rgba(215,160,72,.15);padding:2px 8px;border-radius:100px}
+  .wpp-thread{display:flex;flex-direction:column;gap:8px;margin:.9rem 0;height:520px;overflow-y:auto;padding:.7rem;border:1px solid var(--fio);border-radius:14px;
+    background-color:#e5ddd3;
+    background-image:url("{% static 'img/wpp-doodles.svg' %}");
+    background-size:210px 210px; background-repeat:repeat}
+  .wpp-thread::before{content:"";margin-top:auto}
+  .wpp-thread::-webkit-scrollbar{width:8px}
+  .wpp-thread::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:8px}
+  .wpp-msg{max-width:78%;padding:7px 11px;border-radius:12px;font-size:14px;line-height:1.4;box-shadow:0 1px 1px rgba(0,0,0,.08)}
+  .wpp-msg .wpp-h{display:block;font-size:10.5px;color:var(--tinta-suave);text-align:right;margin-top:3px}
+  .wpp-entrada{align-self:flex-start;background:#fff;border-bottom-left-radius:4px}
+  .wpp-saida{align-self:flex-end;background:#dcf3d8;border:1px solid #bfe6b8;border-bottom-right-radius:4px}
+  .wpp-vazio{color:var(--tinta-suave);text-align:center;padding:1.4rem;font-size:.9rem}
+  .wpp-rapidas{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.6rem}
+  .wpp-chip{font-size:12.5px;color:var(--madeira);background:rgba(215,160,72,.13);border:1px solid rgba(215,160,72,.4);border-radius:100px;padding:4px 11px;cursor:pointer;text-decoration:none}
+  .wpp-chip:hover{background:rgba(215,160,72,.22)}
+  .wpp-form{display:flex;gap:.5rem}
+  .wpp-form input{flex:1;padding:.6rem .8rem;border:1px solid var(--fio);border-radius:12px;font:inherit;background:var(--superficie)}
+  .wpp-sim-form{display:flex;gap:.5rem;margin-top:.6rem;opacity:.75}
+  .wpp-sim-form input{flex:1;padding:.45rem .7rem;border:1px dashed var(--fio-forte);border-radius:10px;font:inherit;background:transparent;font-size:.85rem}
+  .lead-info .l{display:flex;justify-content:space-between;gap:1rem;font-size:.9rem;padding:.42rem 0;border-bottom:1px solid var(--fio)}
+  .lead-info .l:last-child{border-bottom:none}
+  .lead-info .l span{color:var(--tinta-suave)}
+  .lead-info .l b{font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+  /* "Ganhar" em Ações rápidas fica noturno (distinto do sinal dourado) */
+  .op-acoes .op-det-ganhar summary{background:var(--noturno);color:var(--pergaminho)}
+</style>
+<script>
+  function wppInserir(btn){ var i=document.getElementById('wpp-texto'); i.value=btn.dataset.texto; i.focus(); }
+  (function(){ var t=document.querySelector('.wpp-thread'); if(t){ t.scrollTop=t.scrollHeight; } })();
+</script>
 {% endblock %}

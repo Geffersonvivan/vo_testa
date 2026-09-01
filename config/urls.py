@@ -28,6 +28,9 @@ urlpatterns = [
     # Público (hóspede) — permanece na raiz, fora do /crm.
     path("hospede/", include("apps.portal.urls")),
 
+    # Páginas de Captação (Landing Pages) — públicas, fora do /crm.
+    path("captacao/", include("apps.comercial.urls_publicas")),
+
     # API NPS (stub 501 — proposta fase CRM do Hóspede). Ver docs/Proposta_NPS.md.
     path("api/nps/", include("apps.nps.api_urls")),
 

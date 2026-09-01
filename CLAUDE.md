@@ -81,6 +81,36 @@ desenhar o nosso.
 - Antes de finalizar entrega de módulo: testes passando → skill django-verification →
   /code-review → commit → deploy.
 
+## Design & UI (toda tela nasce elegante — premissa fixa)
+
+Todo template novo do CRM **nasce** já no design system unificado (visual "Lampião"):
+nunca criar um estilo paralelo nem hard-codear cor/raio/sombra — sempre reusar os
+tokens e as classes-base. Referência viva: `static/css/app.css` (tokens + componentes) e
+o kit `templates/comercial/_estilo_elegante.html` (telas de painel/lista/detalhe).
+
+- **Tokens, nunca valores fixos:** raio (`--raio-p` 10px / `--raio` 14px / `--raio-g`
+  20px), sombra (`--sombra-1` para elementos pequenos, `--sombra-cartao` para o float
+  suave de cartões), borda (`--fio`/`--fio-forte`), cores da marca (`--lampiao`,
+  `--noturno`, `--madeira`, `--tinta`, `--tinta-suave`, semânticas `--sucesso`/`--alerta`
+  /`--perigo`/`--info`).
+- **Componentes-base reusados:** `.cartao`/`.cartao-el` (cartão com hairline + float),
+  `.tabela`/`.quadro` (cabeçalho em maiúsculas discretas, hairlines, hover na linha) —
+  **coluna de número/dinheiro leva `.num` no `<th>` E no `<td>`** (alinha à direita, nasce
+  alinhada),
+  `.botao-primario` (dourado), `.botao-neutro`, `.botao-mini` (nunca sublinhados; com
+  `:active`), `.selo`/`.selo-*` (status com bolinha), `.kpi`/`.kpi-destaque` (métrica).
+- **Telas de dashboard/lista/detalhe (padrão Comercial):** envolver em `<div class="eleg">`
+  e `{% include "comercial/_estilo_elegante.html" %}` — herda KPIs, quadro e botões prontos.
+- **Tipografia (craft):** números sempre com `font-variant-numeric: tabular-nums`;
+  números grandes com tracking negativo (`letter-spacing:-.02em`); rótulos em MAIÚSCULAS
+  discretas com leve tracking e tom suave; hierarquia por peso+tamanho, não só tamanho.
+- **Interação:** feedback imediato no toque (`:active`), foco dourado da marca em todos
+  os inputs (já global via `.conteudo … :focus`), hover sutil; respeitar
+  `prefers-reduced-motion` (sem slide/spring — cross-fade).
+- **Referências de princípio:** skill `apple-design` (resposta, tipografia ótica,
+  materiais, simplicidade) e a memória [[design-lampiao]]. Ao mudar o "look" global,
+  mexer nos **tokens** (propaga a tudo), não em cada template.
+
 ## Estado atual
 
 - **Fase 0 concluída**: núcleo com login, dashboard, registro de módulos (11 da fase 1

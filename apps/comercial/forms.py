@@ -2,7 +2,22 @@ from django import forms
 
 from apps.nucleo.models import Pessoa, TipoUH
 
-from .models import AtividadeComercial, MotivoPerda, Oportunidade
+from .models import (
+    AtividadeComercial,
+    Campanha,
+    GastoDiario,
+    MotivoPerda,
+    Oportunidade,
+    PaginaCaptacao,
+    RespostaRapida,
+)
+
+
+class RespostaRapidaForm(forms.ModelForm):
+    class Meta:
+        model = RespostaRapida
+        fields = ["titulo", "texto", "atalho", "ordem", "ativo"]
+        widgets = {"texto": forms.Textarea(attrs={"rows": 3})}
 
 
 class DataInput(forms.DateInput):
@@ -11,6 +26,56 @@ class DataInput(forms.DateInput):
 
 class DataHoraInput(forms.DateTimeInput):
     input_type = "datetime-local"
+
+
+class ReaisInput(forms.TextInput):
+    """Campo de moeda BR: máscara 'mascara-reais' (formata ao digitar, converte no submit)."""
+
+    def __init__(self, attrs=None):
+        base = {"class": "mascara-reais", "inputmode": "numeric", "placeholder": "0,00"}
+        if attrs:
+            base.update(attrs)
+        super().__init__(attrs=base)
+
+
+class CampanhaForm(forms.ModelForm):
+    class Meta:
+        model = Campanha
+        fields = ["nome", "codigo", "provedor", "pagina_captacao", "verba",
+                  "id_externo", "ativa"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["pagina_captacao"].queryset = PaginaCaptacao.objects.all()
+        self.fields["pagina_captacao"].required = False
+
+
+class GastoDiarioForm(forms.ModelForm):
+    class Meta:
+        model = GastoDiario
+        fields = ["data", "valor"]
+        widgets = {"data": DataInput()}
+
+
+class PaginaCaptacaoForm(forms.ModelForm):
+    class Meta:
+        model = PaginaCaptacao
+        fields = [
+            "nome", "slug", "status", "tema", "tipo_interesse",
+            "selo_texto", "tagline", "hero_titulo", "hero_subtitulo",
+            "historia_titulo", "historia_texto",
+            "oferta_titulo", "oferta_texto", "cta_texto",
+            "vagas_restantes", "data_evento", "meta_leads",
+            "whatsapp_destino", "meta_pixel_id", "google_tag_id",
+            "faq_texto", "endereco", "mapa_embed",
+        ]
+        widgets = {
+            "hero_subtitulo": forms.Textarea(attrs={"rows": 3}),
+            "historia_texto": forms.Textarea(attrs={"rows": 6}),
+            "oferta_texto": forms.Textarea(attrs={"rows": 3}),
+            "faq_texto": forms.Textarea(attrs={"rows": 6}),
+            "data_evento": DataHoraInput(),
+        }
 
 
 class OportunidadeForm(forms.ModelForm):
@@ -54,7 +119,7 @@ class ConversaoForm(forms.Form):
     checkout = forms.DateField(label="Check-out", widget=DataInput())
     valor_diaria = forms.DecimalField(
         label="Diária (R$)", required=False, max_digits=10, decimal_places=2,
-        help_text="Vazio = usa a tarifa do período.",
+        help_text="Vazio = usa a tarifa do período.", widget=ReaisInput(),
     )
     criar_sinal = forms.BooleanField(
         label="Gerar cobrança de sinal (Pix)", required=False, initial=False,
@@ -62,6 +127,7 @@ class ConversaoForm(forms.Form):
     )
     valor_sinal = forms.DecimalField(
         label="Valor do sinal (R$)", required=False, max_digits=10, decimal_places=2,
+        widget=ReaisInput(),
     )
 
     def clean(self):
@@ -86,7 +152,7 @@ class CotacaoForm(forms.Form):
     checkout = forms.DateField(label="Check-out", widget=DataInput())
     valor_diaria = forms.DecimalField(
         label="Diária (R$)", required=False, max_digits=10, decimal_places=2,
-        help_text="Vazio = calcula pela tarifa do período (Reservas).",
+        help_text="Vazio = calcula pela tarifa do período (Reservas).", widget=ReaisInput(),
     )
     validade = forms.DateField(label="Válida até", required=False, widget=DataInput())
     observacao = forms.CharField(

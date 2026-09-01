@@ -1,14 +1,17 @@
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from io import BytesIO
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db.models import Count, F, Sum
-from django.http import JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.cache import never_cache
+from django.views.decorators.csrf import csrf_protect
 
 from apps.nucleo.models import Pessoa, Prospecto, modulo_ativo
 from apps.nucleo.modulos import Modulo
@@ -16,11 +19,35 @@ from apps.nucleo.permissoes import requer_gerencia, requer_modulo
 from apps.nucleo.seletores import pessoas_agrupadas
 
 from . import services
-from .forms import ConversaoForm, CotacaoForm, MetaForm, PerdaForm
-from .models import AnaliseLead, AtividadeComercial, EtapaFunil, MotivoPerda, Oportunidade
+from .forms import (
+    CampanhaForm,
+    ConversaoForm,
+    CotacaoForm,
+    GastoDiarioForm,
+    MetaForm,
+    PaginaCaptacaoForm,
+    PerdaForm,
+    RespostaRapidaForm,
+)
+from .models import (
+    AnaliseLead,
+    AtividadeComercial,
+    Campanha,
+    EtapaFunil,
+    MotivoPerda,
+    Oportunidade,
+    PaginaCaptacao,
+    RespostaRapida,
+)
 from .proposta_instagram import PROPOSTA as PROPOSTA_INSTAGRAM
 
 Usuario = get_user_model()
+
+# Parâmetros de rastreio de anúncio capturados na Página de Captação (Fase A).
+RASTREIO_KEYS = (
+    "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
+    "fbclid", "gclid",
+)
 
 
 def _valor(txt):
@@ -103,6 +130,7 @@ def funil(request):
         "valor_total": sum((c["total"] for c in colunas), Decimal("0.00")),
         "ponderado_total": sum((o.valor_ponderado for o in itens), Decimal("0.00")),
         "qtd_total": len(itens),
+        "agora": timezone.now(),
     }
     ctx.update(_contexto_form())
     return render(request, "comercial/funil.html", ctx)
@@ -175,8 +203,41 @@ def cacador_feedback(request, pk):
     analise.revisado_por = request.user
     analise.revisado_em = timezone.now()
     analise.save(update_fields=["util", "revisado_por", "revisado_em"])
+    services.assumir_lead(op, request.user)  # avaliar no Caçador = interagir
     messages.success(request, "Feedback registrado — o Caçador aprende com isso.")
     return redirect("comercial:cacador")
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def conversao_reenviar(request, pk):
+    """Reenvia a conversão do lead ao provedor de mídia (Fase B)."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    if request.method == "POST":
+        if op.status == Oportunidade.Status.GANHA:
+            ce = services.enviar_conversao(op, "compra", valor=op.valor_estimado, forcar=True)
+        else:
+            ce = services.enviar_conversao(op, "lead", forcar=True)
+        if ce is None:
+            messages.info(request, "Sem identificador de clique (fbclid/gclid) — nada a enviar.")
+        elif ce.status == "enviada":
+            messages.success(request, "Conversão reenviada ao provedor.")
+        else:
+            messages.error(request, f"Falha ao enviar: {ce.erro[:140]}")
+    return redirect("comercial:oportunidade", pk=op.pk)
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def assumir(request, pk):
+    """Vendedor pega o lead (assume a propriedade se estiver sem dono)."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    if request.method == "POST":
+        if services.assumir_lead(op, request.user):
+            messages.success(request, f"Você assumiu «{op.pessoa.nome}».")
+        elif op.responsavel_id:
+            dono = op.responsavel.get_full_name() or op.responsavel.username
+            messages.info(request, f"Lead já é de {dono}.")
+    destino = request.META.get("HTTP_REFERER") or ""
+    return redirect(destino if destino else "comercial:funil")
 
 
 @requer_modulo(Modulo.COMERCIAL)
@@ -254,6 +315,8 @@ def oportunidade(request, pk):
         Oportunidade.objects.select_related("pessoa", "etapa", "responsavel", "motivo_perda"),
         pk=pk,
     )
+    from django.conf import settings as _settings
+    conversa_wpp = services.abrir_conversa_whatsapp(op)
     return render(request, "comercial/oportunidade.html", {
         "op": op,
         "atividades": op.atividades.select_related("responsavel"),
@@ -263,10 +326,13 @@ def oportunidade(request, pk):
         "conversao_form": _conversao_inicial(op),
         "cotacao_form": _cotacao_inicial(op),
         "perda_form": PerdaForm(),
-        "templates": services.templates_mensagem(op),
         "pagamentos_ativo": modulo_ativo(Modulo.PAGAMENTOS),
         "responsaveis": Usuario.objects.filter(is_active=True).order_by(
             "first_name", "username"),
+        "conversa_wpp": conversa_wpp,
+        "mensagens_wpp": list(conversa_wpp.mensagens.all()),
+        "respostas_rapidas": services.respostas_rapidas_para(op),
+        "whatsapp_simulado": getattr(_settings, "WHATSAPP_GATEWAY", "simulado") == "simulado",
     })
 
 
@@ -432,3 +498,348 @@ def _datahora(txt):
         except (ValueError, TypeError):
             continue
     return None
+
+
+# ─────────────────── Gestor de Páginas de Captação (Landing Pages) ───────────────────
+
+@never_cache
+@requer_modulo(Modulo.COMERCIAL)
+def paginas(request):
+    """Lista as Páginas de Captação com visitas · leads · conversão."""
+    itens = list(PaginaCaptacao.objects.all())
+    return render(request, "comercial/paginas/lista.html", {"paginas": itens})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def pagina_nova(request):
+    if request.method == "POST":
+        form = PaginaCaptacaoForm(request.POST)
+        if form.is_valid():
+            pagina = form.save(commit=False)
+            if not pagina.slug:
+                pagina.slug = slugify(pagina.nome)[:60]
+            pagina.criado_por = request.user
+            if pagina.publicada and not pagina.publicada_em:
+                pagina.publicada_em = timezone.now()
+            pagina.save()
+            messages.success(request, "Página de captação criada.")
+            return redirect("comercial:pagina_detalhe", pk=pagina.pk)
+    else:
+        form = PaginaCaptacaoForm()
+    return render(request, "comercial/paginas/form.html", {"form": form, "novo": True})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def pagina_editar(request, pk):
+    pagina = get_object_or_404(PaginaCaptacao, pk=pk)
+    if request.method == "POST":
+        form = PaginaCaptacaoForm(request.POST, instance=pagina)
+        if form.is_valid():
+            pagina = form.save(commit=False)
+            if pagina.publicada and not pagina.publicada_em:
+                pagina.publicada_em = timezone.now()
+            pagina.save()
+            messages.success(request, "Página atualizada.")
+            return redirect("comercial:pagina_detalhe", pk=pagina.pk)
+    else:
+        form = PaginaCaptacaoForm(instance=pagina)
+    return render(request, "comercial/paginas/form.html",
+                  {"form": form, "pagina": pagina, "novo": False})
+
+
+@never_cache
+@requer_modulo(Modulo.COMERCIAL)
+def pagina_detalhe(request, pk):
+    pagina = get_object_or_404(PaginaCaptacao, pk=pk)
+    leads = pagina.oportunidades.select_related("pessoa", "etapa").order_by("-criado_em")
+    url_publica = request.build_absolute_uri(pagina.get_absolute_url())
+    return render(request, "comercial/paginas/detalhe.html", {
+        "pagina": pagina,
+        "leads": leads,
+        "url_publica": url_publica,
+    })
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def pagina_status(request, pk):
+    """Publicar / despublicar / encerrar (POST)."""
+    pagina = get_object_or_404(PaginaCaptacao, pk=pk)
+    if request.method == "POST":
+        novo = request.POST.get("status")
+        if novo in PaginaCaptacao.Status.values:
+            pagina.status = novo
+            if novo == PaginaCaptacao.Status.PUBLICADA and not pagina.publicada_em:
+                pagina.publicada_em = timezone.now()
+            pagina.save(update_fields=["status", "publicada_em", "atualizado_em"])
+            messages.success(request, f"Página {pagina.get_status_display().lower()}.")
+    return redirect("comercial:pagina_detalhe", pk=pagina.pk)
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def pagina_qr(request, pk):
+    """QR Code (SVG) da URL pública da página."""
+    import qrcode
+    import qrcode.image.svg
+
+    pagina = get_object_or_404(PaginaCaptacao, pk=pk)
+    url = request.build_absolute_uri(pagina.get_absolute_url())
+    img = qrcode.make(url, image_factory=qrcode.image.svg.SvgPathImage,
+                      box_size=10, border=2)
+    buf = BytesIO()
+    img.save(buf)
+    return HttpResponse(buf.getvalue(), content_type="image/svg+xml")
+
+
+@never_cache
+@csrf_protect
+def captacao_publica(request, slug):
+    """Página pública da campanha (sem login). GET conta visita; POST captura lead."""
+    pagina = PaginaCaptacao.objects.filter(slug=slug).first()
+    if pagina is None or not pagina.publicada:
+        raise Http404("Página não encontrada.")
+
+    enviado = request.GET.get("ok") == "1"
+    if request.method == "POST":
+        nome = (request.POST.get("nome") or "").strip()
+        telefone = (request.POST.get("telefone") or "").strip()
+        email = (request.POST.get("email") or "").strip()
+        checkin = _data(request.POST.get("checkin"))
+        checkout = _data(request.POST.get("checkout"))
+        try:
+            pessoas = max(1, min(8, int(request.POST.get("pessoas") or 2)))
+        except (TypeError, ValueError):
+            pessoas = 2
+        origem = {k: (request.POST.get(k) or "").strip() for k in RASTREIO_KEYS}
+        origem["referer"] = request.META.get("HTTP_REFERER", "")
+        origem["landing_url"] = request.build_absolute_uri(pagina.get_absolute_url())
+        if nome and telefone:
+            if checkin and checkout and checkout <= checkin:
+                checkout = None  # ignora saída inválida (funil aceita só a entrada)
+            try:
+                services.capturar_lead_site(
+                    nome=nome, telefone=telefone, email=email,
+                    tipo_interesse=pagina.tipo_interesse, pagina=pagina,
+                    hospedes=pessoas, checkin=checkin, checkout=checkout,
+                    mensagem=f"Lista de espera — {pagina.nome}", origem=origem,
+                )
+            except Exception:
+                pass  # best-effort: nunca quebra a página pública do lead
+            return redirect(f"{pagina.get_absolute_url()}?ok=1")
+        return render(request, "comercial/captacao_publica.html",
+                      {"pagina": pagina, "erro": "Preencha nome e WhatsApp.",
+                       "rastreio": {k: request.POST.get(k, "") for k in RASTREIO_KEYS}})
+
+    services.registrar_visita_pagina(pagina)
+    rastreio = {k: request.GET.get(k, "") for k in RASTREIO_KEYS}
+    return render(request, "comercial/captacao_publica.html",
+                  {"pagina": pagina, "enviado": enviado, "rastreio": rastreio})
+
+
+# ─────────────────── Gestor de Impulsionamento (anúncios) — Fase A ───────────────────
+
+@never_cache
+@requer_modulo(Modulo.COMERCIAL)
+def impulsionamento(request):
+    """Painel: campanhas com gasto · leads · reservas · custo por lead · retorno."""
+    campanhas = list(Campanha.objects.all())
+    tot_gasto = sum((c.gasto_total for c in campanhas), Decimal("0.00"))
+    tot_leads = sum(c.leads for c in campanhas)
+    tot_reservas = sum(c.reservas for c in campanhas)
+    tot_receita = sum((c.receita for c in campanhas), Decimal("0.00"))
+    kpi = {
+        "gasto": tot_gasto,
+        "leads": tot_leads,
+        "reservas": tot_reservas,
+        "cpl": (tot_gasto / tot_leads).quantize(Decimal("0.01")) if tot_leads else Decimal("0.00"),
+        "retorno": (tot_receita / tot_gasto).quantize(Decimal("0.01")) if tot_gasto else Decimal("0.00"),
+    }
+    return render(request, "comercial/impulsionamento/painel.html",
+                  {"campanhas": campanhas, "kpi": kpi})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def campanha_nova(request):
+    if request.method == "POST":
+        form = CampanhaForm(request.POST)
+        if form.is_valid():
+            camp = form.save(commit=False)
+            if not camp.codigo:
+                camp.codigo = slugify(camp.nome)[:80]
+            camp.criado_por = request.user
+            camp.save()
+            messages.success(request, "Campanha criada.")
+            return redirect("comercial:campanha_detalhe", pk=camp.pk)
+    else:
+        form = CampanhaForm()
+    return render(request, "comercial/impulsionamento/form.html",
+                  {"form": form, "novo": True})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def campanha_editar(request, pk):
+    camp = get_object_or_404(Campanha, pk=pk)
+    if request.method == "POST":
+        form = CampanhaForm(request.POST, instance=camp)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Campanha atualizada.")
+            return redirect("comercial:campanha_detalhe", pk=camp.pk)
+    else:
+        form = CampanhaForm(instance=camp)
+    return render(request, "comercial/impulsionamento/form.html",
+                  {"form": form, "campanha": camp, "novo": False})
+
+
+@never_cache
+@requer_modulo(Modulo.COMERCIAL)
+def campanha_detalhe(request, pk):
+    camp = get_object_or_404(Campanha, pk=pk)
+    gasto_form = GastoDiarioForm()
+    leads = camp.oportunidades.select_related("pessoa", "etapa").order_by("-criado_em")
+    gastos = camp.gastos.select_related("criado_por")
+    url_utm = ""
+    if camp.pagina_captacao:
+        base = request.build_absolute_uri(camp.pagina_captacao.get_absolute_url())
+        url_utm = f"{base}?utm_source={camp.provedor}&utm_medium=cpc&utm_campaign={camp.codigo}"
+    return render(request, "comercial/impulsionamento/detalhe.html", {
+        "campanha": camp, "gasto_form": gasto_form,
+        "leads": leads, "gastos": gastos, "url_utm": url_utm,
+    })
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def campanha_sincronizar(request, pk):
+    """Puxa o gasto da plataforma para a campanha (Fase C). POST."""
+    camp = get_object_or_404(Campanha, pk=pk)
+    if request.method == "POST":
+        try:
+            n = services.sincronizar_gastos(campanha=camp, dias=30)
+            if n:
+                messages.success(request, f"{n} dia(s) de gasto sincronizado(s).")
+            else:
+                messages.info(
+                    request,
+                    "Nada sincronizado. Verifique MIDIA_GATEWAY, o token e o ID da campanha "
+                    "na plataforma (ou lance o gasto manualmente).")
+        except Exception as e:  # best-effort
+            messages.error(request, f"Falha na sincronização: {str(e)[:140]}")
+    return redirect("comercial:campanha_detalhe", pk=camp.pk)
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def campanha_gasto(request, pk):
+    """Lança um gasto na campanha (POST)."""
+    camp = get_object_or_404(Campanha, pk=pk)
+    if request.method == "POST":
+        form = GastoDiarioForm(request.POST)
+        if form.is_valid():
+            try:
+                services.registrar_gasto(
+                    campanha=camp, data=form.cleaned_data["data"],
+                    valor=form.cleaned_data["valor"], usuario=request.user,
+                )
+                messages.success(request, "Gasto lançado.")
+            except ValidationError as e:
+                messages.error(request, "; ".join(e.messages))
+        else:
+            messages.error(request, "Preencha data e valor.")
+    return redirect("comercial:campanha_detalhe", pk=camp.pk)
+
+
+# ─────────────────── WhatsApp no funil (MVP) + Respostas Rápidas ───────────────────
+
+@requer_modulo(Modulo.COMERCIAL)
+def enviar_proposta_sinal(request, pk):
+    """Gera a cobrança do sinal (Safrapay/simulado), monta o link público e envia no WhatsApp."""
+    from django.urls import reverse
+    op = get_object_or_404(Oportunidade, pk=pk)
+    if request.method == "POST":
+        try:
+            cobranca = services.criar_cobranca_sinal(op, request.user)
+        except ValidationError as e:
+            messages.error(request, "; ".join(e.messages))
+            return redirect("comercial:oportunidade", pk=op.pk)
+        link = request.build_absolute_uri(reverse("pagamentos:pagar", args=[cobranca.token]))
+        valor_br = f"{cobranca.valor:.2f}".replace(".", ",")
+        texto = services.montar_proposta_sinal(op, cobranca, link)
+        try:
+            conv = services.abrir_conversa_whatsapp(op)
+            services.enviar_mensagem_whatsapp(conversa=conv, texto=texto, usuario=request.user)
+        except Exception:
+            pass  # best-effort — o link já foi gerado
+        services.registrar_atividade(
+            oportunidade=op, usuario=request.user, tipo=AtividadeComercial.Tipo.WHATSAPP,
+            descricao=f"Proposta + sinal enviada (R$ {valor_br}) — {link}")
+        messages.success(request, f"Sinal gerado e enviado no WhatsApp. Link: {link}")
+    return redirect("comercial:oportunidade", pk=op.pk)
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def whatsapp_enviar(request, pk):
+    """Envia uma resposta de WhatsApp pelo gateway (MVP simulado)."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    if request.method == "POST":
+        conv = services.abrir_conversa_whatsapp(op)
+        try:
+            services.enviar_mensagem_whatsapp(
+                conversa=conv, texto=request.POST.get("texto", ""), usuario=request.user)
+        except ValidationError as e:
+            messages.error(request, "; ".join(e.messages))
+    return redirect("comercial:oportunidade", pk=op.pk)
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def whatsapp_simular(request, pk):
+    """MVP: injeta uma mensagem 'recebida' do cliente para testar o fluxo no funil."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    if request.method == "POST":
+        texto = request.POST.get("texto", "").strip() or "Oi! Tenho interesse 🙂"
+        services.receber_mensagem_whatsapp(oportunidade=op, texto=texto)
+        messages.success(request, "Mensagem simulada recebida.")
+    return redirect("comercial:oportunidade", pk=op.pk)
+
+
+@never_cache
+@requer_modulo(Modulo.COMERCIAL)
+def respostas(request):
+    itens = RespostaRapida.objects.all()
+    return render(request, "comercial/respostas/lista.html", {"respostas": itens})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def resposta_nova(request):
+    if request.method == "POST":
+        form = RespostaRapidaForm(request.POST)
+        if form.is_valid():
+            r = form.save(commit=False)
+            r.criado_por = request.user
+            r.save()
+            messages.success(request, "Resposta rápida criada.")
+            return redirect("comercial:respostas")
+    else:
+        form = RespostaRapidaForm()
+    return render(request, "comercial/respostas/form.html", {"form": form, "novo": True})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def resposta_editar(request, pk):
+    r = get_object_or_404(RespostaRapida, pk=pk)
+    if request.method == "POST":
+        form = RespostaRapidaForm(request.POST, instance=r)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Resposta atualizada.")
+            return redirect("comercial:respostas")
+    else:
+        form = RespostaRapidaForm(instance=r)
+    return render(request, "comercial/respostas/form.html",
+                  {"form": form, "resposta": r, "novo": False})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def resposta_excluir(request, pk):
+    r = get_object_or_404(RespostaRapida, pk=pk)
+    if request.method == "POST":
+        r.delete()
+        messages.success(request, "Resposta removida.")
+    return redirect("comercial:respostas")

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block titulo %}{% if novo %}Nova página{% else %}Editar página{% endif %} — Comercial{% endblock %}
+
+{% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
+<div class="eleg">
+  <p class="pagina-eyebrow letreiro">Comercial · Páginas de Captação</p>
+  <div class="pagina-cabecalho">
+    <h1>{% if novo %}Nova página de captação{% else %}Editar “{{ pagina.nome }}”{% endif %}</h1>
+    <a href="{% if novo %}{% url 'comercial:paginas' %}{% else %}{% url 'comercial:pagina_detalhe' pagina.pk %}{% endif %}" class="botao-neutro">Cancelar</a>
+  </div>
+
+  <form method="post" class="cartao-el eleg-form">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<p class="erro-campo">{{ form.non_field_errors }}</p>{% endif %}
+    {% for field in form %}
+      <div class="campo-el {% if field.field.widget.input_type == 'checkbox' %}campo-check{% endif %}">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.help_text %}<p class="ajuda">{{ field.help_text }}</p>{% endif %}
+        {% if field.errors %}<p class="erro-campo">{{ field.errors }}</p>{% endif %}
+      </div>
+    {% endfor %}
+    <button type="submit" class="botao-primario" style="margin-top:.4rem">Salvar</button>
+  </form>
+</div>
+
+<style>
+  .eleg-form{ max-width:760px; display:flex; flex-direction:column; gap:1.15rem; }
+  .eleg-form .campo-el label{ display:block; font-weight:600; font-size:.9rem; color:var(--tinta); }
+  .eleg-form .ajuda{ margin:.35rem 0 0; font-size:.82rem; color:var(--tinta-suave); }
+  .eleg-form .erro-campo{ margin:.35rem 0 0; font-size:.82rem; color:#b3261e; }
+  .eleg-form .campo-check{ display:flex; align-items:center; gap:.5rem; }
+  .eleg-form .campo-check label{ order:2; }
+  .eleg-form .campo-check input{ width:auto; margin:0; }
+</style>
+{% endblock %}

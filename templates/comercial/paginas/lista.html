@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block titulo %}Páginas de Captação — Comercial{% endblock %}
+
+{% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
+<div class="eleg">
+  <p class="pagina-eyebrow letreiro">Comercial</p>
+  <div class="pagina-cabecalho">
+    <h1>Páginas de Captação</h1>
+    <div class="eleg-acoes">
+      <a href="{% url 'comercial:funil' %}" class="botao-neutro">Voltar ao funil</a>
+      <a href="{% url 'comercial:pagina_nova' %}" class="botao-primario">Nova página</a>
+    </div>
+  </div>
+  <p class="eleg-intro">
+    Cada página é uma campanha (Landing Page) com URL própria para colar na bio do Instagram.
+    Os cadastros caem no funil já etiquetados com a campanha.
+  </p>
+
+  <div class="quadro" style="margin-top:1.25rem">
+    <table>
+      <thead><tr>
+        <th>Página</th><th>Status</th><th class="num">Visitas</th><th class="num">Leads</th>
+        <th class="num">Conversão</th><th class="num">Reservas</th><th class="acao"></th>
+      </tr></thead>
+      <tbody>
+        {% for p in paginas %}
+          <tr class="clic" onclick="location.href='{% url 'comercial:pagina_detalhe' p.pk %}'">
+            <td>
+              <span class="camp-nome">{{ p.nome }}</span>
+              <span class="camp-sub">/captacao/{{ p.slug }}/</span>
+            </td>
+            <td>
+              {% if p.status == 'publicada' %}<span class="selo selo-pub">Publicada</span>
+              {% elif p.status == 'encerrada' %}<span class="selo selo-enc">Encerrada</span>
+              {% else %}<span class="selo selo-rasc">Rascunho</span>{% endif %}
+            </td>
+            <td class="num">{{ p.visitas }}</td>
+            <td class="num">{{ p.leads }}</td>
+            <td class="num forte">{{ p.conversao }}%</td>
+            <td class="num">{{ p.reservas_geradas }}</td>
+            <td class="acao"><a href="{% url 'comercial:pagina_detalhe' p.pk %}" class="botao-mini" onclick="event.stopPropagation()">Abrir</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="vazio-el">Nenhuma página ainda. Crie a primeira campanha. 🚀</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

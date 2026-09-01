@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block titulo %}Impulsionamento — Comercial{% endblock %}
+
+{% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
+<div class="eleg">
+  <p class="pagina-eyebrow letreiro">Comercial</p>
+  <div class="pagina-cabecalho">
+    <h1>Impulsionamento</h1>
+    <div class="eleg-acoes">
+      <a href="{% url 'comercial:funil' %}" class="botao-neutro">Voltar ao funil</a>
+      <a href="{% url 'comercial:campanha_nova' %}" class="botao-primario">Nova campanha</a>
+    </div>
+  </div>
+  <p class="eleg-intro">
+    Cada campanha liga o gasto de anúncio aos leads e reservas que gerou — mede custo por
+    lead, custo por reserva e retorno. Use o <strong>código</strong> da campanha no
+    <code>utm_campaign</code> do anúncio para atribuir os leads.
+  </p>
+
+  <div class="kpis">
+    <div class="kpi"><span class="n">R$&nbsp;{{ kpi.gasto }}</span><span class="l">Gasto total</span></div>
+    <div class="kpi"><span class="n">{{ kpi.leads }}</span><span class="l">Leads</span></div>
+    <div class="kpi"><span class="n">R$&nbsp;{{ kpi.cpl }}</span><span class="l">Custo por lead</span></div>
+    <div class="kpi"><span class="n">{{ kpi.reservas }}</span><span class="l">Reservas</span></div>
+    <div class="kpi kpi-destaque"><span class="n">{{ kpi.retorno }}×</span><span class="l">Retorno · receita ÷ gasto</span></div>
+  </div>
+
+  <div class="quadro">
+    <table>
+      <thead><tr>
+        <th>Campanha</th><th>Provedor</th><th class="num">Gasto</th><th class="num">Leads</th>
+        <th class="num">Custo/lead</th><th class="num">Reservas</th><th class="num">Custo/reserva</th>
+        <th class="num">Retorno</th><th class="acao"></th>
+      </tr></thead>
+      <tbody>
+        {% for c in campanhas %}
+          <tr class="clic" onclick="location.href='{% url 'comercial:campanha_detalhe' c.pk %}'">
+            <td>
+              <span class="camp-nome">{{ c.nome }}</span>
+              <span class="camp-sub">utm_campaign={{ c.codigo }}{% if not c.ativa %} · inativa{% endif %}</span>
+            </td>
+            <td><span class="prov"><i class="dot {{ c.provedor }}"></i>{{ c.get_provedor_display }}</span></td>
+            <td class="num">R$&nbsp;{{ c.gasto_total }}</td>
+            <td class="num">{{ c.leads }}</td>
+            <td class="num">R$&nbsp;{{ c.custo_por_lead }}</td>
+            <td class="num">{{ c.reservas }}</td>
+            <td class="num">R$&nbsp;{{ c.custo_por_reserva }}</td>
+            <td class="num forte">{{ c.retorno }}×</td>
+            <td class="acao"><a href="{% url 'comercial:campanha_detalhe' c.pk %}" class="botao-mini" onclick="event.stopPropagation()">Abrir</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="9" class="vazio-el">Nenhuma campanha ainda. Crie a primeira. 📣</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

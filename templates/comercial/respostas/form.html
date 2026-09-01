@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block titulo %}{% if novo %}Nova resposta{% else %}Editar resposta{% endif %} — Comercial{% endblock %}
+
+{% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
+<div class="eleg">
+  <p class="pagina-eyebrow letreiro">Comercial · Respostas rápidas</p>
+  <div class="pagina-cabecalho">
+    <h1>{% if novo %}Nova resposta rápida{% else %}Editar “{{ resposta.titulo }}”{% endif %}</h1>
+    <a href="{% url 'comercial:respostas' %}" class="botao-neutro">Cancelar</a>
+  </div>
+
+  <form method="post" class="cartao-el eleg-form">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="campo-el {% if field.field.widget.input_type == 'checkbox' %}campo-check{% endif %}">
+        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+        {{ field }}
+        {% if field.errors %}<p class="erro-campo">{{ field.errors }}</p>{% endif %}
+      </div>
+    {% endfor %}
+    <p class="ajuda">Variáveis: <code>{nome}</code> <code>{checkin}</code> <code>{checkout}</code> <code>{noites}</code> <code>{valor}</code> <code>{vagas}</code> — preenchidas com os dados do lead na hora de enviar.</p>
+    <div class="eleg-acoes">
+      <button type="submit" class="botao-primario">Salvar</button>
+      {% if not novo %}
+      <form method="post" action="{% url 'comercial:resposta_excluir' resposta.pk %}" onsubmit="return confirm('Remover esta resposta?')" style="margin:0">
+        {% csrf_token %}<button type="submit" class="botao-neutro">Excluir</button>
+      </form>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<style>
+  .eleg-form{ max-width:640px; display:flex; flex-direction:column; gap:1.15rem; }
+  .eleg-form .campo-el label{ display:block; font-weight:600; font-size:.9rem; color:var(--tinta); }
+  .eleg-form .ajuda{ font-size:.82rem; color:var(--tinta-suave); }
+  .eleg-form .ajuda code{ background:rgba(40,30,15,.06); padding:1px 5px; border-radius:5px; }
+  .eleg-form .erro-campo{ margin:.35rem 0 0; font-size:.82rem; color:#b3261e; }
+  .eleg-form .campo-check{ display:flex; align-items:center; gap:.5rem; }
+  .eleg-form .campo-check label{ order:2; } .eleg-form .campo-check input{ width:auto; margin:0; }
+</style>
+{% endblock %}

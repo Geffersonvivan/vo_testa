@@ -261,6 +261,25 @@ FNRH_API_SENHA = os.environ.get("FNRH_API_SENHA", "")
 # Ver docs/Implementar_fiscal.md. Focus/Governo são stubs até ter credenciais/certificado.
 FISCAL_GATEWAY = os.environ.get("FISCAL_GATEWAY", "simulado")
 
+# Mídia/Impulsionamento — gateway de conversões (Fase B do Gestor de Impulsionamento):
+# "simulado" (sem rede, dev/testes) / "meta" (Conversions API) / "google" (Offline Import).
+# Ver docs/Marketing/Gestor_Impulsionamento_CRM.md. PII sempre com hash. Sem credenciais,
+# manter MIDIA_GATEWAY=simulado.
+MIDIA_GATEWAY = os.environ.get("MIDIA_GATEWAY", "simulado")
+META_CAPI_TOKEN = os.environ.get("META_CAPI_TOKEN", "")  # token de usuário de sistema
+META_PIXEL_ID = os.environ.get("META_PIXEL_ID", "")
+META_CAPI_TEST_CODE = os.environ.get("META_CAPI_TEST_CODE", "")  # test_event_code (opcional)
+GOOGLE_ADS_CUSTOMER_ID = os.environ.get("GOOGLE_ADS_CUSTOMER_ID", "")
+GOOGLE_ADS_CONVERSION_ACTION = os.environ.get("GOOGLE_ADS_CONVERSION_ACTION", "")
+
+# WhatsApp — conversa dentro do funil (ver docs/Marketing/CRM_WhatsApp.md):
+# "simulado" (MVP, sem rede) / "cloud" (Meta Cloud API) / "bsp" (provedor). Sem número
+# real, manter WHATSAPP_GATEWAY=simulado.
+WHATSAPP_GATEWAY = os.environ.get("WHATSAPP_GATEWAY", "simulado")
+WHATSAPP_CLOUD_TOKEN = os.environ.get("WHATSAPP_CLOUD_TOKEN", "")
+WHATSAPP_CLOUD_PHONE_ID = os.environ.get("WHATSAPP_CLOUD_PHONE_ID", "")
+WHATSAPP_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "")
+
 # Parâmetros fiscais confirmados pelo contador (jul/2026) — Pousada Vô Testa, Itá/SC.
 # Regime Lucro Presumido; NFS-e pelo Emissor Nacional. NFC-e aguarda Inscrição Estadual.
 FISCAL_REGIME = os.environ.get("FISCAL_REGIME", "lucro_presumido")

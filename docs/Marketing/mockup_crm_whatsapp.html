@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mock-up — WhatsApp dentro do funil · Vô Testa</title>
+<style>
+  @font-face{font-family:'Neco';src:url('../../apps/site/static/site/fonts/Neco-Regular.woff2') format('woff2');font-weight:400;font-display:swap}
+  @font-face{font-family:'Neco';src:url('../../apps/site/static/site/fonts/Neco-Bold.woff2') format('woff2');font-weight:700;font-display:swap}
+  @font-face{font-family:'Neco';src:url('../../apps/site/static/site/fonts/Neco-Black.woff2') format('woff2');font-weight:900;font-display:swap}
+  :root{
+    --noturno:#051C2C; --madeira:#4F2C1D; --lampiao:#D7A048; --pergaminho:#EFDBB2;
+    --musgo:#2E483E; --canvas:#F4F1EC; --superficie:#FFFDFA; --tinta:#22303A;
+    --tinta-suave:#6B7A82; --fio:#E4E0D6; --sucesso:#2E7D5B;
+    --sombra:0 1px 2px rgba(4,21,31,.04), 0 12px 30px -16px rgba(4,21,31,.20);
+    --raio:14px; --raio-g:20px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Neco',Georgia,serif;background:var(--canvas);color:var(--tinta);padding:28px 20px;line-height:1.5}
+  .wrap{max-width:1120px;margin:0 auto}
+  .nota{background:#fff8e6;border:1px dashed #d9b64e;color:#8a6d12;font-size:13px;padding:9px 14px;border-radius:10px;text-align:center;margin-bottom:20px}
+  .eyebrow{color:var(--lampiao);font-size:12px;letter-spacing:.22em;text-transform:uppercase;font-weight:700}
+  h1{font-weight:900;font-size:clamp(24px,3.6vw,34px);color:var(--madeira);letter-spacing:-.02em;margin:.2rem 0 1.4rem}
+
+  .grade{display:grid;grid-template-columns:1.6fr 1fr;gap:18px;align-items:start}
+
+  /* Painel de conversa */
+  .conversa{background:var(--superficie);border:1px solid var(--fio);border-radius:var(--raio-g);box-shadow:var(--sombra);overflow:hidden;display:flex;flex-direction:column;min-height:560px}
+  .conv-topo{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--fio);background:linear-gradient(180deg,#fff,rgba(244,241,236,.5))}
+  .av{width:42px;height:42px;border-radius:50%;background:var(--lampiao);color:var(--noturno);font-weight:900;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none}
+  .conv-topo .nome{font-weight:700;color:var(--madeira)}
+  .conv-topo .tel{font-size:12.5px;color:var(--tinta-suave)}
+  .wpp-badge{margin-left:auto;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--sucesso);background:rgba(46,125,91,.1);border:1px solid rgba(46,125,91,.25);padding:4px 10px;border-radius:100px}
+  .wpp-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--sucesso)}
+
+  .thread{flex:1;padding:18px;display:flex;flex-direction:column;gap:10px;overflow:auto;
+    background-color:#e5ddd3;
+    background-image:url('../../static/img/wpp-doodles.svg');
+    background-size:210px 210px; background-repeat:repeat}
+  .prop{align-self:flex-end;max-width:80%;background:#fff;border:1px solid #e2ddd4;border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.1)}
+  .prop-top{background:var(--noturno);color:var(--pergaminho);padding:9px 13px;font-weight:700;font-size:13px}
+  .prop-corpo{padding:11px 13px;font-size:13px;color:var(--tinta)}
+  .prop-corpo .l{display:flex;justify-content:space-between;padding:2px 0}
+  .prop-corpo .l b{font-variant-numeric:tabular-nums}
+  .prop-btn{display:block;text-align:center;background:var(--sucesso);color:#fff;font-weight:800;padding:11px;text-decoration:none;font-size:14px}
+  .prop .h{display:block;text-align:right;font-size:10.5px;color:var(--tinta-suave);padding:0 13px 8px}
+  .dia{align-self:center;font-size:11px;color:var(--tinta-suave);background:rgba(255,255,255,.7);padding:3px 12px;border-radius:100px;border:1px solid var(--fio)}
+  .msg{max-width:74%;padding:9px 13px;border-radius:14px;font-size:14px;box-shadow:0 1px 1px rgba(0,0,0,.05);position:relative}
+  .msg .h{display:block;font-size:10.5px;color:var(--tinta-suave);text-align:right;margin-top:3px}
+  .in{align-self:flex-start;background:#fff;border:1px solid var(--fio);border-bottom-left-radius:4px}
+  .out{align-self:flex-end;background:#dcf3d8;border:1px solid #bfe6b8;border-bottom-right-radius:4px}
+  .out .h::after{content:" ✓✓";color:var(--sucesso)}
+  .sistema{align-self:center;font-size:11.5px;color:var(--tinta-suave);font-style:italic}
+
+  /* Barra de resposta */
+  .responder{border-top:1px solid var(--fio);padding:12px 16px;background:#fff}
+  .rapidas{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px}
+  .chip{font-size:12px;color:var(--madeira);background:rgba(215,160,72,.12);border:1px solid rgba(215,160,72,.4);border-radius:100px;padding:4px 11px;cursor:pointer}
+  .chip:hover{background:rgba(215,160,72,.2)}
+  .campo-resp{display:flex;gap:8px;align-items:center}
+  .campo-resp input{flex:1;padding:11px 14px;border:1px solid var(--fio);border-radius:12px;font:inherit;background:var(--superficie)}
+  .btn-tpl{border:1px solid var(--fio);background:var(--superficie);border-radius:10px;padding:10px 12px;font-size:13px;color:var(--tinta-suave);cursor:pointer;white-space:nowrap}
+  .btn-env{background:var(--lampiao);color:#241a08;border:none;border-radius:12px;padding:11px 18px;font-weight:700;cursor:pointer}
+  .janela{font-size:11.5px;color:var(--sucesso);margin-top:8px;text-align:center}
+
+  /* Rail de contexto */
+  .rail{display:flex;flex-direction:column;gap:16px}
+  .cartao{background:var(--superficie);border:1px solid var(--fio);border-radius:var(--raio-g);box-shadow:var(--sombra);padding:18px}
+  .cartao h3{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--tinta-suave);margin-bottom:12px;font-weight:700}
+  .linha{display:flex;justify-content:space-between;font-size:14px;padding:5px 0;border-bottom:1px solid var(--fio)}
+  .linha:last-child{border-bottom:none}
+  .linha .k{color:var(--tinta-suave)}
+  .linha .v{font-weight:600;font-variant-numeric:tabular-nums}
+  .selo{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:3px 10px;border-radius:100px}
+  .selo.quente{color:#b3261e;background:#fdece8}
+  .dono{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tinta)}
+  .btn-acao{display:block;text-align:center;background:var(--noturno);color:var(--pergaminho);border-radius:12px;padding:11px;font-weight:700;text-decoration:none;margin-top:6px}
+  .btn-acao.ouro{background:var(--lampiao);color:#241a08}
+
+  /* Frame PWA */
+  .pwa{margin-top:34px}
+  .pwa h2{font-weight:900;color:var(--madeira);font-size:22px;margin-bottom:4px}
+  .pwa .sub{color:var(--tinta-suave);margin-bottom:20px;font-size:15px}
+  .pwa-linha{display:flex;gap:26px;align-items:center;flex-wrap:wrap}
+  .fone{width:230px;flex:none;background:var(--noturno);border-radius:34px;padding:12px;box-shadow:var(--sombra)}
+  .fone-tela{background:var(--canvas);border-radius:24px;overflow:hidden;height:420px;position:relative}
+  .fone-topo{background:var(--noturno);color:var(--pergaminho);padding:12px 14px;font-size:12px;display:flex;justify-content:space-between}
+  .push{position:absolute;top:44px;left:10px;right:10px;background:#fff;border:1px solid var(--fio);border-radius:14px;padding:10px 12px;box-shadow:0 8px 20px rgba(0,0,0,.18);font-size:12px;z-index:2}
+  .push b{color:var(--madeira)} .push .ic{color:var(--sucesso);font-weight:900}
+  .fone-corpo{padding:14px}
+  .fone-corpo .tt{font-weight:900;color:var(--madeira);font-size:16px;margin-bottom:10px}
+  .mini-card{background:#fff;border:1px solid var(--fio);border-radius:12px;padding:9px 11px;margin-bottom:9px;font-size:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .mini-card .n{font-weight:700;color:var(--tinta)}
+  .mini-card .m{color:var(--tinta-suave)}
+  .mini-card .tag{display:inline-block;font-size:10px;font-weight:700;color:#b3261e;background:#fdece8;padding:1px 7px;border-radius:100px;margin-top:4px}
+  .pwa-txt{flex:1;min-width:260px}
+  .pwa-txt li{margin:.4rem 0;color:var(--tinta);font-size:15px}
+  .pwa-txt .destaque{color:var(--madeira);font-weight:700}
+
+  @media(max-width:860px){.grade{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="nota">🔧 MOCK-UP (esboço visual) — a conversa do WhatsApp vivendo dentro do card do lead, no funil. Ainda não é o sistema real.</div>
+  <p class="eyebrow">Comercial · Funil · Lead</p>
+  <h1>WhatsApp dentro do funil</h1>
+
+  <div class="grade">
+    <!-- Conversa -->
+    <div class="conversa">
+      <div class="conv-topo">
+        <div class="av">KM</div>
+        <div>
+          <div class="nome">Kelly Mazzocco</div>
+          <div class="tel">+55 49 99123-4567 · via Campanha «Fundador — Meta»</div>
+        </div>
+        <span class="wpp-badge"><span class="dot"></span>WhatsApp</span>
+      </div>
+
+      <div class="thread">
+        <span class="dia">Hoje</span>
+        <span class="sistema">Kelly clicou no anúncio e abriu conversa pela Landing Page.</span>
+        <div class="msg in">Oi! Vi o anúncio da inauguração. Vocês têm quarto para o feriado de 31/10 a 02/11, casal?<span class="h">14:38</span></div>
+        <span class="sistema">Gefferson assumiu o lead (1º a responder).</span>
+        <div class="msg out">Oi, Kelly! Temos sim 🙌 Para 31/10→02/11 (2 noites), restam <b>3 quartos</b> na tarifa de fundador (−25%). Quer que eu segure um para vocês?<span class="h">14:41</span></div>
+        <div class="msg in">Que ótimo! Qual fica o valor com o desconto?<span class="h">14:43</span></div>
+        <div class="msg out">Fica R$ 585 as 2 noites (de R$ 780) + café da manhã. Posso te mandar a proposta com o botão de pagar o sinal e já travar a data 😉<span class="h">14:44</span></div>
+        <div class="msg in">Pode mandar!<span class="h">14:45</span></div>
+        <div class="prop">
+          <div class="prop-top">Proposta · Pousada Vô Testa</div>
+          <div class="prop-corpo">
+            <div class="l"><span>Quarto</span><b>Suíte do Inventor</b></div>
+            <div class="l"><span>Datas</span><b>31/10 → 02/11 · 2 noites</b></div>
+            <div class="l"><span>Hóspedes</span><b>2</b></div>
+            <div class="l"><span>Total (tarifa fundador)</span><b>R$ 585,00</b></div>
+            <div class="l"><span>Sinal para travar a data (30%)</span><b>R$ 175,50</b></div>
+          </div>
+          <a href="#" class="prop-btn">💳 Pagar sinal — R$ 175,50</a>
+          <span class="h">14:46 · enviada</span>
+        </div>
+        <span class="sistema">O hóspede paga o sinal → a reserva confirma e a data trava sozinha.</span>
+      </div>
+
+      <div class="responder">
+        <div class="rapidas">
+          <span class="chip">📎 Enviar proposta + pagamento</span>
+          <span class="chip">📅 Confirmar disponibilidade</span>
+          <span class="chip">🕗 Late checkout</span>
+          <span class="chip">🐾 Política pet</span>
+        </div>
+        <div class="campo-resp">
+          <button class="btn-tpl" title="Fora da janela de 24h, usa modelo aprovado">Modelo ▾</button>
+          <input type="text" placeholder="Escreva uma mensagem…">
+          <button class="btn-env">Enviar</button>
+        </div>
+        <div class="janela">🟢 Janela de 24h aberta — mensagens livres liberadas</div>
+      </div>
+    </div>
+
+    <!-- Rail de contexto -->
+    <div class="rail">
+      <div class="cartao">
+        <h3>Este lead</h3>
+        <div class="linha"><span class="k">Temperatura</span><span class="selo quente">🔥 Quente</span></div>
+        <div class="linha"><span class="k">Campanha</span><span class="v">Fundador — Meta</span></div>
+        <div class="linha"><span class="k">Datas</span><span class="v">31/10 → 02/11</span></div>
+        <div class="linha"><span class="k">Pessoas</span><span class="v">2</span></div>
+        <div class="linha"><span class="k">Etapa</span><span class="v">Cotação</span></div>
+        <div class="linha"><span class="k">Responsável</span><span class="v">Gefferson</span></div>
+      </div>
+
+      <div class="cartao">
+        <h3>Ações rápidas</h3>
+        <a href="#" class="btn-acao ouro">Enviar proposta + sinal (Safrapay)</a>
+        <a href="#" class="btn-acao">Ganhar → criar reserva</a>
+      </div>
+
+      <div class="cartao">
+        <h3>Por que isto é matador</h3>
+        <div class="dono" style="flex-direction:column;align-items:flex-start;gap:8px">
+          <span>✅ Toda a equipe responde — nada preso a um celular.</span>
+          <span>✅ Histórico + reserva no mesmo lugar.</span>
+          <span>✅ Quem responde primeiro assume o lead.</span>
+          <span>✅ Respostas rápidas e proposta com 1 toque.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PWA -->
+  <div class="pwa">
+    <h2>+ Funil no bolso (aplicativo instalável — PWA)</h2>
+    <p class="sub">O mesmo CRM vira um ícone na tela do celular, com notificação quando entra lead quente.</p>
+    <div class="pwa-linha">
+      <div class="fone">
+        <div class="fone-tela">
+          <div class="fone-topo"><span>9:41</span><span>Vô Testa CRM</span></div>
+          <div class="push"><span class="ic">●</span> <b>Novo lead quente no WhatsApp</b><br>Kelly Mazzocco — feriado 31/10, casal. Toque para responder.</div>
+          <div class="fone-corpo" style="margin-top:60px">
+            <div class="tt">Meu funil</div>
+            <div class="mini-card"><div class="n">Kelly Mazzocco</div><div class="m">31/10→02/11 · 2p · WhatsApp</div><span class="tag">🔥 quente · responder</span></div>
+            <div class="mini-card"><div class="n">João Fundador</div><div class="m">nov · 4p · Instagram</div></div>
+            <div class="mini-card"><div class="n">Ana & Pedro</div><div class="m">dez · 2p · site</div></div>
+          </div>
+        </div>
+      </div>
+      <ul class="pwa-txt">
+        <li><span class="destaque">Instala como app</span> (Android/iPhone) — ícone na tela inicial, abre em tela cheia, sem loja de apps.</li>
+        <li><span class="destaque">Notificação push</span> ao entrar lead quente ou mensagem no WhatsApp — o vendedor responde na hora, de qualquer lugar.</li>
+        <li><span class="destaque">Mesmo sistema</span> — não é outro app para manter: é o próprio CRM, só que "vestido" de aplicativo.</li>
+        <li><span class="destaque">Funciona offline</span> o essencial (abre e mostra a última tela mesmo sem sinal).</li>
+      </ul>
+    </div>
+  </div>
+
+  <p style="text-align:center;color:var(--tinta-suave);font-size:12px;margin-top:30px;opacity:.7">Pousada Vô Testa · CRM — Comercial · Integração WhatsApp + PWA (esboço)</p>
+</div>
+</body>
+</html>

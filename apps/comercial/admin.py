@@ -2,12 +2,58 @@ from django.contrib import admin
 
 from .models import (
     AtividadeComercial,
+    Campanha,
+    ConversaoEnviada,
     Cotacao,
     EtapaFunil,
+    GastoDiario,
     MetaComercial,
     MotivoPerda,
     Oportunidade,
+    PaginaCaptacao,
+    RespostaRapida,
 )
+
+
+@admin.register(RespostaRapida)
+class RespostaRapidaAdmin(admin.ModelAdmin):
+    list_display = ("titulo", "atalho", "ordem", "ativo")
+    list_editable = ("ordem", "ativo")
+    search_fields = ("titulo", "texto")
+
+
+@admin.register(ConversaoEnviada)
+class ConversaoEnviadaAdmin(admin.ModelAdmin):
+    list_display = ("oportunidade", "evento", "provedor", "status", "valor", "enviado_em")
+    list_filter = ("evento", "provedor", "status")
+    readonly_fields = ("oportunidade", "evento", "provedor", "status", "valor",
+                       "id_externo", "erro", "enviado_em")
+
+
+@admin.register(Campanha)
+class CampanhaAdmin(admin.ModelAdmin):
+    list_display = ("nome", "codigo", "provedor", "gasto_total", "leads",
+                    "custo_por_lead", "reservas", "retorno", "ativa")
+    list_filter = ("provedor", "ativa")
+    search_fields = ("nome", "codigo")
+    prepopulated_fields = {"codigo": ("nome",)}
+
+
+@admin.register(GastoDiario)
+class GastoDiarioAdmin(admin.ModelAdmin):
+    list_display = ("campanha", "data", "valor", "origem", "criado_em")
+    list_filter = ("origem", "campanha")
+    date_hierarchy = "data"
+
+
+@admin.register(PaginaCaptacao)
+class PaginaCaptacaoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "slug", "status", "tipo_interesse", "visitas",
+                    "leads", "conversao", "atualizado_em")
+    list_filter = ("status", "tema", "tipo_interesse")
+    search_fields = ("nome", "slug")
+    prepopulated_fields = {"slug": ("nome",)}
+    readonly_fields = ("visitas", "criado_por", "criado_em", "atualizado_em", "publicada_em")
 
 
 @admin.register(EtapaFunil)

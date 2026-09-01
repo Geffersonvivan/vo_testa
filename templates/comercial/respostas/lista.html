@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block titulo %}Respostas rápidas — Comercial{% endblock %}
+
+{% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
+<div class="eleg">
+  <p class="pagina-eyebrow letreiro">Comercial</p>
+  <div class="pagina-cabecalho">
+    <h1>Respostas rápidas</h1>
+    <div class="eleg-acoes">
+      <a href="{% url 'comercial:funil' %}" class="botao-neutro">Voltar ao funil</a>
+      <a href="{% url 'comercial:resposta_nova' %}" class="botao-primario">Nova resposta</a>
+    </div>
+  </div>
+  <p class="eleg-intro">
+    Textos pré-salvos para responder o lead em 1 toque. Use variáveis que se preenchem
+    sozinhas: <code>{nome}</code> <code>{checkin}</code> <code>{checkout}</code>
+    <code>{noites}</code> <code>{valor}</code> <code>{vagas}</code>.
+  </p>
+
+  <div class="quadro" style="margin-top:1.25rem">
+    <table>
+      <thead><tr><th>Título</th><th>Texto</th><th class="num">Ordem</th><th>Ativo</th><th class="acao"></th></tr></thead>
+      <tbody>
+        {% for r in respostas %}
+          <tr class="clic" onclick="location.href='{% url 'comercial:resposta_editar' r.pk %}'">
+            <td class="camp-nome" style="font-weight:600">{{ r.titulo }}</td>
+            <td style="color:var(--tinta-suave);max-width:520px">{{ r.texto|truncatechars:90 }}</td>
+            <td class="num">{{ r.ordem }}</td>
+            <td>{% if r.ativo %}<span class="selo selo-pub">Ativo</span>{% else %}<span class="selo selo-enc">Inativo</span>{% endif %}</td>
+            <td class="acao"><a href="{% url 'comercial:resposta_editar' r.pk %}" class="botao-mini" onclick="event.stopPropagation()">Editar</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="vazio-el">Nenhuma resposta ainda. Crie a primeira. ✍️</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

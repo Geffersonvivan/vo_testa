@@ -3,14 +3,14 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.nucleo.models import UH, Pessoa, Prospecto, TipoUH
 
 from . import services
-from .models import AnaliseLead, Cotacao, EtapaFunil, MotivoPerda, Oportunidade
+from .models import AnaliseLead, EtapaFunil, MotivoPerda, Oportunidade
 
 Usuario = get_user_model()
 
@@ -294,7 +294,6 @@ class ConversaoTests(TestCase):
             )
 
     def test_cancelamento_anota_oportunidade(self):
-        from apps.reservas.models import Reserva
         oport = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="Canc")
         hoje = timezone.localdate()
         reserva = services.converter_em_reserva(
@@ -394,7 +393,7 @@ class ViewTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Linha do tempo")
         self.assertContains(r, "Registrar cotação")
-        self.assertContains(r, "Templates")
+        self.assertContains(r, "WhatsApp")
 
     def test_registrar_atividade_via_form(self):
         op = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="Coment")
@@ -440,3 +439,405 @@ class SitePropostaTests(TestCase):
         self.assertTrue(
             Oportunidade.objects.filter(origem="site", pessoa__email="lead@site.com").exists()
         )
+
+
+class PaginaCaptacaoTests(TestCase):
+    def setUp(self):
+        self.op = Usuario.objects.create_superuser(username="com", password="senha-forte-123")
+
+    def _pagina(self, **extra):
+        from .models import PaginaCaptacao
+        dados = dict(
+            nome="Inauguração — Fundador", slug="fundador",
+            status=PaginaCaptacao.Status.PUBLICADA,
+            tipo_interesse=Oportunidade.TipoInteresse.HOSPEDAGEM,
+            hero_titulo="Bem-vindo", criado_por=self.op,
+        )
+        dados.update(extra)
+        return PaginaCaptacao.objects.create(**dados)
+
+    def test_rascunho_nao_e_publica(self):
+        from .models import PaginaCaptacao
+        self._pagina(status=PaginaCaptacao.Status.RASCUNHO)
+        r = self.client.get(reverse("captacao:publica", args=["fundador"]))
+        self.assertEqual(r.status_code, 404)
+
+    def test_publicada_abre_e_conta_visita(self):
+        pag = self._pagina()
+        r = self.client.get(reverse("captacao:publica", args=["fundador"]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Bem-vindo")
+        pag.refresh_from_db()
+        self.assertEqual(pag.visitas, 1)
+
+    def test_post_cria_lead_no_funil_etiquetado(self):
+        pag = self._pagina(tipo_interesse=Oportunidade.TipoInteresse.HOSPEDAGEM)
+        r = self.client.post(reverse("captacao:publica", args=["fundador"]), {
+            "nome": "Maria Fundadora", "telefone": "49999990000", "email": "",
+        })
+        self.assertEqual(r.status_code, 302)
+        op = Oportunidade.objects.filter(pagina_captacao=pag).first()
+        self.assertIsNotNone(op)
+        self.assertEqual(op.origem, Oportunidade.Origem.SITE)
+        self.assertEqual(op.tipo_interesse, Oportunidade.TipoInteresse.HOSPEDAGEM)
+        self.assertEqual(op.pessoa.nome, "Maria Fundadora")
+
+    def test_gestao_lista_e_detalhe_ok(self):
+        pag = self._pagina()
+        self.client.login(username="com", password="senha-forte-123")
+        self.assertEqual(self.client.get(reverse("comercial:paginas")).status_code, 200)
+        r = self.client.get(reverse("comercial:pagina_detalhe", args=[pag.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "/captacao/fundador/")
+
+    def test_pixel_e_whatsapp_renderizam(self):
+        self._pagina(meta_pixel_id="123456789", whatsapp_destino="5549999990000")
+        r = self.client.get(reverse("captacao:publica", args=["fundador"]))
+        self.assertContains(r, "fbq('init','123456789')")
+        # Tela de agradecimento leva ao WhatsApp
+        r2 = self.client.get(reverse("captacao:publica", args=["fundador"]) + "?ok=1")
+        self.assertContains(r2, "wa.me/5549999990000")
+        self.assertContains(r2, "fbq('track','Lead')")
+
+    def test_post_enriquece_lead_com_datas_e_pessoas(self):
+        pag = self._pagina()
+        self.client.post(reverse("captacao:publica", args=["fundador"]), {
+            "nome": "João Fundador", "telefone": "49988887777",
+            "checkin": "2026-11-14", "checkout": "2026-11-16", "pessoas": "4",
+        })
+        op = Oportunidade.objects.filter(pagina_captacao=pag).first()
+        self.assertIsNotNone(op)
+        self.assertEqual(op.hospedes, 4)
+        self.assertEqual(str(op.checkin_previsto), "2026-11-14")
+        self.assertEqual(str(op.checkout_previsto), "2026-11-16")
+
+    def test_post_limita_pessoas_a_8(self):
+        pag = self._pagina()
+        self.client.post(reverse("captacao:publica", args=["fundador"]), {
+            "nome": "Grupo Grande", "telefone": "49988887777", "pessoas": "20",
+        })
+        op = Oportunidade.objects.filter(pagina_captacao=pag).first()
+        self.assertEqual(op.hospedes, 8)
+
+    def test_faq_parseia_pares(self):
+        pag = self._pagina(faq_texto="P: Aceita pet?\nR: Sim.\n\nP: Tem café?\nR: Tem.")
+        itens = pag.faq_itens
+        self.assertEqual(len(itens), 2)
+        self.assertEqual(itens[0]["pergunta"], "Aceita pet?")
+        self.assertEqual(itens[0]["resposta"], "Sim.")
+
+
+class PropriedadeLeadTests(TestCase):
+    """Regra: todos veem todos; o primeiro que interage/pega assume o lead."""
+
+    def setUp(self):
+        self.v1 = Usuario.objects.create_superuser(username="vend1", password="forte-123-abc")
+        self.v2 = Usuario.objects.create_superuser(username="vend2", password="forte-123-abc")
+        self.pessoa = Pessoa.objects.create(nome="Lead Órfão", telefone="(49) 99123-4567")
+        self.op = services.criar_oportunidade(
+            usuario=self.v1, pessoa=self.pessoa, titulo="Órfão", responsavel=None)
+
+    def test_lead_do_site_nasce_sem_dono(self):
+        self.assertIsNone(self.op.responsavel)
+
+    def test_primeiro_a_interagir_assume_e_segundo_nao_toma(self):
+        self.assertTrue(services.assumir_lead(self.op, self.v1))
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.responsavel, self.v1)
+        self.assertFalse(services.assumir_lead(self.op, self.v2))
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.responsavel, self.v1)
+
+    def test_usuario_de_sistema_nao_assume(self):
+        self.assertFalse(services.assumir_lead(self.op, services._usuario_site()))
+        self.op.refresh_from_db()
+        self.assertIsNone(self.op.responsavel)
+
+    def test_registrar_atividade_assume_o_lead(self):
+        from .models import AtividadeComercial
+        services.registrar_atividade(
+            oportunidade=self.op, usuario=self.v2,
+            tipo=AtividadeComercial.Tipo.NOTA, descricao="primeiro contato")
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.responsavel, self.v2)
+
+    def test_whatsapp_url_do_telefone(self):
+        self.assertTrue(self.op.whatsapp_url.startswith("https://wa.me/55"))
+
+    def test_view_assumir(self):
+        self.client.login(username="vend2", password="forte-123-abc")
+        self.client.post(reverse("comercial:assumir", args=[self.op.pk]))
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.responsavel, self.v2)
+
+    def test_trilha_registra_quem_assumiu_e_moveu(self):
+        """A 'trilha de pão': cada ação vira evento de sistema com autor."""
+        from .models import AtividadeComercial
+        services.assumir_lead(self.op, self.v1)
+        negociacao = EtapaFunil.objects.get(nome="Negociação")
+        services.mover_etapa(self.op, negociacao, self.v1)
+        eventos = AtividadeComercial.objects.filter(
+            oportunidade=self.op, tipo=AtividadeComercial.Tipo.SISTEMA
+        ).order_by("id")
+        descricoes = [e.descricao for e in eventos]
+        self.assertIn("assumiu o lead", descricoes)
+        self.assertTrue(any("moveu:" in d and "Negociação" in d for d in descricoes))
+        self.assertTrue(all(e.criado_por == self.v1 for e in eventos))
+
+    def test_trilha_ignora_usuario_de_sistema(self):
+        from .models import AtividadeComercial
+        services._log_evento(self.op, services._usuario_site(), "não deveria aparecer")
+        self.assertFalse(AtividadeComercial.objects.filter(
+            oportunidade=self.op, tipo=AtividadeComercial.Tipo.SISTEMA).exists())
+
+
+class ImpulsionamentoTests(TestCase):
+    """Fase A: atribuição de anúncio + gasto manual + painel."""
+
+    def setUp(self):
+        from .models import Campanha, PaginaCaptacao
+        self.op = Usuario.objects.create_superuser(username="mkt", password="forte-123-abc")
+        self.pag = PaginaCaptacao.objects.create(
+            nome="Fundador", slug="fundador",
+            status=PaginaCaptacao.Status.PUBLICADA, hero_titulo="Oi", criado_por=self.op)
+        self.camp = Campanha.objects.create(
+            nome="Inauguração Meta Casais", codigo="fundador-meta",
+            provedor=Campanha.Provedor.META, pagina_captacao=self.pag, criado_por=self.op)
+
+    def test_captura_grava_rastreio_e_casa_campanha(self):
+        op = services.capturar_lead_site(
+            nome="Lead Ads", telefone="49999990000",
+            origem={"utm_campaign": "fundador-meta", "utm_source": "meta",
+                    "fbclid": "abc123", "gclid": ""})
+        self.assertEqual(op.campanha, self.camp)
+        self.assertEqual(op.origem_rastreio.get("fbclid"), "abc123")
+        self.assertNotIn("gclid", op.origem_rastreio)  # vazios não gravam
+
+    def test_utm_desconhecido_nao_casa(self):
+        op = services.capturar_lead_site(
+            nome="Sem Camp", telefone="49999990001",
+            origem={"utm_campaign": "inexistente"})
+        self.assertIsNone(op.campanha)
+
+    def test_metricas_custo_e_retorno(self):
+        services.registrar_gasto(campanha=self.camp, data=timezone.localdate(),
+                                 valor="100.00", usuario=self.op)
+        a = services.criar_oportunidade(usuario=self.op, campanha=self.camp,
+            pessoa=Pessoa.objects.create(nome="L1"), titulo="l1")
+        services.criar_oportunidade(usuario=self.op, campanha=self.camp,
+            pessoa=Pessoa.objects.create(nome="L2"), titulo="l2")
+        Oportunidade.objects.filter(pk=a.pk).update(
+            status=Oportunidade.Status.GANHA, valor_estimado=Decimal("1000.00"))
+        self.camp.refresh_from_db()
+        self.assertEqual(self.camp.leads, 2)
+        self.assertEqual(self.camp.custo_por_lead, Decimal("50.00"))
+        self.assertEqual(self.camp.reservas, 1)
+        self.assertEqual(self.camp.retorno, Decimal("10.00"))
+
+    def test_painel_e_detalhe_renderizam(self):
+        self.client.force_login(self.op)
+        self.assertEqual(self.client.get(reverse("comercial:impulsionamento")).status_code, 200)
+        r = self.client.get(reverse("comercial:campanha_detalhe", args=[self.camp.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "utm_campaign=fundador-meta")
+
+    def test_lancar_gasto_via_view(self):
+        self.client.force_login(self.op)
+        self.client.post(reverse("comercial:campanha_gasto", args=[self.camp.pk]),
+                         {"data": "2026-09-01", "valor": "250.00"})
+        self.camp.refresh_from_db()
+        self.assertEqual(self.camp.gasto_total, Decimal("250.00"))
+
+
+class ConversaoMidiaTests(TestCase):
+    """Fase B: devolver conversões (lead/compra) ao provedor (simulado nos testes)."""
+
+    def setUp(self):
+        self.u = Usuario.objects.create_superuser(username="conv", password="forte-123-abc")
+
+    def _lead_com_clique(self):
+        pessoa = Pessoa.objects.create(nome="Pago", email="pago@ex.com", telefone="49999990000")
+        return services.criar_oportunidade(
+            usuario=self.u, pessoa=pessoa, titulo="pago",
+            origem_rastreio={"fbclid": "abc", "landing_url": "https://x/y"})
+
+    def test_envia_lead_simulado(self):
+        from .models import ConversaoEnviada
+        ce = services.enviar_conversao(self._lead_com_clique(), "lead")
+        self.assertIsNotNone(ce)
+        self.assertEqual(ce.status, ConversaoEnviada.Status.ENVIADA)
+        self.assertEqual(ce.evento, "lead")
+
+    def test_sem_clique_nao_envia(self):
+        op = services.criar_oportunidade(
+            usuario=self.u, pessoa=Pessoa.objects.create(nome="Organico"), titulo="org")
+        self.assertIsNone(services.enviar_conversao(op, "lead"))
+
+    def test_idempotente_e_forcar(self):
+        op = self._lead_com_clique()
+        services.enviar_conversao(op, "lead")
+        self.assertIsNone(services.enviar_conversao(op, "lead"))       # já enviada
+        self.assertIsNotNone(services.enviar_conversao(op, "lead", forcar=True))  # reenvio
+
+    def test_compra_com_valor(self):
+        op = self._lead_com_clique()
+        ce = services.enviar_conversao(op, "compra", valor=Decimal("1400.00"))
+        self.assertEqual(ce.evento, "compra")
+        self.assertEqual(ce.valor, Decimal("1400.00"))
+
+    def test_hash_pii(self):
+        from .midia_gateways import hash_email, hash_telefone
+        self.assertEqual(len(hash_email("a@b.com")), 64)
+        self.assertEqual(hash_email(""), "")
+        self.assertTrue(hash_telefone("(49) 99999-0000"))
+        self.assertEqual(hash_telefone(""), "")
+
+    def test_hook_lead_no_captura(self):
+        from .models import ConversaoEnviada
+        with self.captureOnCommitCallbacks(execute=True):
+            services.capturar_lead_site(
+                nome="Clicou", telefone="49999991111",
+                origem={"fbclid": "qq", "utm_campaign": "x"})
+        self.assertTrue(ConversaoEnviada.objects.filter(evento="lead").exists())
+
+    def test_reenviar_view(self):
+        from .models import ConversaoEnviada
+        op = self._lead_com_clique()
+        self.client.force_login(self.u)
+        self.client.post(reverse("comercial:conversao_reenviar", args=[op.pk]))
+        self.assertTrue(ConversaoEnviada.objects.filter(oportunidade=op).exists())
+
+
+class SincronizarGastoTests(TestCase):
+    """Fase C: puxar gasto das plataformas (simulado = no-op nos testes)."""
+
+    def setUp(self):
+        from .models import Campanha
+        self.u = Usuario.objects.create_superuser(username="sinc", password="forte-123-abc")
+        self.camp = Campanha.objects.create(
+            nome="Meta Sync", codigo="meta-sync", provedor=Campanha.Provedor.META,
+            id_externo="123456", criado_por=self.u)
+
+    def test_upsert_idempotente_por_dia(self):
+        import datetime
+
+        from .models import GastoDiario
+        d = datetime.date(2026, 9, 1)
+        n = services._upsert_gastos_sincronizados(self.camp, [{"data": d, "valor": "120.00"}])
+        self.assertEqual(n, 1)
+        services._upsert_gastos_sincronizados(self.camp, [{"data": d, "valor": "150.00"}])
+        self.assertEqual(
+            GastoDiario.objects.filter(campanha=self.camp, origem="sincronizado").count(), 1)
+        self.camp.refresh_from_db()
+        self.assertEqual(self.camp.gasto_total, Decimal("150.00"))
+
+    def test_sincronizar_simulado_noop(self):
+        self.assertEqual(services.sincronizar_gastos(campanha=self.camp), 0)
+
+    def test_view_sincronizar_redireciona(self):
+        self.client.force_login(self.u)
+        r = self.client.post(reverse("comercial:campanha_sincronizar", args=[self.camp.pk]))
+        self.assertEqual(r.status_code, 302)
+
+
+class WhatsAppMVPTests(TestCase):
+    """MVP simulado: conversa no funil + respostas rápidas."""
+
+    def setUp(self):
+        self.u = Usuario.objects.create_superuser(username="wpp", password="forte-123-abc")
+        self.v2 = Usuario.objects.create_superuser(username="wpp2", password="forte-123-abc")
+        self.pessoa = Pessoa.objects.create(nome="Kelly Mazzocco", telefone="49991234567")
+        self.op = services.criar_oportunidade(
+            usuario=self.u, pessoa=self.pessoa, titulo="Lead WhatsApp", responsavel=None)
+
+    def test_receber_abre_janela_e_conta_nao_lida(self):
+        m = services.receber_mensagem_whatsapp(oportunidade=self.op, texto="Oi, tem quarto?")
+        self.assertEqual(m.direcao, "entrada")
+        conv = self.op.conversa_whatsapp
+        self.assertTrue(conv.janela_aberta)
+        self.assertEqual(conv.nao_lidas, 1)
+
+    def test_receber_idempotente_por_id_externo(self):
+        services.receber_mensagem_whatsapp(oportunidade=self.op, texto="a", id_externo="X1")
+        services.receber_mensagem_whatsapp(oportunidade=self.op, texto="a", id_externo="X1")
+        self.assertEqual(self.op.conversa_whatsapp.mensagens.count(), 1)
+
+    def test_enviar_cria_saida_e_assume_lead(self):
+        conv = services.abrir_conversa_whatsapp(self.op)
+        m = services.enviar_mensagem_whatsapp(conversa=conv, texto="Olá!", usuario=self.v2)
+        self.assertEqual(m.direcao, "saida")
+        self.assertEqual(m.status, "enviada")  # simulado
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.responsavel, self.v2)  # quem responde primeiro assume
+
+    def test_variaveis_da_resposta(self):
+        from datetime import date
+        self.op.checkin_previsto = date(2026, 10, 31)
+        self.op.checkout_previsto = date(2026, 11, 2)
+        self.op.save()
+        txt = services.aplicar_variaveis_resposta(
+            "Oi {nome}, {checkin}→{checkout} = {noites} noites", self.op)
+        self.assertEqual(txt, "Oi Kelly, 31/10→02/11 = 2 noites")
+
+    def test_views_enviar_e_simular(self):
+        self.client.force_login(self.u)
+        self.client.post(reverse("comercial:whatsapp_simular", args=[self.op.pk]),
+                         {"texto": "quero reservar"})
+        self.client.post(reverse("comercial:whatsapp_enviar", args=[self.op.pk]),
+                         {"texto": "claro!"})
+        conv = self.op.conversa_whatsapp
+        self.assertEqual(conv.mensagens.filter(direcao="entrada").count(), 1)
+        self.assertEqual(conv.mensagens.filter(direcao="saida").count(), 1)
+
+    def test_crud_resposta_rapida(self):
+        self.client.force_login(self.u)
+        self.client.post(reverse("comercial:resposta_nova"),
+                         {"titulo": "Oi", "texto": "Olá {nome}", "ordem": "0", "ativo": "on"})
+        from .models import RespostaRapida
+        self.assertTrue(RespostaRapida.objects.filter(titulo="Oi").exists())
+
+
+@override_settings(PAGAMENTOS_GATEWAY="simulado")
+class PropostaSinalTests(TestCase):
+    """Ação 'Enviar proposta + sinal': cria cobrança (simulado) + envia no WhatsApp.
+
+    Fixa o gateway simulado para não bater na rede (o .env pode estar em safrapay/HML).
+    """
+
+    def setUp(self):
+        from apps.nucleo.models import ModuloContratado
+        from apps.nucleo.modulos import Modulo
+        ModuloContratado.objects.update_or_create(
+            codigo=Modulo.PAGAMENTOS, defaults={"ativo": True})
+        self.u = Usuario.objects.create_superuser(username="prop", password="forte-123-abc")
+        self.pessoa = Pessoa.objects.create(nome="Ana Sinal", telefone="49999990000")
+        self.op = services.criar_oportunidade(
+            usuario=self.u, pessoa=self.pessoa, titulo="Sinal", responsavel=None,
+            valor_estimado=Decimal("585.00"))
+
+    def test_gera_cobranca_e_envia_whatsapp(self):
+        self.client.force_login(self.u)
+        r = self.client.post(reverse("comercial:enviar_proposta_sinal", args=[self.op.pk]))
+        self.assertEqual(r.status_code, 302)
+        self.op.refresh_from_db()
+        self.assertIsNotNone(self.op.cobranca_sinal_id)  # cobrança criada e vinculada
+        self.assertTrue(
+            self.op.conversa_whatsapp.mensagens.filter(direcao="saida").exists())  # link no WhatsApp
+
+    def test_servico_calcula_30_por_cento(self):
+        cob = services.criar_cobranca_sinal(self.op, self.u)
+        self.assertEqual(cob.valor, Decimal("175.50"))  # 30% de 585
+
+    def test_copy_da_proposta_e_calorosa_e_formata_brl(self):
+        from types import SimpleNamespace
+        cob = SimpleNamespace(valor=Decimal("175.50"))  # só o valor importa p/ a copy
+        texto = services.montar_proposta_sinal(self.op, cob, "http://x/pagar/abc")
+        self.assertIn("Oi, Ana", texto)                     # personalizado no topo
+        self.assertIn("*Pousada Vô Testa*", texto)          # marca em destaque
+        self.assertIn("*R$ 175,50*", texto)                 # sinal herói em BRL
+        self.assertIn("na chegada", texto)                  # reduz fricção (resto depois)
+        self.assertIn("http://x/pagar/abc", texto)          # CTA único com o link
+
+    def test_brl_usa_separador_de_milhar(self):
+        self.assertEqual(services._brl(Decimal("1500")), "1.500,00")
+        self.assertEqual(services._brl(Decimal("450.5")), "450,50")
