@@ -100,6 +100,21 @@ class CapturaSiteTests(TestCase):
         self.assertEqual(a.pk, b.pk)
         self.assertEqual(Oportunidade.objects.filter(origem="site").count(), 1)
 
+    def test_mesmo_email_nome_diferente_cria_pessoa_nova(self):
+        """E-mail compartilhado (agência/engano) + nome diferente = pessoa distinta."""
+        a = services.capturar_lead_site(nome="Daniela", email="mesmo@ex.com")
+        b = services.capturar_lead_site(nome="Flávio Calgaro", email="mesmo@ex.com")
+        self.assertNotEqual(a.pessoa_id, b.pessoa_id)
+        self.assertEqual(a.pessoa.nome, "Daniela")
+        self.assertEqual(b.pessoa.nome, "Flávio Calgaro")
+
+    def test_mesmo_email_nome_compativel_atualiza_para_o_mais_completo(self):
+        a = services.capturar_lead_site(nome="Flavio", email="flavio@ex.com")
+        b = services.capturar_lead_site(nome="Flávio Calgaro", email="flavio@ex.com")
+        self.assertEqual(a.pessoa_id, b.pessoa_id)          # mesma pessoa
+        b.pessoa.refresh_from_db()
+        self.assertEqual(b.pessoa.nome, "Flávio Calgaro")   # nome completo vence
+
 
 class CacadorTests(TestCase):
     def setUp(self):

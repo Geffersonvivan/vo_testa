@@ -4,6 +4,7 @@ Regras do módulo Comercial. Interface pública para views, Site, Auditoria e Re
 Só conversa com outros módulos por services. Ganho exige conversão em reserva;
 perda exige motivo. Cotação, SLA, score e metas cobrem o Plano Comercial P0–P3.
 """
+import unicodedata
 from datetime import timedelta
 from decimal import Decimal
 
@@ -264,6 +265,25 @@ def _resolver_campanha(rastreio):
     return Campanha.objects.filter(codigo__iexact=utm.strip()).first()
 
 
+def _norm_nome(s):
+    s = (s or "").strip().lower()
+    s = "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
+    return " ".join(s.split())
+
+
+def _nomes_compativeis(a, b):
+    """Mesma pessoa? Ignora acento/caixa; aceita prefixo/contido ou mesmo 1º nome.
+
+    'Flavio' ~ 'Flávio Calgaro' (True); 'Daniela' vs 'Flávio Calgaro' (False).
+    """
+    na, nb = _norm_nome(a), _norm_nome(b)
+    if not na or not nb:
+        return True
+    if na == nb or na in nb or nb in na:
+        return True
+    return na.split()[0] == nb.split()[0]
+
+
 def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
                        checkin=None, checkout=None, hospedes=2, documento="",
                        tipo_interesse="hospedagem", faturamento=None, pagina=None,
@@ -299,6 +319,10 @@ def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
         pessoa = Pessoa.objects.filter(email__iexact=email, ativo=True).first()
     if pessoa is None and documento:
         pessoa = Pessoa.objects.filter(documento=documento, ativo=True).first()
+    # E-mail/documento podem ser compartilhados (agência, família, engano). Se o nome é
+    # claramente outro, é OUTRA pessoa — não funde leads distintos sob o nome antigo.
+    if pessoa is not None and not _nomes_compativeis(pessoa.nome, nome):
+        pessoa = None
     if pessoa is None:
         pessoa = Pessoa.objects.create(
             nome=nome, email=email, telefone=telefone, documento=documento,
@@ -311,6 +335,10 @@ def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
         if email and not pessoa.email:
             pessoa.email = email
             mudou.append("email")
+        # Nome compatível e mais completo → atualiza ("Flavio" → "Flávio Calgaro").
+        if nome and len(nome) > len(pessoa.nome or ""):
+            pessoa.nome = nome
+            mudou.append("nome")
         if mudou:
             pessoa.save(update_fields=mudou)
 
