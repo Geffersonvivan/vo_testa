@@ -823,3 +823,50 @@ class MensagemWhatsApp(models.Model):
 
     def __str__(self):
         return f"{self.get_direcao_display()}: {self.texto[:40]}"
+
+
+class EnvioEmail(models.Model):
+    """Livro-razão (append-only) de cada e-mail enviado a um destinatário.
+
+    Compartilhado entre o trilho 1:1 (enviado do lead) e a futura campanha em massa
+    (FK campanha entra na Fase 3). Nunca se edita destrutivamente: correção = novo envio.
+    """
+
+    class Status(models.TextChoices):
+        PENDENTE = "pendente", "Pendente"
+        ENVIADO = "enviado", "Enviado"
+        ENTREGUE = "entregue", "Entregue"
+        BOUNCE = "bounce", "Devolvido (bounce)"
+        RECLAMADO = "reclamado", "Reclamação"
+        ABERTO = "aberto", "Aberto"
+        ERRO = "erro", "Erro"
+
+    oportunidade = models.ForeignKey(
+        Oportunidade, on_delete=models.CASCADE, related_name="emails",
+        null=True, blank=True, verbose_name="oportunidade",
+    )
+    pessoa = models.ForeignKey(
+        "nucleo.Pessoa", on_delete=models.SET_NULL, related_name="emails_comerciais",
+        null=True, blank=True, verbose_name="destinatário (pessoa)",
+    )
+    email = models.EmailField("e-mail")
+    assunto = models.CharField("assunto", max_length=200)
+    status = models.CharField(
+        "status", max_length=10, choices=Status.choices, default=Status.PENDENTE)
+    message_id = models.CharField("message-id", max_length=120, blank=True, db_index=True)
+    erro = models.TextField("erro", blank=True)
+    autor = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="emails_enviados", verbose_name="autor (envio)",
+    )
+    enviado_em = models.DateTimeField("enviado em", null=True, blank=True)
+    evento_em = models.DateTimeField("último evento em", null=True, blank=True)
+    criado_em = models.DateTimeField("registrado em", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+        verbose_name = "envio de e-mail"
+        verbose_name_plural = "envios de e-mail"
+
+    def __str__(self):
+        return f"{self.email}: {self.assunto[:40]}"

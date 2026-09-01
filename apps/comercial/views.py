@@ -2,9 +2,11 @@ from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.db.models import Count, F, Sum
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -772,6 +774,69 @@ def enviar_proposta_sinal(request, pk):
             descricao=f"Proposta + sinal enviada (R$ {valor_br}) — {link}")
         messages.success(request, f"Sinal gerado e enviado no WhatsApp. Link: {link}")
     return redirect("comercial:oportunidade", pk=op.pk)
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def enviar_email_lead(request, pk):
+    """Trilho 1:1: compõe o e-mail da proposta (cotação + valores + link), preview
+    editável, e envia para o lead. Roda no gateway simulado (console em dev)."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    stored = (op.pessoa.email or "").strip()
+    destinatario = stored
+    assincrono = getattr(settings, "EMAIL_ENVIO_ASSINCRONO", True)
+    if request.method == "POST":
+        assunto = (request.POST.get("assunto") or "").strip()
+        corpo = request.POST.get("corpo") or ""
+        acao = request.POST.get("acao") or "previa"
+        destinatario = (request.POST.get("destinatario") or "").strip()
+        dados = services.montar_proposta_email(op, corpo=corpo)
+        if assunto:
+            dados["assunto"] = assunto
+
+        if acao == "enviar":
+            try:
+                validate_email(destinatario)
+            except ValidationError:
+                messages.error(request, "Informe um e-mail válido para enviar ao lead.")
+            else:
+                # Novo contato / correção: grava o e-mail no cadastro (fica na trilha).
+                salvou_contato = destinatario != stored
+                if salvou_contato:
+                    op.pessoa.email = destinatario
+                    op.pessoa.save(update_fields=["email"])
+                envio = services.enviar_email(
+                    para=destinatario, assunto=dados["assunto"], html=dados["html"],
+                    texto=dados["texto"], usuario=request.user, oportunidade=op,
+                    assincrono=assincrono)
+                if envio.status != envio.Status.ERRO:
+                    messages.success(
+                        request,
+                        f"E-mail a caminho de {destinatario}." +
+                        (" E-mail salvo no cadastro do lead." if salvou_contato else ""))
+                    return redirect("comercial:oportunidade", pk=op.pk)
+                messages.error(request, f"Falha ao enviar o e-mail: {envio.erro}")
+
+        elif acao == "teste":
+            para = (request.user.email or "").strip()
+            if not para:
+                messages.error(request, "Seu usuário não tem e-mail cadastrado "
+                               "para receber o teste.")
+            else:
+                envio = services.enviar_email(
+                    para=para, assunto=f"[TESTE] {dados['assunto']}", html=dados["html"],
+                    texto=dados["texto"], usuario=request.user, oportunidade=None,
+                    assincrono=assincrono)
+                if envio.status != envio.Status.ERRO:
+                    messages.success(request, f"Teste a caminho de {para}.")
+                else:
+                    messages.error(request, f"Falha ao enviar o teste: {envio.erro}")
+    else:
+        dados = services.montar_proposta_email(op)
+
+    return render(request, "comercial/email/enviar.html", {
+        "op": op, "dados": dados, "resumo": services.resumo_da_conversa(op),
+        "lead_email": destinatario,
+    })
 
 
 @requer_modulo(Modulo.COMERCIAL)

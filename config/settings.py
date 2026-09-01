@@ -308,3 +308,23 @@ DEFAULT_FROM_EMAIL = os.environ.get(
 # URL pública do site (links em e-mail). Em produção: https://www.pousadavotesta.com.br
 SITE_PUBLIC_URL = os.environ.get("SITE_PUBLIC_URL", "http://127.0.0.1:8000").rstrip("/")
 
+# E-mail do Comercial — gateway plugável (docs/Marketing/Gestor_email_leads_funil.md).
+# simulado (default): usa o EMAIL_BACKEND acima (console em dev). ses: Amazon SES (Fase 4).
+EMAIL_GATEWAY = os.environ.get("EMAIL_GATEWAY", "simulado")
+# Remetente do trilho 1:1 (proposta/resumo pedidos pelo cliente) — caixa monitorada.
+EMAIL_COMERCIAL_FROM = os.environ.get(
+    "EMAIL_COMERCIAL_FROM", "Pousada Vô Testa <comercial@pousadavotesta.com.br>"
+)
+EMAIL_COMERCIAL_REPLY_TO = os.environ.get(
+    "EMAIL_COMERCIAL_REPLY_TO", "comercial@pousadavotesta.com.br"
+)
+# SMTP dedicado do comercial@ (senha de app do Zoho da caixa comercial@). Se vazio,
+# o e-mail 1:1 sai pela conta autenticada global (naoresponda@) com Reply-To comercial@
+# — evita o "553 Sender is not allowed to relay" do Zoho ao usar From diferente do login.
+EMAIL_COMERCIAL_HOST_USER = os.environ.get("EMAIL_COMERCIAL_HOST_USER", "")
+EMAIL_COMERCIAL_HOST_PASSWORD = os.environ.get("EMAIL_COMERCIAL_HOST_PASSWORD", "")
+# SMTP é lento (handshake TLS): limita a espera e envia o 1:1 em thread de fundo para
+# não travar a tela. Desligar (False) em testes para envio determinístico.
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "15"))
+EMAIL_ENVIO_ASSINCRONO = os.environ.get("EMAIL_ENVIO_ASSINCRONO", "1") == "1"
+

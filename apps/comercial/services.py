@@ -7,10 +7,12 @@ perda exige motivo. Cotação, SLA, score e metas cobrem o Plano Comercial P0–
 from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Sum
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from apps.nucleo.models import Hospede, Prospecto, modulo_ativo, registrar_auditoria
@@ -669,6 +671,211 @@ def montar_proposta_sinal(oportunidade, cobranca, link) -> str:
         "Vai ser um prazer receber você 🌿",
     ]
     return "\n".join(linhas)
+
+
+def resumo_da_conversa(oportunidade, limite=8):
+    """Últimas mensagens do WhatsApp do lead — para o bloco 'O que combinamos'.
+
+    Devolve [{'quem','texto','quando'}] em ordem cronológica. Degrada para [] sem
+    conversa (WhatsApp inativo ou lead sem histórico).
+    """
+    from .models import MensagemWhatsApp
+    conv = getattr(oportunidade, "conversa_whatsapp", None)
+    if conv is None:
+        return []
+    nome_cliente = (oportunidade.pessoa.nome or "").split()[0] if oportunidade.pessoa and oportunidade.pessoa.nome else "Cliente"
+    msgs = list(conv.mensagens.order_by("-horario", "-id")[:limite])[::-1]
+    return [{
+        "quem": "Você" if m.direcao == MensagemWhatsApp.Direcao.SAIDA else nome_cliente,
+        "texto": m.texto,
+        "quando": m.horario,
+    } for m in msgs]
+
+
+def _link_sinal_da_oportunidade(oportunidade):
+    """Link público de pagamento do sinal já existente (se houver) — não cria cobrança."""
+    if not (oportunidade.cobranca_sinal_id and modulo_ativo(Modulo.PAGAMENTOS)):
+        return None
+    try:
+        from django.urls import reverse
+
+        from apps.pagamentos.models import Cobranca
+        cob = Cobranca.objects.filter(pk=oportunidade.cobranca_sinal_id).first()
+        if cob and cob.status == "pendente":
+            return settings.SITE_PUBLIC_URL + reverse("pagamentos:pagar", args=[cob.token])
+    except Exception:
+        return None
+    return None
+
+
+def _contato_pousada():
+    """Contatos oficiais (WhatsApp/telefone/e-mail) da ConfiguracaoSite — fonte única.
+
+    Reply-to preferencial = caixa comercial monitorada. Degrada com defaults se o site
+    não estiver disponível.
+    """
+    whatsapp = telefone = ""
+    email = getattr(settings, "EMAIL_COMERCIAL_REPLY_TO", "") or "comercial@pousadavotesta.com.br"
+    try:
+        from apps.site.models import ConfiguracaoSite
+        cfg = ConfiguracaoSite.load()
+        whatsapp = "".join(c for c in (cfg.whatsapp or "") if c.isdigit())
+        telefone = (cfg.telefone or "").strip()
+        email = email or (cfg.email or "")
+    except Exception:
+        pass
+    return {"whatsapp": whatsapp, "telefone": telefone, "email": email}
+
+
+def montar_proposta_email(oportunidade, cobranca=None, link=None, corpo=None):
+    """Monta o e-mail 1:1 da proposta (HTML + texto), reusando a cotação/valores do lead.
+
+    `corpo` = texto de abertura editável pelo vendedor (None → padrão caloroso). O cartão
+    da estadia e os valores são sempre renderizados dos dados (não do corpo).
+    Devolve {assunto, corpo, html, texto}.
+    """
+    op = oportunidade
+    nome = (op.pessoa.nome or "").split()[0] if op.pessoa and op.pessoa.nome else ""
+    cot = op.ultima_cotacao
+    quarto = cot.tipo_uh.nome if cot else op.get_tipo_interesse_display()
+
+    periodo = noites = None
+    if op.checkin_previsto and op.checkout_previsto:
+        periodo = f"{op.checkin_previsto:%d/%m} → {op.checkout_previsto:%d/%m/%Y}"
+        noites = (op.checkout_previsto - op.checkin_previsto).days
+
+    total_br = _brl(op.valor_estimado) if op.valor_estimado else None
+    sinal_br = restante_br = None
+    if cobranca is not None:
+        sinal_br = _brl(cobranca.valor)
+        if op.valor_estimado:
+            restante = Decimal(op.valor_estimado) - Decimal(cobranca.valor)
+            if restante > 0:
+                restante_br = _brl(restante)
+
+    if link is None:
+        link = _link_sinal_da_oportunidade(op)
+
+    assunto = f"Sua estadia na Pousada Vô Testa — {quarto}"
+    if periodo:
+        assunto += f" ({op.checkin_previsto:%d/%m}–{op.checkout_previsto:%d/%m})"
+
+    if corpo is None:
+        saud = f"Oi, {nome}!" if nome else "Olá!"
+        corpo = (
+            f"{saud} Como combinamos por aqui, deixei tudo por escrito abaixo.\n\n"
+            "Qualquer ajuste de datas ou de quarto, é só responder este e-mail — "
+            "vai ser um prazer receber você."
+        )
+
+    # Links de resposta no rodapé (o cliente clica e já fala com a gente).
+    from urllib.parse import quote
+    contato = _contato_pousada()
+    msg_wa = f"Olá! Sobre a proposta da {quarto}" + (f" ({periodo})" if periodo else "")
+    url_whatsapp = (f"https://wa.me/{contato['whatsapp']}?text={quote(msg_wa)}"
+                    if contato["whatsapp"] else "")
+    url_email = (f"mailto:{contato['email']}?subject={quote('Re: ' + assunto)}"
+                 if contato["email"] else "")
+
+    corpo_paragrafos = [p.strip() for p in corpo.split("\n\n") if p.strip()]
+    contexto = {
+        "assunto": assunto, "corpo_paragrafos": corpo_paragrafos,
+        "quarto": quarto, "periodo": periodo, "noites": noites,
+        "pessoas": op.hospedes, "total_br": total_br, "sinal_br": sinal_br,
+        "restante_br": restante_br, "link": link,
+        "cta_texto": "Pagar o sinal e garantir a data",
+        "url_whatsapp": url_whatsapp, "url_email": url_email,
+        "email_contato": contato["email"], "telefone": contato["telefone"],
+    }
+    html = render_to_string("comercial/email/proposta.html", contexto)
+
+    # Fallback texto puro (clientes sem HTML) — espelha o cartão.
+    linhas = list(corpo_paragrafos)
+    linhas.append(f"\n🏕 {quarto}")
+    if periodo:
+        linhas.append(f"🗓 {periodo}" + (f" · {noites} noites" if noites else ""))
+    linhas.append(f"👥 {op.hospedes} pessoas")
+    if total_br:
+        linhas.append(f"Total da estadia: R$ {total_br}")
+    if sinal_br:
+        linhas.append(f"Sinal para garantir: R$ {sinal_br}")
+    if restante_br:
+        linhas.append(f"Restante na chegada: R$ {restante_br}")
+    if link:
+        linhas.append(f"\nPagar o sinal: {link}")
+    if url_whatsapp:
+        linhas.append(f"\nFalar no WhatsApp: {url_whatsapp}")
+    if contato["email"]:
+        linhas.append(f"Ou responda este e-mail / escreva para {contato['email']}")
+    texto = "\n".join(linhas)
+
+    return {"assunto": assunto, "corpo": corpo, "html": html, "texto": texto}
+
+
+def _processar_envio_email(envio_id, para, assunto, html, texto, remetente, reply_to,
+                           usuario_id, oportunidade_id):
+    """Faz o envio pelo gateway e atualiza o EnvioEmail (re-busca objetos por id)."""
+    from .email_gateways import get_email_gateway
+    from .models import EnvioEmail
+
+    envio = EnvioEmail.objects.filter(pk=envio_id).first()
+    if envio is None:
+        return
+    try:
+        res = get_email_gateway().enviar(
+            para=para, assunto=assunto, html=html, texto=texto,
+            remetente=remetente, reply_to=reply_to)
+        envio.status = EnvioEmail.Status.ENVIADO
+        envio.message_id = res.get("message_id", "")
+        envio.enviado_em = timezone.now()
+    except Exception as e:  # noqa: BLE001 — best-effort, registra o erro
+        envio.status = EnvioEmail.Status.ERRO
+        envio.erro = str(e)
+    envio.save(update_fields=["status", "message_id", "enviado_em", "erro"])
+    if envio.status == EnvioEmail.Status.ENVIADO and oportunidade_id:
+        op = Oportunidade.objects.filter(pk=oportunidade_id).first()
+        user = Usuario.objects.filter(pk=usuario_id).first() if usuario_id else None
+        if op:
+            _log_evento(op, user, f"enviou e-mail — {assunto}")
+
+
+def _envio_email_em_thread(*args):
+    """Wrapper de thread: processa e fecha a conexão de banco própria da thread."""
+    from django.db import connections
+    try:
+        _processar_envio_email(*args)
+    finally:
+        connections.close_all()
+
+
+def enviar_email(*, para, assunto, html, texto, usuario, oportunidade=None,
+                 pessoa=None, remetente=None, reply_to=None, assincrono=False):
+    """Grava o EnvioEmail e dispara pelo gateway.
+
+    `assincrono=True` → não bloqueia o request: cria o registro como 'pendente', envia
+    numa thread de fundo (SMTP é lento) e atualiza o status. Best-effort: erro do
+    provedor não estoura — fica no EnvioEmail. Evento na trilha só quando dá certo.
+    """
+    from .models import EnvioEmail
+
+    remetente = remetente or getattr(
+        settings, "EMAIL_COMERCIAL_FROM", settings.DEFAULT_FROM_EMAIL)
+    reply_to = reply_to or getattr(settings, "EMAIL_COMERCIAL_REPLY_TO", "") or None
+    if pessoa is None and oportunidade is not None:
+        pessoa = oportunidade.pessoa
+
+    envio = EnvioEmail.objects.create(
+        oportunidade=oportunidade, pessoa=pessoa, email=para,
+        assunto=assunto[:200], autor=usuario, status=EnvioEmail.Status.PENDENTE)
+    args = (envio.pk, para, assunto, html, texto, remetente, reply_to,
+            usuario.pk if usuario else None, oportunidade.pk if oportunidade else None)
+    if assincrono:
+        import threading
+        threading.Thread(target=_envio_email_em_thread, args=args, daemon=True).start()
+    else:
+        _processar_envio_email(*args)
+        envio.refresh_from_db()
+    return envio
 
 
 def templates_mensagem(oportunidade):

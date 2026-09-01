@@ -31,6 +31,7 @@ urlpatterns = [
     path("<int:pk>/assumir/", views.assumir, name="assumir"),
     path("<int:pk>/conversao/", views.conversao_reenviar, name="conversao_reenviar"),
     path("<int:pk>/proposta-sinal/", views.enviar_proposta_sinal, name="enviar_proposta_sinal"),
+    path("<int:pk>/email/", views.enviar_email_lead, name="enviar_email_lead"),
     path("<int:pk>/whatsapp/enviar/", views.whatsapp_enviar, name="whatsapp_enviar"),
     path("<int:pk>/whatsapp/simular/", views.whatsapp_simular, name="whatsapp_simular"),
     path("respostas/", views.respostas, name="respostas"),

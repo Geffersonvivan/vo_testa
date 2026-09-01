@@ -1,0 +1,112 @@
+{% load static %}<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ assunto }}</title>
+</head>
+<body style="margin:0; padding:0; background:#f4f1ea; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#2a251c;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f1ea; padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; background:#ffffff; border-radius:16px; overflow:hidden; box-shadow:0 1px 3px rgba(40,34,20,.10);">
+
+          <!-- Cabeçalho -->
+          <tr>
+            <td style="background:#23201a; padding:22px 28px;">
+              <span style="color:#e9dcc0; font-size:13px; letter-spacing:.14em; text-transform:uppercase;">Pousada Vô Testa</span>
+            </td>
+          </tr>
+
+          <!-- Corpo (editável pelo vendedor) -->
+          <tr>
+            <td style="padding:28px 28px 8px;">
+              {% for paragrafo in corpo_paragrafos %}
+                <p style="margin:0 0 14px; font-size:15px; line-height:1.55; color:#2a251c;">{{ paragrafo|linebreaksbr }}</p>
+              {% endfor %}
+            </td>
+          </tr>
+
+          <!-- Cartão da estadia + valores (automático, dos dados) -->
+          <tr>
+            <td style="padding:6px 28px 8px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#faf7f0; border:1px solid #ece4d3; border-radius:12px;">
+                <tr>
+                  <td style="padding:18px 20px;">
+                    <p style="margin:0 0 10px; font-size:16px; font-weight:700; color:#23201a;">🏕 {{ quarto }}</p>
+                    {% if periodo %}<p style="margin:0 0 4px; font-size:14px; color:#5b5445;">🗓 {{ periodo }}{% if noites %} · {{ noites }} noite{{ noites|pluralize }}{% endif %}</p>{% endif %}
+                    <p style="margin:0 0 14px; font-size:14px; color:#5b5445;">👥 {{ pessoas }} pessoa{{ pessoas|pluralize }}</p>
+
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-top:1px solid #ece4d3;">
+                      {% if total_br %}
+                      <tr>
+                        <td style="padding:10px 0 4px; font-size:14px; color:#5b5445;">Total da estadia</td>
+                        <td align="right" style="padding:10px 0 4px; font-size:15px; font-weight:700; color:#23201a;">R$ {{ total_br }}</td>
+                      </tr>
+                      {% endif %}
+                      {% if sinal_br %}
+                      <tr>
+                        <td style="padding:4px 0; font-size:14px; color:#5b5445;">Sinal para garantir a data</td>
+                        <td align="right" style="padding:4px 0; font-size:15px; font-weight:700; color:#9a6a12;">R$ {{ sinal_br }}</td>
+                      </tr>
+                      {% endif %}
+                      {% if restante_br %}
+                      <tr>
+                        <td style="padding:4px 0; font-size:13px; color:#8a8271;">Restante na chegada</td>
+                        <td align="right" style="padding:4px 0; font-size:13px; color:#8a8271;">R$ {{ restante_br }}</td>
+                      </tr>
+                      {% endif %}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Botão de pagamento (só quando há link) -->
+          {% if link %}
+          <tr>
+            <td align="center" style="padding:18px 28px 6px;">
+              <a href="{{ link }}" style="display:inline-block; background:#c99a3a; color:#23201a; font-size:15px; font-weight:700; text-decoration:none; padding:14px 30px; border-radius:10px;">{{ cta_texto }}</a>
+              <p style="margin:10px 0 0; font-size:12px; color:#8a8271;">Pague o sinal e a data fica travada no seu nome.</p>
+            </td>
+          </tr>
+          {% endif %}
+
+          <!-- Responder — links clicáveis -->
+          {% if url_whatsapp or url_email %}
+          <tr>
+            <td style="padding:16px 28px 4px;">
+              <p style="margin:0 0 10px; font-size:13px; color:#5b5445; text-align:center;">Fale com a gente — é só clicar:</p>
+              <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:0 auto;">
+                <tr>
+                  {% if url_whatsapp %}
+                  <td style="padding:4px;">
+                    <a href="{{ url_whatsapp }}" style="display:inline-block; background:#25d366; color:#ffffff; font-size:14px; font-weight:700; text-decoration:none; padding:11px 22px; border-radius:9px;">Responder no WhatsApp</a>
+                  </td>
+                  {% endif %}
+                  {% if url_email %}
+                  <td style="padding:4px;">
+                    <a href="{{ url_email }}" style="display:inline-block; background:#faf7f0; color:#23201a; border:1px solid #ece4d3; font-size:14px; font-weight:700; text-decoration:none; padding:11px 22px; border-radius:9px;">Responder por e-mail</a>
+                  </td>
+                  {% endif %}
+                </tr>
+              </table>
+            </td>
+          </tr>
+          {% endif %}
+
+          <!-- Rodapé -->
+          <tr>
+            <td style="padding:18px 28px 26px; border-top:1px solid #f0ebe0;">
+              <p style="margin:0 0 4px; font-size:13px; color:#8a8271;">Ou responda diretamente este e-mail{% if telefone %} · {{ telefone }}{% endif %}.</p>
+              <p style="margin:0; font-size:12px; color:#a8a08c;">Pousada Vô Testa · Itá, Santa Catarina · a invenção que virou história.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

@@ -797,6 +797,128 @@ class WhatsAppMVPTests(TestCase):
         self.assertTrue(RespostaRapida.objects.filter(titulo="Oi").exists())
 
 
+@override_settings(EMAIL_ENVIO_ASSINCRONO=False)
+class EmailLeadTests(TestCase):
+    """Fase 1 — trilho 1:1: montar o e-mail da proposta + enviar do lead (simulado).
+
+    Envio fixado em síncrono para asserção determinística (produção usa thread de fundo).
+    """
+
+    def setUp(self):
+        self.u = Usuario.objects.create_superuser(
+            username="mail", password="forte-123-abc", email="vend@pousadavotesta.com.br")
+        self.pessoa = Pessoa.objects.create(
+            nome="Daniela Alves", telefone="49999990000", email="daniela@ex.com")
+        self.op = services.criar_oportunidade(
+            usuario=self.u, pessoa=self.pessoa, titulo="Proposta",
+            responsavel=None, valor_estimado=Decimal("800.00"))
+        self.op.checkin_previsto = timezone.localdate()
+        self.op.checkout_previsto = timezone.localdate() + timedelta(days=2)
+        self.op.hospedes = 4
+        self.op.save()
+
+    def test_montar_email_formata_cartao_e_assunto(self):
+        d = services.montar_proposta_email(self.op)
+        self.assertIn("Pousada Vô Testa", d["assunto"])
+        self.assertIn("R$ 800,00", d["html"])          # total em BRL no cartão
+        self.assertIn("Oi, Daniela", d["corpo"])        # saudação personalizada
+        self.assertNotIn("Sinal para garantir", d["html"])  # sem cobrança → sem sinal
+
+    def test_montar_email_com_cobranca_mostra_sinal_e_restante(self):
+        from types import SimpleNamespace
+        cob = SimpleNamespace(valor=Decimal("240.00"))
+        d = services.montar_proposta_email(self.op, cobranca=cob, link="http://x/p/1")
+        self.assertIn("R$ 240,00", d["html"])           # sinal
+        self.assertIn("R$ 560,00", d["html"])           # restante = 800 - 240
+        self.assertIn("http://x/p/1", d["html"])        # botão de pagamento
+
+    def test_email_tem_links_de_resposta(self):
+        d = services.montar_proposta_email(self.op)
+        self.assertIn("https://wa.me/", d["html"])          # botão WhatsApp
+        self.assertIn("Responder no WhatsApp", d["html"])
+        self.assertIn("mailto:", d["html"])                 # botão responder por e-mail
+        self.assertIn("wa.me/", d["texto"])                 # também no fallback texto
+
+    def test_resumo_da_conversa(self):
+        conv = services.abrir_conversa_whatsapp(self.op)
+        services.enviar_mensagem_whatsapp(conversa=conv, texto="Café incluso?", usuario=self.u)
+        r = services.resumo_da_conversa(self.op)
+        self.assertTrue(any("Café incluso?" in m["texto"] for m in r))
+
+    def test_resumo_vazio_sem_conversa(self):
+        self.assertEqual(services.resumo_da_conversa(self.op), [])
+
+    def test_enviar_email_grava_envio_e_trilha(self):
+        from django.core import mail
+
+        from .models import AtividadeComercial, EnvioEmail
+        d = services.montar_proposta_email(self.op)
+        envio = services.enviar_email(
+            para=self.pessoa.email, assunto=d["assunto"], html=d["html"],
+            texto=d["texto"], usuario=self.u, oportunidade=self.op)
+        self.assertEqual(envio.status, EnvioEmail.Status.ENVIADO)
+        self.assertTrue(envio.message_id)
+        self.assertEqual(len(mail.outbox), 1)           # simulado usa o backend do Django
+        self.assertEqual(mail.outbox[0].to, ["daniela@ex.com"])
+        self.assertTrue(AtividadeComercial.objects.filter(
+            oportunidade=self.op, tipo=AtividadeComercial.Tipo.SISTEMA,
+            descricao__startswith="enviou e-mail").exists())
+
+    @override_settings(EMAIL_GATEWAY="ses")
+    def test_gateway_ses_stub_vira_erro_sem_derrubar(self):
+        from .models import EnvioEmail
+        d = services.montar_proposta_email(self.op)
+        envio = services.enviar_email(
+            para=self.pessoa.email, assunto=d["assunto"], html=d["html"],
+            texto=d["texto"], usuario=self.u, oportunidade=self.op)
+        self.assertEqual(envio.status, EnvioEmail.Status.ERRO)
+        self.assertIn("ses", envio.erro.lower())
+
+    def test_view_preview_get(self):
+        self.client.force_login(self.u)
+        r = self.client.get(reverse("comercial:enviar_email_lead", args=[self.op.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Enviar por e-mail")
+
+    def test_view_enviar_ao_lead(self):
+        from .models import EnvioEmail
+        self.client.force_login(self.u)
+        r = self.client.post(reverse("comercial:enviar_email_lead", args=[self.op.pk]),
+                             {"acao": "enviar", "assunto": "Oi", "corpo": "texto",
+                              "destinatario": self.pessoa.email})
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(EnvioEmail.objects.filter(
+            oportunidade=self.op, status=EnvioEmail.Status.ENVIADO).exists())
+
+    def test_view_enviar_salva_email_no_cadastro(self):
+        """Lead sem e-mail: o campo preenchido é salvo no contato ao enviar."""
+        from .models import EnvioEmail
+        self.pessoa.email = ""
+        self.pessoa.save()
+        self.client.force_login(self.u)
+        r = self.client.post(reverse("comercial:enviar_email_lead", args=[self.op.pk]),
+                             {"acao": "enviar", "assunto": "Oi", "corpo": "t",
+                              "destinatario": "novo@contato.com"})
+        self.assertEqual(r.status_code, 302)
+        self.pessoa.refresh_from_db()
+        self.assertEqual(self.pessoa.email, "novo@contato.com")   # salvo no cadastro
+        self.assertTrue(EnvioEmail.objects.filter(
+            oportunidade=self.op, email="novo@contato.com",
+            status=EnvioEmail.Status.ENVIADO).exists())
+
+    def test_view_enviar_sem_destinatario_nao_envia(self):
+        from .models import EnvioEmail
+        self.pessoa.email = ""
+        self.pessoa.save()
+        self.client.force_login(self.u)
+        self.client.post(reverse("comercial:enviar_email_lead", args=[self.op.pk]),
+                         {"acao": "enviar", "assunto": "Oi", "corpo": "t",
+                          "destinatario": ""})
+        self.assertFalse(EnvioEmail.objects.filter(oportunidade=self.op).exists())
+        self.pessoa.refresh_from_db()
+        self.assertEqual(self.pessoa.email, "")
+
+
 @override_settings(PAGAMENTOS_GATEWAY="simulado")
 class PropostaSinalTests(TestCase):
     """Ação 'Enviar proposta + sinal': cria cobrança (simulado) + envia no WhatsApp.

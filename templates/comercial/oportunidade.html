@@ -160,6 +160,7 @@
         <button type="submit" class="botao-primario botao-largo">Enviar proposta + sinal (Safrapay)</button>
       </form>
       {% endif %}
+      <a href="{% url 'comercial:enviar_email_lead' op.pk %}" class="botao-neutro botao-largo" style="display:block; text-align:center; margin-top:.5rem">Enviar por e-mail</a>
       <details class="op-det op-det-ganhar">
         <summary>Ganhar → criar reserva</summary>
         <form method="post" action="{% url 'comercial:converter' op.pk %}">

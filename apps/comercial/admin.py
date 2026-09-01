@@ -5,6 +5,7 @@ from .models import (
     Campanha,
     ConversaoEnviada,
     Cotacao,
+    EnvioEmail,
     EtapaFunil,
     GastoDiario,
     MetaComercial,
@@ -96,3 +97,14 @@ class OportunidadeAdmin(admin.ModelAdmin):
 @admin.register(MetaComercial)
 class MetaComercialAdmin(admin.ModelAdmin):
     list_display = ("mes", "valor_meta", "oportunidades_meta")
+
+
+@admin.register(EnvioEmail)
+class EnvioEmailAdmin(admin.ModelAdmin):
+    list_display = ("email", "assunto", "status", "oportunidade", "autor",
+                    "enviado_em", "criado_em")
+    list_filter = ("status",)
+    search_fields = ("email", "assunto", "message_id", "oportunidade__pessoa__nome")
+    readonly_fields = ("oportunidade", "pessoa", "email", "assunto", "status",
+                       "message_id", "erro", "autor", "enviado_em", "evento_em",
+                       "criado_em")

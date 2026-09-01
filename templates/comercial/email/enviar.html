@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+
+{% block titulo %}Enviar e-mail — {{ op.pessoa.nome }} — Comercial{% endblock %}
+
+{% block conteudo %}
+<style>
+  /* ── E-mail 1:1 — estúdio de composição (full-bleed) ───────────────────── */
+  .em-wrap{ margin:-1.4rem -1.6rem 0; }               /* fura o padding do .conteudo */
+  @media (max-width:900px){ .em-wrap{ margin:-1rem -1rem 0; } }
+
+  .em-topo{ display:flex; align-items:flex-end; justify-content:space-between;
+    gap:1rem; padding:1.4rem 1.6rem .9rem; }
+  .em-topo .eyebrow{ font-size:11.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--tinta-suave); margin:0 0 .35rem; font-weight:600; }
+  .em-topo h1{ margin:0; font-size:30px; letter-spacing:-.02em; line-height:1.05; }
+  .em-topo .lead-chip{ display:inline-flex; align-items:center; gap:.5rem; margin-top:.55rem;
+    font-size:13px; color:var(--tinta-suave); }
+  .em-topo .lead-av{ width:26px; height:26px; border-radius:50%; background:var(--lampiao);
+    color:var(--noturno); display:inline-grid; place-items:center; font-weight:800; font-size:12px; }
+
+  .em-grid{ display:grid; grid-template-columns:minmax(380px,460px) 1fr; gap:0;
+    min-height:calc(100dvh - 168px); align-items:stretch; }
+  @media (max-width:1000px){ .em-grid{ grid-template-columns:1fr; } }
+
+  /* Coluna esquerda — compor */
+  .em-compor{ padding:0 1.4rem 2rem 1.6rem; }
+  .em-campo{ margin-bottom:1.05rem; }
+  .em-campo > label{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--tinta-suave); margin-bottom:.45rem; font-weight:700; }
+  .em-campo input, .em-campo textarea{ width:100%; padding:.75rem .85rem; border:1px solid var(--fio);
+    border-radius:var(--raio); font:inherit; background:var(--superficie); color:var(--tinta);
+    transition:border-color .15s, box-shadow .15s; }
+  .em-campo input:focus, .em-campo textarea:focus{ outline:none; border-color:var(--lampiao);
+    box-shadow:0 0 0 4px rgba(226,168,74,.18); }
+  .em-campo textarea{ min-height:150px; resize:vertical; line-height:1.6; }
+  .em-hint{ font-size:11.5px; color:var(--tinta-suave); margin:.4rem 0 0; font-weight:400;
+    text-transform:none; letter-spacing:0; }
+
+  .em-acoes{ display:flex; flex-wrap:wrap; gap:.55rem; margin:.2rem 0 .2rem; }
+  .em-acoes .grow{ flex:1 1 auto; }
+  .botao-fantasma{ background:transparent; border:1px solid var(--fio); color:var(--tinta);
+    padding:.62rem 1rem; border-radius:var(--raio-p); font:inherit; font-weight:600; cursor:pointer;
+    transition:background .12s, border-color .12s, transform .06s; }
+  .botao-fantasma:hover{ background:var(--superficie-2); border-color:var(--fio-forte); }
+  .botao-fantasma:active{ transform:scale(.98); }
+  .em-enviar{ width:100%; margin-top:.15rem; padding:.85rem 1rem; font-size:15px; }
+  .em-enviar[disabled]{ opacity:.45; cursor:not-allowed; filter:grayscale(.3); }
+
+  /* Resumo da conversa */
+  .em-resumo{ margin-top:1.6rem; }
+  .em-resumo .cab{ display:flex; align-items:center; justify-content:space-between; margin-bottom:.5rem; }
+  .em-resumo .cab p{ margin:0; font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--tinta-suave); font-weight:700; }
+  .em-msg{ display:flex; gap:.6rem; align-items:flex-start; padding:.55rem .3rem;
+    border-bottom:1px solid var(--fio); }
+  .em-msg:last-child{ border-bottom:0; }
+  .em-msg .add{ flex:0 0 auto; width:24px; height:24px; border-radius:50%; border:1px solid var(--fio);
+    background:var(--superficie); color:var(--tinta-suave); font-size:15px; line-height:1; cursor:pointer;
+    display:grid; place-items:center; transition:all .12s; }
+  .em-msg .add:hover{ background:var(--lampiao); color:var(--noturno); border-color:var(--lampiao); }
+  .em-msg .txt{ font-size:13px; color:var(--tinta); line-height:1.45; min-width:0; }
+  .em-msg .txt b{ color:var(--tinta-suave); font-weight:700; margin-right:.25rem; }
+  .em-msg .txt .corpo{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;
+    overflow:hidden; }
+
+  /* Coluna direita — palco da prévia */
+  .em-palco{ background:
+      radial-gradient(120% 80% at 50% -10%, #fbf6ec 0%, var(--canvas) 60%);
+    border-left:1px solid var(--fio); padding:1.6rem; position:sticky; top:0;
+    display:flex; flex-direction:column; }
+  @media (max-width:1000px){ .em-palco{ position:static; border-left:0; border-top:1px solid var(--fio); } }
+  .em-palco .rot{ font-size:11px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--tinta-suave); font-weight:700; margin:0 0 .9rem; text-align:center; }
+
+  /* Moldura tipo cliente de e-mail */
+  .em-device{ width:100%; max-width:600px; margin:0 auto; background:var(--superficie);
+    border:1px solid var(--fio); border-radius:var(--raio-g); overflow:hidden;
+    box-shadow:0 30px 60px -30px rgba(4,21,31,.45), 0 2px 6px rgba(4,21,31,.06); }
+  .em-device .barra{ display:flex; align-items:center; gap:.5rem; padding:.7rem .95rem;
+    background:var(--superficie-2); border-bottom:1px solid var(--fio); }
+  .em-device .dots{ display:flex; gap:6px; }
+  .em-device .dots i{ width:11px; height:11px; border-radius:50%; display:block; }
+  .em-device .dots i:nth-child(1){ background:#ec6a5e; }
+  .em-device .dots i:nth-child(2){ background:#f4bf4f; }
+  .em-device .dots i:nth-child(3){ background:#61c554; }
+  .em-device .barra .tag{ margin-left:auto; font-size:10.5px; letter-spacing:.1em;
+    text-transform:uppercase; color:var(--tinta-suave); font-weight:700; }
+  .em-meta{ padding:.85rem 1.1rem; border-bottom:1px solid var(--fio); font-size:12.5px; }
+  .em-meta .linha{ display:flex; gap:.5rem; margin:.15rem 0; }
+  .em-meta .k{ color:var(--tinta-suave); width:56px; flex:0 0 auto; }
+  .em-meta .v{ color:var(--tinta); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .em-meta .assunto{ font-weight:700; }
+  .em-device iframe{ width:100%; border:0; display:block; background:#f4f1ea; min-height:420px; }
+
+  /* ── Modal de confirmação (centralizado) ─────────────────────────────── */
+  [x-cloak]{ display:none !important; }
+  .cfm-ov{ position:fixed; inset:0; z-index:200; display:grid; place-items:center;
+    padding:1.2rem; background:rgba(5,28,44,.5); backdrop-filter:blur(4px); }
+  .cfm-card{ width:100%; max-width:420px; background:var(--superficie);
+    border:1px solid var(--fio); border-radius:var(--raio-g);
+    box-shadow:0 40px 80px -30px rgba(4,21,31,.55), 0 4px 12px rgba(4,21,31,.12);
+    padding:1.7rem 1.6rem 1.4rem; text-align:center; }
+  .cfm-icone{ width:52px; height:52px; margin:0 auto .9rem; border-radius:50%;
+    display:grid; place-items:center; color:var(--lampiao);
+    background:radial-gradient(120% 120% at 50% 20%, #fbeccb, #f6dfae);
+    border:1px solid #eecf95; }
+  .cfm-icone svg{ width:24px; height:24px; }
+  .cfm-card h2{ margin:0 0 .3rem; font-size:20px; letter-spacing:-.01em; }
+  .cfm-sub{ margin:0 0 1.1rem; font-size:13.5px; color:var(--tinta-suave); line-height:1.5; }
+  .cfm-dados{ text-align:left; background:var(--superficie-2); border:1px solid var(--fio);
+    border-radius:var(--raio); padding:.7rem .9rem; }
+  .cfm-linha{ display:flex; gap:.6rem; padding:.2rem 0; font-size:13px; }
+  .cfm-linha .cfm-k{ color:var(--tinta-suave); width:58px; flex:0 0 auto; }
+  .cfm-linha .cfm-v{ color:var(--tinta); font-weight:600; word-break:break-word; }
+  .cfm-nota{ margin:.7rem 0 0; font-size:12.5px; color:var(--musgo); }
+  .cfm-acoes{ display:flex; gap:.6rem; margin-top:1.2rem; }
+  .cfm-acoes > *{ flex:1 1 0; justify-content:center; }
+  .cfm-acoes .botao-primario{ padding:.7rem 1rem; }
+
+  /* transições (apple-design: escala+opacidade; reduced-motion → só opacidade) */
+  .cfm-ov-in{ transition:opacity .18s ease-out; } .cfm-ov-out{ transition:opacity .15s ease-in; }
+  .cfm-in{ transition:transform .22s cubic-bezier(.2,.9,.3,1), opacity .22s ease-out; }
+  .cfm-out{ transition:transform .16s ease-in, opacity .16s ease-in; }
+  .cfm-in-ini{ opacity:0; transform:scale(.94) translateY(6px); }
+  .cfm-in-fim{ opacity:1; transform:scale(1) translateY(0); }
+  @media (prefers-reduced-motion: reduce){
+    .cfm-in, .cfm-out{ transition:opacity .15s ease; }
+    .cfm-in-ini{ transform:none; }
+  }
+</style>
+
+<div class="em-wrap" x-data="confirmEmail()">
+  <div class="em-topo">
+    <div>
+      <p class="eyebrow">Comercial · E-mail 1:1</p>
+      <h1>Enviar por e-mail</h1>
+      <span class="lead-chip">
+        <span class="lead-av">{{ op.pessoa.nome|first|upper }}</span>
+        {{ op.pessoa.nome }}{% if lead_email %} · {{ lead_email }}{% endif %}
+      </span>
+    </div>
+    <a href="{% url 'comercial:oportunidade' op.pk %}" class="botao-fantasma">Voltar ao lead</a>
+  </div>
+
+  <div class="em-grid">
+    <!-- ESQUERDA — compor -->
+    <form method="post" class="em-compor" id="email-form">
+      {% csrf_token %}
+      <div class="em-campo">
+        <label for="id_destinatario">Para (e-mail do lead)</label>
+        <input type="email" id="id_destinatario" name="destinatario" value="{{ lead_email }}"
+               placeholder="nome@exemplo.com" autocomplete="email">
+        {% if not lead_email %}
+          <p class="em-hint">Este lead ainda não tem e-mail no cadastro — preencha aqui. Ao enviar, o e-mail é <b>salvo no contato do lead</b>.</p>
+        {% endif %}
+      </div>
+      <div class="em-campo">
+        <label for="id_assunto">Assunto</label>
+        <input type="text" id="id_assunto" name="assunto" value="{{ dados.assunto }}" maxlength="200">
+      </div>
+      <div class="em-campo">
+        <label for="id_corpo">Mensagem de abertura</label>
+        <textarea id="id_corpo" name="corpo">{{ dados.corpo }}</textarea>
+        <p class="em-hint">O cartão da estadia e os valores entram automaticamente abaixo — você só escreve o toque pessoal.</p>
+      </div>
+
+      <div class="em-acoes">
+        <button type="submit" name="acao" value="previa" class="botao-fantasma grow">Atualizar prévia</button>
+        <button type="submit" name="acao" value="teste" class="botao-fantasma grow">Enviar teste pra mim</button>
+      </div>
+      <button type="button" class="botao-primario em-enviar" @click="abrir()">
+        Enviar ao lead
+      </button>
+
+      {% if resumo %}
+      <div class="em-resumo">
+        <div class="cab"><p>Resumo da conversa</p><span class="em-hint">clique no + para inserir</span></div>
+        {% for m in resumo %}
+          <div class="em-msg">
+            <button type="button" class="add" data-texto="{{ m.texto }}" onclick="inserirResumo(this)" title="Inserir na mensagem">+</button>
+            <span class="txt"><b>{{ m.quem }}:</b><span class="corpo">{{ m.texto }}</span></span>
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </form>
+
+    <!-- DIREITA — palco da prévia -->
+    <div class="em-palco">
+      <p class="rot">Prévia do e-mail</p>
+      <div class="em-device">
+        <div class="barra"><span class="dots"><i></i><i></i><i></i></span><span class="tag">Caixa de entrada</span></div>
+        <div class="em-meta">
+          <div class="linha"><span class="k">De</span><span class="v">Pousada Vô Testa &lt;comercial@pousadavotesta.com.br&gt;</span></div>
+          <div class="linha"><span class="k">Para</span><span class="v" id="previa-para" data-nome="{{ op.pessoa.nome }}">{{ op.pessoa.nome }}{% if lead_email %} &lt;{{ lead_email }}&gt;{% endif %}</span></div>
+          <div class="linha"><span class="k">Assunto</span><span class="v assunto" id="previa-assunto">{{ dados.assunto }}</span></div>
+        </div>
+        <iframe id="previa" title="Prévia do e-mail"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <textarea id="email-html" hidden>{{ dados.html }}</textarea>
+
+  <!-- Modal de confirmação (centralizado, material com blur) -->
+  <div class="cfm-ov" x-show="aberto" x-cloak
+       x-transition:enter="cfm-ov-in" x-transition:leave="cfm-ov-out"
+       @click.self="fechar()" @keydown.escape.window="fechar()" style="display:none">
+    <div class="cfm-card" role="dialog" aria-modal="true" aria-labelledby="cfm-titulo"
+         x-show="aberto"
+         x-transition:enter="cfm-in" x-transition:enter-start="cfm-in-ini" x-transition:enter-end="cfm-in-fim"
+         x-transition:leave="cfm-out" x-transition:leave-start="cfm-in-fim" x-transition:leave-end="cfm-in-ini">
+      <div class="cfm-icone" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4 20-7z"/><path d="M22 2 11 13"/></svg>
+      </div>
+      <h2 id="cfm-titulo">Enviar proposta por e-mail?</h2>
+      <p class="cfm-sub">Ela vai direto para a caixa do lead — com o cartão da estadia e os valores.</p>
+
+      <div class="cfm-dados">
+        <div class="cfm-linha"><span class="cfm-k">Para</span><span class="cfm-v" x-text="email"></span></div>
+        <div class="cfm-linha"><span class="cfm-k">Assunto</span><span class="cfm-v" x-text="assunto"></span></div>
+      </div>
+      {% if not lead_email %}
+        <p class="cfm-nota">✓ Este e-mail será <b>salvo no cadastro</b> do lead.</p>
+      {% endif %}
+
+      <div class="cfm-acoes">
+        <button type="button" class="botao-fantasma" @click="fechar()">Cancelar</button>
+        <button type="submit" form="email-form" name="acao" value="enviar"
+                class="botao-primario" x-ref="ok">Enviar agora</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Prévia robusta: lê o HTML do textarea oculto (sem problema de escape em atributo)
+  // e injeta via srcdoc; ajusta a altura ao conteúdo.
+  (function () {
+    var frame = document.getElementById('previa');
+    var fonte = document.getElementById('email-html');
+    if (!frame || !fonte) return;
+    frame.addEventListener('load', function () {
+      try {
+        var h = frame.contentDocument.documentElement.scrollHeight;
+        if (h > 200) frame.style.height = (h + 4) + 'px';
+      } catch (e) {}
+    });
+    frame.srcdoc = fonte.value;
+  })();
+
+  function inserirResumo(btn) {
+    var t = document.getElementById('id_corpo');
+    t.value += (t.value ? '\n\n' : '') + btn.dataset.texto;
+    t.focus();
+  }
+
+  // Componente Alpine do modal de confirmação.
+  function confirmEmail() {
+    return {
+      aberto: false, email: '', assunto: '',
+      abrir() {
+        var e = (document.getElementById('id_destinatario').value || '').trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+          document.getElementById('id_destinatario').focus();
+          alert('Informe um e-mail válido para enviar ao lead.');
+          return;
+        }
+        this.email = e;
+        this.assunto = (document.getElementById('id_assunto').value || '');
+        this.aberto = true;
+        this.$nextTick(function () { this.$refs.ok && this.$refs.ok.focus(); }.bind(this));
+      },
+      fechar() { this.aberto = false; },
+    };
+  }
+
+  // Espelha o e-mail digitado no "Para" da prévia, em tempo real.
+  (function () {
+    var input = document.getElementById('id_destinatario');
+    var alvo = document.getElementById('previa-para');
+    if (!input || !alvo) return;
+    var base = (alvo.dataset.nome || '').trim();
+    function sync() {
+      var e = input.value.trim();
+      alvo.textContent = base + (e ? ' <' + e + '>' : '');
+    }
+    input.addEventListener('input', sync);
+  })();
+</script>
+{% endblock %}
