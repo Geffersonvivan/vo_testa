@@ -130,6 +130,54 @@ categoria. Inventário, diferenciais, experiências inclusas e **projeção de o
   **Rodar no deploy.**
 - **Mínimo de noites** em Réveillon/Carnaval/feriados longos — ⬜ ainda a implementar (§5).
 
+**Projeção & inauguração** (detalhe no PDF, §4):
+- **Inauguração 31/10/2026** — cai no **feriadão de Finados**; estratégia de **escassez**
+  (preço de pico, liberar poucos quartos e subir conforme enche; mín. 3 noites).
+- **Ocupação sazonal** (média ~80%): Baixa 60% · Média 75% · Alta 90% · Feriado-pico 100%.
+- **Ceia** (Natal 24/12 e virada 31/12): **R$ 180/pessoa** (~2,5/quarto = R$ 450/quarto).
+- **Faturamento (só quartos):** **2026 ≈ R$ 568 mil** (abre em 31/10 → estreia + nov + dez,
+  com as duas ceias) · **2027 ≈ R$ 3,15 mi** (primeiro ano cheio).
+
+### 4.1. Demonstrativo Executivo para Investidores: Ganho × Gasto × Lucro
+
+> **Premissas Operacionais:** 24 Quartos (720 noites/mês) · Equipe de **12 colaboradores** (mix CLT + PJ) · Custo Fixo Total: **R$ 80.000/mês** (Folha R$ 48k + Estrutura/Piscinas R$ 22k + **Marketing Ativo R$ 10k**) · Custo Quarto: **R$ 95/noite** (Lavanderia R$ 42 + Café da Manhã R$ 35 + Amenities/Energia R$ 18) · Comissões (6%) + Impostos/Taxas (10%) = 16%.
+
+| Cenário de Ocupação | Faturamento / Mês | Gasto Total / Mês | Lucro Líquido / Mês | Lucro Líquido / Ano | Margem (%) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **25% Ocupação** (6 qtos/dia · 180 noites) | **R$ 85.660** | **R$ 110.800** | **−R$ 25.140** | **−R$ 301.680** | *Déficit* |
+| **50% Ocupação** (12 qtos/dia · 360 noites) | **R$ 171.325** | **R$ 141.600** | **+R$ 29.725** | **+R$ 356.700** | **17,3%** |
+| **⭐ 80% Ocupação (META)** (19 qtos/dia · 576 noites) | **R$ 274.120** | **R$ 178.570** | **+R$ 95.550** | **+R$ 1.146.600** | **34,9%** |
+| **100% Ocupação** (24 qtos/dia · 720 noites) | **R$ 342.650** | **R$ 203.220** | **+R$ 139.430** | **+R$ 1.673.160** | **40,7%** |
+
+#### Indicadores-Chave de Retorno (Meta 80%):
+* **Ponto de Equilíbrio (Breakeven):** **36,4% de ocupação** (~8,7 quartos/dia). Com apenas 9 quartos ocupados, a pousada paga 100% das despesas e marketing.
+* **RevPAR (Receita por Quarto Disponível):** **R$ 380,70/dia** · **GOPPAR (Lucro Operacional por Quarto):** **R$ 132,70/dia**.
+* **EBITDA / Lucro Líquido Anual:** **R$ 1.146.600 / ano** (sem contar receitas ancilares).
+
+#### Detalhamento das Linhas de Gasto Mensal
+
+| Linha de Gasto | 25% (180 noites) | 50% (360 noites) | 80% (576 noites - Meta) | 100% (720 noites) |
+| :--- | :---: | :---: | :---: | :---: |
+| • **Lavanderia Externa** (R$ 12/kg · ~3,5kg = R$ 42/noite) | R$ 7.560 | R$ 15.120 | R$ 24.192 | R$ 30.240 |
+| • **Café da Manhã Colonial** (R$ 35/quarto-noite) | R$ 6.300 | R$ 12.600 | R$ 20.160 | R$ 25.200 |
+| • **Amenities, Limpeza & Energia Extra Quarto** (R$ 18/noite) | R$ 3.240 | R$ 6.480 | R$ 10.368 | R$ 12.960 |
+| • **Comissão Equipe (6%) + Impostos & Cartões (10%)** | R$ 13.700 | R$ 27.400 | R$ 43.850 | R$ 54.820 |
+| • **Equipe (12 colaboradores: mix CLT + PJ + Vale R$ 500)** | R$ 48.000 | R$ 48.000 | R$ 48.000 | R$ 48.000 |
+| • **Marketing & Aquisição Ativa (Meta/Google Ads/CRM)** | R$ 10.000 | R$ 10.000 | R$ 10.000 | R$ 10.000 |
+| • **Estrutura Fixa (Piscinas Aquecidas, Energia, Manut., Sistemas)** | R$ 22.000 | R$ 22.000 | R$ 22.000 | R$ 22.000 |
+| **TOTAL DE GASTOS** | **R$ 110.800** | **R$ 141.600** | **R$ 178.570** | **R$ 203.220** |
+
+> [!IMPORTANT]
+> ### 🚨 PONTO DE ATENÇÃO & POTENCIAL DE RECEITA (UPSIDE)
+> **Esta projeção considera ESTRITAMENTE a receita de diárias dos quartos.**
+> 
+> **Receitas extras NÃO estão incluídas nesta base de cálculo e entram 100% como faturamento adicional por cima dessa margem:**
+> 1. **Restaurante da Piscina & Bar** (almoços, porções, drinks, chopp artesanal)
+> 2. **Loja de Souvenirs & Produtos Coloniais Vô Testa**
+> 3. **Ceias de Fim de Ano** (Natal e Réveillon: R$ 180/pessoa)
+> 4. **Day Use / Dia na Pousada** (DAY 01 a 04: R$ 180 a R$ 270/dia)
+> 5. **Taxa de Pet / Consumo de Frigobar / Experiências Exclusivas**
+
 **Calibrar pela ocupação real** (meta 80%/ano): encheu fácil → subir os prêmios de
 média/alta; encalhou → revisar marketing/reputação, não a base (ancorada no mercado).
 
