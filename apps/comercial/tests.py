@@ -933,6 +933,51 @@ class EmailLeadTests(TestCase):
         self.pessoa.refresh_from_db()
         self.assertEqual(self.pessoa.email, "")
 
+    # ── Fase 2: templates de e-mail ─────────────────────────────────────────
+    def test_aplicar_template_preenche_variaveis(self):
+        from .models import TemplateEmail
+        t = TemplateEmail.objects.create(
+            nome="Oi", assunto="Proposta {quarto}",
+            corpo="Oi, {primeiro_nome}! {noites} noite(s).", criado_por=self.u)
+        assunto, corpo = services.aplicar_template_email(t, self.op)
+        self.assertIn("Daniela", corpo)          # {primeiro_nome} → Daniela
+        self.assertNotIn("{primeiro_nome}", corpo)
+        self.assertNotIn("{quarto}", assunto)
+
+    def test_salvar_template_reverte_primeiro_nome(self):
+        """Salvar do lead troca o 1º nome por {primeiro_nome} p/ reutilizar."""
+        t = services.salvar_template_email(
+            nome="Meu", assunto="Oi Daniela",
+            corpo="Oi, Daniela! tudo bem?", oportunidade=self.op, usuario=self.u)
+        self.assertIn("{primeiro_nome}", t.corpo)
+        self.assertNotIn("Daniela", t.corpo)
+
+    def test_view_aplica_template_no_corpo(self):
+        from .models import TemplateEmail
+        t = TemplateEmail.objects.create(
+            nome="T", assunto="A {quarto}", corpo="Olá {primeiro_nome}!",
+            criado_por=self.u)
+        self.client.force_login(self.u)
+        r = self.client.post(reverse("comercial:enviar_email_lead", args=[self.op.pk]),
+                             {"acao": "template", "template": str(t.pk)})
+        self.assertContains(r, "Olá Daniela!")   # corpo do template aplicado ao lead
+
+    def test_view_salvar_template_cria_registro(self):
+        from .models import TemplateEmail
+        self.client.force_login(self.u)
+        self.client.post(reverse("comercial:enviar_email_lead", args=[self.op.pk]),
+                         {"acao": "salvar_template", "template_nome": "Novo T",
+                          "assunto": "Assunto X", "corpo": "corpo Y"})
+        self.assertTrue(TemplateEmail.objects.filter(nome="Novo T").exists())
+
+    def test_biblioteca_crud(self):
+        from .models import TemplateEmail
+        self.client.force_login(self.u)
+        r = self.client.post(reverse("comercial:email_template_novo"),
+                             {"nome": "CRUD", "assunto": "S", "corpo": "C", "ativo": "on"})
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(TemplateEmail.objects.filter(nome="CRUD").exists())
+
 
 @override_settings(PAGAMENTOS_GATEWAY="simulado")
 class PropostaSinalTests(TestCase):

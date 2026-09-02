@@ -13,6 +13,7 @@ from .models import (
     Oportunidade,
     PaginaCaptacao,
     RespostaRapida,
+    TemplateEmail,
 )
 
 
@@ -108,3 +109,10 @@ class EnvioEmailAdmin(admin.ModelAdmin):
     readonly_fields = ("oportunidade", "pessoa", "email", "assunto", "status",
                        "message_id", "erro", "autor", "enviado_em", "evento_em",
                        "criado_em")
+
+
+@admin.register(TemplateEmail)
+class TemplateEmailAdmin(admin.ModelAdmin):
+    list_display = ("nome", "assunto", "ativo", "criado_por", "atualizado_em")
+    list_filter = ("ativo",)
+    search_fields = ("nome", "assunto", "corpo")

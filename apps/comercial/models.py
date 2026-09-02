@@ -870,3 +870,32 @@ class EnvioEmail(models.Model):
 
     def __str__(self):
         return f"{self.email}: {self.assunto[:40]}"
+
+
+class TemplateEmail(models.Model):
+    """E-mail salvo e reutilizável (assunto + corpo com variáveis).
+
+    Base tanto do 1:1 (aplicado ao lead) quanto da campanha em massa (Fase 3). Variáveis
+    no texto: {primeiro_nome} {nome} {quarto} {checkin} {checkout} {noites} {pessoas}
+    {total}. `blocos` reserva o liga/desliga de blocos 1:1 (resumo/link) para o massa.
+    """
+
+    nome = models.CharField("nome", max_length=80)
+    assunto = models.CharField("assunto", max_length=200)
+    corpo = models.TextField("corpo (abertura, com variáveis)")
+    blocos = models.JSONField("blocos opcionais", default=dict, blank=True)
+    ativo = models.BooleanField("ativo", default=True)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="templates_email", verbose_name="criado por",
+    )
+    criado_em = models.DateTimeField("criado em", auto_now_add=True)
+    atualizado_em = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        ordering = ["nome"]
+        verbose_name = "template de e-mail"
+        verbose_name_plural = "templates de e-mail"
+
+    def __str__(self):
+        return self.nome

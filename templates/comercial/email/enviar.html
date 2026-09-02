@@ -24,6 +24,18 @@
 
   /* Coluna esquerda — compor */
   .em-compor{ padding:0 1.4rem 2rem 1.6rem; }
+  .em-tpl{ background:var(--superficie-2); border:1px solid var(--fio); border-radius:var(--raio);
+    padding:.7rem .8rem; margin-bottom:1.1rem; display:flex; flex-direction:column; gap:.5rem; }
+  .em-tpl-linha{ display:flex; gap:.5rem; align-items:center; }
+  .em-tpl-sel{ flex:1 1 auto; min-width:0; padding:.5rem .6rem; border:1px solid var(--fio);
+    border-radius:var(--raio-p); font:inherit; background:var(--superficie); color:var(--tinta); }
+  .em-tpl-nome{ flex:1 1 auto; min-width:0; padding:.5rem .6rem; border:1px solid var(--fio);
+    border-radius:var(--raio-p); font:inherit; background:var(--superficie); color:var(--tinta); }
+  .em-tpl .botao-fantasma{ padding:.5rem .8rem; white-space:nowrap; }
+  .em-tpl-link{ font-size:12.5px; font-weight:600; color:var(--tinta-suave); text-decoration:none;
+    white-space:nowrap; padding:0 .3rem; }
+  .em-tpl-link:hover{ color:var(--lampiao); }
+
   .em-campo{ margin-bottom:1.05rem; }
   .em-campo > label{ display:block; font-size:11px; text-transform:uppercase; letter-spacing:.08em;
     color:var(--tinta-suave); margin-bottom:.45rem; font-weight:700; }
@@ -146,6 +158,24 @@
     <!-- ESQUERDA — compor -->
     <form method="post" class="em-compor" id="email-form">
       {% csrf_token %}
+
+      <div class="em-tpl">
+        <div class="em-tpl-linha">
+          <select name="template" class="em-tpl-sel" aria-label="Template">
+            <option value="">Começar do zero…</option>
+            {% for t in templates %}
+              <option value="{{ t.pk }}" {% if template_sel == t.pk|stringformat:'s' %}selected{% endif %}>{{ t.nome }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" name="acao" value="template" class="botao-fantasma">Aplicar</button>
+          <a href="{% url 'comercial:email_templates' %}" class="em-tpl-link" title="Gerenciar templates">Biblioteca</a>
+        </div>
+        <div class="em-tpl-linha">
+          <input type="text" name="template_nome" placeholder="Nome do novo template" class="em-tpl-nome">
+          <button type="submit" name="acao" value="salvar_template" class="botao-fantasma">Salvar como template</button>
+        </div>
+      </div>
+
       <div class="em-campo">
         <label for="id_destinatario">Para (e-mail do lead)</label>
         <input type="email" id="id_destinatario" name="destinatario" value="{{ lead_email }}"

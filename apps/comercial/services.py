@@ -1373,6 +1373,58 @@ def respostas_rapidas_para(oportunidade):
     return itens
 
 
+def _vars_email(op) -> dict:
+    """Valores das variáveis do e-mail para um lead."""
+    nome = (op.pessoa.nome or "").strip() if op.pessoa else ""
+    primeiro = nome.split()[0] if nome else ""
+    cot = op.ultima_cotacao
+    quarto = cot.tipo_uh.nome if cot else op.get_tipo_interesse_display()
+    ci = op.checkin_previsto.strftime("%d/%m") if op.checkin_previsto else "—"
+    co = op.checkout_previsto.strftime("%d/%m") if op.checkout_previsto else "—"
+    noites = ((op.checkout_previsto - op.checkin_previsto).days
+              if op.checkin_previsto and op.checkout_previsto else 0)
+    total = f"R$ {_brl(op.valor_estimado)}" if op.valor_estimado else "a combinar"
+    return {
+        "{primeiro_nome}": primeiro, "{nome}": nome, "{quarto}": quarto,
+        "{checkin}": ci, "{checkout}": co, "{noites}": str(noites),
+        "{pessoas}": str(op.hospedes), "{total}": total,
+    }
+
+
+def aplicar_variaveis_email(texto, oportunidade) -> str:
+    """Preenche {primeiro_nome}{nome}{quarto}{checkin}{checkout}{noites}{pessoas}{total}."""
+    for k, v in _vars_email(oportunidade).items():
+        texto = texto.replace(k, v)
+    return texto
+
+
+def aplicar_template_email(template, oportunidade):
+    """Aplica um TemplateEmail ao lead → (assunto, corpo) com as variáveis preenchidas."""
+    return (aplicar_variaveis_email(template.assunto, oportunidade),
+            aplicar_variaveis_email(template.corpo, oportunidade))
+
+
+def salvar_template_email(*, nome, assunto, corpo, oportunidade=None, usuario):
+    """Cria um TemplateEmail. Se vier de um lead, troca o 1º nome do lead por
+    {primeiro_nome} para o texto voltar a ser reutilizável."""
+    from .models import TemplateEmail
+    assunto = (assunto or "").strip()
+    corpo = corpo or ""
+    if oportunidade is not None and oportunidade.pessoa and oportunidade.pessoa.nome:
+        primeiro = oportunidade.pessoa.nome.split()[0]
+        if primeiro:
+            assunto = assunto.replace(primeiro, "{primeiro_nome}")
+            corpo = corpo.replace(primeiro, "{primeiro_nome}")
+    nome = (nome or "").strip() or (assunto[:60] or "Template sem nome")
+    return TemplateEmail.objects.create(
+        nome=nome, assunto=assunto or "(sem assunto)", corpo=corpo, criado_por=usuario)
+
+
+def templates_email_ativos():
+    from .models import TemplateEmail
+    return TemplateEmail.objects.filter(ativo=True)
+
+
 def criar_cobranca_sinal(oportunidade, usuario, valor=None, metodo="pix"):
     """Cria a cobrança do sinal (Safrapay/simulado) para o lead e a vincula.
 

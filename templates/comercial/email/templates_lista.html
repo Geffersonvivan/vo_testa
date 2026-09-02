@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block titulo %}Templates de e-mail — Comercial{% endblock %}
+
+{% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
+<div class="eleg">
+  <p class="pagina-eyebrow letreiro">Comercial · E-mail</p>
+  <div class="pagina-cabecalho">
+    <h1>Templates de e-mail</h1>
+    <div class="eleg-acoes">
+      <a href="{% url 'comercial:funil' %}" class="botao-neutro">Voltar ao funil</a>
+      <a href="{% url 'comercial:email_template_novo' %}" class="botao-primario">Novo template</a>
+    </div>
+  </div>
+  <p class="eleg-intro">
+    E-mails prontos e reutilizáveis. Ao compor no lead, escolha um e as variáveis se
+    preenchem sozinhas: <code>{primeiro_nome}</code> <code>{quarto}</code>
+    <code>{checkin}</code> <code>{checkout}</code> <code>{noites}</code>
+    <code>{pessoas}</code> <code>{total}</code>.
+  </p>
+
+  <div class="quadro" style="margin-top:1.25rem">
+    <table>
+      <thead><tr><th>Nome</th><th>Assunto</th><th>Ativo</th><th class="acao"></th></tr></thead>
+      <tbody>
+        {% for t in itens %}
+          <tr class="clic" onclick="location.href='{% url 'comercial:email_template_editar' t.pk %}'">
+            <td class="camp-nome" style="font-weight:600">{{ t.nome }}</td>
+            <td style="color:var(--tinta-suave);max-width:520px">{{ t.assunto|truncatechars:80 }}</td>
+            <td>{% if t.ativo %}<span class="selo selo-pub">Ativo</span>{% else %}<span class="selo selo-enc">Inativo</span>{% endif %}</td>
+            <td class="acao"><a href="{% url 'comercial:email_template_editar' t.pk %}" class="botao-mini" onclick="event.stopPropagation()">Editar</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="vazio-el">Nenhum template ainda. Crie o primeiro ou salve um a partir de um lead. ✉️</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

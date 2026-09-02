@@ -10,6 +10,7 @@ from .models import (
     Oportunidade,
     PaginaCaptacao,
     RespostaRapida,
+    TemplateEmail,
 )
 
 
@@ -18,6 +19,17 @@ class RespostaRapidaForm(forms.ModelForm):
         model = RespostaRapida
         fields = ["titulo", "texto", "atalho", "ordem", "ativo"]
         widgets = {"texto": forms.Textarea(attrs={"rows": 3})}
+
+
+class TemplateEmailForm(forms.ModelForm):
+    class Meta:
+        model = TemplateEmail
+        fields = ["nome", "assunto", "corpo", "ativo"]
+        widgets = {"corpo": forms.Textarea(attrs={"rows": 8})}
+        help_texts = {
+            "corpo": "Variáveis: {primeiro_nome} {nome} {quarto} {checkin} "
+                     "{checkout} {noites} {pessoas} {total}",
+        }
 
 
 class DataInput(forms.DateInput):

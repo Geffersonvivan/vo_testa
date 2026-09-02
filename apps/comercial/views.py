@@ -784,16 +784,33 @@ def enviar_email_lead(request, pk):
     stored = (op.pessoa.email or "").strip()
     destinatario = stored
     assincrono = getattr(settings, "EMAIL_ENVIO_ASSINCRONO", True)
+    template_sel = ""
     if request.method == "POST":
         assunto = (request.POST.get("assunto") or "").strip()
         corpo = request.POST.get("corpo") or ""
         acao = request.POST.get("acao") or "previa"
         destinatario = (request.POST.get("destinatario") or "").strip()
+        template_sel = (request.POST.get("template") or "").strip()
+
+        # Aplicar template: substitui assunto+corpo pelo template preenchido com o lead.
+        if acao == "template" and template_sel:
+            tpl = services.templates_email_ativos().filter(pk=template_sel).first()
+            if tpl:
+                assunto, corpo = services.aplicar_template_email(tpl, op)
+                messages.success(request, f"Template “{tpl.nome}” aplicado.")
+
         dados = services.montar_proposta_email(op, corpo=corpo)
         if assunto:
             dados["assunto"] = assunto
 
-        if acao == "enviar":
+        if acao == "salvar_template":
+            tpl = services.salvar_template_email(
+                nome=request.POST.get("template_nome", ""),
+                assunto=dados["assunto"], corpo=corpo,
+                oportunidade=op, usuario=request.user)
+            messages.success(request, f"Template “{tpl.nome}” salvo na biblioteca.")
+
+        elif acao == "enviar":
             try:
                 validate_email(destinatario)
             except ValidationError:
@@ -835,8 +852,60 @@ def enviar_email_lead(request, pk):
 
     return render(request, "comercial/email/enviar.html", {
         "op": op, "dados": dados, "resumo": services.resumo_da_conversa(op),
-        "lead_email": destinatario,
+        "lead_email": destinatario, "templates": services.templates_email_ativos(),
+        "template_sel": template_sel,
     })
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def email_templates(request):
+    from .models import TemplateEmail
+    return render(request, "comercial/email/templates_lista.html",
+                  {"itens": TemplateEmail.objects.all()})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def email_template_novo(request):
+    from .forms import TemplateEmailForm
+    if request.method == "POST":
+        form = TemplateEmailForm(request.POST)
+        if form.is_valid():
+            t = form.save(commit=False)
+            t.criado_por = request.user
+            t.save()
+            messages.success(request, "Template criado.")
+            return redirect("comercial:email_templates")
+    else:
+        form = TemplateEmailForm()
+    return render(request, "comercial/email/template_form.html",
+                  {"form": form, "novo": True})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def email_template_editar(request, pk):
+    from .forms import TemplateEmailForm
+    from .models import TemplateEmail
+    t = get_object_or_404(TemplateEmail, pk=pk)
+    if request.method == "POST":
+        form = TemplateEmailForm(request.POST, instance=t)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Template atualizado.")
+            return redirect("comercial:email_templates")
+    else:
+        form = TemplateEmailForm(instance=t)
+    return render(request, "comercial/email/template_form.html",
+                  {"form": form, "template": t, "novo": False})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def email_template_excluir(request, pk):
+    from .models import TemplateEmail
+    t = get_object_or_404(TemplateEmail, pk=pk)
+    if request.method == "POST":
+        t.delete()
+        messages.success(request, "Template removido.")
+    return redirect("comercial:email_templates")
 
 
 @requer_modulo(Modulo.COMERCIAL)
