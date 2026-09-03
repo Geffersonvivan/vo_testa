@@ -219,6 +219,7 @@ class PermissaoTests(PagamentosBase):
 class SafrapayGatewayTests(PagamentosBase):
     def test_sem_token_recusa_criar(self):
         from django.test import override_settings
+
         from .gateways import GatewaySafrapay
         c = self.cobranca()  # criada no simulado
         with override_settings(
@@ -304,6 +305,7 @@ class SafrapayGatewayTests(PagamentosBase):
         """Shape REAL do Safrapay: chargeStatus=PreAuthorized + transactionStatus=
         PendingPayment (Pix criado, ainda não pago) NÃO pode confirmar a cobrança."""
         import json
+
         from django.test import override_settings
         c = self.cobranca()
         with override_settings(PAGAMENTOS_GATEWAY="safrapay"):
@@ -323,6 +325,7 @@ class SafrapayGatewayTests(PagamentosBase):
     def test_webhook_safrapay_sem_status_fora_do_sandbox_nao_confirma(self):
         """Webhook real (gateway=safrapay) sem status reconhecível não confirma no escuro."""
         import json
+
         from django.test import override_settings
         c = self.cobranca()
         with override_settings(PAGAMENTOS_GATEWAY="safrapay"):

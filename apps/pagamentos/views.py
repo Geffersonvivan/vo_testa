@@ -46,7 +46,7 @@ def painel(request):
 def conciliacao(request):
     """Recebimentos × banco: o que entrou, quanto o banco liquidou (líquido/taxa)
     e o que ainda falta cair na conta — base pra bater com o extrato."""
-    from datetime import date, datetime
+    from datetime import datetime
 
     def _data(param):
         v = (request.GET.get(param) or "").strip()
@@ -214,11 +214,32 @@ def pagar(request, token):
     """Página pública do link de pagamento (sem login)."""
     cobranca = get_object_or_404(Cobranca, token=token)
     sandbox = getattr(settings, "PAGAMENTOS_GATEWAY", "simulado") == "simulado"
+    qr_svg = ""
+    if (cobranca.metodo == Cobranca.Metodo.PIX and cobranca.pix_copia_cola
+            and cobranca.status == Cobranca.Status.PENDENTE):
+        qr_svg = _qr_pix_svg(cobranca.pix_copia_cola)
     return render(request, "pagamentos/pagar.html", {
         "cobranca": cobranca,
         "url_recibo_site": _url_recibo_site(cobranca),
         "sandbox": sandbox,
+        "qr_svg": qr_svg,
     })
+
+
+def _qr_pix_svg(codigo):
+    """SVG do QR do Pix (copia-e-cola). Falha silenciosa: sem QR, fica só o texto."""
+    try:
+        from io import BytesIO
+
+        import qrcode
+        import qrcode.image.svg
+        img = qrcode.make(codigo, image_factory=qrcode.image.svg.SvgPathImage,
+                          box_size=9, border=2)
+        buf = BytesIO()
+        img.save(buf)
+        return buf.getvalue().decode("utf-8")
+    except Exception:
+        return ""
 
 
 @require_POST
@@ -316,6 +337,7 @@ def _url_recibo_site(cobranca):
         return None
     try:
         from django.urls import reverse
+
         from apps.site.models import Reserva as SiteReserva
     except Exception:
         return None
