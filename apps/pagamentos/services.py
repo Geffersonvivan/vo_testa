@@ -223,5 +223,19 @@ def autorizar_cartao_online(cobranca, card: dict, usuario=None):
     payload.pop("card", None)  # nunca persistir o PAN
     cobranca.payload = payload
     cobranca.save(update_fields=["gateway_id", "payload"])
-    confirmar_pagamento(cobranca, usuario or cobranca.criado_por, origem="cartao")
-    return True, "Pagamento aprovado."
+
+    # A requisição pode ter sido aceita (HTTP 200) e a transação RECUSADA. Só confirma
+    # em status inequívoco de pago; recusa/desconhecido NÃO confirma (fail-safe).
+    from .gateways import status_negado, status_pago
+    status_raw = dados.get("status_raw")
+    if status_pago(status_raw) is True:
+        confirmar_pagamento(cobranca, usuario or cobranca.criado_por, origem="cartao")
+        return True, "Pagamento aprovado."
+    EventoPagamento.objects.create(
+        cobranca=cobranca, tipo=EventoPagamento.Tipo.WEBHOOK,
+        origem="cartao", detalhe={"status_raw": status_raw, "aprovado": False},
+    )
+    if status_negado(status_raw):
+        return False, "Cartão não autorizado pela operadora. Tente outro cartão."
+    return False, ("Não foi possível confirmar o pagamento agora. "
+                   "Se o valor foi debitado, ele será conciliado automaticamente.")

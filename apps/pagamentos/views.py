@@ -17,6 +17,7 @@ from apps.nucleo.seletores import pessoas_agrupadas
 
 from . import services
 from .gateways import get_gateway, status_credenciais
+from .gateways import status_pago as _status_pago
 from .models import Cobranca, EventoPagamento
 
 
@@ -351,34 +352,8 @@ def _url_recibo_site(cobranca):
     return reverse("core:reserva_confirmada", args=[recibo.token])
 
 
-# Mapa de status do webhook — alinhado à enum TransactionStatus da Aditum/SafraPay:
-#   1=PreAuthorized · 2=Captured · 3=Denied · 4=Pending · 5=Canceled · 8=Paid
-# Conservador por segurança: só confirmamos em estados inequívocos de pago
-# (Captured/Paid). Negado/cancelado/desconhecido NÃO confirma (fail-safe) —
-# fica pendente p/ conciliação. Confirmar o campo/valores exatos na homologação.
-# Sandbox envia sem status → confirma (st = None).
-_STATUS_PAGO = {
-    "paid", "pago", "captured", "consolidated",
-    "2", "8",
-}
-_STATUS_PENDENTE = {
-    "pending", "pendente", "ordered", "created",
-    "preauthorized", "pre_authorized", "authorized",
-    "pendingpayment", "pending_payment",
-    "1", "4",
-}
-
-
-def _status_pago(status_raw):
-    """True = pago, False = pendente, None = desconhecido (fail-safe: não confirma)."""
-    if status_raw is None or status_raw == "":
-        return None
-    st = str(status_raw).lower()
-    if st in _STATUS_PAGO:
-        return True
-    if st in _STATUS_PENDENTE:
-        return False
-    return None
+# Mapa de status do provedor centralizado em gateways.status_pago (usado por webhook,
+# consulta e autorização de cartão). Conservador: só confirma em pago inequívoco.
 
 
 @csrf_exempt
@@ -418,7 +393,7 @@ def webhook(request):
     gateway = getattr(settings, "PAGAMENTOS_GATEWAY", "simulado")
     if gateway == "simulado":
         # Sandbox não envia status: ausência = confirma; senão exige status pago.
-        pago = True if status_gw is None else (str(status_gw).lower() in _STATUS_PAGO)
+        pago = True if status_gw in (None, "") else (_status_pago(status_gw) is True)
     else:
         try:
             gw = get_gateway()

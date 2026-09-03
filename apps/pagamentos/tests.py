@@ -397,6 +397,34 @@ class CartaoOnlineTests(PagamentosBase):
         self.assertTrue(ok)
         self.assertEqual(cb.status, Cobranca.Status.PAGO)
 
+    def test_cartao_recusado_nao_confirma(self):
+        """REGRESSÃO: gateway aceita a requisição (HTTP 200) mas RECUSA a transação
+        (chargeStatus=NotAuthorized/Denied) → NÃO pode marcar pago."""
+        from unittest.mock import patch
+        cb = self.cobranca(metodo="cartao")
+
+        class GwRecusa:
+            def autorizar_cartao(self, cobranca, card):
+                return {"gateway_id": "GID-RECUSADO", "status_raw": "Denied",
+                        "payload": {"safrapay": {"charge": {"chargeStatus": "NotAuthorized"}}}}
+
+        with patch("apps.pagamentos.services.get_gateway", return_value=GwRecusa()):
+            ok, msg = services.autorizar_cartao_online(cb, {"cardNumber": "4"}, usuario=self.op)
+        cb.refresh_from_db()
+        self.assertFalse(ok)
+        self.assertIn("não autoriz", msg.lower())
+        self.assertEqual(cb.status, Cobranca.Status.PENDENTE)  # continua pendente
+
+    def test_status_pago_mapeia_corretamente(self):
+        from apps.pagamentos.gateways import status_pago
+        self.assertIs(status_pago("Captured"), True)
+        self.assertIs(status_pago("Paid"), True)
+        self.assertIs(status_pago("Denied"), False)
+        self.assertIs(status_pago("NotAuthorized"), False)
+        self.assertIs(status_pago("PreAuthorized"), False)   # criado, não pago
+        self.assertIsNone(status_pago(""))                   # desconhecido → fail-safe
+        self.assertIsNone(status_pago("QualquerCoisa"))
+
     def test_pan_nunca_persistido(self):
         cb = self.cobranca(metodo="cartao")
         services.autorizar_cartao_online(

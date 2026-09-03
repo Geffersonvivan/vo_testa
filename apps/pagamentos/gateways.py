@@ -54,6 +54,7 @@ class GatewaySimulado:
         return {
             "gateway": self.nome,
             "gateway_id": gid,
+            "status_raw": "captured",  # sandbox aprova
             "payload": {**(cobranca.payload or {}), "sandbox": True, "cartao_ok": True},
         }
 
@@ -315,9 +316,13 @@ class GatewaySafrapay:
             body=body,
         )
         gid, charge = self._parse_charge(data, merchant_charge_id=merchant_charge_id)
+        txs = charge.get("transactions") if isinstance(charge.get("transactions"), list) else []
+        tx0 = txs[0] if txs else {}
+        status_raw = charge.get("chargeStatus") or tx0.get("transactionStatus") or ""
         return {
             "gateway": self.nome,
             "gateway_id": gid,
+            "status_raw": status_raw,
             "expira_em": timezone.now() + timezone.timedelta(hours=24),
             "payload": {
                 "safrapay": data,
@@ -471,3 +476,36 @@ def get_gateway():
             f"Use um de: {', '.join(sorted(_GATEWAYS))}."
         )
     return cls()
+
+
+# Mapa de status do provedor (SafraPay/Aditum) — compartilhado por webhook, consulta e
+# autorização de cartão. Conservador: só "pago" em estados inequívocos (Captured/Paid);
+# negado/cancelado/desconhecido NÃO confirma (fail-safe). Sandbox sem status → None.
+#   1=PreAuthorized · 2=Captured · 3=Denied · 4=Pending · 5=Canceled · 8=Paid
+_STATUS_PAGO = {"paid", "pago", "captured", "consolidated", "2", "8"}
+_STATUS_PENDENTE = {
+    "pending", "pendente", "ordered", "created",
+    "preauthorized", "pre_authorized", "authorized",
+    "pendingpayment", "pending_payment", "1", "4",
+}
+_STATUS_NEGADO = {
+    "denied", "notauthorized", "not_authorized", "refused", "declined",
+    "canceled", "cancelled", "cancelado", "3", "5",
+}
+
+
+def status_pago(status_raw):
+    """True = pago, False = pendente/negado, None = desconhecido (fail-safe: não confirma)."""
+    if status_raw is None or status_raw == "":
+        return None
+    st = str(status_raw).lower()
+    if st in _STATUS_PAGO:
+        return True
+    if st in _STATUS_PENDENTE or st in _STATUS_NEGADO:
+        return False
+    return None
+
+
+def status_negado(status_raw):
+    """True quando o provedor recusou/cancelou explicitamente (para mensagem ao cliente)."""
+    return str(status_raw or "").lower() in _STATUS_NEGADO
