@@ -8,9 +8,16 @@
 
 <!-- Open Graph -->
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://www.pousadavotesta.com.br/">
 <meta property="og:title" content="O fantástico mundo do Vô Testa está prestes a abrir">
 <meta property="og:description" content="Antes de abrir ao público, um grupo pequeno conhece tudo primeiro. Entre para a lista de fundadores.">
-<meta property="og:image" content="[URL DA IMAGEM DE COMPARTILHAMENTO]">
+<meta property="og:image" content="https://www.pousadavotesta.com.br/static/lp/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="O fantástico mundo do Vô Testa está prestes a abrir">
+<meta name="twitter:description" content="Antes de abrir ao público, um grupo pequeno conhece tudo primeiro. Entre para a lista de fundadores.">
+<meta name="twitter:image" content="https://www.pousadavotesta.com.br/static/lp/og.jpg">
 
 <!-- Google tag (gtag.js) — ID injetado pelo servidor via GOOGLE_TAG_ID. Sem ID, não carrega. -->
 <script>
@@ -596,8 +603,11 @@ form.addEventListener('submit', async e=>{
   ['utm_source','utm_medium','utm_campaign','utm_content','utm_term','fbclid','gclid']
     .forEach(k=>{ const v=q.get(k); if(v) rastreio[k]=v; });
   if(window.__abCTA) rastreio.cta_variant = window.__abCTA;
+  function cookie(n){ var m=document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)'); return m?m.pop():''; }
+  var eventId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(16).slice(2));
   const dados = { nome:nome.value.trim(), email:email.value.trim(), whatsapp:digitos,
-                  origem:'lp-fundador', consent:true, rastreio };
+                  origem:'lp-fundador', consent:true, rastreio,
+                  event_id:eventId, fbp:cookie('_fbp'), fbc:cookie('_fbc') };
 
   try{
     if(CONFIG.CRM_ENDPOINT){
@@ -609,7 +619,7 @@ form.addEventListener('submit', async e=>{
       console.log('[modo demonstração] lead capturado:', dados);
     }
     if(window.gtag){ gtag('event','generate_lead',{ variant: window.__abCTA || '' }); }
-    if(window.fbq){ fbq('track','Lead',{ content_name:'LP Fundador' }); }
+    if(window.fbq){ fbq('track','Lead',{ content_name:'LP Fundador' },{ eventID: eventId }); }
     document.getElementById('captura').classList.add('enviado');
     document.getElementById('sucesso').focus?.();
   }catch(err){

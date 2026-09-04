@@ -73,4 +73,17 @@ def lp_fundador_lead(request):
             origem=origem, aceita_email=bool(dados.get("consent", True)))
     except Exception:  # noqa: BLE001 — captação pública nunca estoura
         pass
+
+    # Conversions API (Meta) pelo servidor — dedupe com o Pixel via event_id.
+    try:
+        xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+        ip = (xff.split(",")[0].strip() if xff else request.META.get("REMOTE_ADDR", ""))
+        services.enviar_capi_lead(
+            email=email, telefone=whats,
+            event_id=(dados.get("event_id") or ""),
+            fbp=(dados.get("fbp") or ""), fbc=(dados.get("fbc") or ""),
+            event_source_url=request.META.get("HTTP_REFERER", ""),
+            client_ip=ip, user_agent=request.META.get("HTTP_USER_AGENT", ""))
+    except Exception:  # noqa: BLE001
+        pass
     return JsonResponse({"ok": True})

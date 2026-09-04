@@ -1570,6 +1570,68 @@ def enviar_boas_vindas(op_id):
                  assincrono=getattr(settings, "EMAIL_ENVIO_ASSINCRONO", True))
 
 
+def enviar_capi_lead(*, email="", telefone="", event_id="", fbp="", fbc="",
+                     event_source_url="", client_ip="", user_agent="", assincrono=True):
+    """Evento 'Lead' à Meta pela Conversions API (servidor). Dedupe com o Pixel do
+    navegador via event_id. Best-effort; dorme sem META_CAPI_TOKEN (o Pixel segue)."""
+    token = getattr(settings, "META_CAPI_TOKEN", "")
+    pixel = getattr(settings, "META_PIXEL_ID", "")
+    if not token or not pixel:
+        return None
+    import hashlib
+    import json
+    import time as _t
+
+    def _h(v):
+        return hashlib.sha256(v.strip().lower().encode("utf-8")).hexdigest()
+
+    tel = "".join(c for c in (telefone or "") if c.isdigit())
+    if tel and not tel.startswith("55"):
+        tel = "55" + tel
+    user_data = {}
+    if email:
+        user_data["em"] = [_h(email)]
+    if tel:
+        user_data["ph"] = [hashlib.sha256(tel.encode()).hexdigest()]
+    if fbp:
+        user_data["fbp"] = fbp
+    if fbc:
+        user_data["fbc"] = fbc
+    if client_ip:
+        user_data["client_ip_address"] = client_ip
+    if user_agent:
+        user_data["client_user_agent"] = user_agent
+
+    evento = {
+        "event_name": "Lead", "event_time": int(_t.time()),
+        "action_source": "website",
+        "event_source_url": event_source_url or (settings.SITE_PUBLIC_URL + "/"),
+        "user_data": user_data,
+    }
+    if event_id:
+        evento["event_id"] = event_id
+    body = json.dumps({"data": [evento]}).encode("utf-8")
+
+    def _post():
+        from urllib import request as urlreq
+        url = (f"https://graph.facebook.com/v21.0/{pixel}/events"
+               f"?access_token={token}")
+        req = urlreq.Request(url, data=body,
+                             headers={"Content-Type": "application/json"}, method="POST")
+        try:
+            with urlreq.urlopen(req, timeout=10) as r:
+                r.read()
+        except Exception:  # noqa: BLE001 — best-effort, não trava a captação
+            pass
+
+    if assincrono:
+        import threading
+        threading.Thread(target=_post, daemon=True).start()
+    else:
+        _post()
+    return evento
+
+
 def montar_email_campanha(campanha, pessoa, oportunidade=None):
     """Renderiza o e-mail da campanha para um destinatário (variáveis + descadastro)."""
     from django.urls import reverse

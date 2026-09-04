@@ -494,6 +494,18 @@ class LPFundadorTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Política de Privacidade")
 
+    def test_capi_dorme_sem_token_e_hasheia_com_token(self):
+        # Sem token → no-op (só o Pixel do navegador roda).
+        self.assertIsNone(services.enviar_capi_lead(email="a@b.com", assincrono=False))
+        with self.settings(META_CAPI_TOKEN="TESTE", META_PIXEL_ID="999"):
+            ev = services.enviar_capi_lead(
+                email="A@B.com ", telefone="(48) 99999-0000",
+                event_id="e1", assincrono=False)
+        self.assertEqual(ev["event_name"], "Lead")
+        self.assertEqual(ev["event_id"], "e1")
+        self.assertEqual(len(ev["user_data"]["em"][0]), 64)      # SHA-256
+        self.assertNotIn("@", ev["user_data"]["em"][0])          # nunca em claro
+
     @override_settings(EMAIL_ENVIO_ASSINCRONO=False, LEADS_ALERTA_EMAILS="time@ex.com")
     def test_lead_dispara_alerta_e_boas_vindas(self):
         import json
