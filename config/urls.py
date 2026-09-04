@@ -4,8 +4,10 @@ from django.contrib.auth import views as auth_views
 from django.contrib.sitemaps.views import sitemap
 from django.http import HttpResponse
 from django.urls import include, path, re_path
+from django.views.generic import RedirectView
 from django.views.static import serve
 
+from apps.comercial import views_lp
 from apps.site import views as site_views
 from apps.site.sitemaps import PaginasEstaticas
 
@@ -28,8 +30,17 @@ urlpatterns = [
     # Público (hóspede) — permanece na raiz, fora do /crm.
     path("hospede/", include("apps.portal.urls")),
 
+    # LP Fundador (HTML oficial em LPs/) — pública, fora do /crm.
+    path("lp/", include("apps.comercial.urls_lp")),
+    path("privacidade/", views_lp.privacidade, name="privacidade"),
+    # LP antiga (templated) aposentada → redireciona para a nova.
+    path("captacao/fundador/", RedirectView.as_view(url="/lp/fundador/", permanent=False)),
+
     # Páginas de Captação (Landing Pages) — públicas, fora do /crm.
     path("captacao/", include("apps.comercial.urls_publicas")),
+
+    # Descadastro de e-mail marketing (LGPD) — público, fora do /crm.
+    path("email/", include("apps.comercial.urls_email_publico")),
 
     # API NPS (stub 501 — proposta fase CRM do Hóspede). Ver docs/Proposta_NPS.md.
     path("api/nps/", include("apps.nps.api_urls")),
@@ -56,7 +67,9 @@ urlpatterns = [
     path("crm/comercial/", include("apps.comercial.urls")),
     path("crm/nps/", include("apps.nps.urls")),
 
-    # Site público — assume a raiz "/".
+    # Raiz "/": LP Fundador quando HOME_MODO=lp_fundador; senão o site (home_root delega).
+    path("", views_lp.home_root, name="raiz"),
+    # Site público — demais páginas (/quartos/, etc.).
     path("", include("apps.site.urls")),
 ]
 

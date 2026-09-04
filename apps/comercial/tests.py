@@ -441,6 +441,78 @@ class ViewTests(TestCase):
         self.assertEqual(self.client.get(reverse("comercial:funil")).status_code, 403)
 
 
+class LPFundadorTests(TestCase):
+    """LP Fundador servida do HTML oficial + captura religada ao funil."""
+
+    def setUp(self):
+        from .models import PaginaCaptacao
+        self.u = Usuario.objects.create_superuser(username="lp", password="forte-123-abc")
+        self.pag = PaginaCaptacao.objects.create(
+            nome="Inauguração — Fundador", slug="fundador",
+            status=PaginaCaptacao.Status.PUBLICADA, hero_titulo="Oi", criado_por=self.u)
+
+    def test_lp_serve_html_com_form_e_endpoint(self):
+        r = self.client.get(reverse("lp:fundador"))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"form-lista", r.content)
+        self.assertIn(b"/lp/fundador/lead/", r.content)  # endpoint religado
+
+    def test_raiz_serve_lp_com_flag(self):
+        with self.settings(HOME_MODO="lp_fundador"):
+            r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"form-lista", r.content)
+
+    def test_captacao_antiga_redireciona(self):
+        r = self.client.get("/captacao/fundador/")
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.headers["Location"], "/lp/fundador/")
+
+    def test_lead_cai_no_funil_com_optin_e_pagina(self):
+        import json
+        r = self.client.post(
+            reverse("lp:fundador_lead"),
+            data=json.dumps({"nome": "Fulano LP", "email": "flp@ex.com",
+                             "whatsapp": "49999887766", "consent": True,
+                             "rastreio": {"utm_source": "instagram"}}),
+            content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        op = Oportunidade.objects.get(pessoa__email="flp@ex.com")
+        self.assertEqual(op.pagina_captacao, self.pag)
+        self.assertEqual(op.origem_rastreio.get("utm_source"), "instagram")
+        self.assertTrue(op.pessoa.aceita_email)
+
+    def test_lead_incompleto_400(self):
+        import json
+        r = self.client.post(reverse("lp:fundador_lead"),
+                             data=json.dumps({"nome": ""}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_privacidade_publica(self):
+        r = self.client.get(reverse("privacidade"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "Política de Privacidade")
+
+    @override_settings(EMAIL_ENVIO_ASSINCRONO=False, LEADS_ALERTA_EMAILS="time@ex.com")
+    def test_lead_dispara_alerta_e_boas_vindas(self):
+        import json
+
+        from django.core import mail
+        with self.captureOnCommitCallbacks(execute=True):
+            self.client.post(
+                reverse("lp:fundador_lead"),
+                data=json.dumps({"nome": "Maria LP", "email": "maria@ex.com",
+                                 "whatsapp": "49999887766", "consent": True}),
+                content_type="application/json")
+        destinatarios = [to for m in mail.outbox for to in m.to]
+        self.assertIn("time@ex.com", destinatarios)     # alerta p/ a equipe
+        self.assertIn("maria@ex.com", destinatarios)     # boas-vindas p/ o lead
+        assuntos = " ".join(m.subject for m in mail.outbox)
+        self.assertIn("Novo lead", assuntos)
+        self.assertIn("fundadores", assuntos.lower())
+
+
 class SitePropostaTests(TestCase):
     def test_pedir_proposta_cria_oportunidade(self):
         r = self.client.post(reverse("core:pedir_proposta"), {
@@ -463,7 +535,7 @@ class PaginaCaptacaoTests(TestCase):
     def _pagina(self, **extra):
         from .models import PaginaCaptacao
         dados = dict(
-            nome="Inauguração — Fundador", slug="fundador",
+            nome="Inauguração — Fundador", slug="promo-lp",
             status=PaginaCaptacao.Status.PUBLICADA,
             tipo_interesse=Oportunidade.TipoInteresse.HOSPEDAGEM,
             hero_titulo="Bem-vindo", criado_por=self.op,
@@ -474,12 +546,12 @@ class PaginaCaptacaoTests(TestCase):
     def test_rascunho_nao_e_publica(self):
         from .models import PaginaCaptacao
         self._pagina(status=PaginaCaptacao.Status.RASCUNHO)
-        r = self.client.get(reverse("captacao:publica", args=["fundador"]))
+        r = self.client.get(reverse("captacao:publica", args=["promo-lp"]))
         self.assertEqual(r.status_code, 404)
 
     def test_publicada_abre_e_conta_visita(self):
         pag = self._pagina()
-        r = self.client.get(reverse("captacao:publica", args=["fundador"]))
+        r = self.client.get(reverse("captacao:publica", args=["promo-lp"]))
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "Bem-vindo")
         pag.refresh_from_db()
@@ -487,7 +559,7 @@ class PaginaCaptacaoTests(TestCase):
 
     def test_post_cria_lead_no_funil_etiquetado(self):
         pag = self._pagina(tipo_interesse=Oportunidade.TipoInteresse.HOSPEDAGEM)
-        r = self.client.post(reverse("captacao:publica", args=["fundador"]), {
+        r = self.client.post(reverse("captacao:publica", args=["promo-lp"]), {
             "nome": "Maria Fundadora", "telefone": "49999990000", "email": "",
         })
         self.assertEqual(r.status_code, 302)
@@ -503,20 +575,20 @@ class PaginaCaptacaoTests(TestCase):
         self.assertEqual(self.client.get(reverse("comercial:paginas")).status_code, 200)
         r = self.client.get(reverse("comercial:pagina_detalhe", args=[pag.pk]))
         self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "/captacao/fundador/")
+        self.assertContains(r, "/captacao/promo-lp/")
 
     def test_pixel_e_whatsapp_renderizam(self):
         self._pagina(meta_pixel_id="123456789", whatsapp_destino="5549999990000")
-        r = self.client.get(reverse("captacao:publica", args=["fundador"]))
+        r = self.client.get(reverse("captacao:publica", args=["promo-lp"]))
         self.assertContains(r, "fbq('init','123456789')")
         # Tela de agradecimento leva ao WhatsApp
-        r2 = self.client.get(reverse("captacao:publica", args=["fundador"]) + "?ok=1")
+        r2 = self.client.get(reverse("captacao:publica", args=["promo-lp"]) + "?ok=1")
         self.assertContains(r2, "wa.me/5549999990000")
         self.assertContains(r2, "fbq('track','Lead')")
 
     def test_post_enriquece_lead_com_datas_e_pessoas(self):
         pag = self._pagina()
-        self.client.post(reverse("captacao:publica", args=["fundador"]), {
+        self.client.post(reverse("captacao:publica", args=["promo-lp"]), {
             "nome": "João Fundador", "telefone": "49988887777",
             "checkin": "2026-11-14", "checkout": "2026-11-16", "pessoas": "4",
         })
@@ -528,7 +600,7 @@ class PaginaCaptacaoTests(TestCase):
 
     def test_post_limita_pessoas_a_8(self):
         pag = self._pagina()
-        self.client.post(reverse("captacao:publica", args=["fundador"]), {
+        self.client.post(reverse("captacao:publica", args=["promo-lp"]), {
             "nome": "Grupo Grande", "telefone": "49988887777", "pessoas": "20",
         })
         op = Oportunidade.objects.filter(pagina_captacao=pag).first()
@@ -977,6 +1049,98 @@ class EmailLeadTests(TestCase):
                              {"nome": "CRUD", "assunto": "S", "corpo": "C", "ativo": "on"})
         self.assertEqual(r.status_code, 302)
         self.assertTrue(TemplateEmail.objects.filter(nome="CRUD").exists())
+
+
+class CampanhaEmailTests(TestCase):
+    """Fase 3 — campanha por segmento + opt-in/descadastro (LGPD)."""
+
+    def setUp(self):
+        self.u = Usuario.objects.create_superuser(
+            username="camp", password="forte-123-abc", email="v@ex.com")
+        self.p1 = Pessoa.objects.create(nome="Ana", email="ana@ex.com", telefone="1")
+        self.p2 = Pessoa.objects.create(nome="Bia", email="bia@ex.com", telefone="2")
+        self.op1 = services.criar_oportunidade(usuario=self.u, pessoa=self.p1, titulo="A")
+        self.op2 = services.criar_oportunidade(usuario=self.u, pessoa=self.p2, titulo="B")
+
+    def _campanha(self, **seg):
+        return services.criar_campanha_email(
+            nome="Lançamento", assunto="Oi {primeiro_nome}", corpo="Novidade!",
+            segmento=seg, usuario=self.u)
+
+    def test_publico_exclui_optout_e_sem_email(self):
+        self.p2.aceita_email = False
+        self.p2.save()
+        pub = list(services.publico_da_campanha({}))
+        self.assertIn(self.p1, pub)
+        self.assertNotIn(self.p2, pub)      # descadastrado fora
+
+    def test_publico_exclui_bounce(self):
+        from .models import EnvioEmail
+        EnvioEmail.objects.create(email="ana@ex.com", assunto="x",
+                                  status=EnvioEmail.Status.BOUNCE)
+        pub = list(services.publico_da_campanha({}))
+        self.assertNotIn(self.p1, pub)      # e-mail devolvido fora
+
+    def test_descadastro_por_token(self):
+        self.assertTrue(self.p1.aceita_email)
+        p = services.descadastrar_por_token(self.p1.unsub_token)
+        self.assertEqual(p, self.p1)
+        self.p1.refresh_from_db()
+        self.assertFalse(self.p1.aceita_email)
+        self.assertIsNotNone(self.p1.email_descadastro_em)
+
+    def test_montar_campanha_tem_descadastro_e_header(self):
+        c = self._campanha()
+        d = services.montar_email_campanha(c, self.p1)
+        self.assertIn("descadastrar", d["html"].lower())
+        self.assertIn("List-Unsubscribe", d["headers"])
+        self.assertIn("Oi Ana", d["assunto"])   # variável aplicada
+
+    def test_enviar_campanha_idempotente(self):
+        from django.core import mail
+
+        from .models import CampanhaEmail, EnvioEmail
+        c = self._campanha()
+        services.enviar_campanha_email(c, usuario=self.u)
+        c.refresh_from_db()
+        self.assertEqual(c.status, CampanhaEmail.Status.ENVIADA)
+        self.assertEqual(c.enviados, 2)
+        self.assertEqual(len(mail.outbox), 2)
+        # 2º disparo não reenvia
+        mail.outbox.clear()
+        services.enviar_campanha_email(c, usuario=self.u)
+        self.assertEqual(len(mail.outbox), 0)
+        self.assertEqual(
+            EnvioEmail.objects.filter(campanha=c, status="enviado").count(), 2)
+
+    def test_view_descadastro_publico(self):
+        r = self.client.get(reverse("email_publico:descadastrar",
+                                    args=[self.p1.unsub_token]))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "descadastrado")
+        self.p1.refresh_from_db()
+        self.assertFalse(self.p1.aceita_email)
+
+    def test_view_criar_e_enviar_campanha(self):
+        from django.core import mail
+
+        from .models import CampanhaEmail
+        self.client.force_login(self.u)
+        r = self.client.post(reverse("comercial:email_campanha_nova"),
+                             {"nome": "C1", "assunto": "Oi", "corpo": "corpo"})
+        self.assertEqual(r.status_code, 302)
+        c = CampanhaEmail.objects.get(nome="C1")
+        mail.outbox.clear()
+        self.client.post(reverse("comercial:email_campanha_enviar", args=[c.pk]))
+        c.refresh_from_db()
+        self.assertEqual(c.status, "enviada")
+        self.assertGreaterEqual(len(mail.outbox), 1)
+
+    def test_consentimento_da_lp_grava_optin(self):
+        op = services.capturar_lead_site(
+            nome="Novo Lead", email="novo@ex.com", telefone="9", aceita_email=True)
+        self.assertTrue(op.pessoa.aceita_email)
+        self.assertIsNotNone(op.pessoa.email_optin_em)
 
 
 @override_settings(PAGAMENTOS_GATEWAY="simulado")

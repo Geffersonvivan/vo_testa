@@ -308,6 +308,15 @@ DEFAULT_FROM_EMAIL = os.environ.get(
 # URL pública do site (links em e-mail). Em produção: https://www.pousadavotesta.com.br
 SITE_PUBLIC_URL = os.environ.get("SITE_PUBLIC_URL", "http://127.0.0.1:8000").rstrip("/")
 
+# Modo da raiz "/": "lp_fundador" serve a LP Fundador (site ainda não pronto);
+# vazio = site público normal. Reversível por env (Railway) sem mexer no código.
+HOME_MODO = os.environ.get("HOME_MODO", "")
+
+# E-mails avisados quando um lead novo cai no funil (vírgula). Vazio → comercial@.
+LEADS_ALERTA_EMAILS = os.environ.get("LEADS_ALERTA_EMAILS", "")
+# Boas-vindas automáticas ao lead que se cadastra (LP/site). Desligável por env.
+LEAD_BOAS_VINDAS = os.environ.get("LEAD_BOAS_VINDAS", "1") == "1"
+
 # E-mail do Comercial — gateway plugável (docs/Marketing/Gestor_email_leads_funil.md).
 # simulado (default): usa o EMAIL_BACKEND acima (console em dev). ses: Amazon SES (Fase 4).
 EMAIL_GATEWAY = os.environ.get("EMAIL_GATEWAY", "simulado")

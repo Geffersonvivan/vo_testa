@@ -7,6 +7,7 @@ Pessoa é a base única. Hóspede, Funcionário e Fornecedor são especializaç�
 Pessoa diretamente, opcional.
 """
 
+import uuid
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
@@ -36,6 +37,13 @@ class Pessoa(models.Model):
     cep = models.CharField("CEP", max_length=9, blank=True)
     observacoes = models.TextField("observações", blank=True)
     ativo = models.BooleanField("ativo", default=True)
+    # Preferência de e-mail marketing (LGPD): descadastro público desliga; opt-in explícito
+    # (checkbox da LP) carimba a data. `unsub_token` é o identificador do link de saída.
+    aceita_email = models.BooleanField("aceita e-mails", default=True)
+    email_optin_em = models.DateTimeField("opt-in de e-mail em", null=True, blank=True)
+    email_descadastro_em = models.DateTimeField("descadastro em", null=True, blank=True)
+    unsub_token = models.UUIDField("token de descadastro", default=uuid.uuid4,
+                                   editable=False, unique=True, db_index=True)
     criado_em = models.DateTimeField("criado em", auto_now_add=True)
     atualizado_em = models.DateTimeField("atualizado em", auto_now=True)
 

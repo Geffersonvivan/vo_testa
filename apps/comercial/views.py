@@ -623,6 +623,7 @@ def captacao_publica(request, slug):
                     tipo_interesse=pagina.tipo_interesse, pagina=pagina,
                     hospedes=pessoas, checkin=checkin, checkout=checkout,
                     mensagem=f"Lista de espera — {pagina.nome}", origem=origem,
+                    aceita_email=(request.POST.get("consent") or "") == "on",
                 )
             except Exception:
                 pass  # best-effort: nunca quebra a página pública do lead
@@ -857,6 +858,14 @@ def enviar_email_lead(request, pk):
     })
 
 
+@never_cache
+def descadastrar_email(request, token):
+    """Página pública de descadastro (LGPD) — sem login, achada pelo unsub_token."""
+    pessoa = services.descadastrar_por_token(token)
+    return render(request, "comercial/email/descadastro.html",
+                  {"pessoa": pessoa, "ok": pessoa is not None})
+
+
 @requer_modulo(Modulo.COMERCIAL)
 def email_templates(request):
     from .models import TemplateEmail
@@ -906,6 +915,100 @@ def email_template_excluir(request, pk):
         t.delete()
         messages.success(request, "Template removido.")
     return redirect("comercial:email_templates")
+
+
+# ───────────────────────── Campanha de e-mail (Fase 3) ─────────────────────────
+
+def _segmento_do_post(request):
+    """Monta o dict de segmento a partir dos campos (só os preenchidos)."""
+    seg = {}
+    for campo in ("etapa", "origem", "temperatura", "status", "pagina"):
+        v = (request.POST.get(campo) or "").strip()
+        if v:
+            seg[campo] = v
+    return seg
+
+
+def _contexto_segmento():
+    from .models import EtapaFunil, PaginaCaptacao
+    return {
+        "etapas": EtapaFunil.objects.filter(ativa=True),
+        "origens": Oportunidade.Origem.choices,
+        "temperaturas": [("quente", "Quente"), ("morno", "Morno"), ("frio", "Frio")],
+        "status_ops": Oportunidade.Status.choices,
+        "paginas": PaginaCaptacao.objects.all(),
+        "templates": services.templates_email_ativos(),
+    }
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def email_campanhas(request):
+    from .models import CampanhaEmail
+    return render(request, "comercial/email/campanhas_lista.html",
+                  {"itens": CampanhaEmail.objects.all()})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def email_campanha_nova(request):
+    if request.method == "POST":
+        nome = (request.POST.get("nome") or "").strip()
+        assunto = (request.POST.get("assunto") or "").strip()
+        corpo = (request.POST.get("corpo") or "").strip()
+        if not (nome and assunto and corpo):
+            messages.error(request, "Preencha nome, assunto e corpo.")
+        else:
+            agendar = (request.POST.get("agendar_para") or "").strip()
+            camp = services.criar_campanha_email(
+                nome=nome, assunto=assunto, corpo=corpo,
+                segmento=_segmento_do_post(request), usuario=request.user,
+                agendar_para=agendar or None)
+            messages.success(request, "Campanha criada.")
+            return redirect("comercial:email_campanha_detalhe", pk=camp.pk)
+    ctx = {"novo": True}
+    ctx.update(_contexto_segmento())
+    return render(request, "comercial/email/campanha_form.html", ctx)
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def email_campanha_detalhe(request, pk):
+    from .models import CampanhaEmail
+    camp = get_object_or_404(CampanhaEmail, pk=pk)
+    publico = services.publico_da_campanha(camp.segmento)
+    return render(request, "comercial/email/campanha_detalhe.html", {
+        "campanha": camp, "publico_count": publico.count(),
+        "amostra": publico[:10],
+    })
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def email_campanha_enviar(request, pk):
+    from .models import CampanhaEmail
+    camp = get_object_or_404(CampanhaEmail, pk=pk)
+    if request.method == "POST":
+        camp = services.enviar_campanha_email(camp, usuario=request.user)
+        messages.success(
+            request, f"Campanha enviada: {camp.enviados} e-mail(s), {camp.erros} erro(s).")
+    return redirect("comercial:email_campanha_detalhe", pk=camp.pk)
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def email_campanha_teste(request, pk):
+    from .models import CampanhaEmail
+    camp = get_object_or_404(CampanhaEmail, pk=pk)
+    para = (request.user.email or "").strip()
+    if request.method == "POST" and para:
+        pessoa = Pessoa.objects.filter(oportunidades__isnull=False).first()
+        dados = services.montar_email_campanha(camp, pessoa) if pessoa else {
+            "assunto": camp.assunto, "html": camp.corpo, "texto": camp.corpo,
+            "headers": None}
+        services.enviar_email(
+            para=para, assunto=f"[TESTE] {dados['assunto']}", html=dados["html"],
+            texto=dados["texto"], usuario=request.user, headers=dados.get("headers"),
+            assincrono=getattr(settings, "EMAIL_ENVIO_ASSINCRONO", True))
+        messages.success(request, f"Teste a caminho de {para}.")
+    elif not para:
+        messages.error(request, "Seu usuário não tem e-mail para o teste.")
+    return redirect("comercial:email_campanha_detalhe", pk=camp.pk)
 
 
 @requer_modulo(Modulo.COMERCIAL)

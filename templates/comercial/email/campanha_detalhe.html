@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ campanha.nome }} — Campanha — Comercial{% endblock %}
+
+{% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
+<div class="eleg">
+  <p class="pagina-eyebrow letreiro">Comercial · E-mail · Campanha</p>
+  <div class="pagina-cabecalho">
+    <h1>{{ campanha.nome }}</h1>
+    <a href="{% url 'comercial:email_campanhas' %}" class="botao-neutro">Voltar</a>
+  </div>
+
+  <div class="kpis-el" style="display:flex; gap:1rem; flex-wrap:wrap; margin:.5rem 0 1.4rem">
+    <div class="kpi"><span class="kpi-rot">Status</span><span class="kpi-val">{{ campanha.get_status_display }}</span></div>
+    <div class="kpi"><span class="kpi-rot">Público-alvo</span><span class="kpi-val">{{ publico_count }}</span></div>
+    <div class="kpi"><span class="kpi-rot">Enviados</span><span class="kpi-val">{{ campanha.enviados }}</span></div>
+    <div class="kpi"><span class="kpi-rot">Erros</span><span class="kpi-val">{{ campanha.erros }}</span></div>
+  </div>
+
+  <div class="cartao-el" style="padding:1.1rem 1.3rem; margin-bottom:1.2rem">
+    <p style="margin:.1rem 0"><b>Assunto:</b> {{ campanha.assunto }}</p>
+    <p style="margin:.5rem 0 0; color:var(--tinta-suave); white-space:pre-wrap">{{ campanha.corpo }}</p>
+  </div>
+
+  {% if campanha.status == 'rascunho' or campanha.status == 'agendada' %}
+  <div class="cartao-el" style="padding:1.1rem 1.3rem; margin-bottom:1.2rem">
+    <p style="margin:0 0 .8rem"><b>{{ publico_count }}</b> pessoa(s) vão receber. Envie um teste antes de disparar.</p>
+    <div class="eleg-acoes">
+      <form method="post" action="{% url 'comercial:email_campanha_teste' campanha.pk %}" style="margin:0">{% csrf_token %}
+        <button class="botao-neutro">Enviar teste pra mim</button>
+      </form>
+      <form method="post" action="{% url 'comercial:email_campanha_enviar' campanha.pk %}"
+            onsubmit="return confirm('Disparar a campanha para {{ publico_count }} pessoa(s)?')" style="margin:0">{% csrf_token %}
+        <button class="botao-primario">Enviar agora ({{ publico_count }})</button>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if amostra %}
+  <div class="quadro">
+    <table>
+      <thead><tr><th>Amostra do público</th><th>E-mail</th></tr></thead>
+      <tbody>
+        {% for p in amostra %}<tr><td>{{ p.nome }}</td><td style="color:var(--tinta-suave)">{{ p.email }}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -3,6 +3,7 @@ from django.contrib import admin
 from .models import (
     AtividadeComercial,
     Campanha,
+    CampanhaEmail,
     ConversaoEnviada,
     Cotacao,
     EnvioEmail,
@@ -116,3 +117,12 @@ class TemplateEmailAdmin(admin.ModelAdmin):
     list_display = ("nome", "assunto", "ativo", "criado_por", "atualizado_em")
     list_filter = ("ativo",)
     search_fields = ("nome", "assunto", "corpo")
+
+
+@admin.register(CampanhaEmail)
+class CampanhaEmailAdmin(admin.ModelAdmin):
+    list_display = ("nome", "status", "total", "enviados", "erros",
+                    "criado_por", "enviada_em")
+    list_filter = ("status",)
+    search_fields = ("nome", "assunto")
+    readonly_fields = ("total", "enviados", "erros", "status", "enviada_em", "criado_em")

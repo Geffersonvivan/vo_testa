@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block titulo %}Campanhas de e-mail — Comercial{% endblock %}
+
+{% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
+<div class="eleg">
+  <p class="pagina-eyebrow letreiro">Comercial · E-mail</p>
+  <div class="pagina-cabecalho">
+    <h1>Campanhas de e-mail</h1>
+    <div class="eleg-acoes">
+      <a href="{% url 'comercial:email_templates' %}" class="botao-neutro">Templates</a>
+      <a href="{% url 'comercial:email_campanha_nova' %}" class="botao-primario">Nova campanha</a>
+    </div>
+  </div>
+  <p class="eleg-intro">
+    Dispare um e-mail para um recorte do funil (etapa, temperatura, origem, LP). Só vai
+    para quem <b>aceita e-mails</b> e tem endereço válido — descadastrados e devolvidos
+    são excluídos automaticamente (LGPD).
+  </p>
+
+  <div class="quadro" style="margin-top:1.25rem">
+    <table>
+      <thead><tr><th>Nome</th><th>Assunto</th><th>Status</th><th class="num">Enviados</th><th>Quando</th><th class="acao"></th></tr></thead>
+      <tbody>
+        {% for c in itens %}
+          <tr class="clic" onclick="location.href='{% url 'comercial:email_campanha_detalhe' c.pk %}'">
+            <td class="camp-nome" style="font-weight:600">{{ c.nome }}</td>
+            <td style="color:var(--tinta-suave);max-width:420px">{{ c.assunto|truncatechars:70 }}</td>
+            <td><span class="selo {% if c.status == 'enviada' %}selo-pub{% elif c.status == 'cancelada' %}selo-enc{% endif %}">{{ c.get_status_display }}</span></td>
+            <td class="num">{{ c.enviados }}{% if c.total %}/{{ c.total }}{% endif %}</td>
+            <td style="color:var(--tinta-suave)">{{ c.enviada_em|date:"d/m/Y H:i"|default:"—" }}</td>
+            <td class="acao"><a href="{% url 'comercial:email_campanha_detalhe' c.pk %}" class="botao-mini" onclick="event.stopPropagation()">Abrir</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="vazio-el">Nenhuma campanha ainda. Crie a primeira. 📣</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

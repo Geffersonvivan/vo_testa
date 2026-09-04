@@ -287,7 +287,7 @@ def _nomes_compativeis(a, b):
 def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
                        checkin=None, checkout=None, hospedes=2, documento="",
                        tipo_interesse="hospedagem", faturamento=None, pagina=None,
-                       origem=None):
+                       origem=None, aceita_email=None):
     """Interface pública do site: cria Pessoa+Prospecto+Oportunidade (origem=site).
 
     Se o módulo Comercial estiver inativo, retorna None (site ainda mostra sucesso).
@@ -341,6 +341,12 @@ def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
             mudou.append("nome")
         if mudou:
             pessoa.save(update_fields=mudou)
+
+    # Consentimento explícito da LP (opt-in): carimba a data uma vez.
+    if aceita_email and (not pessoa.aceita_email or pessoa.email_optin_em is None):
+        pessoa.aceita_email = True
+        pessoa.email_optin_em = pessoa.email_optin_em or timezone.now()
+        pessoa.save(update_fields=["aceita_email", "email_optin_em"])
 
     Prospecto.objects.get_or_create(pessoa=pessoa)
 
@@ -412,6 +418,9 @@ def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
     )
     # Devolve o evento Lead ao provedor de mídia (Fase B), após gravar. Best-effort.
     transaction.on_commit(lambda: enviar_conversao(op, "lead"))
+    # Avisa a equipe e manda boas-vindas ao lead (assíncrono, após o commit).
+    transaction.on_commit(lambda: notificar_lead_novo(op.pk))
+    transaction.on_commit(lambda: enviar_boas_vindas(op.pk))
     return op
 
 
@@ -841,7 +850,7 @@ def montar_proposta_email(oportunidade, cobranca=None, link=None, corpo=None):
 
 
 def _processar_envio_email(envio_id, para, assunto, html, texto, remetente, reply_to,
-                           usuario_id, oportunidade_id):
+                           usuario_id, oportunidade_id, headers=None):
     """Faz o envio pelo gateway e atualiza o EnvioEmail (re-busca objetos por id)."""
     from .email_gateways import get_email_gateway
     from .models import EnvioEmail
@@ -852,7 +861,7 @@ def _processar_envio_email(envio_id, para, assunto, html, texto, remetente, repl
     try:
         res = get_email_gateway().enviar(
             para=para, assunto=assunto, html=html, texto=texto,
-            remetente=remetente, reply_to=reply_to)
+            remetente=remetente, reply_to=reply_to, headers=headers)
         envio.status = EnvioEmail.Status.ENVIADO
         envio.message_id = res.get("message_id", "")
         envio.enviado_em = timezone.now()
@@ -877,7 +886,8 @@ def _envio_email_em_thread(*args):
 
 
 def enviar_email(*, para, assunto, html, texto, usuario, oportunidade=None,
-                 pessoa=None, remetente=None, reply_to=None, assincrono=False):
+                 pessoa=None, remetente=None, reply_to=None, assincrono=False,
+                 campanha=None, headers=None):
     """Grava o EnvioEmail e dispara pelo gateway.
 
     `assincrono=True` → não bloqueia o request: cria o registro como 'pendente', envia
@@ -893,10 +903,11 @@ def enviar_email(*, para, assunto, html, texto, usuario, oportunidade=None,
         pessoa = oportunidade.pessoa
 
     envio = EnvioEmail.objects.create(
-        oportunidade=oportunidade, pessoa=pessoa, email=para,
+        oportunidade=oportunidade, campanha=campanha, pessoa=pessoa, email=para,
         assunto=assunto[:200], autor=usuario, status=EnvioEmail.Status.PENDENTE)
     args = (envio.pk, para, assunto, html, texto, remetente, reply_to,
-            usuario.pk if usuario else None, oportunidade.pk if oportunidade else None)
+            usuario.pk if usuario else None,
+            oportunidade.pk if oportunidade else None, headers)
     if assincrono:
         import threading
         threading.Thread(target=_envio_email_em_thread, args=args, daemon=True).start()
@@ -1423,6 +1434,221 @@ def salvar_template_email(*, nome, assunto, corpo, oportunidade=None, usuario):
 def templates_email_ativos():
     from .models import TemplateEmail
     return TemplateEmail.objects.filter(ativo=True)
+
+
+# ───────────────────────── Campanha de e-mail (Fase 3) ─────────────────────────
+
+def publico_da_campanha(segmento):
+    """Pessoas-alvo de uma campanha, a partir de filtros do funil.
+
+    Sempre exige e-mail válido + aceita_email e exclui quem já deu bounce/reclamação.
+    Filtros de `segmento`: etapa, origem, pagina (LP), temperatura, status.
+    Sem filtros → todos os leads (pessoas com alguma oportunidade).
+    """
+    from apps.nucleo.models import Pessoa
+
+    from .models import EnvioEmail
+
+    seg = segmento or {}
+    ops = Oportunidade.objects.all()
+    if seg.get("etapa"):
+        ops = ops.filter(etapa_id=seg["etapa"])
+    if seg.get("origem"):
+        ops = ops.filter(origem=seg["origem"])
+    if seg.get("pagina"):
+        ops = ops.filter(pagina_captacao_id=seg["pagina"])
+    if seg.get("temperatura"):
+        ops = ops.filter(analise__temperatura=seg["temperatura"])
+    if seg.get("status"):
+        ops = ops.filter(status=seg["status"])
+
+    ids = ops.values_list("pessoa_id", flat=True).distinct()
+    pessoas = (Pessoa.objects.filter(pk__in=ids, ativo=True, aceita_email=True)
+               .exclude(email=""))
+    ruins = (EnvioEmail.objects
+             .filter(status__in=[EnvioEmail.Status.BOUNCE, EnvioEmail.Status.RECLAMADO])
+             .values_list("email", flat=True))
+    return pessoas.exclude(email__in=ruins).order_by("nome")
+
+
+def descadastrar_por_token(token):
+    """Descadastro público (LGPD): desliga aceita_email. Idempotente. Devolve a Pessoa."""
+    from apps.nucleo.models import Pessoa
+    pessoa = Pessoa.objects.filter(unsub_token=token).first()
+    if pessoa is None:
+        return None
+    if pessoa.aceita_email:
+        pessoa.aceita_email = False
+        pessoa.email_descadastro_em = timezone.now()
+        pessoa.save(update_fields=["aceita_email", "email_descadastro_em"])
+    return pessoa
+
+
+def _op_recente(pessoa):
+    return (Oportunidade.objects.filter(pessoa=pessoa)
+            .order_by("-atualizado_em").first())
+
+
+def notificar_lead_novo(op_id):
+    """Avisa a equipe (e-mail) que um lead novo caiu no funil. Best-effort/assíncrono."""
+    op = (Oportunidade.objects
+          .filter(pk=op_id).select_related("pessoa", "pagina_captacao").first())
+    if op is None:
+        return
+    destinos = [e.strip() for e in getattr(settings, "LEADS_ALERTA_EMAILS", "").split(",")
+                if e.strip()]
+    if not destinos:
+        alvo = getattr(settings, "EMAIL_COMERCIAL_REPLY_TO", "") or ""
+        destinos = [alvo] if alvo else []
+    if not destinos:
+        return
+    p = op.pessoa
+    origem = op.pagina_captacao.nome if op.pagina_captacao else op.get_origem_display()
+    link = settings.SITE_PUBLIC_URL + f"/crm/comercial/{op.pk}/"
+    linhas = [
+        f"Novo lead capturado ({origem}):", "",
+        f"Nome: {p.nome}", f"WhatsApp: {p.telefone or '—'}", f"E-mail: {p.email or '—'}",
+    ]
+    if op.checkin_previsto and op.checkout_previsto:
+        linhas.append(f"Datas: {op.checkin_previsto:%d/%m} → {op.checkout_previsto:%d/%m}")
+    linhas += ["", f"Abrir no funil: {link}", "",
+               "Quem pegar primeiro assume o lead."]
+    texto = "\n".join(linhas)
+    html = "<p>" + "</p><p>".join(x or "&nbsp;" for x in linhas) + "</p>"
+    for d in destinos:
+        enviar_email(para=d, assunto=f"🔥 Novo lead: {p.nome}", html=html, texto=texto,
+                     usuario=None, oportunidade=None,
+                     assincrono=getattr(settings, "EMAIL_ENVIO_ASSINCRONO", True))
+
+
+def montar_email_boas_vindas(oportunidade):
+    """E-mail de boas-vindas ao lead recém-cadastrado (com descadastro/LGPD)."""
+    from urllib.parse import quote  # noqa: F401 (mantém paridade com montar_email_campanha)
+
+    from django.urls import reverse
+    op = oportunidade
+    p = op.pessoa
+    primeiro = (p.nome or "").split()[0] if p.nome else ""
+    saud = f"Oi, {primeiro}!" if primeiro else "Olá!"
+    corpo = (
+        f"{saud} Que bom ter você na lista de fundadores da Pousada Vô Testa 💛\n\n"
+        "Você vai ser um dos primeiros a saber das novidades, dos pacotes e da condição "
+        "especial de fundador — antes de abrirmos ao público.\n\n"
+        "Em breve a gente te chama. Qualquer coisa, é só responder este e-mail."
+    )
+    descadastro_url = settings.SITE_PUBLIC_URL + reverse(
+        "email_publico:descadastrar", args=[p.unsub_token])
+    contato = _contato_pousada()
+    url_whatsapp = f"https://wa.me/{contato['whatsapp']}" if contato["whatsapp"] else ""
+    ctx = {
+        "assunto": "Bem-vindo à lista de fundadores 💛",
+        "corpo_paragrafos": [x.strip() for x in corpo.split("\n\n") if x.strip()],
+        "descadastro_url": descadastro_url, "url_whatsapp": url_whatsapp,
+    }
+    html = render_to_string("comercial/email/campanha.html", ctx)
+    texto = corpo + f"\n\nDescadastrar: {descadastro_url}"
+    headers = {
+        "List-Unsubscribe": f"<{descadastro_url}>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    }
+    return {"assunto": ctx["assunto"], "html": html, "texto": texto, "headers": headers}
+
+
+def enviar_boas_vindas(op_id):
+    """Dispara o welcome ao lead (se tem e-mail e opt-in). Best-effort/assíncrono."""
+    if not getattr(settings, "LEAD_BOAS_VINDAS", True):
+        return
+    op = Oportunidade.objects.filter(pk=op_id).select_related("pessoa").first()
+    if op is None or op.pessoa is None:
+        return
+    email = (op.pessoa.email or "").strip()
+    if not email or not op.pessoa.aceita_email:
+        return
+    dados = montar_email_boas_vindas(op)
+    enviar_email(para=email, assunto=dados["assunto"], html=dados["html"],
+                 texto=dados["texto"], usuario=None, oportunidade=op, pessoa=op.pessoa,
+                 headers=dados["headers"],
+                 assincrono=getattr(settings, "EMAIL_ENVIO_ASSINCRONO", True))
+
+
+def montar_email_campanha(campanha, pessoa, oportunidade=None):
+    """Renderiza o e-mail da campanha para um destinatário (variáveis + descadastro)."""
+    from django.urls import reverse
+    op = oportunidade or _op_recente(pessoa)
+    if op is not None:
+        assunto = aplicar_variaveis_email(campanha.assunto, op)
+        corpo = aplicar_variaveis_email(campanha.corpo, op)
+    else:
+        primeiro = (pessoa.nome or "").split()[0] if pessoa.nome else ""
+        assunto = campanha.assunto.replace("{primeiro_nome}", primeiro)
+        corpo = campanha.corpo.replace("{primeiro_nome}", primeiro)
+
+    descadastro_url = settings.SITE_PUBLIC_URL + reverse(
+        "email_publico:descadastrar", args=[pessoa.unsub_token])
+    contato = _contato_pousada()
+    url_whatsapp = (f"https://wa.me/{contato['whatsapp']}"
+                    if contato["whatsapp"] else "")
+    contexto = {
+        "assunto": assunto,
+        "corpo_paragrafos": [p.strip() for p in corpo.split("\n\n") if p.strip()],
+        "descadastro_url": descadastro_url, "url_whatsapp": url_whatsapp,
+    }
+    html = render_to_string("comercial/email/campanha.html", contexto)
+    texto = corpo + f"\n\nDescadastrar: {descadastro_url}"
+    headers = {
+        "List-Unsubscribe": f"<{descadastro_url}>",
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+    }
+    return {"assunto": assunto, "html": html, "texto": texto, "headers": headers}
+
+
+def criar_campanha_email(*, nome, assunto, corpo, segmento, usuario, template=None,
+                         agendar_para=None):
+    from .models import CampanhaEmail
+    return CampanhaEmail.objects.create(
+        nome=nome, assunto=assunto, corpo=corpo, segmento=segmento or {},
+        template=template, agendar_para=agendar_para, criado_por=usuario,
+        status=(CampanhaEmail.Status.AGENDADA if agendar_para
+                else CampanhaEmail.Status.RASCUNHO))
+
+
+def enviar_campanha_email(campanha, usuario=None):
+    """Dispara a campanha para o público do segmento. Idempotente por (campanha, pessoa):
+    não reenvia a quem já recebeu. Atualiza contadores e status."""
+    from .models import CampanhaEmail, EnvioEmail
+
+    if campanha.status in (CampanhaEmail.Status.ENVIADA, CampanhaEmail.Status.CANCELADA):
+        return campanha
+    campanha.status = CampanhaEmail.Status.ENVIANDO
+    campanha.save(update_fields=["status"])
+
+    ja_enviados = set(EnvioEmail.objects.filter(
+        campanha=campanha, status=EnvioEmail.Status.ENVIADO
+    ).values_list("pessoa_id", flat=True))
+
+    publico = publico_da_campanha(campanha.segmento)
+    total = enviados = erros = 0
+    for pessoa in publico:
+        total += 1
+        if pessoa.pk in ja_enviados:
+            continue
+        dados = montar_email_campanha(campanha, pessoa)
+        envio = enviar_email(
+            para=pessoa.email, assunto=dados["assunto"], html=dados["html"],
+            texto=dados["texto"], usuario=usuario, pessoa=pessoa,
+            campanha=campanha, headers=dados["headers"], assincrono=False)
+        if envio.status == EnvioEmail.Status.ENVIADO:
+            enviados += 1
+        else:
+            erros += 1
+
+    campanha.total = total
+    campanha.enviados = len(ja_enviados) + enviados
+    campanha.erros = erros
+    campanha.status = CampanhaEmail.Status.ENVIADA
+    campanha.enviada_em = timezone.now()
+    campanha.save(update_fields=["total", "enviados", "erros", "status", "enviada_em"])
+    return campanha
 
 
 def criar_cobranca_sinal(oportunidade, usuario, valor=None, metodo="pix"):

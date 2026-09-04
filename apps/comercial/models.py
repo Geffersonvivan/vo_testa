@@ -845,6 +845,10 @@ class EnvioEmail(models.Model):
         Oportunidade, on_delete=models.CASCADE, related_name="emails",
         null=True, blank=True, verbose_name="oportunidade",
     )
+    campanha = models.ForeignKey(
+        "CampanhaEmail", on_delete=models.CASCADE, related_name="envios",
+        null=True, blank=True, verbose_name="campanha",
+    )
     pessoa = models.ForeignKey(
         "nucleo.Pessoa", on_delete=models.SET_NULL, related_name="emails_comerciais",
         null=True, blank=True, verbose_name="destinatário (pessoa)",
@@ -896,6 +900,51 @@ class TemplateEmail(models.Model):
         ordering = ["nome"]
         verbose_name = "template de e-mail"
         verbose_name_plural = "templates de e-mail"
+
+    def __str__(self):
+        return self.nome
+
+
+class CampanhaEmail(models.Model):
+    """Disparo de e-mail em massa para um segmento do funil.
+
+    `segmento` é um dict de filtros (etapa/temperatura/origem/pagina). O envio materializa
+    um EnvioEmail por destinatário (idempotente). Os contadores são desnormalizados.
+    """
+
+    class Status(models.TextChoices):
+        RASCUNHO = "rascunho", "Rascunho"
+        AGENDADA = "agendada", "Agendada"
+        ENVIANDO = "enviando", "Enviando"
+        ENVIADA = "enviada", "Enviada"
+        CANCELADA = "cancelada", "Cancelada"
+
+    nome = models.CharField("nome", max_length=100)
+    assunto = models.CharField("assunto", max_length=200)
+    corpo = models.TextField("corpo (com variáveis)")
+    template = models.ForeignKey(
+        "TemplateEmail", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="campanhas", verbose_name="template de origem",
+    )
+    segmento = models.JSONField("segmento (filtros)", default=dict, blank=True)
+    status = models.CharField("status", max_length=10, choices=Status.choices,
+                              default=Status.RASCUNHO)
+    agendar_para = models.DateTimeField("agendar para", null=True, blank=True)
+    # Contadores desnormalizados (atualizados no envio).
+    total = models.PositiveIntegerField("público-alvo", default=0)
+    enviados = models.PositiveIntegerField("enviados", default=0)
+    erros = models.PositiveIntegerField("erros", default=0)
+    criado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name="campanhas_email", verbose_name="criado por",
+    )
+    criado_em = models.DateTimeField("criada em", auto_now_add=True)
+    enviada_em = models.DateTimeField("enviada em", null=True, blank=True)
+
+    class Meta:
+        ordering = ["-criado_em"]
+        verbose_name = "campanha de e-mail"
+        verbose_name_plural = "campanhas de e-mail"
 
     def __str__(self):
         return self.nome

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block titulo %}Nova campanha — Comercial{% endblock %}
+
+{% block conteudo %}
+{% include "comercial/_estilo_elegante.html" %}
+<div class="eleg">
+  <p class="pagina-eyebrow letreiro">Comercial · E-mail</p>
+  <div class="pagina-cabecalho">
+    <h1>Nova campanha</h1>
+    <a href="{% url 'comercial:email_campanhas' %}" class="botao-neutro">Cancelar</a>
+  </div>
+
+  <form method="post" class="cartao-el eleg-form">
+    {% csrf_token %}
+
+    <div class="campo-el">
+      <label>Usar um template (opcional)</label>
+      <select id="tpl-sel" onchange="usarTemplate()">
+        <option value="">— começar do zero —</option>
+        {% for t in templates %}
+          <option value="{{ t.pk }}" data-assunto="{{ t.assunto }}" data-corpo="{{ t.corpo }}">{{ t.nome }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="campo-el"><label>Nome da campanha</label><input type="text" name="nome" required></div>
+    <div class="campo-el"><label>Assunto</label><input type="text" id="f-assunto" name="assunto" maxlength="200" required></div>
+    <div class="campo-el">
+      <label>Corpo</label>
+      <textarea id="f-corpo" name="corpo" rows="8" required></textarea>
+      <p class="ajuda">Variáveis: <code>{primeiro_nome}</code> <code>{quarto}</code> <code>{checkin}</code> <code>{checkout}</code> <code>{noites}</code> <code>{pessoas}</code> <code>{total}</code>. O rodapé de descadastro entra automaticamente (LGPD).</p>
+    </div>
+
+    <fieldset class="seg">
+      <legend>Segmento (deixe em branco para todos os leads)</legend>
+      <div class="seg-grid">
+        <div class="campo-el"><label>Etapa</label>
+          <select name="etapa"><option value="">Todas</option>{% for e in etapas %}<option value="{{ e.pk }}">{{ e.nome }}</option>{% endfor %}</select>
+        </div>
+        <div class="campo-el"><label>Temperatura</label>
+          <select name="temperatura"><option value="">Todas</option>{% for v, r in temperaturas %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
+        </div>
+        <div class="campo-el"><label>Origem</label>
+          <select name="origem"><option value="">Todas</option>{% for v, r in origens %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
+        </div>
+        <div class="campo-el"><label>Status</label>
+          <select name="status"><option value="">Todos</option>{% for v, r in status_ops %}<option value="{{ v }}">{{ r }}</option>{% endfor %}</select>
+        </div>
+        <div class="campo-el"><label>Landing Page</label>
+          <select name="pagina"><option value="">Todas</option>{% for p in paginas %}<option value="{{ p.pk }}">{{ p.nome }}</option>{% endfor %}</select>
+        </div>
+        <div class="campo-el"><label>Agendar para (opcional)</label>
+          <input type="datetime-local" name="agendar_para">
+        </div>
+      </div>
+    </fieldset>
+
+    <div class="eleg-acoes">
+      <button type="submit" class="botao-primario">Criar campanha</button>
+    </div>
+  </form>
+</div>
+
+<style>
+  .eleg-form{ max-width:720px; display:flex; flex-direction:column; gap:1.1rem; }
+  .eleg-form .campo-el label{ display:block; font-weight:600; font-size:.9rem; margin-bottom:.35rem; }
+  .eleg-form input:not([type=checkbox]), .eleg-form select, .eleg-form textarea{ width:100%; }
+  .eleg-form .ajuda{ font-size:.82rem; color:var(--tinta-suave); margin:.35rem 0 0; }
+  .eleg-form .ajuda code{ background:rgba(40,30,15,.06); padding:1px 5px; border-radius:5px; }
+  .seg{ border:1px solid var(--fio); border-radius:var(--raio); padding:1rem 1.1rem; }
+  .seg legend{ font-size:.8rem; text-transform:uppercase; letter-spacing:.06em; color:var(--tinta-suave); padding:0 .4rem; }
+  .seg-grid{ display:grid; grid-template-columns:1fr 1fr; gap:.9rem; }
+  @media (max-width:640px){ .seg-grid{ grid-template-columns:1fr; } }
+</style>
+<script>
+  function usarTemplate(){
+    var o = document.getElementById('tpl-sel').selectedOptions[0];
+    if(!o || !o.value) return;
+    document.getElementById('f-assunto').value = o.dataset.assunto || '';
+    document.getElementById('f-corpo').value = o.dataset.corpo || '';
+  }
+</script>
+{% endblock %}
