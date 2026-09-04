@@ -1534,12 +1534,11 @@ def montar_email_boas_vindas(oportunidade):
         f"{saud} Que bom ter você na lista de fundadores da Pousada Vô Testa 💛\n\n"
         "Você vai ser um dos primeiros a saber das novidades, dos pacotes e da condição "
         "especial de fundador — antes de abrirmos ao público.\n\n"
-        "Em breve a gente te chama. Qualquer coisa, é só responder este e-mail."
+        "Em breve a gente te chama."
     )
     descadastro_url = settings.SITE_PUBLIC_URL + reverse(
         "email_publico:descadastrar", args=[p.unsub_token])
-    contato = _contato_pousada()
-    url_whatsapp = f"https://wa.me/{contato['whatsapp']}" if contato["whatsapp"] else ""
+    url_whatsapp = ""  # WhatsApp ainda não disponível — sem botão por ora
     ctx = {
         "assunto": "Bem-vindo à lista de fundadores 💛",
         "corpo_paragrafos": [x.strip() for x in corpo.split("\n\n") if x.strip()],
@@ -1585,9 +1584,7 @@ def montar_email_campanha(campanha, pessoa, oportunidade=None):
 
     descadastro_url = settings.SITE_PUBLIC_URL + reverse(
         "email_publico:descadastrar", args=[pessoa.unsub_token])
-    contato = _contato_pousada()
-    url_whatsapp = (f"https://wa.me/{contato['whatsapp']}"
-                    if contato["whatsapp"] else "")
+    url_whatsapp = ""  # WhatsApp ainda não disponível — sem botão por ora
     contexto = {
         "assunto": assunto,
         "corpo_paragrafos": [p.strip() for p in corpo.split("\n\n") if p.strip()],

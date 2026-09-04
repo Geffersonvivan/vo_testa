@@ -27,8 +27,9 @@ def _lp_html() -> str:
 
 
 def servir_lp_fundador(request):
-    """Renderiza a LP Fundador (HTML autocontido)."""
-    return HttpResponse(_lp_html())
+    """Renderiza a LP Fundador (HTML autocontido). Injeta o Google tag (env)."""
+    html = _lp_html().replace("__GTAG_ID__", getattr(settings, "GOOGLE_TAG_ID", "") or "")
+    return HttpResponse(html)
 
 
 def privacidade(request):

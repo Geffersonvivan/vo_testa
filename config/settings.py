@@ -314,6 +314,9 @@ HOME_MODO = os.environ.get("HOME_MODO", "")
 
 # E-mails avisados quando um lead novo cai no funil (vírgula). Vazio → comercial@.
 LEADS_ALERTA_EMAILS = os.environ.get("LEADS_ALERTA_EMAILS", "")
+# Google tag (GA4 "G-…" ou Google Ads "AW-…") injetado na LP. Padrão = GA4 da pousada;
+# pode sobrescrever/desligar via env (ID é público, fica no client-side de qualquer jeito).
+GOOGLE_TAG_ID = os.environ.get("GOOGLE_TAG_ID", "G-40Q43DCPR8")
 # Boas-vindas automáticas ao lead que se cadastra (LP/site). Desligável por env.
 LEAD_BOAS_VINDAS = os.environ.get("LEAD_BOAS_VINDAS", "1") == "1"
 
