@@ -26,9 +26,34 @@ def _lp_html() -> str:
     return _LP_CACHE["html"]
 
 
+_BOTS = ("bot", "crawl", "spider", "facebookexternalhit", "whatsapp", "preview",
+         "slurp", "bingpreview", "embedly", "quora", "pinterest", "telegrambot",
+         "developers.google.com", "headless")
+
+
+def _contar_visita_lp(request):
+    """+1 visita na Página de Captação 'fundador' (pula scrapers/preview de link)."""
+    ua = (request.META.get("HTTP_USER_AGENT", "") or "").lower()
+    if not ua or any(b in ua for b in _BOTS):
+        return
+    from .models import PaginaCaptacao
+    pagina = PaginaCaptacao.objects.filter(slug="fundador").first()
+    if pagina:
+        services.registrar_visita_pagina(pagina)
+
+
+@never_cache
 def servir_lp_fundador(request):
-    """Renderiza a LP Fundador (HTML autocontido). Injeta o Google tag (env)."""
+    """Renderiza a LP Fundador (HTML autocontido). Injeta o Google tag (env).
+
+    `@never_cache`: sem isto, recarregar/voltar no histórico ou um proxy serviriam do
+    cache e a visita nunca chegaria ao servidor — subcontando as métricas.
+    """
     html = _lp_html().replace("__GTAG_ID__", getattr(settings, "GOOGLE_TAG_ID", "") or "")
+    try:
+        _contar_visita_lp(request)
+    except Exception:  # noqa: BLE001 — métrica nunca quebra a LP
+        pass
     return HttpResponse(html)
 
 
