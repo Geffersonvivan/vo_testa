@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from django.conf import settings
+from django.core.cache import cache
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.cache import never_cache
@@ -17,6 +18,13 @@ from . import services
 
 _LP_PATH = Path(settings.BASE_DIR) / "LPs" / "LP_Fundador" / "LP_Fundador.html"
 _LP_CACHE = {"html": None}
+
+# Anti-abuso do endpoint público de lead (não é auth — só corta spam/bot):
+_RATE_MAX = 6            # nº de leads aceitos por IP
+_RATE_JANELA = 600       # … a cada 10 min
+_MIN_MS = 1500           # tempo mínimo de preenchimento (bot posta instantâneo)
+_VISITA_COOKIE = "lpv_fundador"   # conta 1 visita por navegador (dedupe reload)
+_VISITA_TTL = 6 * 3600
 
 
 def _lp_html() -> str:
@@ -29,6 +37,12 @@ def _lp_html() -> str:
 _BOTS = ("bot", "crawl", "spider", "facebookexternalhit", "whatsapp", "preview",
          "slurp", "bingpreview", "embedly", "quora", "pinterest", "telegrambot",
          "developers.google.com", "headless")
+
+
+def _ip(request) -> str:
+    """IP do cliente respeitando o proxy do Railway (X-Forwarded-For)."""
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    return (xff.split(",")[0].strip() if xff else request.META.get("REMOTE_ADDR", "")) or "?"
 
 
 def _contar_visita_lp(request):
@@ -48,13 +62,19 @@ def servir_lp_fundador(request):
 
     `@never_cache`: sem isto, recarregar/voltar no histórico ou um proxy serviriam do
     cache e a visita nunca chegaria ao servidor — subcontando as métricas.
+    Conta 1 visita por navegador (cookie `lpv_fundador`) — reload/back não infla.
     """
     html = _lp_html().replace("__GTAG_ID__", getattr(settings, "GOOGLE_TAG_ID", "") or "")
-    try:
-        _contar_visita_lp(request)
-    except Exception:  # noqa: BLE001 — métrica nunca quebra a LP
-        pass
-    return HttpResponse(html)
+    resp = HttpResponse(html)
+    if not request.COOKIES.get(_VISITA_COOKIE):
+        try:
+            _contar_visita_lp(request)
+        except Exception:  # noqa: BLE001 — métrica nunca quebra a LP
+            pass
+        resp.set_cookie(_VISITA_COOKIE, "1", max_age=_VISITA_TTL,
+                        httponly=True, samesite="Lax",
+                        secure=not settings.DEBUG)
+    return resp
 
 
 def privacidade(request):
@@ -80,6 +100,27 @@ def lp_fundador_lead(request):
     except (ValueError, TypeError):
         return JsonResponse({"ok": False, "erro": "json inválido"}, status=400)
 
+    # Anti-bot silencioso: honeypot preenchido ou envio instantâneo → finge sucesso
+    # (não revela a defesa) e descarta sem criar lead nem chamar a CAPI.
+    if (dados.get("empresa") or "").strip():
+        return JsonResponse({"ok": True})
+    try:
+        ms = float(dados.get("ms") or 0)
+    except (TypeError, ValueError):
+        ms = 0
+    if 0 < ms < _MIN_MS:
+        return JsonResponse({"ok": True})
+
+    # Rate limit por IP (corta flood de leads/CAPI). Best-effort — cache pode faltar.
+    ip = _ip(request)
+    try:
+        chave = f"lp_lead_rate:{ip}"
+        cache.add(chave, 0, _RATE_JANELA)
+        if cache.incr(chave) > _RATE_MAX:
+            return JsonResponse({"ok": True})  # silencioso
+    except Exception:  # noqa: BLE001 — sem cache, segue sem rate limit
+        pass
+
     nome = (dados.get("nome") or "").strip()
     email = (dados.get("email") or "").strip()
     whats = (dados.get("whatsapp") or dados.get("whats") or "").strip()
@@ -101,8 +142,7 @@ def lp_fundador_lead(request):
 
     # Conversions API (Meta) pelo servidor — dedupe com o Pixel via event_id.
     try:
-        xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
-        ip = (xff.split(",")[0].strip() if xff else request.META.get("REMOTE_ADDR", ""))
+        ip = _ip(request)
         services.enviar_capi_lead(
             email=email, telefone=whats,
             event_id=(dados.get("event_id") or ""),

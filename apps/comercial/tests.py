@@ -506,6 +506,54 @@ class LPFundadorTests(TestCase):
         self.assertEqual(len(ev["user_data"]["em"][0]), 64)      # SHA-256
         self.assertNotIn("@", ev["user_data"]["em"][0])          # nunca em claro
 
+    def test_honeypot_descarta_bot_silenciosamente(self):
+        import json
+        r = self.client.post(
+            reverse("lp:fundador_lead"),
+            data=json.dumps({"nome": "Bot", "email": "bot@ex.com",
+                             "whatsapp": "49999887766", "empresa": "Spam LTDA"}),
+            content_type="application/json")
+        self.assertEqual(r.status_code, 200)          # finge sucesso
+        self.assertFalse(Oportunidade.objects.filter(pessoa__email="bot@ex.com").exists())
+
+    def test_envio_instantaneo_descarta(self):
+        import json
+        r = self.client.post(
+            reverse("lp:fundador_lead"),
+            data=json.dumps({"nome": "Rapido", "email": "rapido@ex.com",
+                             "whatsapp": "49999887766", "ms": 200}),
+            content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        self.assertFalse(Oportunidade.objects.filter(pessoa__email="rapido@ex.com").exists())
+
+    def test_rate_limit_corta_flood_por_ip(self):
+        import json
+
+        from django.core.cache import cache
+        cache.clear()
+        criados = 0
+        for i in range(10):
+            self.client.post(
+                reverse("lp:fundador_lead"),
+                data=json.dumps({"nome": f"Lead {i}", "email": f"l{i}@ex.com",
+                                 "whatsapp": "49999887766", "ms": 5000}),
+                content_type="application/json", REMOTE_ADDR="203.0.113.9")
+        criados = Oportunidade.objects.filter(pessoa__email__endswith="@ex.com").count()
+        self.assertLessEqual(criados, 6)              # _RATE_MAX
+        self.assertGreater(criados, 0)
+
+    def test_visita_conta_uma_vez_por_navegador(self):
+        ua = "Mozilla/5.0 (Macintosh)"
+        self.client.get(reverse("lp:fundador"), HTTP_USER_AGENT=ua)
+        self.client.get(reverse("lp:fundador"), HTTP_USER_AGENT=ua)  # 2º hit já traz o cookie
+        self.pag.refresh_from_db()
+        self.assertEqual(self.pag.visitas, 1)
+
+    def test_visita_pula_bot_por_user_agent(self):
+        self.client.get(reverse("lp:fundador"), HTTP_USER_AGENT="facebookexternalhit/1.1")
+        self.pag.refresh_from_db()
+        self.assertEqual(self.pag.visitas, 0)
+
     @override_settings(EMAIL_ENVIO_ASSINCRONO=False, LEADS_ALERTA_EMAILS="time@ex.com")
     def test_lead_dispara_alerta_e_boas_vindas(self):
         import json

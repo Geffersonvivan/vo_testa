@@ -88,7 +88,7 @@ body{
   -webkit-font-smoothing:antialiased;
   overflow-x:hidden;
 }
-h1,h2,h3{font-family:"Gloock",Georgia,serif;font-weight:400;line-height:1.06;letter-spacing:-.01em;margin:0}
+h1,h2,h3{font-family:"Gloock",Georgia,serif;font-weight:400;line-height:1.06;letter-spacing:-.01em;margin:0;overflow-wrap:break-word}
 p{margin:0}
 a{color:inherit;text-decoration:none}
 img{display:block;max-width:100%}
@@ -127,11 +127,11 @@ header{
 /* ---------- Hero (assimétrico) ---------- */
 .hero{position:relative;padding-block:clamp(3.5rem,9vw,7rem) var(--gap-sec)}
 .hero-grid{
-  display:grid;grid-template-columns:1.15fr .85fr;gap:clamp(2rem,5vw,4.5rem);
+  display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:clamp(2rem,5vw,4.5rem);
   align-items:center;
 }
 .eyebrow{font-size:.95rem;color:var(--lampiao);margin-bottom:1.4rem;font-style:italic}
-.hero h1{font-size:clamp(2.5rem,2rem + 3.6vw,4.6rem);max-width:14ch}
+.hero h1{font-size:clamp(2.05rem,1.3rem + 4vw,4.6rem);max-width:14ch}
 .hero .lede{margin-top:1.6rem;max-width:46ch;color:var(--pergaminho-70);font-size:1.22rem}
 .hero .cta-row{margin-top:2.4rem;display:flex;flex-wrap:wrap;gap:1rem}
 
@@ -164,7 +164,7 @@ header{
   70%{box-shadow:0 0 0 7px rgba(215,160,72,0)}
   100%{box-shadow:0 0 0 0 rgba(215,160,72,0)}
 }
-.of-title{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.of-title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .of-date{color:var(--lampiao);white-space:nowrap}
 .of-line{
   margin:0;padding:.95rem .95rem 1.05rem;min-height:3.1em;
@@ -177,7 +177,7 @@ header{
 @media(prefers-reduced-motion:reduce){.of-cursor,.of-dot{animation:none}}
 
 @media(max-width:860px){
-  .hero-grid{grid-template-columns:1fr;text-align:left}
+  .hero-grid{grid-template-columns:minmax(0,1fr);text-align:left}
   .hero-logo-holder{order:-1;margin-bottom:1rem}
   .hero-logo{width:min(66%,300px)}
   .oficina{max-width:100%}
@@ -363,6 +363,10 @@ footer .links a:hover{color:var(--lampiao)}
           <label for="whats">WhatsApp</label>
           <input type="text" id="whats" name="whats" inputmode="numeric" autocomplete="tel" placeholder="(00) 00000-0000" aria-invalid="false">
           <span class="err" id="err-whats">Confira o número. Precisa do DDD e do WhatsApp completo.</span>
+        </div>
+        <div aria-hidden="true" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0">
+          <label for="empresa">Empresa</label>
+          <input type="text" id="empresa" name="empresa" tabindex="-1" autocomplete="off">
         </div>
         <label class="consent" id="consent-wrap">
           <input type="checkbox" id="consent" name="consent">
@@ -566,6 +570,7 @@ const email = document.getElementById('email');
 const whats = document.getElementById('whats');
 const consent = document.getElementById('consent');
 const consentWrap = document.getElementById('consent-wrap');
+const FORM_T0 = Date.now();   // p/ medir o tempo de preenchimento (anti-bot)
 const reEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /* Máscara de WhatsApp (BR) */
@@ -607,7 +612,9 @@ form.addEventListener('submit', async e=>{
   var eventId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(16).slice(2));
   const dados = { nome:nome.value.trim(), email:email.value.trim(), whatsapp:digitos,
                   origem:'lp-fundador', consent:true, rastreio,
-                  event_id:eventId, fbp:cookie('_fbp'), fbc:cookie('_fbc') };
+                  event_id:eventId, fbp:cookie('_fbp'), fbc:cookie('_fbc'),
+                  empresa:(document.getElementById('empresa')||{}).value||'',
+                  ms: Date.now() - FORM_T0 };
 
   try{
     if(CONFIG.CRM_ENDPOINT){
