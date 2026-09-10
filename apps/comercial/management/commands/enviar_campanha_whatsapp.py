@@ -36,7 +36,7 @@ class Command(BaseCommand):
         if opts["slug"]:
             qs = qs.filter(pagina_captacao__slug=opts["slug"])
 
-        elegiveis = [o for o in qs if (o.pessoa.telefone or "").strip() and o.pessoa.aceita_email]
+        elegiveis = [o for o in qs if (o.pessoa.telefone or "").strip() and o.pessoa.aceita_whatsapp]
         self.stdout.write(f"Leads elegíveis (telefone + opt-in): {len(elegiveis)}")
 
         if opts["dry_run"]:

@@ -342,11 +342,21 @@ def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
         if mudou:
             pessoa.save(update_fields=mudou)
 
-    # Consentimento explícito da LP (opt-in): carimba a data uma vez.
-    if aceita_email and (not pessoa.aceita_email or pessoa.email_optin_em is None):
-        pessoa.aceita_email = True
-        pessoa.email_optin_em = pessoa.email_optin_em or timezone.now()
-        pessoa.save(update_fields=["aceita_email", "email_optin_em"])
+    # Consentimento explícito da LP (opt-in) — concede e-mail E WhatsApp (o texto da LP
+    # autoriza os dois). Carimba cada data uma vez; canais desligam-se de forma
+    # independente depois (descadastro de e-mail vs. "sair" no WhatsApp).
+    if aceita_email:
+        campos = []
+        if not pessoa.aceita_email or pessoa.email_optin_em is None:
+            pessoa.aceita_email = True
+            pessoa.email_optin_em = pessoa.email_optin_em or timezone.now()
+            campos += ["aceita_email", "email_optin_em"]
+        if not pessoa.aceita_whatsapp or pessoa.whatsapp_optin_em is None:
+            pessoa.aceita_whatsapp = True
+            pessoa.whatsapp_optin_em = pessoa.whatsapp_optin_em or timezone.now()
+            campos += ["aceita_whatsapp", "whatsapp_optin_em"]
+        if campos:
+            pessoa.save(update_fields=campos)
 
     Prospecto.objects.get_or_create(pessoa=pessoa)
 
@@ -1312,9 +1322,14 @@ def receber_mensagem_whatsapp(*, oportunidade=None, telefone=None, texto,
         from apps.nucleo.models import Pessoa
         so_num = "".join(c for c in telefone if c.isdigit())
         pessoa = Pessoa.objects.filter(telefone__contains=so_num[-8:]).first() if so_num else None
-        oportunidade = (Oportunidade.objects.filter(pessoa=pessoa,
-                        status=Oportunidade.Status.ABERTA).order_by("-criado_em").first()
-                        if pessoa else None)
+        if pessoa:
+            # Prefere a oportunidade em aberto; se não houver (lead já ganho/perdido),
+            # anexa à mais recente — a resposta do cliente nunca se perde e a janela
+            # de 24h abre para atender inclusive quem já reservou.
+            base = Oportunidade.objects.filter(pessoa=pessoa)
+            oportunidade = (
+                base.filter(status=Oportunidade.Status.ABERTA).order_by("-criado_em").first()
+                or base.order_by("-criado_em").first())
     if oportunidade is None:
         return None
     if id_externo and MensagemWhatsApp.objects.filter(id_externo=id_externo).exists():
@@ -1458,11 +1473,12 @@ def processar_webhook_whatsapp(payload: dict) -> dict:
 
 
 def _marcar_opt_out(oportunidade):
-    """Cliente pediu para sair: retira o opt-in de contato da pessoa (LGPD)."""
+    """Cliente pediu para sair PELO WHATSAPP: desliga só o consentimento de WhatsApp
+    (o e-mail é canal à parte, com seu próprio descadastro)."""
     pessoa = oportunidade.pessoa
-    if pessoa.aceita_email:
-        pessoa.aceita_email = False
-        pessoa.save(update_fields=["aceita_email"])
+    if pessoa.aceita_whatsapp:
+        pessoa.aceita_whatsapp = False
+        pessoa.save(update_fields=["aceita_whatsapp"])
 
 
 def disparar_campanha_whatsapp(*, template, idioma="pt_BR", leads=None, usuario=None,
@@ -1470,7 +1486,8 @@ def disparar_campanha_whatsapp(*, template, idioma="pt_BR", leads=None, usuario=
     """Dispara um template para uma lista de leads (best-effort). Respeita opt-in.
 
     `leads`: queryset de Oportunidade (default = abertas). Pula quem não tem telefone
-    ou não deu opt-in (`pessoa.aceita_email`). Devolve o resumo (enviados/pulados/erros).
+    ou não deu opt-in de WhatsApp (`pessoa.aceita_whatsapp`). Devolve o resumo
+    (enviados/pulados/erros).
     """
     from .models import MensagemWhatsApp, Oportunidade
 
@@ -1479,7 +1496,7 @@ def disparar_campanha_whatsapp(*, template, idioma="pt_BR", leads=None, usuario=
     resumo = {"enviados": 0, "pulados": 0, "erros": 0}
     for op in qs.select_related("pessoa"):
         pessoa = op.pessoa
-        if not (pessoa.telefone or "").strip() or not pessoa.aceita_email:
+        if not (pessoa.telefone or "").strip() or not pessoa.aceita_whatsapp:
             resumo["pulados"] += 1
             continue
         variaveis = [(pessoa.nome or "").split()[0]] if so_primeiro_nome else []

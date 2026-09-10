@@ -481,6 +481,7 @@ class LPFundadorTests(TestCase):
         self.assertEqual(op.pagina_captacao, self.pag)
         self.assertEqual(op.origem_rastreio.get("utm_source"), "instagram")
         self.assertTrue(op.pessoa.aceita_email)
+        self.assertTrue(op.pessoa.aceita_whatsapp)  # o consent da LP concede os dois
 
     def test_lead_incompleto_400(self):
         import json
@@ -579,7 +580,8 @@ class WhatsAppCloudTests(TestCase):
     def setUp(self):
         self.user = Usuario.objects.create_superuser(username="wa", password="senha-forte-123")
         self.pessoa = Pessoa.objects.create(
-            nome="Maria Silva", telefone="49999887766", aceita_email=True)
+            nome="Maria Silva", telefone="49999887766",
+            aceita_email=True, aceita_whatsapp=True)
         self.op = services.criar_oportunidade(
             usuario=self.user, pessoa=self.pessoa, titulo="Lead WA")
 
@@ -661,13 +663,26 @@ class WhatsAppCloudTests(TestCase):
         m.refresh_from_db()
         self.assertEqual(m.status, "erro")
 
-    def test_webhook_opt_out_desliga_optin(self):
+    def test_webhook_opt_out_desliga_so_whatsapp(self):
         import json
         self.client.post(reverse("whatsapp:webhook"),
                          data=json.dumps(self._payload_msg(texto="Sair", wamid="wamid.OUT")),
                          content_type="application/json")
         self.pessoa.refresh_from_db()
-        self.assertFalse(self.pessoa.aceita_email)
+        self.assertFalse(self.pessoa.aceita_whatsapp)   # WhatsApp desligado
+        self.assertTrue(self.pessoa.aceita_email)       # e-mail intacto (canal à parte)
+
+    def test_reply_de_lead_ganho_abre_janela(self):
+        import json
+        # lead já convertido (não-ABERTA): a resposta não pode se perder
+        self.op.status = Oportunidade.Status.GANHA
+        self.op.save(update_fields=["status"])
+        self.client.post(reverse("whatsapp:webhook"),
+                         data=json.dumps(self._payload_msg(wamid="wamid.GANHO")),
+                         content_type="application/json")
+        conv = self.op.conversa_whatsapp
+        self.assertEqual(conv.mensagens.filter(direcao="entrada").count(), 1)
+        self.assertTrue(conv.janela_aberta)
 
     def test_webhook_status_failed_nao_reverte(self):
         import json

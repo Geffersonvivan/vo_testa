@@ -42,6 +42,10 @@ class Pessoa(models.Model):
     aceita_email = models.BooleanField("aceita e-mails", default=True)
     email_optin_em = models.DateTimeField("opt-in de e-mail em", null=True, blank=True)
     email_descadastro_em = models.DateTimeField("descadastro em", null=True, blank=True)
+    # Consentimento de WhatsApp — INDEPENDENTE do e-mail (canais não se contaminam).
+    # O opt-in da LP concede os dois; o "sair" no WhatsApp desliga só este.
+    aceita_whatsapp = models.BooleanField("aceita WhatsApp", default=False)
+    whatsapp_optin_em = models.DateTimeField("opt-in de WhatsApp em", null=True, blank=True)
     unsub_token = models.UUIDField("token de descadastro", default=uuid.uuid4,
                                    editable=False, unique=True, db_index=True)
     criado_em = models.DateTimeField("criado em", auto_now_add=True)
