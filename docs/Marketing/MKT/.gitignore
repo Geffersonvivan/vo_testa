@@ -1,0 +1,4 @@
+# Dados pessoais de clientes (LGPD) — nunca versionar
+leads_funil.csv
+*leads*.csv
+*_pii*.csv
