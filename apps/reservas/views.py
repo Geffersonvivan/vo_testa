@@ -522,6 +522,7 @@ def pagamento_novo(request, pk):
                 form.cleaned_data["valor"],
                 form.cleaned_data["parcelas"],
                 form.cleaned_data.get("observacao", ""),
+                autorizacao=form.cleaned_data.get("autorizacao", ""),
             )
             messages.success(request, "Pagamento recebido no seu caixa.")
         except (ValidationError, Reserva.conta.RelatedObjectDoesNotExist) as erro:
@@ -550,6 +551,7 @@ def adiantamento_novo(request, pk):
                 form.cleaned_data["forma"],
                 form.cleaned_data["valor"],
                 form.cleaned_data["parcelas"],
+                autorizacao=form.cleaned_data.get("autorizacao", ""),
             )
             messages.success(request, "Adiantamento recebido no seu caixa.")
         except ValidationError as erro:
@@ -877,6 +879,7 @@ def grupo_receber_folio(request, pk):
                     grupo, request.user, form.cleaned_data["forma"],
                     form.cleaned_data["valor"], form.cleaned_data.get("parcelas", 1),
                     form.cleaned_data.get("observacao", ""),
+                    autorizacao=form.cleaned_data.get("autorizacao", ""),
                 )
                 messages.success(request, "Recebimento do folio registrado.")
             except ValidationError as erro:

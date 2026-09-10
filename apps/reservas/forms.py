@@ -95,6 +95,12 @@ class RecebimentoForm(forms.Form):
         }),
     )
     parcelas = forms.IntegerField(label="Parcelas", min_value=1, initial=1)
+    autorizacao = forms.CharField(
+        label="Autorização / NSU (cartão)", required=False, max_length=40,
+        widget=forms.TextInput(attrs={
+            "placeholder": "Do comprovante da maquininha — p/ conciliar",
+        }),
+    )
     observacao = forms.CharField(
         label="Pagador / observação (rateio)", required=False, max_length=120,
         widget=forms.TextInput(attrs={"placeholder": "Ex.: Casal A, cartão do João"}),

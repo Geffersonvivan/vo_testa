@@ -18,7 +18,6 @@ from apps.nucleo.models import (
     UH,
     FormaPagamento,
     MovimentoCaixa,
-    SessaoCaixa,
     Temporada,
     TipoUH,
     registrar_auditoria,
@@ -585,7 +584,8 @@ def lancar_na_conta(
 
 
 def _receber_no_caixa(
-    usuario, forma: FormaPagamento, valor: Decimal, descricao: str, parcelas: int = 1
+    usuario, forma: FormaPagamento, valor: Decimal, descricao: str, parcelas: int = 1,
+    autorizacao: str = "",
 ) -> MovimentoCaixa:
     """Recebimento pelo caixa de RESERVAS do operador — gaveta própria da recepção,
     separada de Loja/Restaurante. Delega ao helper público do núcleo."""
@@ -593,7 +593,8 @@ def _receber_no_caixa(
     from apps.nucleo.modulos import Modulo
 
     return receber_no_caixa(
-        usuario, forma, valor, descricao, parcelas, modulo=Modulo.RESERVAS
+        usuario, forma, valor, descricao, parcelas, modulo=Modulo.RESERVAS,
+        autorizacao=autorizacao,
     )
 
 
@@ -604,17 +605,19 @@ def receber_pagamento(
     valor: Decimal,
     parcelas: int = 1,
     observacao: str = "",
+    autorizacao: str = "",
 ) -> PagamentoConta:
     """Recebe um pagamento (parcial ou total) da conta pelo caixa do operador.
     Vários pagamentos na mesma conta = rateio (formas/pagadores diferentes). A conta
-    só fecha quando o saldo zera. `observacao` registra quem pagou cada parte."""
+    só fecha quando o saldo zera. `observacao` registra quem pagou cada parte.
+    `autorizacao` guarda o NSU/código do comprovante do cartão (conciliação)."""
     if not conta.aberta:
         raise ValidationError("A conta desta hospedagem já foi fechada.")
     sufixo = f" ({observacao})" if observacao else ""
     movimento = _receber_no_caixa(
         usuario, forma, valor,
         f"Conta reserva #{conta.reserva_id} — {conta.reserva.hospede.nome}{sufixo}",
-        parcelas,
+        parcelas, autorizacao=autorizacao,
     )
     return PagamentoConta.objects.create(
         conta=conta, movimento_caixa=movimento, valor=valor, observacao=observacao
@@ -770,7 +773,8 @@ def total_grupo(grupo) -> dict:
 
 @transaction.atomic
 def receber_folio_grupo(grupo, usuario, forma: FormaPagamento, valor: Decimal,
-                        parcelas: int = 1, observacao: str = "") -> PagamentoConta:
+                        parcelas: int = 1, observacao: str = "",
+                        autorizacao: str = "") -> PagamentoConta:
     """Recebe (parcial ou total) o folio-mãe pelo caixa do operador. O folio só fecha
     no `encerrar_grupo`, quando o saldo zera."""
     folio = grupo.folio
@@ -779,7 +783,7 @@ def receber_folio_grupo(grupo, usuario, forma: FormaPagamento, valor: Decimal,
     sufixo = f" ({observacao})" if observacao else ""
     movimento = _receber_no_caixa(
         usuario, forma, valor, f"Folio grupo #{grupo.pk} — {grupo.rotulo}{sufixo}",
-        parcelas,
+        parcelas, autorizacao=autorizacao,
     )
     return PagamentoConta.objects.create(
         conta=folio, movimento_caixa=movimento, valor=valor, observacao=observacao
@@ -935,7 +939,8 @@ def conta_aberta(conta_id):
 
 
 def receber_adiantamento(
-    reserva: Reserva, usuario, forma: FormaPagamento, valor: Decimal, parcelas: int = 1
+    reserva: Reserva, usuario, forma: FormaPagamento, valor: Decimal, parcelas: int = 1,
+    autorizacao: str = "",
 ) -> Adiantamento:
     """Adiantamento/sinal antes do check-in — vira crédito na conta."""
     if reserva.status not in (
@@ -947,7 +952,7 @@ def receber_adiantamento(
     movimento = _receber_no_caixa(
         usuario, forma, valor,
         f"Adiantamento reserva #{reserva.pk} — {reserva.hospede.nome}",
-        parcelas,
+        parcelas, autorizacao=autorizacao,
     )
     return Adiantamento.objects.create(
         reserva=reserva, movimento_caixa=movimento, valor=valor

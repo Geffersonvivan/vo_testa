@@ -225,6 +225,18 @@ class RegrasDeCaixaTests(CaixaTestsBase):
         with self.assertRaises(ValidationError):
             movimento.delete()
 
+    def test_recebimento_guarda_autorizacao_nsu(self):
+        from apps.nucleo.models import receber_no_caixa
+
+        mov = receber_no_caixa(
+            self.operador, self.pix, Decimal("150.00"),
+            "Cartão na maquininha", autorizacao="  NSU-998877  ", modulo="nucleo")
+        self.assertEqual(mov.autorizacao, "NSU-998877")  # normaliza (strip)
+        # opcional: recebimento sem NSU fica em branco
+        mov2 = receber_no_caixa(
+            self.operador, self.dinheiro, Decimal("10.00"), "Dinheiro", modulo="nucleo")
+        self.assertEqual(mov2.autorizacao, "")
+
     def test_movimento_exige_sessao_aberta(self):
         self.sessao.fechar(Decimal("150.00"), self.operador)
         with self.assertRaises(ValidationError):

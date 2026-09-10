@@ -224,7 +224,7 @@
           <td>{{ p.criado_em|date:"d/m H:i" }}</td>
           <td>Pagamento</td>
           <td>—</td>
-          <td>{{ p.movimento_caixa.forma_pagamento }}{% if p.observacao %} · <em>{{ p.observacao }}</em>{% endif %}</td>
+          <td>{{ p.movimento_caixa.forma_pagamento }}{% if p.movimento_caixa.autorizacao %} · NSU {{ p.movimento_caixa.autorizacao }}{% endif %}{% if p.observacao %} · <em>{{ p.observacao }}</em>{% endif %}</td>
           <td>−R$ {{ p.valor }}</td>
         </tr>
       {% endfor %}

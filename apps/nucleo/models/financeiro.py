@@ -221,6 +221,11 @@ class MovimentoCaixa(models.Model):
         validators=[MinValueValidator(Decimal("0.01"))],
     )
     parcelas = models.PositiveSmallIntegerField("parcelas", default=1)
+    autorizacao = models.CharField(
+        "autorização / NSU", max_length=40, blank=True,
+        help_text="Código de autorização ou NSU do comprovante do cartão — "
+                  "para conciliar com a maquininha (SafraPay).",
+    )
     descricao = models.CharField("descrição", max_length=200)
     motivo = models.TextField(
         "motivo", blank=True, help_text="Obrigatório em estornos."
@@ -305,12 +310,13 @@ class MovimentoCaixa(models.Model):
 
 
 def receber_no_caixa(usuario, forma, valor: Decimal, descricao: str, parcelas: int = 1,
-                     modulo: str = CENTRO_NUCLEO):
+                     modulo: str = CENTRO_NUCLEO, autorizacao: str = ""):
     """
     Recebimento pela sessão de caixa aberta do operador NAQUELE módulo — a "veia
     do dinheiro". Cada caixa (Loja, Reservas, Restaurante…) é uma gaveta física
     separada, conferida à parte: o dinheiro da Loja só entra no caixa da Loja.
     Interface pública para os módulos cobrarem no seu próprio caixa.
+    `autorizacao` (opcional): NSU/código do comprovante do cartão, p/ conciliação.
     """
     sessao = SessaoCaixa.objects.filter(
         operador=usuario, modulo=modulo, status=SessaoCaixa.Status.ABERTA
@@ -327,6 +333,7 @@ def receber_no_caixa(usuario, forma, valor: Decimal, descricao: str, parcelas: i
         forma_pagamento=forma,
         valor=valor,
         parcelas=parcelas,
+        autorizacao=(autorizacao or "").strip()[:40],
         descricao=descricao,
         criado_por=usuario,
     )
