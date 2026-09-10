@@ -279,6 +279,11 @@ WHATSAPP_GATEWAY = os.environ.get("WHATSAPP_GATEWAY", "simulado")
 WHATSAPP_CLOUD_TOKEN = os.environ.get("WHATSAPP_CLOUD_TOKEN", "")
 WHATSAPP_CLOUD_PHONE_ID = os.environ.get("WHATSAPP_CLOUD_PHONE_ID", "")
 WHATSAPP_VERIFY_TOKEN = os.environ.get("WHATSAPP_VERIFY_TOKEN", "")
+WHATSAPP_API_VERSION = os.environ.get("WHATSAPP_API_VERSION", "v21.0")
+WHATSAPP_WABA_ID = os.environ.get("WHATSAPP_WABA_ID", "")  # gestão de templates (futuro)
+# App Secret do app da Meta — se definido, o webhook exige a assinatura
+# X-Hub-Signature-256 (recomendado em produção). Vazio = sem checagem (dev/simulado).
+WHATSAPP_APP_SECRET = os.environ.get("WHATSAPP_APP_SECRET", "")
 
 # Parâmetros fiscais confirmados pelo contador (jul/2026) — Pousada Vô Testa, Itá/SC.
 # Regime Lucro Presumido; NFS-e pelo Emissor Nacional. NFC-e aguarda Inscrição Estadual.

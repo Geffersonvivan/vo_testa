@@ -194,3 +194,166 @@ a equipe responde junto (sem celular preso a uma pessoa), com respostas rápidas
 com pagamento em 1 toque. O **PWA** coloca esse funil no bolso, com **push** de lead
 quente. Começamos pelo **MVP simulado** (ver a conversa no funil antes de ligar o número),
 no mesmo padrão de gateway plugável dos demais módulos.
+
+---
+
+# Anexo A — Custos da Meta, janela de 24h e templates
+
+> Consolidado das definições de negócio (set/2026) para não perder o raciocínio de custo.
+> Preço unitário citado é **aproximado** — confirmar o rate card oficial da Meta (Brasil,
+> marketing ≈ US$ 0,05–0,0625/mensagem ≈ **R$ 0,40**).
+
+## A.1 O que é um template
+Mensagem **pré-aprovada pela Meta**, usada para **iniciar** conversa (janela fechada) ou
+para qualquer mensagem que **a pousada** dispara primeiro. Anti-spam: não se manda texto
+livre "frio".
+- **Corpo fixo com variáveis:** `Olá, {{1}}! Você se inscreveu…` (o `{{1}}` vira o nome).
+- Opcionais: cabeçalho (texto/imagem), rodapé e **botões** ("Sim, quero" / "Sair").
+- **Categoria** define o preço: **Marketing** (oferta/novidade — o nosso caso), **Utility**
+  (confirmação/lembrete — mais barato), **Authentication** (código).
+- Submete → Meta revisa (minutos a ~1 dia) → aprovado, **reutiliza infinitas vezes**.
+
+## A.2 Como a Meta cobra (modelo por mensagem, desde jul/2025)
+| Categoria | O que é | Custo |
+|---|---|---|
+| **Marketing** | Novidade, oferta, convite (disparo aos fundadores, Natal) | **Pago** (~R$ 0,40) |
+| **Utility** | Confirmação de reserva, lembrete, recibo | Pago (mais barato) |
+| **Authentication** | Código de verificação | Pago |
+| **Service** | Pousada **respondendo** o cliente, texto livre, dentro de 24h | **Grátis e ilimitado** |
+
+Receber mensagem e verificar o número = grátis. Na prática, **paga-se só o marketing**.
+**Regra de ouro:** cobra-se pelo nº de **disparos de template**, não pelo nº de mensagens
+trocadas. Conversar muito não custa; **reiniciar** do zero é que custa.
+
+## A.3 A janela de 24h (quem abre e quem renova)
+- **Só o CLIENTE abre e renova** a janela: cada mensagem dele inicia/reinicia 24h.
+- **Respostas da pousada NÃO abrem nem esticam** a janela — só a usam.
+- **O template disparado também NÃO abre** a janela; ele só "toca a campainha". A janela
+  abre quando o cliente **responde** (ex.: toca o botão "Sim").
+
+Linha do tempo:
+| Quando | Evento | Janela | Custo |
+|---|---|---|---|
+| Seg 10:00 | Pousada dispara o template (boas-vindas + botão) | fechada | **pago** |
+| Seg 10:05 | Cliente toca "Sim" | **abre** até Ter 10:05 | grátis |
+| Seg 15:00 | Pousada responde (texto livre) | segue até Ter 10:05 (não esticou) | grátis |
+| Seg 20:00 | Cliente responde de novo | **renova** até Ter 20:00 | grátis |
+| Qua 09:00 | Silêncio desde Ter 20:00 → janela **fechou** | fechada | — |
+| Qua 09:00 | Para reiniciar, pousada manda template | — | **pago** |
+
+## A.4 Custo aplicado ao nosso fluxo (captação → negociação)
+Fluxo: lead entra pela LP → dispara boas-vindas com **botão Sim** → cliente responde →
+conversa de dias até fechar a reserva.
+- **Lead que engaja:** só o disparo inicial = **~R$ 0,40**. Toda a negociação = R$ 0.
+- **Lead que esfria e é reativado:** +~R$ 0,40 por reativação (novo template).
+- **Lead que nunca responde:** pagou só o template inicial (~R$ 0,40).
+
+Estimativa mensal (fase "montando a base", ~R$ 0,40/template):
+| Cenário | Templates pagos | Custo/mês |
+|---|---:|---:|
+| 24 fundadores de hoje + reativações leves | ~40 | ~R$ 16 |
+| 100 leads/mês + ~30 reativações | ~130 | ~R$ 52 |
+| 300 leads/mês + ~90 reativações | ~390 | ~R$ 156 |
+
+## A.5 Otimizações de custo (embutir no fluxo)
+1. **Sempre com botão** ("Sim, quero" / "Ver valores") → força a resposta e abre a janela
+   grátis já no 1º toque.
+2. **Não reiniciar à toa:** agrupar follow-ups num único template bem pensado.
+3. **Reativação como Utility** quando couber (ex.: "sua condição de fundador está
+   reservada até…") — mais barata que marketing.
+
+## A.6 Template inicial (para aprovação)
+> **Nome:** `boas_vindas_fundador` · **Categoria:** Marketing · **Idioma:** pt-BR
+>
+> Olá, {{1}}! Aqui é o *Vô Testa* 🎩 Que bom ter você na lista de *fundadores* da nossa
+> pousada às margens do Lago, em Itá. Você vai saber de tudo primeiro — valores, pacotes e
+> a condição de quem chegou antes de as portas abrirem. Posso te mandar as novidades em
+> primeira mão por aqui?
+>
+> *(botões: "Quero sim" · "Sair da lista")*
+
+## A.7 Voz vs. WhatsApp no mesmo número
+A **linha telefônica** (operadora) e a **Cloud API** são independentes, mesmo sendo o
+mesmo número:
+- **Ligação de voz** → pela linha da operadora (telefonia normal). A API não interfere.
+- **Mensagens WhatsApp** → pela Cloud API (internet). Ela não faz/recebe voz do WhatsApp.
+- Única regra: **não instalar esse número no app do WhatsApp** (conflita com a API).
+
+---
+
+# Anexo B — Voz no CRM: discador, gravação, transcrição e BI
+
+> Objetivo: ligar para o lead de dentro do CRM, gravar, transcrever e transformar as
+> conversas em inteligência (melhorar o pitch dos vendedores e entender o cliente).
+> **Princípio:** não construir telefonia do zero — **orquestrar** provedores por API.
+
+## B.1 Consentimento / LGPD (aviso de gravação)
+- **Pode gravar** (a pousada é parte da conversa — legal no Brasil). **Avisar no início** é
+  a boa prática e cumpre a transparência da LGPD.
+- Informar **finalidade** ("gravada para qualidade e melhoria do atendimento"), guardar
+  com **acesso restrito**, definir **retenção** (sugestão: 12 meses) e permitir
+  **acesso/exclusão** a pedido. Não reutilizar para outra finalidade.
+- **Implementação:** áudio automático no começo da ligação ("Esta ligação será
+  gravada…") ou script fixo do vendedor; o CRM **registra o consentimento** junto da
+  gravação. Sem aceite → segue **sem gravar**.
+
+## B.2 Arquitetura (4 camadas plugadas ao CRM)
+```
+[CRM Django] --clique p/ ligar--> [Provedor de Voz/VoIP c/ API]
+     ^                                   |
+     |  webhook (áudio + status)         v
+     |<-------------------------  grava a ligação (mp3)
+     |
+     |--envia áudio--> [Transcrição/STT] --texto--> salva no lead
+     |                                                   |
+     |--envia texto--> [IA (Claude)] --resumo/objeções/score--> ficha
+     |                                                   |
+     |----------- campos estruturados ----------> [Painel/BI]
+```
+
+1. **Ligar (click-to-call):** botão no lead → API do provedor. Opções: **softphone
+   WebRTC** no navegador (vendedor fala pelo CRM, sem telefone físico — melhor UX) ou
+   **dial pareado** (liga no celular do vendedor e conecta o cliente).
+   - A linha VoIP da operadora sozinha não dá click-to-call/gravação; conecta-se via um
+     **CPaaS** (Twilio, Telnyx, Plivo, ou BR Zenvia/Total Voice) que fornece número/SIP
+     programável. Alternativa avançada: **Asterisk/FreePBX** self-hosted no SIP trunk da
+     operadora (mais barato em escala, exige manter servidor).
+2. **Gravar:** provedor grava no servidor e, ao fim, manda **webhook** com o link do
+   áudio. O CRM salva como **atividade imutável** no lead (padrão de auditoria).
+3. **Transcrever (áudio → texto):** enviar a gravação ao **STT** — Whisper (OpenAI ou
+   local) / Deepgram / AssemblyAI (todos bons em pt-BR). Guardar o transcript no lead.
+4. **Analisar + BI:**
+   - **Por ligação:** IA (**Claude**) lê o transcript e extrai **estruturado**: resumo,
+     objeções, o que funcionou, próximos passos, aderência ao script, nota. Fica na ficha.
+   - **BI:** como a IA devolve campos padronizados, agregam-se objeções comuns, motivos de
+     perda, temas citados, sentimento por vendedor, conversão por abordagem. Começa nos
+     gráficos atuais (Chart.js); se crescer, **Metabase** direto no Postgres.
+
+## B.3 Como pluga no CRM
+Novo módulo `apps/telefonia` (contratável, no padrão do projeto): services públicos
+(`iniciar_ligacao`, `registrar_gravacao`, `transcrever`, `analisar`); cada ligação vira
+`AtividadeComercial` no funil; gravação/transcrição **append-only**; tudo na auditoria;
+zero acoplamento com os outros módulos.
+
+## B.4 Plano faseado
+1. **Fase 1 — Discar + gravar:** click-to-call + gravação salva no lead.
+2. **Fase 2 — Transcrição automática** ao encerrar.
+3. **Fase 3 — Análise por IA** (resumo/objeções/score) na ficha.
+4. **Fase 4 — BI agregado** (objeções, motivos, sentimento, ranking de pitch).
+
+## B.5 Custo aproximado (volume de pousada = baixo)
+- **Voz:** ~R$ 0,10–0,30/min (CPaaS BR).
+- **Transcrição:** ~US$ 0,006/min (Whisper) — centavos por ligação.
+- **Análise IA:** poucos centavos por ligação.
+- Ex.: 100 ligações de 5 min/mês ≈ **R$ 50–150 de voz + ~R$ 20 STT/IA**.
+
+## B.6 Decisões em aberto
+1. **Provedor de voz:** CPaaS pronto (**Twilio** = mais fácil em Django) vs. **Asterisk +
+   SIP da operadora** (mais barato/complexo). Para estrear rápido: **Twilio**.
+2. **Softphone no navegador** ou dial para o celular do vendedor?
+3. **STT:** Whisper (barato/flexível) vs. serviço gerenciado (Deepgram/AssemblyAI).
+4. **Retenção** das gravações (sugestão 12 meses) + política LGPD.
+
+**Recomendação para estrear rápido e barato:** Twilio (voz + gravação + softphone WebRTC)
+→ Whisper (transcrição) → Claude (análise) → dashboard atual (BI). Faseado, começando por
+"discar + gravar".

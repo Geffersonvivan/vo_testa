@@ -573,6 +573,149 @@ class LPFundadorTests(TestCase):
         self.assertIn("fundadores", assuntos.lower())
 
 
+class WhatsAppCloudTests(TestCase):
+    """Envio real (template/texto), janela de 24h, webhook e disparo em lote."""
+
+    def setUp(self):
+        self.user = Usuario.objects.create_superuser(username="wa", password="senha-forte-123")
+        self.pessoa = Pessoa.objects.create(
+            nome="Maria Silva", telefone="49999887766", aceita_email=True)
+        self.op = services.criar_oportunidade(
+            usuario=self.user, pessoa=self.pessoa, titulo="Lead WA")
+
+    # ---- envio ----
+    def test_enviar_template_registra_saida(self):
+        msg = services.enviar_template_whatsapp(
+            oportunidade=self.op, template="boas_vindas_fundador",
+            variaveis=["Maria"], usuario=self.user)
+        self.assertEqual(msg.direcao, "saida")
+        self.assertEqual(msg.status, "enviada")  # gateway simulado
+        self.assertIn("boas_vindas_fundador", msg.texto)
+
+    @override_settings(WHATSAPP_GATEWAY="cloud")
+    def test_texto_livre_fora_da_janela_bloqueia(self):
+        conv = services.abrir_conversa_whatsapp(self.op)  # cliente nunca falou → fechada
+        with self.assertRaises(ValidationError):
+            services.enviar_mensagem_whatsapp(
+                conversa=conv, texto="Oi", usuario=self.user)
+
+    def test_texto_livre_simulado_sempre_ok(self):
+        conv = services.abrir_conversa_whatsapp(self.op)
+        msg = services.enviar_mensagem_whatsapp(
+            conversa=conv, texto="Oi", usuario=self.user)
+        self.assertEqual(msg.status, "enviada")
+
+    # ---- webhook ----
+    def _payload_msg(self, texto="Oi, tenho interesse", wamid="wamid.IN1"):
+        agora = str(int(timezone.now().timestamp()))
+        return {"object": "whatsapp_business_account", "entry": [{"id": "WABA", "changes": [{
+            "field": "messages", "value": {"messaging_product": "whatsapp", "messages": [{
+                "from": "5549999887766", "id": wamid, "timestamp": agora,
+                "type": "text", "text": {"body": texto}}]}}]}]}
+
+    def test_webhook_verificacao_ok(self):
+        with self.settings(WHATSAPP_VERIFY_TOKEN="segredo"):
+            r = self.client.get(reverse("whatsapp:webhook"), {
+                "hub.mode": "subscribe", "hub.verify_token": "segredo",
+                "hub.challenge": "123"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.content, b"123")
+
+    def test_webhook_verificacao_token_errado(self):
+        with self.settings(WHATSAPP_VERIFY_TOKEN="segredo"):
+            r = self.client.get(reverse("whatsapp:webhook"), {
+                "hub.mode": "subscribe", "hub.verify_token": "errado",
+                "hub.challenge": "123"})
+        self.assertEqual(r.status_code, 403)
+
+    def test_webhook_recebe_mensagem_e_abre_janela(self):
+        import json
+        r = self.client.post(reverse("whatsapp:webhook"),
+                             data=json.dumps(self._payload_msg()),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        conv = self.op.conversa_whatsapp
+        self.assertEqual(conv.mensagens.filter(direcao="entrada").count(), 1)
+        self.assertTrue(conv.janela_aberta)
+
+    def test_webhook_idempotente(self):
+        import json
+        for _ in range(2):
+            self.client.post(reverse("whatsapp:webhook"),
+                             data=json.dumps(self._payload_msg(wamid="wamid.SAME")),
+                             content_type="application/json")
+        self.assertEqual(self.op.conversa_whatsapp.mensagens.count(), 1)
+
+    def test_webhook_status_failed_marca_erro(self):
+        import json
+
+        from .models import MensagemWhatsApp
+        conv = services.abrir_conversa_whatsapp(self.op)
+        m = MensagemWhatsApp.objects.create(
+            conversa=conv, direcao="saida", texto="x", status="enviada",
+            id_externo="wamid.OUT1", horario=timezone.now())
+        payload = {"entry": [{"changes": [{"value": {"statuses": [
+            {"id": "wamid.OUT1", "status": "failed", "timestamp": "1757000000"}]}}]}]}
+        self.client.post(reverse("whatsapp:webhook"), data=json.dumps(payload),
+                         content_type="application/json")
+        m.refresh_from_db()
+        self.assertEqual(m.status, "erro")
+
+    def test_webhook_opt_out_desliga_optin(self):
+        import json
+        self.client.post(reverse("whatsapp:webhook"),
+                         data=json.dumps(self._payload_msg(texto="Sair", wamid="wamid.OUT")),
+                         content_type="application/json")
+        self.pessoa.refresh_from_db()
+        self.assertFalse(self.pessoa.aceita_email)
+
+    def test_webhook_status_failed_nao_reverte(self):
+        import json
+
+        from .models import MensagemWhatsApp
+        conv = services.abrir_conversa_whatsapp(self.op)
+        m = MensagemWhatsApp.objects.create(
+            conversa=conv, direcao="saida", texto="x", status="enviada",
+            id_externo="wamid.Z", horario=timezone.now())
+        st = lambda s: {"entry": [{"changes": [{"value": {"statuses": [  # noqa: E731
+            {"id": "wamid.Z", "status": s, "timestamp": "1757000000"}]}}]}]}
+        # failed marca erro; um 'delivered' tardio NÃO reverte
+        self.client.post(reverse("whatsapp:webhook"), data=json.dumps(st("failed")),
+                         content_type="application/json")
+        self.client.post(reverse("whatsapp:webhook"), data=json.dumps(st("delivered")),
+                         content_type="application/json")
+        m.refresh_from_db()
+        self.assertEqual(m.status, "erro")
+
+    @override_settings(WHATSAPP_APP_SECRET="segredo-do-app")
+    def test_webhook_exige_assinatura_quando_ha_secret(self):
+        import hashlib
+        import hmac
+        import json
+        corpo = json.dumps(self._payload_msg(wamid="wamid.SIG")).encode()
+        # sem assinatura → 403
+        r = self.client.post(reverse("whatsapp:webhook"), data=corpo,
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 403)
+        # com assinatura correta → 200
+        assinatura = "sha256=" + hmac.new(
+            b"segredo-do-app", corpo, hashlib.sha256).hexdigest()
+        r = self.client.post(reverse("whatsapp:webhook"), data=corpo,
+                             content_type="application/json",
+                             HTTP_X_HUB_SIGNATURE_256=assinatura)
+        self.assertEqual(r.status_code, 200)
+
+    # ---- disparo em lote ----
+    def test_disparar_campanha_respeita_optin(self):
+        # lead sem opt-in é pulado
+        p2 = Pessoa.objects.create(nome="Sem Optin", telefone="4890000000", aceita_email=False)
+        services.criar_oportunidade(usuario=self.user, pessoa=p2, titulo="Sem optin")
+        res = services.disparar_campanha_whatsapp(
+            template="boas_vindas_fundador", usuario=self.user)
+        self.assertEqual(res["enviados"], 1)   # só a Maria (com opt-in)
+        self.assertGreaterEqual(res["pulados"], 1)
+
+
 class SitePropostaTests(TestCase):
     def test_pedir_proposta_cria_oportunidade(self):
         r = self.client.post(reverse("core:pedir_proposta"), {

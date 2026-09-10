@@ -5,7 +5,7 @@ Só conversa com outros módulos por services. Ganho exige conversão em reserva
 perda exige motivo. Cotação, SLA, score e metas cobrem o Plano Comercial P0–P3.
 """
 import unicodedata
-from datetime import timedelta
+from datetime import UTC, timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -1339,6 +1339,12 @@ def enviar_mensagem_whatsapp(*, conversa, texto, usuario):
     texto = (texto or "").strip()
     if not texto:
         raise ValidationError("Escreva uma mensagem.")
+    # Fora do simulado, a Meta só aceita texto livre dentro da janela de 24h.
+    if (getattr(settings, "WHATSAPP_GATEWAY", "simulado") != "simulado"
+            and not conversa.janela_aberta):
+        raise ValidationError(
+            "Fora da janela de 24h: o cliente não fala há mais de 24h. Reabra a "
+            "conversa com um template aprovado.")
     assumir_lead(conversa.oportunidade, usuario)  # quem responde primeiro assume
     try:
         res = get_whatsapp_gateway().enviar(conversa, texto)
@@ -1353,6 +1359,140 @@ def enviar_mensagem_whatsapp(*, conversa, texto, usuario):
     conversa.nao_lidas = 0
     conversa.save(update_fields=["nao_lidas", "atualizado_em"])
     return msg
+
+
+def enviar_template_whatsapp(*, oportunidade, template, idioma="pt_BR",
+                             variaveis=None, usuario=None):
+    """Dispara um template APROVADO para o lead (inicia conversa / fora da janela 24h).
+
+    Best-effort: registra a mensagem de saída (enviada/erro) e nunca estoura. Os
+    templates são pré-aprovados na Meta; aqui só passamos nome + variáveis ({{1}}…).
+    """
+    from .models import MensagemWhatsApp
+    from .whatsapp_gateways import get_whatsapp_gateway
+
+    conv = abrir_conversa_whatsapp(oportunidade)
+    telefone = conv.telefone or oportunidade.pessoa.telefone or ""
+    variaveis = list(variaveis or [])
+    try:
+        res = get_whatsapp_gateway().enviar_template(
+            telefone, template, idioma=idioma, variaveis=variaveis)
+    except Exception as e:  # noqa: BLE001 — best-effort
+        res = {"ok": False, "erro": str(e)[:300]}
+    resumo = f"[modelo: {template}]" + (" · " + " · ".join(map(str, variaveis))
+                                        if variaveis else "")
+    msg = MensagemWhatsApp.objects.create(
+        conversa=conv, direcao=MensagemWhatsApp.Direcao.SAIDA, texto=resumo,
+        status=(MensagemWhatsApp.Status.ENVIADA if res.get("ok")
+                else MensagemWhatsApp.Status.ERRO),
+        id_externo=(res.get("id") or "")[:120], autor=usuario, horario=timezone.now(),
+    )
+    return msg
+
+
+# Palavras que o cliente manda para sair da lista (opt-out LGPD).
+_OPT_OUT = {"sair", "sair da lista", "parar", "cancelar", "descadastrar", "remover"}
+
+
+def _atualizar_status_mensagem(id_externo, status_meta):
+    """Atualiza o status de uma mensagem enviada pelo callback da Meta (delivered/read/failed)."""
+    from .models import MensagemWhatsApp
+
+    if not id_externo:
+        return
+    qs = MensagemWhatsApp.objects.filter(
+        id_externo=id_externo, direcao=MensagemWhatsApp.Direcao.SAIDA,
+    )
+    if status_meta == "failed":
+        qs.update(status=MensagemWhatsApp.Status.ERRO)
+    else:
+        # 'sent'/'delivered'/'read' → enviada, mas NUNCA reverte um 'failed' já
+        # gravado (a Meta pode reordenar/reenviar callbacks do mesmo wamid).
+        qs.exclude(status=MensagemWhatsApp.Status.ERRO).update(
+            status=MensagemWhatsApp.Status.ENVIADA)
+
+
+def processar_webhook_whatsapp(payload: dict) -> dict:
+    """Processa o corpo do webhook da Meta: mensagens recebidas + status de entrega.
+
+    Idempotente (via id_externo em receber_mensagem_whatsapp). Trata texto, botão e
+    resposta interativa; detecta opt-out por palavra-chave.
+    """
+    from datetime import datetime
+
+    resumo = {"mensagens": 0, "status": 0, "opt_out": 0}
+    for entry in (payload.get("entry") or []):
+        for ch in (entry.get("changes") or []):
+            val = ch.get("value") or {}
+            for m in (val.get("messages") or []):
+                telefone = m.get("from", "")
+                wamid = m.get("id", "")
+                tipo = m.get("type")
+                if tipo == "text":
+                    texto = (m.get("text") or {}).get("body", "")
+                elif tipo == "button":
+                    texto = (m.get("button") or {}).get("text", "")
+                elif tipo == "interactive":
+                    inter = m.get("interactive") or {}
+                    alvo = inter.get("button_reply") or inter.get("list_reply") or {}
+                    texto = alvo.get("title", "")
+                else:
+                    texto = f"[{tipo}]"
+                quando = None
+                try:
+                    quando = datetime.fromtimestamp(int(m.get("timestamp")), tz=UTC)
+                except (TypeError, ValueError):
+                    pass
+                msg = receber_mensagem_whatsapp(
+                    telefone=telefone, texto=texto or "[sem texto]",
+                    id_externo=wamid, quando=quando)
+                if msg is not None:
+                    resumo["mensagens"] += 1
+                    if texto.strip().lower() in _OPT_OUT:
+                        _marcar_opt_out(msg.conversa.oportunidade)
+                        resumo["opt_out"] += 1
+            for st in (val.get("statuses") or []):
+                _atualizar_status_mensagem(st.get("id"), st.get("status"))
+                resumo["status"] += 1
+    return resumo
+
+
+def _marcar_opt_out(oportunidade):
+    """Cliente pediu para sair: retira o opt-in de contato da pessoa (LGPD)."""
+    pessoa = oportunidade.pessoa
+    if pessoa.aceita_email:
+        pessoa.aceita_email = False
+        pessoa.save(update_fields=["aceita_email"])
+
+
+def disparar_campanha_whatsapp(*, template, idioma="pt_BR", leads=None, usuario=None,
+                               so_primeiro_nome=True, limite=None):
+    """Dispara um template para uma lista de leads (best-effort). Respeita opt-in.
+
+    `leads`: queryset de Oportunidade (default = abertas). Pula quem não tem telefone
+    ou não deu opt-in (`pessoa.aceita_email`). Devolve o resumo (enviados/pulados/erros).
+    """
+    from .models import MensagemWhatsApp, Oportunidade
+
+    qs = leads if leads is not None else Oportunidade.objects.filter(
+        status=Oportunidade.Status.ABERTA)
+    resumo = {"enviados": 0, "pulados": 0, "erros": 0}
+    for op in qs.select_related("pessoa"):
+        pessoa = op.pessoa
+        if not (pessoa.telefone or "").strip() or not pessoa.aceita_email:
+            resumo["pulados"] += 1
+            continue
+        variaveis = [(pessoa.nome or "").split()[0]] if so_primeiro_nome else []
+        msg = enviar_template_whatsapp(
+            oportunidade=op, template=template, idioma=idioma,
+            variaveis=variaveis, usuario=usuario)
+        if msg.status == MensagemWhatsApp.Status.ENVIADA:
+            resumo["enviados"] += 1
+        else:
+            resumo["erros"] += 1
+        if limite and resumo["enviados"] >= limite:
+            break
+    return resumo
 
 
 def aplicar_variaveis_resposta(texto, oportunidade) -> str:
