@@ -231,6 +231,39 @@ class SafrapayGatewayTests(PagamentosBase):
                 GatewaySafrapay().criar_cobranca(c)
             self.assertIn("Token ausente", str(ctx.exception))
 
+    def test_cartao_monta_pacote_antifraude(self):
+        """O corpo de /v2/charge/authorization traz sessionId, customer.address,
+        card.billingAddress/brand/isPrivateLabel e remoteIp — sem isso o antifraude
+        recusa (750). Marca padrão da BIN homologada = Mastercard (2)."""
+        from .gateways import GatewaySafrapay
+        c = self.cobranca(metodo="cartao", valor=Decimal("15.00"))
+        gw = GatewaySafrapay()
+        gw._access_token = lambda: "TESTE"
+        capturado = {}
+
+        def fake_http(method, path, headers=None, body=None, timeout=30):
+            capturado["path"] = path
+            capturado["body"] = body
+            return 200, {"charge": {"id": "X", "chargeStatus": "Authorized",
+                                    "transactions": [{"transactionStatus": "Authorized"}]}}
+        gw._http = fake_http
+        card = {"cardholderName": "Maria Silva", "cardNumber": "5502091221618516",
+                "expirationMonth": 12, "expirationYear": 2034, "securityCode": "123"}
+        gw.autorizar_cartao(c, card, remote_ip="203.0.113.45")
+
+        self.assertEqual(capturado["path"], "/v2/charge/authorization")
+        body = capturado["body"]
+        self.assertEqual(body["remoteIp"], "203.0.113.45")
+        charge = body["charge"]
+        self.assertTrue(charge["sessionId"])                      # UUID de antifraude
+        self.assertIn("address", charge["customer"])              # endereço do cliente
+        self.assertIn("phone", charge["customer"])                # telefone forçado
+        card_out = charge["transactions"][0]["card"]
+        self.assertEqual(card_out["brand"], 2)                    # Mastercard
+        self.assertIn("billingAddress", card_out)
+        self.assertIs(card_out["isPrivateLabel"], False)
+        self.assertTrue(card_out["cardholderDocument"])
+
     def test_checklist_e_tela(self):
         from .gateways import status_credenciais
         st = status_credenciais()
@@ -404,7 +437,7 @@ class CartaoOnlineTests(PagamentosBase):
         cb = self.cobranca(metodo="cartao")
 
         class GwRecusa:
-            def autorizar_cartao(self, cobranca, card):
+            def autorizar_cartao(self, cobranca, card, remote_ip=""):
                 return {"gateway_id": "GID-RECUSADO", "status_raw": "Denied",
                         "payload": {"safrapay": {"charge": {"chargeStatus": "NotAuthorized"}}}}
 

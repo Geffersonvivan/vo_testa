@@ -279,7 +279,10 @@ def pagar_cartao(request, token):
     }
     if doc:
         card["cardholderDocument"] = doc
-    ok, msg = services.autorizar_cartao_online(cobranca, card, usuario=cobranca.criado_por)
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    ip = (xff.split(",")[0].strip() if xff else request.META.get("REMOTE_ADDR", ""))
+    ok, msg = services.autorizar_cartao_online(
+        cobranca, card, usuario=cobranca.criado_por, remote_ip=ip)
     cobranca.refresh_from_db()
     if ok and cobranca.status == Cobranca.Status.PAGO:
         destino = _url_recibo_site(cobranca)

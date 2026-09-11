@@ -196,10 +196,11 @@ def recebimentos(*, inicio=None, fim=None, metodo="", status="", liquidacao=""):
     return list(qs[:300]), totais
 
 
-def autorizar_cartao_online(cobranca, card: dict, usuario=None):
+def autorizar_cartao_online(cobranca, card: dict, usuario=None, remote_ip=""):
     """Autoriza o cartão digitado pelo hóspede na página pública e, se aprovado,
     confirma o pagamento. Retorna (ok: bool, mensagem: str). Nunca guarda o PAN:
-    o cartão só transita para o gateway — o payload persistido é o do provedor."""
+    o cartão só transita para o gateway — o payload persistido é o do provedor.
+    `remote_ip` = IP do hóspede (o antifraude usa)."""
     if cobranca.metodo != Cobranca.Metodo.CARTAO:
         return False, "Esta cobrança não é de cartão."
     if cobranca.status != Cobranca.Status.PENDENTE:
@@ -208,7 +209,7 @@ def autorizar_cartao_online(cobranca, card: dict, usuario=None):
     if not hasattr(gw, "autorizar_cartao"):
         return False, "Gateway não suporta autorização de cartão."
     try:
-        dados = gw.autorizar_cartao(cobranca, card)
+        dados = gw.autorizar_cartao(cobranca, card, remote_ip=remote_ip)
     except ValidationError as erro:
         EventoPagamento.objects.create(
             cobranca=cobranca, tipo=EventoPagamento.Tipo.WEBHOOK,

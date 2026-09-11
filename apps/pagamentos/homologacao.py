@@ -48,6 +48,11 @@ def payloads_api_hml(*, valor_pix="10.00", valor_cartao="10.00", valor_boleto="1
     """Corpos que o CRM enviará à Safrapay HML quando o Token existir."""
     base = getattr(settings, "SAFRAPAY_GATEWAY_URL", "https://payment-hml.safrapay.com.br")
     customer = _customer_demo()
+    endereco_demo = {
+        "street": "Rota do Sol", "number": "S/N", "neighborhood": "Centro",
+        "city": "Itá", "state": "SC", "zipCode": "89760000",
+        "complement": "", "country": "BR",
+    }
     return {
         "ambiente": getattr(settings, "SAFRAPAY_ENV", "hml"),
         "gateway_base": base,
@@ -80,17 +85,22 @@ def payloads_api_hml(*, valor_pix="10.00", valor_cartao="10.00", valor_boleto="1
                 "metodo": "POST",
                 "path": "/v2/charge/authorization",
                 "body": {
+                    "remoteIp": "<IP do hóspede na página de pagamento>",
                     "charge": {
                         "merchantChargeId": "VT-HML-CARD-DEMO",
-                        "customer": customer,
+                        "sessionId": "<UUID do antifraude>",
+                        "customer": {**customer, "address": endereco_demo},
                         "transactions": [{
                             "card": {
                                 "cardholderName": "CLIENTE HOMOLOGACAO",
-                                "cardNumber": "4111111111111111",
+                                "cardNumber": "5502091221618516",  # Mastercard HOMOLOGADO (HML)
                                 "expirationMonth": 12,
-                                "expirationYear": 2030,
+                                "expirationYear": 2034,
                                 "securityCode": "123",
-                                "cardholderDocument": "11144477735",  # HML exige CPF do titular
+                                "cardholderDocument": "11144477735",  # CPF do titular
+                                "brand": 2,  # 2 = Mastercard
+                                "billingAddress": endereco_demo,
+                                "isPrivateLabel": False,
                             },
                             "paymentType": 2,
                             "amount": _centavos(valor_cartao),
@@ -105,7 +115,9 @@ def payloads_api_hml(*, valor_pix="10.00", valor_cartao="10.00", valor_boleto="1
                         "source": 1,
                     }
                 },
-                "nota": "Cartão de teste clássico — trocar pelo cartão/titular que a SafraPay pedir na homologação.",
+                "nota": ("Cartão HOMOLOGADO + pacote completo de antifraude (sessionId, "
+                         "customer.address, card.billingAddress/brand). O 4111 genérico é "
+                         "reprovado pelo antifraude."),
             },
             {
                 "meio": "boleto",
@@ -115,11 +127,7 @@ def payloads_api_hml(*, valor_pix="10.00", valor_cartao="10.00", valor_boleto="1
                     "charge": {
                         "merchantChargeId": "VT-HML-BOL-DEMO",
                         # Boleto exige telefone + endereço (com country) do sacado.
-                        "customer": {**customer, "address": {
-                            "street": "Rota do Sol", "number": "S/N",
-                            "neighborhood": "Centro", "city": "Itá", "state": "SC",
-                            "zipCode": "89760000", "complement": "", "country": "BR",
-                        }},
+                        "customer": {**customer, "address": endereco_demo},
                         "deadline": "<YYYY-MM-DD vencimento, ex.: now+3 dias>",
                         "transactions": [{
                             "amount": _centavos(valor_boleto),

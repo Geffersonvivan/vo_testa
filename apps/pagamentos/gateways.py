@@ -22,6 +22,26 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
+def _brand_do_cartao(numero: str) -> int:
+    """Código de bandeira SafraPay a partir da BIN (Mastercard=2 confirmado no exemplo
+    de antifraude; demais por prefixo). Default Mastercard se não reconhecer."""
+    n = "".join(c for c in (numero or "") if c.isdigit())
+    if not n:
+        return 2
+    if n[0] == "4":
+        return 1  # Visa
+    if n[:2] in {"34", "37"}:
+        return 3  # Amex
+    if n[:6] in {"606282", "384100", "384140", "384160"}:
+        return 5  # Hipercard
+    if (n[:4] in {"4011", "4312", "4389", "5041", "5066", "5067", "6277", "6362", "6363"}
+            or n[:3] in {"509", "650", "651", "655"}):
+        return 4  # Elo
+    if n[:2] in {"51", "52", "53", "54", "55"} or "2221" <= n[:4] <= "2720":
+        return 2  # Mastercard
+    return 2
+
+
 class GatewaySimulado:
     """Sandbox: gera identificadores/códigos fake e aceita estorno sempre."""
     nome = "simulado"
@@ -48,7 +68,7 @@ class GatewaySimulado:
             dados["payload"]["instrucao"] = "Sandbox: boleto simulado — use «Já paguei»."
         return dados
 
-    def autorizar_cartao(self, cobranca, card: dict) -> dict:
+    def autorizar_cartao(self, cobranca, card: dict, remote_ip: str = "") -> dict:
         """Sandbox: 'aprova' o cartão digitado sem tocar em rede."""
         gid = cobranca.gateway_id or f"SIM-{uuid.uuid4().hex[:16].upper()}"
         return {
@@ -182,17 +202,19 @@ class GatewaySafrapay:
         return customer
 
     def _endereco(self, cobranca) -> dict:
-        """Endereço do pagador p/ boleto; fallback da pousada se ausente."""
+        """Endereço do pagador (boleto e antifraude do cartão). `Pessoa` guarda o
+        logradouro em texto livre (`endereco`) + cidade/uf/cep; número/bairro não são
+        estruturados, então vão como S/N/Centro. Fallback da pousada se ausente."""
         pagador = cobranca.pagador
         cep = "".join(c for c in (getattr(pagador, "cep", "") or "") if c.isdigit())
         return {
-            "street": (getattr(pagador, "logradouro", "") or "Rota do Sol")[:120],
-            "number": (getattr(pagador, "numero", "") or "S/N")[:10],
-            "neighborhood": (getattr(pagador, "bairro", "") or "Centro")[:60],
+            "street": (getattr(pagador, "endereco", "") or "Rota do Sol")[:120],
+            "number": "S/N",
+            "neighborhood": "Centro",
             "city": (getattr(pagador, "cidade", "") or "Itá")[:60],
             "state": (getattr(pagador, "uf", "") or "SC")[:2],
             "zipCode": (cep or "89760000")[:8],
-            "complement": (getattr(pagador, "complemento", "") or "")[:60],
+            "complement": "",
             "country": "BR",
         }
 
@@ -236,12 +258,15 @@ class GatewaySafrapay:
             return self._criar_cartao(cobranca, como_link=True)
         raise ValidationError(f"Safrapay: método '{cobranca.metodo}' não suportado.")
 
-    def autorizar_cartao(self, cobranca, card: dict) -> dict:
+    def autorizar_cartao(self, cobranca, card: dict, remote_ip: str = "") -> dict:
         """Autoriza o crédito à vista com o cartão digitado pelo hóspede na página
         pública. `card` = {cardholderName, cardNumber, expirationMonth,
-        expirationYear, securityCode[, cardholderDocument]}."""
+        expirationYear, securityCode[, cardholderDocument]}. `remote_ip` = IP do
+        hóspede (o antifraude usa)."""
         payload = dict(cobranca.payload or {})
         payload["card"] = card
+        if remote_ip:
+            payload["remote_ip"] = remote_ip
         cobranca.payload = payload
         return self._criar_cartao(cobranca)
 
@@ -278,24 +303,37 @@ class GatewaySafrapay:
         }
 
     def _criar_cartao(self, cobranca, *, como_link=False) -> dict:
-        """Crédito à vista (autoCapture). Cartão de teste só em HML com Token."""
+        """Crédito à vista (autoCapture) com o pacote completo de ANTIFRAUDE.
+
+        O antifraude SafraPay recusa transações sem dados completos: exige
+        `sessionId`, `customer` com telefone+endereço, e no cartão `brand`,
+        `billingAddress`, `cardholderDocument` e `isPrivateLabel`; `remoteIp` no
+        topo. Sem UI, o default usa um cartão HOMOLOGADO (não o 4111 genérico,
+        que o antifraude reprova)."""
         access = self._access_token()
         merchant_charge_id = f"VT-{cobranca.pk or uuid.uuid4().hex[:8]}"
-        # Sem dados de cartão na UI ainda: HML exige card no body — o operador
-        # homologa com o cartão que a SafraPay indicar (painel / evidências).
-        card = (cobranca.payload or {}).get("card") or {
+        payload = cobranca.payload or {}
+        card = dict(payload.get("card") or {
             "cardholderName": "CLIENTE HOMOLOGACAO",
-            "cardNumber": "4111111111111111",
+            "cardNumber": "5502091221618516",  # Mastercard HOMOLOGADO (tabela SafraPay HML)
             "expirationMonth": 12,
-            "expirationYear": 2030,
+            "expirationYear": 2034,
             "securityCode": "123",
-        }
-        # HML exige o CPF do titular no objeto do cartão.
+        })
+        endereco = self._endereco(cobranca)
         card.setdefault("cardholderDocument", self._documento(cobranca))
+        card.setdefault("brand", _brand_do_cartao(str(card.get("cardNumber", ""))))
+        card.setdefault("billingAddress", endereco)
+        card.setdefault("isPrivateLabel", False)
+        customer = self._customer(cobranca, exigir_contato=True)  # força telefone
+        customer["address"] = endereco
         body = {
             "charge": {
                 "merchantChargeId": merchant_charge_id,
-                "customer": self._customer(cobranca),
+                # sessionId: fingerprint do antifraude. Em HML aceita UUID; em produção,
+                # idealmente vem do JS de device fingerprint da SafraPay na página.
+                "sessionId": payload.get("session_id") or str(uuid.uuid4()),
+                "customer": customer,
                 "transactions": [{
                     "card": card,
                     "paymentType": 2,
@@ -310,6 +348,8 @@ class GatewaySafrapay:
                 "source": 1,
             }
         }
+        if payload.get("remote_ip"):
+            body["remoteIp"] = payload["remote_ip"]  # topo, irmão de charge (ver exemplo antifraude)
         _status, data = self._http(
             "POST", "/v2/charge/authorization",
             headers={"Authorization": f"Bearer {access}"},
