@@ -287,7 +287,7 @@ def _nomes_compativeis(a, b):
 def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
                        checkin=None, checkout=None, hospedes=2, documento="",
                        tipo_interesse="hospedagem", faturamento=None, pagina=None,
-                       origem=None, aceita_email=None):
+                       origem=None, aceita_email=None, ip="", user_agent=""):
     """Interface pública do site: cria Pessoa+Prospecto+Oportunidade (origem=site).
 
     Se o módulo Comercial estiver inativo, retorna None (site ainda mostra sucesso).
@@ -313,6 +313,17 @@ def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
     if tipo == Oportunidade.TipoInteresse.EVENTO and not faturamento:
         fat = Oportunidade.Faturamento.EMPRESA
     usuario = _usuario_site()
+
+    # Enriquecimento best-effort do lead (sinais estimados: sexo/UF/cidade/dispositivo)
+    # → carimbados no origem_rastreio, sem sobrescrever nada explícito do anúncio.
+    origem = dict(origem or {})
+    try:
+        from .enriquecimento import sinais_do_lead
+        for chave, valor in sinais_do_lead(
+                nome=nome, telefone=telefone, ip=ip, user_agent=user_agent).items():
+            origem.setdefault(chave, valor)
+    except Exception:  # noqa: BLE001 — enriquecimento nunca quebra a captação
+        pass
 
     pessoa = None
     if email:

@@ -636,6 +636,62 @@ class LPFundador2Tests(TestCase):
         self.assertEqual(r.status_code, 400)
 
 
+class EnriquecimentoLeadTests(TestCase):
+    """Sinais estimados do lead (sexo/UF/dispositivo/navegador) — offline."""
+
+    def test_sexo_por_nome(self):
+        from .enriquecimento import sexo_por_nome
+        self.assertEqual(sexo_por_nome("Maria Silva"), "F")
+        self.assertEqual(sexo_por_nome("João Pedro"), "M")
+        self.assertEqual(sexo_por_nome("Isabel"), "F")     # exceção termina-em-A
+        self.assertEqual(sexo_por_nome("Josué"), "M")      # exceção termina-em-E→M list
+        self.assertEqual(sexo_por_nome(""), "")
+
+    def test_uf_por_telefone_varios_formatos(self):
+        from .enriquecimento import uf_por_telefone
+        self.assertEqual(uf_por_telefone("(49) 99999-0000"), "SC")
+        self.assertEqual(uf_por_telefone("5549999990000"), "SC")   # com país
+        self.assertEqual(uf_por_telefone("11988887777"), "SP")
+        self.assertEqual(uf_por_telefone("21999990000"), "RJ")
+        self.assertEqual(uf_por_telefone("999"), "")               # sem DDD válido
+
+    def test_dispositivo_e_navegador(self):
+        from .enriquecimento import dispositivo_por_ua, navegador_app
+        ig = ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+              "AppleWebKit/605 Instagram 300.0")
+        self.assertEqual(dispositivo_por_ua(ig), "iPhone")
+        self.assertEqual(navegador_app(ig), "Instagram")
+        self.assertEqual(dispositivo_por_ua("Mozilla/5.0 (Linux; Android 13; Mobile)"),
+                         "Android (celular)")
+        self.assertEqual(navegador_app("Mozilla/5.0 (Windows NT 10.0)"), "")
+
+    def test_geoip_no_op_sem_base(self):
+        from .enriquecimento import cidade_uf_por_ip
+        self.assertEqual(cidade_uf_por_ip("8.8.8.8"), ("", ""))    # sem GEOIP_CITY_DB
+        self.assertEqual(cidade_uf_por_ip("127.0.0.1"), ("", ""))  # IP privado ignorado
+
+    def test_lead_da_lp_grava_sinais_no_rastreio(self):
+        import json
+
+        from .models import PaginaCaptacao
+        u = Usuario.objects.create_superuser(username="enr", password="forte-123-abc")
+        pag = PaginaCaptacao.objects.create(
+            nome="F2", slug="fundador-2", status=PaginaCaptacao.Status.PUBLICADA,
+            hero_titulo="Oi", criado_por=u)
+        r = self.client.post(
+            reverse("lp:fundador_2_lead"),
+            data=json.dumps({"nome": "Mariana Rossi", "whatsapp": "(49) 99123-4567",
+                             "consent": True, "ms": 5000}),
+            content_type="application/json",
+            HTTP_USER_AGENT="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Instagram 300.0")
+        self.assertEqual(r.status_code, 200)
+        op = Oportunidade.objects.get(pagina_captacao=pag)
+        self.assertEqual(op.origem_rastreio.get("sexo_estimado"), "F")
+        self.assertEqual(op.origem_rastreio.get("uf_estimada"), "SC")
+        self.assertEqual(op.origem_rastreio.get("dispositivo"), "iPhone")
+        self.assertEqual(op.origem_rastreio.get("navegador"), "Instagram")
+
+
 class WhatsAppCloudTests(TestCase):
     """Envio real (template/texto), janela de 24h, webhook e disparo em lote."""
 

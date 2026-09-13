@@ -217,6 +217,21 @@
     </div>
     {% endif %}
 
+    {% with r=op.origem_rastreio %}
+    {% if r.sexo_estimado or r.uf_estimada or r.cidade_estimada or r.dispositivo or r.navegador %}
+    <div class="cartao" style="padding:1rem 1.2rem">
+      <p class="rot-secao">Perfil estimado</p>
+      <p style="font-size:.72em;color:var(--tinta-suave);margin:-.15rem 0 .55rem">Inferido do nome, do DDD e do dispositivo — aproximado, para segmentar o atendimento.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:.4rem">
+        {% if r.sexo_estimado %}<span class="chip-est">{% if r.sexo_estimado == 'F' %}♀ Feminino{% else %}♂ Masculino{% endif %}</span>{% endif %}
+        {% if r.uf_estimada or r.cidade_estimada %}<span class="chip-est">📍 {% if r.cidade_estimada %}{{ r.cidade_estimada }}{% if r.uf_estimada %}/{% endif %}{% endif %}{{ r.uf_estimada }}</span>{% endif %}
+        {% if r.dispositivo %}<span class="chip-est">📱 {{ r.dispositivo }}</span>{% endif %}
+        {% if r.navegador %}<span class="chip-est">🔗 {{ r.navegador }}</span>{% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+
     {% if op.origem_rastreio or op.campanha %}
     <div class="cartao" style="padding:1rem 1.2rem">
       <p class="rot-secao">Impulsionamento</p>
@@ -240,6 +255,7 @@
 </div>
 
 <style>
+  .chip-est{display:inline-flex;align-items:center;gap:.3rem;font-size:.8em;padding:.22rem .6rem;border:1px solid var(--fio);border-radius:999px;color:var(--tinta);background:var(--superficie);white-space:nowrap}
   .wpp-topo{display:flex;align-items:center;gap:.7rem;padding-bottom:.7rem;border-bottom:1px solid var(--fio);margin-bottom:.2rem}
   .wpp-av{width:40px;height:40px;flex:none;border-radius:50%;background:var(--lampiao);color:var(--noturno);font-weight:800;display:flex;align-items:center;justify-content:center;font-size:15px}
   .wpp-ident{min-width:0} .wpp-nome{display:block;font-weight:700;color:var(--madeira);line-height:1.2}

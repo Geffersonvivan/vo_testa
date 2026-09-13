@@ -328,6 +328,10 @@ META_PIXEL_ID = os.environ.get("META_PIXEL_ID", "38503344465975740")
 META_CAPI_TOKEN = os.environ.get("META_CAPI_TOKEN", "")
 # Boas-vindas automáticas ao lead que se cadastra (LP/site). Desligável por env.
 LEAD_BOAS_VINDAS = os.environ.get("LEAD_BOAS_VINDAS", "1") == "1"
+# GeoIP de CIDADE do lead (opcional, OFFLINE). Aponte para um GeoLite2-City.mmdb
+# (MaxMind, grátis) + `pip install geoip2` para preencher cidade_estimada. Vazio =
+# desligado (a UF já vem do DDD do WhatsApp, sem precisar de base). Ver enriquecimento.py.
+GEOIP_CITY_DB = os.environ.get("GEOIP_CITY_DB", "")
 
 # E-mail do Comercial — gateway plugável (docs/Marketing/Gestor_email_leads_funil.md).
 # simulado (default): usa o EMAIL_BACKEND acima (console em dev). ses: Amazon SES (Fase 4).

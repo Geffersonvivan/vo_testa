@@ -242,7 +242,8 @@ def lp_fundador_2_lead(request):
             nome=nome, email=email, telefone=whats,
             tipo_interesse=(pagina.tipo_interesse if pagina else "hospedagem"),
             pagina=pagina, mensagem="Lista de espera — LP Fundador II",
-            origem=origem, aceita_email=bool(dados.get("consent", True)))
+            origem=origem, aceita_email=bool(dados.get("consent", True)),
+            ip=ip, user_agent=request.META.get("HTTP_USER_AGENT", ""))
     except Exception:  # noqa: BLE001 — captação pública nunca estoura
         pass
 
