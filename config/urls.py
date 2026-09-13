@@ -35,6 +35,8 @@ urlpatterns = [
     path("privacidade/", views_lp.privacidade, name="privacidade"),
     # LP antiga (templated) aposentada → redireciona para a nova.
     path("captacao/fundador/", RedirectView.as_view(url="/lp/fundador/", permanent=False)),
+    # Campanha Fundador II (LP bespoke em /lp/fundador-2/) — link do CRM redireciona.
+    path("captacao/fundador-2/", RedirectView.as_view(url="/lp/fundador-2/", permanent=False)),
 
     # Páginas de Captação (Landing Pages) — públicas, fora do /crm.
     path("captacao/", include("apps.comercial.urls_publicas")),

@@ -152,3 +152,107 @@ def lp_fundador_lead(request):
     except Exception:  # noqa: BLE001
         pass
     return JsonResponse({"ok": True})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LP Fundador II — nova campanha (13/09/2026), servida em paralelo à Fundador
+# original, em /lp/fundador-2/. Código ADITIVO: não altera a LP que está no ar.
+# ─────────────────────────────────────────────────────────────────────────────
+_LP2_PATH = (Path(settings.BASE_DIR) / "LPs" / "LP_Fundador_II_13_09_2026"
+             / "LP_Fundador_II_13_09_2026.html")
+_LP2_CACHE = {"html": None}
+_LP2_SLUG = "fundador-2"                 # casa com a PaginaCaptacao e o utm_campaign
+_VISITA2_COOKIE = "lpv_fundador_2"       # conta 1 visita por navegador (dedupe reload)
+
+
+def _lp2_html() -> str:
+    if _LP2_CACHE["html"] is None or settings.DEBUG:
+        _LP2_CACHE["html"] = _LP2_PATH.read_text(encoding="utf-8")
+    return _LP2_CACHE["html"]
+
+
+def _contar_visita_pagina(request, slug: str):
+    """+1 visita na Página de Captação `slug` (pula scrapers/preview de link)."""
+    ua = (request.META.get("HTTP_USER_AGENT", "") or "").lower()
+    if not ua or any(b in ua for b in _BOTS):
+        return
+    from .models import PaginaCaptacao
+    pagina = PaginaCaptacao.objects.filter(slug=slug).first()
+    if pagina:
+        services.registrar_visita_pagina(pagina)
+
+
+@never_cache
+def servir_lp_fundador_2(request):
+    """LP Fundador II (HTML autocontido) em /lp/fundador-2/. Injeta o Google tag."""
+    html = _lp2_html().replace("__GTAG_ID__", getattr(settings, "GOOGLE_TAG_ID", "") or "")
+    resp = HttpResponse(html)
+    if not request.COOKIES.get(_VISITA2_COOKIE):
+        try:
+            _contar_visita_pagina(request, _LP2_SLUG)
+        except Exception:  # noqa: BLE001 — métrica nunca quebra a LP
+            pass
+        resp.set_cookie(_VISITA2_COOKIE, "1", max_age=_VISITA_TTL,
+                        httponly=True, samesite="Lax",
+                        secure=not settings.DEBUG)
+    return resp
+
+
+@csrf_exempt
+@never_cache
+@require_POST
+def lp_fundador_2_lead(request):
+    """Lead da LP Fundador II (JSON) → funil, etiquetado na campanha fundador-2."""
+    try:
+        dados = json.loads(request.body or b"{}")
+    except (ValueError, TypeError):
+        return JsonResponse({"ok": False, "erro": "json inválido"}, status=400)
+
+    # Anti-bot silencioso: honeypot preenchido ou envio instantâneo → finge sucesso.
+    if (dados.get("empresa") or "").strip():
+        return JsonResponse({"ok": True})
+    try:
+        ms = float(dados.get("ms") or 0)
+    except (TypeError, ValueError):
+        ms = 0
+    if 0 < ms < _MIN_MS:
+        return JsonResponse({"ok": True})
+
+    ip = _ip(request)
+    try:
+        chave = f"lp_lead_rate:{ip}"
+        cache.add(chave, 0, _RATE_JANELA)
+        if cache.incr(chave) > _RATE_MAX:
+            return JsonResponse({"ok": True})  # silencioso
+    except Exception:  # noqa: BLE001 — sem cache, segue sem rate limit
+        pass
+
+    nome = (dados.get("nome") or "").strip()
+    email = (dados.get("email") or "").strip()
+    whats = (dados.get("whatsapp") or dados.get("whats") or "").strip()
+    if not nome or not (email or whats):
+        return JsonResponse({"ok": False, "erro": "dados incompletos"}, status=400)
+
+    from .models import PaginaCaptacao
+    pagina = PaginaCaptacao.objects.filter(slug=_LP2_SLUG).first()
+    origem = dict(dados.get("rastreio") or {})
+    origem.setdefault("origem_form", dados.get("origem") or "lp-fundador-2")
+    try:
+        services.capturar_lead_site(
+            nome=nome, email=email, telefone=whats,
+            tipo_interesse=(pagina.tipo_interesse if pagina else "hospedagem"),
+            pagina=pagina, mensagem="Lista de espera — LP Fundador II",
+            origem=origem, aceita_email=bool(dados.get("consent", True)))
+    except Exception:  # noqa: BLE001 — captação pública nunca estoura
+        pass
+
+    try:
+        services.enviar_capi_lead(
+            email=email, telefone=whats,
+            event_id=(dados.get("event_id") or ""),
+            fbp=(dados.get("fbp") or ""), fbc=(dados.get("fbc") or ""),
+            event_source_url=request.META.get("HTTP_REFERER", ""),
+            client_ip=ip, user_agent=request.META.get("HTTP_USER_AGENT", ""))
+    except Exception:  # noqa: BLE001
+        pass
+    return JsonResponse({"ok": True})

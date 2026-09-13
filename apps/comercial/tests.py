@@ -574,6 +574,68 @@ class LPFundadorTests(TestCase):
         self.assertIn("fundadores", assuntos.lower())
 
 
+class LPFundador2Tests(TestCase):
+    """Fundador II — nova campanha em paralelo (/lp/fundador-2/), sem tocar na LP no ar."""
+
+    def setUp(self):
+        from .models import Campanha, PaginaCaptacao
+        self.u = Usuario.objects.create_superuser(username="lp2", password="forte-123-abc")
+        self.pag = PaginaCaptacao.objects.create(
+            nome="Fundador II — 13/09/2026", slug="fundador-2",
+            status=PaginaCaptacao.Status.PUBLICADA, hero_titulo="Oi", criado_por=self.u)
+        self.camp = Campanha.objects.create(
+            nome="Fundador II — 13/09/2026", codigo="fundador-2",
+            provedor=Campanha.Provedor.OUTRO, pagina_captacao=self.pag, criado_por=self.u)
+
+    def test_serve_html_com_form_endpoint_e_static_webp(self):
+        r = self.client.get(reverse("lp:fundador_2"))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"form-lista", r.content)
+        self.assertIn(b"/lp/fundador-2/lead/", r.content)          # endpoint próprio
+        self.assertIn(b"/static/lp/fundador-2/inventor.webp", r.content)
+        self.assertNotIn(b"Fotos/", r.content)                      # nada de caminho relativo
+        self.assertNotIn(b"com.br../..", r.content)                 # og corrigido
+
+    def test_nao_referencia_endpoint_da_lp_no_ar(self):
+        r = self.client.get(reverse("lp:fundador_2"))
+        self.assertNotIn(b"/lp/fundador/lead/", r.content)
+
+    def test_link_do_crm_redireciona_para_a_lp(self):
+        r = self.client.get("/captacao/fundador-2/")
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.headers["Location"], "/lp/fundador-2/")
+
+    def test_lead_so_whatsapp_cai_no_funil_ligado_a_campanha(self):
+        import json
+        r = self.client.post(
+            reverse("lp:fundador_2_lead"),
+            data=json.dumps({"nome": "Fulano II", "whatsapp": "49999887766",
+                             "consent": True, "ms": 5000,
+                             "rastreio": {"utm_campaign": "fundador-2"}}),
+            content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        op = Oportunidade.objects.get(pagina_captacao=self.pag)
+        self.assertTrue(op.pessoa.aceita_whatsapp)
+        self.assertEqual(op.origem_rastreio.get("utm_campaign"), "fundador-2")
+
+    def test_honeypot_descarta_sem_criar_lead(self):
+        import json
+        r = self.client.post(
+            reverse("lp:fundador_2_lead"),
+            data=json.dumps({"nome": "Bot", "whatsapp": "49999880000",
+                             "empresa": "x", "ms": 5000}),
+            content_type="application/json")
+        self.assertEqual(r.status_code, 200)          # finge sucesso
+        self.assertFalse(Oportunidade.objects.exists())
+
+    def test_lead_incompleto_400(self):
+        import json
+        r = self.client.post(reverse("lp:fundador_2_lead"),
+                             data=json.dumps({"nome": "Só nome"}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+
 class WhatsAppCloudTests(TestCase):
     """Envio real (template/texto), janela de 24h, webhook e disparo em lote."""
 
