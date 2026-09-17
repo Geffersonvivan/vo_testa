@@ -171,6 +171,25 @@ def _lp2_html() -> str:
     return _LP2_CACHE["html"]
 
 
+def _qtd_fundadores() -> int:
+    """Nº real de leads na lista de fundadores — prova social viva.
+
+    Conta as DUAS LPs (Fundador + Fundador II): a prova social é a lista inteira,
+    não só a LP II (que herdou os leads da original). Marcadores robustos = slug da
+    página de captação + `origem_form` (não depende de texto de observação).
+    """
+    from django.db.models import Q
+
+    from .models import Oportunidade
+    try:
+        return Oportunidade.objects.filter(
+            Q(pagina_captacao__slug__in=("fundador", _LP2_SLUG))
+            | Q(origem_rastreio__origem_form__in=("lp-fundador", "lp-fundador-2"))
+        ).distinct().count()
+    except Exception:  # noqa: BLE001 — métrica nunca quebra a LP
+        return 0
+
+
 def _contar_visita_pagina(request, slug: str):
     """+1 visita na Página de Captação `slug` (pula scrapers/preview de link)."""
     ua = (request.META.get("HTTP_USER_AGENT", "") or "").lower()
@@ -186,6 +205,8 @@ def _contar_visita_pagina(request, slug: str):
 def servir_lp_fundador_2(request):
     """LP Fundador II (HTML autocontido) em /lp/fundador-2/. Injeta o Google tag."""
     html = _lp2_html().replace("__GTAG_ID__", getattr(settings, "GOOGLE_TAG_ID", "") or "")
+    n = _qtd_fundadores()
+    html = html.replace("__QTD_FUNDADORES__", str(n) if n else "56")  # fallback seguro
     resp = HttpResponse(html)
     if not request.COOKIES.get(_VISITA2_COOKIE):
         try:
