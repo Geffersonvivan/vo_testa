@@ -74,3 +74,6 @@ docs/Foco_Tecnologia.pdf
 .claude/
 .cursor/
 .impeccable/
+
+# Fontes de vídeo pesados / arquivos de trabalho (o leve vai em static/lp/)
+docs/Vídeos/

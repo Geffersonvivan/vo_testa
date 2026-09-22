@@ -300,7 +300,8 @@ footer .links a:hover{color:var(--lampiao)}
 .hero-grid-v2{display:grid;grid-template-columns:1.02fr .98fr;gap:clamp(2rem,5vw,4rem);align-items:center}
 @media(max-width:900px){.hero-grid-v2{grid-template-columns:1fr}}
 .hero .oferta{margin-top:1.4rem;max-width:42ch;font-size:1.32rem;color:var(--pergaminho)}
-.hero .oferta b{color:var(--lampiao);font-weight:400}
+.hero .oferta b{color:var(--lampiao);font-weight:600}
+.hero .oferta strong{color:var(--pergaminho);font-weight:600}
 .escassez{margin-top:1.6rem;display:inline-flex;align-items:center;gap:.7rem;
   background:rgba(215,160,72,.1);border:1px solid rgba(215,160,72,.35);
   padding:.55rem 1rem;border-radius:100px;font-size:1.02rem;color:var(--pergaminho);line-height:1.3}
@@ -311,7 +312,7 @@ footer .links a:hover{color:var(--lampiao)}
 .form-card{background:var(--pergaminho);color:var(--madeira);border-radius:22px;
   padding:clamp(1.5rem,3vw,2.1rem);box-shadow:0 44px 100px -55px #000}
 .form-card .fc-titulo{font-family:"Gloock",serif;font-size:1.55rem;color:var(--madeira);line-height:1.1}
-.form-card .fc-sub{font-size:.98rem;color:color-mix(in srgb,var(--madeira) 70%,transparent);margin:.3rem 0 1.1rem}
+.form-card .fc-sub{font-size:.98rem;color:color-mix(in srgb,var(--madeira) 92%,transparent);font-weight:500;margin:.3rem 0 1.1rem}
 .form-card .campo{margin-bottom:.85rem}
 .form-card label{display:block;font-size:.9rem;font-weight:600;margin-bottom:.35rem;color:var(--madeira)}
 .form-card input[type=text],.form-card input[type=tel]{width:100%;padding:.85rem 1rem;border-radius:12px;
@@ -371,6 +372,7 @@ footer .links a:hover{color:var(--lampiao)}
 /* banda muito mais à vista */
 .banda-lugar img{height:min(90vh,780px);transition:transform 8s linear}
 .banda-lugar:hover img{transform:scale(1.05)}
+.banda-lugar video{width:100%;height:min(90vh,780px);object-fit:cover;display:block}
 .banda-lugar h2{font-size:clamp(2.2rem,1.6rem + 3.2vw,4.4rem)}
 .banda-lugar p{font-size:1.35rem}
 
@@ -455,7 +457,7 @@ body{ font-size:clamp(1.18rem,.95rem + .7vw,1.42rem); line-height:1.55 }
   font-size:clamp(2.5rem,1.4rem + 3.6vw,4.8rem); letter-spacing:-.026em; line-height:1.04;
 }
 .fundador .top{ max-width:none }
-.fundador h2{ max-width:13ch }
+.fundador h2{ max-width:24ch; text-wrap:balance }
 .historia p{ font-size:clamp(1.25rem,1rem + .85vw,1.7rem); line-height:1.5 }
 .historia .assinatura{ font-size:clamp(1.4rem,1.1rem + .9vw,2rem) }
 .fundador .top p{ font-size:clamp(1.3rem,1rem + 1vw,1.9rem); max-width:40ch; margin-top:1.8rem }
@@ -470,7 +472,8 @@ body{ font-size:clamp(1.18rem,.95rem + .7vw,1.42rem); line-height:1.55 }
 /* Manifesto "para quem" — escala de manchete Apple */
 .paraquem .inner{ padding-block:clamp(4rem,9vw,7rem) }
 .paraquem .rotulo{ font-size:1.1rem }
-.paraquem .manifesto{ font-size:clamp(2.5rem,1.4rem + 3.8vw,5rem); letter-spacing:-.028em; line-height:1.05; max-width:20ch; margin-bottom:3rem }
+.paraquem .manifesto{ font-size:clamp(2.5rem,1.4rem + 3.8vw,5rem); letter-spacing:-.028em; line-height:1.05; max-width:26ch; text-wrap:balance; margin-bottom:3rem }
+.paraquem .manifesto b{white-space:nowrap}
 .paraquem .linhas{ gap:1.4rem; max-width:34ch }
 .paraquem .linhas p{ font-size:clamp(1.5rem,1.1rem + 1.4vw,2.4rem); line-height:1.22 }
 
@@ -528,7 +531,7 @@ footer .links{ font-size:1.1rem }
 .posic{border-block:1px solid var(--noturno-borda)}
 .posic .inner{padding-block:var(--gap-sec)}
 .posic-hook{font-family:"Gloock",serif;font-size:clamp(2.2rem,1.3rem + 3.6vw,4.8rem);
-  letter-spacing:-.028em;line-height:1.05;max-width:15ch}
+  letter-spacing:-.028em;line-height:1.05;text-wrap:balance}
 .posic-hook b{color:var(--lampiao);font-weight:400}
 .posic-oque{margin-top:1.6rem;max-width:50ch;color:var(--pergaminho-70);
   font-size:clamp(1.25rem,1rem + .9vw,1.75rem);line-height:1.45}
@@ -581,15 +584,15 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
     <div>
       <p class="eyebrow reveal d1">A casa do Vô, à beira do Lago de Itá</p>
       <h1 class="reveal d2">As portas da casa do Vô estão prestes a abrir.</h1>
-      <p class="oferta reveal d3">Entre na lista e seja dos <b>primeiros a reservar</b> na inauguração — com a <b>primeira proposta</b> e a condição de fundador. <b>Sem custo e sem compromisso.</b></p>
+      <p class="oferta reveal d3">Entre na lista de fundadores e garanta <b>prioridade para reservar</b> — antes do público, sabendo preços e datas em primeira mão. <strong>Sem custo e sem compromisso.</strong></p>
       <div class="escassez reveal d4"><span class="pulse"></span>
         <span><b>__QTD_FUNDADORES__ pessoas</b> já estão na lista de fundadores. As <b>24 cabanas</b> abrem primeiro para elas.</span>
       </div>
     </div>
 
     <div class="form-card reveal d3" id="captura">
-      <p class="fc-titulo">Entre para a lista de fundadores</p>
-      <p class="fc-sub">Leva 20 segundos. Você é dos primeiros a saber.</p>
+      <p class="fc-titulo">Garanta sua vaga de fundador</p>
+      <p class="fc-sub">Só nome e WhatsApp. A gente chama você primeiro, com prioridade para reservar.</p>
       <form class="lista" id="form-lista" novalidate>
         <div class="campo"><label for="h-nome">Seu nome</label>
           <input type="text" id="h-nome" name="nome" autocomplete="name" placeholder="Como vamos chamar você" aria-invalid="false"></div>
@@ -600,11 +603,11 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
                style="position:absolute!important;left:-9999px;width:1px;height:1px;opacity:0">
         <label class="fc-consent" id="consent-wrap"><input type="checkbox" id="consent">
           <span>Autorizo receber as novidades por WhatsApp e e-mail. <a href="/privacidade/">Privacidade</a>. <span class="fc-err">Marque esta caixa para continuar.</span></span></label>
-        <button class="btn btn-primary">Quero minha condição de fundador</button>
+        <button class="btn btn-primary">Quero minha vaga de fundador</button>
       </form>
       <div class="sucesso" id="sucesso" role="status" tabindex="-1">
         <h2>Pronto! Você está na lista.</h2>
-        <p>Você é dos primeiros a saber. Em breve chamamos você no WhatsApp com a sua condição de fundador.</p>
+        <p>Você é dos primeiros a saber. Em breve chamamos você no WhatsApp — com prioridade para reservar.</p>
       </div>
       <p class="fc-micro">Sem compromisso · a vaga de fundador não se repete</p>
     </div>
@@ -739,11 +742,16 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
 
 <!-- ============ BANDA: RELÓGIO AO PÔR DO SOL (mockup) ============ -->
 <section class="banda-lugar">
-  <img src="/static/lp/fundador-2/relogio.webp" alt="A casa do relógio ao pôr do sol, às margens do Lago" loading="lazy">
+  <video class="banda-video" autoplay loop muted playsinline preload="metadata"
+         poster="/static/lp/fundador-2/lugar-poster.jpg"
+         aria-label="Sobrevoo da pousada: cabanas, recepção e o relógio à beira do Lago de Itá">
+    <source src="/static/lp/fundador-2/lugar.mp4" type="video/mp4">
+    <source src="/static/lp/fundador-2/lugar.webm" type="video/webm">
+  </video>
   <div class="grad"></div>
   <div class="cap"><div class="inner2 appear">
     <h2>Onde o tempo trabalha a seu favor.</h2>
-    <p>A casa do inventor ao pôr do sol — engrenagens, tijolo e o relógio que move as águas.</p>
+    <p>Do alto: as cabanas, a recepção e o relógio que move as águas — à beira do Lago de Itá.</p>
   </div></div>
 </section>
 
@@ -784,7 +792,7 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
   <div class="wrap inner appear">
     <p style="font-family:'Gloock',serif;color:var(--lampiao);font-size:clamp(1.4rem,1rem + 1.4vw,2.2rem);letter-spacing:-.02em;line-height:1.1;margin-bottom:1rem">Reunir. Descansar. Viver Itá.</p>
     <h2>São 24 cabanas. E a lista de fundadores só cresce.</h2>
-    <a class="btn btn-primary" href="#captura">Quero minha condição de fundador</a>
+    <a class="btn btn-primary" href="#captura">Quero minha vaga de fundador</a>
     <p style="margin-top:1rem;color:var(--pergaminho-70)">Entre agora e receba a primeira proposta, com as condições de inauguração.</p>
   </div>
 </section>
@@ -798,7 +806,10 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
       Itá — Santa Catarina. Engenhosidade, acolhimento e bom viver — a essência do Vô Testa.
     </div>
     <div class="links">
-      <a href="https://www.instagram.com/pousadavotesta" target="_blank" rel="noopener">Instagram</a>
+      <a href="https://www.instagram.com/pousadavotesta" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:.55ch">
+        <svg viewBox="0 0 24 24" width="1.05em" height="1.05em" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" style="flex:none">
+          <rect x="3" y="3" width="18" height="18" rx="5.4"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.2" cy="6.8" r="1.1" fill="currentColor" stroke="none"/>
+        </svg>Instagram</a>
     </div>
   </div>
 </footer>
@@ -923,7 +934,7 @@ if(form && whats){
     window.__abCTA = ab;
     if(ab === 'B'){
       document.querySelectorAll('a.btn-primary, button.btn-primary').forEach(function(b){
-        if(b.textContent.trim() === 'Quero minha condição de fundador') b.textContent = 'Garantir minha condição de fundador';
+        if(b.textContent.trim() === 'Quero minha vaga de fundador') b.textContent = 'Garantir minha vaga de fundador';
       });
     }
   }catch(e){ window.__abCTA = 'A'; }
