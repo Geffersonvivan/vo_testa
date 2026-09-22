@@ -564,6 +564,13 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
 ::-webkit-scrollbar-track{background:var(--noturno-painel)}
 ::-webkit-scrollbar-thumb{background:var(--noturno-borda);border-radius:100px;border:3px solid var(--noturno-painel)}
 ::-webkit-scrollbar-thumb:hover{background:var(--lampiao)}
+
+/* ===== Responsivo: padroniza o padding lateral das seções (alinha ao hero) ===== */
+@media(max-width:820px){
+  .historia .inner{padding-inline:clamp(1.25rem,5vw,3rem)}
+  .olugar .inner{padding-inline:clamp(1.25rem,5vw,3rem)}
+  .galeria{padding-inline:0}
+}
 </style>
 </head>
 <body>
