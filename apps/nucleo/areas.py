@@ -22,6 +22,9 @@ class Area(models.TextChoices):
     REMUNERACAO = "remuneracao", "Remuneração (ver salários)"
     LOGBOOK = "logbook", "Recados do turno"
     NPS = "nps", "NPS"
+    # Analista de Marketing: mover campanha até Aprovação, lançar gasto, marcar peça.
+    # (Gestor = gerência; ver a tela = módulo Marketing.)
+    MARKETING = "marketing", "Marketing (analista)"
     EQUIPE = "equipe", "Equipe & Acessos"
 
 

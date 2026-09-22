@@ -186,6 +186,45 @@ cliques e custo por resultado** direto das plataformas, por campanha.
 - **Alta** no total — por isso é a última. O lançamento manual da Fase A resolve enquanto
   as aprovações não saem.
 
+### C.4 Demografia do público — idade/gênero/cidade (breakdowns)
+
+**Pergunta recorrente:** "dá para captar sexo, idade, cidade do visitante?" A resposta
+tem duas metades — e a boa notícia é que **quase tudo já está pronto**, porque a
+demografia **mora no Meta**, não no navegador.
+
+**O que NÃO dá (nem por tecnologia, nem por lei):** o navegador **não expõe** sexo, idade
+nem identidade de um visitante anônimo. Não existe API para isso; prometer "descobrir
+idade/gênero do anônimo" é falso ou fere a LGPD. Do nosso lado só temos o que a pessoa
+**digita no formulário** e **sinais técnicos** (IP, dispositivo, origem, utm, fbclid).
+
+**O que o Meta entrega (agregado, de graça):** como o tráfego vem de anúncios, o
+**Gerenciador de Anúncios → Detalhar (Breakdown)** mostra, por campanha, **quem viu,
+clicou e converteu**, dividido por **idade, gênero, cidade/região(UF), posicionamento e
+dispositivo** — incluindo os **Leads** (porque o evento `Lead` volta pelo Pixel/CAPI). É
+**distribuição agregada** (ex.: "62% mulheres, 28–44, maioria SC/RS"), **nunca** o
+nome+idade de cada pessoa — isso é PII protegida (e correto p/ LGPD).
+
+**Como "ligar" (3 passos, sem código):**
+1. **Confirmar `META_CAPI_TOKEN` em produção** — o Pixel do navegador já roda; com o token,
+   o CAPI server-side melhora a atribuição (resiste a bloqueador/iOS). Pixel ID já embutido
+   nas LPs.
+2. **Rodar o anúncio com UTMs** apontando para a LP:
+   `…/lp/fundador-2/?utm_source=instagram&utm_medium=paid&utm_campaign=fundador-2`
+   (casa o lead com a campanha no CRM pelo `utm_campaign`).
+3. **Ler no Gerenciador** → abrir a campanha → **Detalhar**: por dados demográficos
+   (idade/gênero), por local (país/UF/cidade), por posicionamento/plataforma/dispositivo.
+
+**Dado por lead (para o atendimento) fica no CRM:** o **"Perfil estimado"** no detalhe do
+lead (`enriquecimento.py`) infere, offline, **sexo** (pelo nome), **UF** (pelo DDD do
+WhatsApp), **dispositivo/navegador** (user-agent) e **cidade** (GeoIP opcional). É
+aproximado e serve para segmentar contato — não confundir com a demografia agregada do
+Meta. Resumo: **demografia do público → Meta; dado por lead → CRM (Perfil estimado)**.
+
+**Opcional (aí sim é código):** puxar os breakdowns **para dentro do CRM** via **Marketing
+API (Insights)** — `insights?breakdowns=age,gender,region` — num painel junto da campanha
+(mesma dependência de `ads_read` da Fase C; o campo `Campanha.id_externo` já está
+reservado). Enquanto não, o Ads Manager cobre 100%.
+
 ---
 
 ## 3. Credenciais necessárias (resumo)

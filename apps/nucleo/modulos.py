@@ -29,6 +29,7 @@ class Modulo(models.TextChoices):
     AUDITORIA = "auditoria", "Auditoria"
     RELATORIOS = "relatorios", "Relatórios"
     COMERCIAL = "comercial", "Comercial"
+    MARKETING = "marketing", "Marketing"
 
 
 # Dependências entre módulos (módulo -> módulos exigidos).
@@ -113,6 +114,12 @@ APRESENTACAO: dict[str, dict] = {
         "ordem": 115,
         "descricao": "Funil de vendas — leads, oportunidades e conversão em reserva.",
         "url_name": "comercial:funil",
+    },
+    Modulo.MARKETING: {
+        "grupo": "Comercial",
+        "ordem": 117,
+        "descricao": "Campanhas: da ideia à retrospectiva, com verba mensal e calendário.",
+        "url_name": "marketing:quadro",
     },
     Modulo.APPSITE: {
         "grupo": "Online",

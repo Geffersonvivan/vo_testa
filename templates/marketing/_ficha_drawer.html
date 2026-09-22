@@ -1,0 +1,303 @@
+{% comment %}GAVETA da ficha (520px) sobre o quadro — carregada por HTMX em #ficha-slot.
+Espelha o protótipo (ABRIR-Marketing): cabeçalho (dados + canais-pílula + verba), KPIs
+travada/gasta/disponível, portão POR FASE, etapas, envolvidos, conversa e rodapé "Avançar".
+Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
+(hx-target #ficha-slot). Só tokens do app.css.{% endcomment %}
+{% load nucleo_extras moeda %}
+<style>
+  .fx-in{width:100%;box-sizing:border-box;background:var(--superficie);border:1px solid var(--fio);border-radius:12px;padding:9px 11px;font-size:13px;color:var(--tinta)}
+  .fx-lb{font-size:11px;letter-spacing:.05em;font-weight:700;color:var(--tinta-suave)}
+  .fx-h3{margin:0 0 4px;font-family:var(--fonte-titulo);font-size:14px;font-weight:700;color:var(--tinta)}
+  .fx-sub{margin:0 0 10px;font-size:11.5px;line-height:1.45;color:var(--tinta-suave)}
+  .fx-sec{padding:15px 16px;border-radius:16px;background:var(--superficie-2);border:1px solid var(--fio);margin-bottom:18px}
+  .fx-row{display:flex;align-items:flex-start;gap:11px;padding:10px 13px;border-radius:12px;background:var(--superficie);border:1px solid var(--fio)}
+  .fx-chk{flex:none;width:20px;height:20px;margin-top:1px;border-radius:6px;border:1px solid var(--fio-forte);background:var(--superficie);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;font-size:12px;font-weight:700;color:transparent}
+  .fx-chk.on{border-color:var(--musgo);background:var(--musgo);color:var(--superficie)}
+  .fx-chk.disp{border-color:var(--fio-forte);background:var(--superficie-2);color:var(--tinta-suave)}
+  .fx-chk[disabled]{cursor:default}
+  .fx-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;font-size:12.5px;font-weight:700;border:1px solid var(--fio);background:var(--superficie);color:var(--tinta-suave);cursor:pointer}
+  .fx-chip.on{background:var(--tinta);color:var(--superficie);border-color:var(--tinta)}
+  .fx-obrig{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--perigo);background:var(--perigo-bg);border-radius:99px;padding:2px 7px}
+  .fx-av{flex:none;width:30px;height:30px;border-radius:50%;background:var(--superficie);border:1px solid var(--fio);color:var(--tinta);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+  .fx-sel{appearance:none;background:var(--superficie);border:1px solid var(--fio);border-radius:10px;padding:7px 26px 7px 11px;font-size:12.5px;font-weight:700;color:var(--tinta);cursor:pointer;background-image:linear-gradient(45deg,transparent 50%,var(--tinta-suave) 50%),linear-gradient(135deg,var(--tinta-suave) 50%,transparent 50%);background-position:calc(100% - 15px) 55%,calc(100% - 10px) 55%;background-size:5px 5px,5px 5px;background-repeat:no-repeat}
+  .fx-btn{height:38px;padding:0 15px;border-radius:12px;border:none;background:linear-gradient(180deg,var(--lampiao-claro),var(--lampiao));color:var(--madeira);font-weight:700;font-size:13px;cursor:pointer}
+  .fx-btn[disabled]{opacity:.5;cursor:default}
+  .fx-btn-n{height:38px;padding:0 15px;border-radius:12px;border:1px solid var(--fio);background:var(--superficie);color:var(--tinta);font-weight:700;font-size:13px;cursor:pointer}
+  .fx-kpi{padding:12px 14px;border-radius:14px;background:var(--superficie-2);border:1px solid var(--fio)}
+</style>
+
+<div onclick="document.getElementById('ficha-slot').innerHTML=''"
+     style="position:fixed;inset:0;background:rgba(4,21,31,.42);z-index:80"></div>
+
+<aside style="position:fixed;top:0;right:0;bottom:0;width:min(520px,94vw);background:var(--superficie);border-left:1px solid var(--fio);box-shadow:var(--sombra-3);z-index:81;display:flex;flex-direction:column">
+
+  {# ── Cabeçalho: dados da campanha (form próprio) ── #}
+  <div style="flex:none;padding:18px 22px 15px;border-bottom:1px solid var(--fio)">
+    <div style="display:flex;align-items:flex-start;gap:12px">
+      <form hx-post="{% url 'marketing:salvar_campanha' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML"
+            style="flex:1;min-width:0;display:grid;gap:8px">
+        {% csrf_token %}
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-family:var(--fonte-mono,ui-monospace),monospace;font-size:11px;color:var(--tinta-suave)">{{ c.codigo }}</span>
+          <span class="selo">{{ c.get_fase_display|upper }}</span>
+        </div>
+        <input class="fx-in" type="text" name="nome" value="{{ c.nome }}" placeholder="Nome da campanha"
+               style="font-family:var(--fonte-titulo);font-size:18px;font-weight:700;border:none;border-bottom:1px solid var(--fio);border-radius:0;padding:2px 0">
+        <textarea class="fx-in" name="objetivo" rows="2" placeholder="Em uma frase: o que esta campanha precisa conseguir">{{ c.objetivo }}</textarea>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <input class="fx-in" type="text" name="publico" value="{{ c.publico }}" placeholder="Público-alvo" style="flex:1;min-width:150px">
+          <input class="fx-in" type="date" name="inicio" value="{{ c.inicio|date:'Y-m-d' }}" style="width:140px">
+          <span style="font-size:12px;color:var(--tinta-suave)">a</span>
+          <input class="fx-in" type="date" name="fim" value="{{ c.fim|date:'Y-m-d' }}" style="width:140px">
+        </div>
+        <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:2px">
+          <span class="fx-lb">VERBA PREVISTA</span>
+          <input class="fx-in num js-moeda" type="text" name="verba_prevista" value="{{ c.verba_prevista|intcomma_brl }}" style="width:132px">
+          <span style="font-size:11.5px;color:var(--tinta-suave)">sai do teto do mês quando for aprovada</span>
+          <button class="fx-btn-n" type="submit" style="height:32px">Salvar dados</button>
+        </div>
+      </form>
+      <form method="post" action="{% url 'marketing:duplicar' c.pk %}" style="flex:none">
+        {% csrf_token %}<button type="submit" title="Duplicar" class="mkt-btn-ghost">⧉</button>
+      </form>
+      <button onclick="var s=document.getElementById('ficha-slot');if(s){s.innerHTML=''}else{location.href='{% url 'marketing:quadro' %}'}" class="mkt-btn-ghost" aria-label="Fechar">✕</button>
+    </div>
+
+    {# Canais como pílulas (toggle) #}
+    <div style="margin-top:12px">
+      <span class="fx-lb">CANAIS</span>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">
+        {% for canal in canais_padrao %}
+        <form hx-post="{% url 'marketing:alternar_canal' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML" style="display:inline">
+          {% csrf_token %}<input type="hidden" name="canal" value="{{ canal }}">
+          <button type="submit" class="fx-chip {% if canal in c.canais %}on{% endif %}">{{ canal }}</button>
+        </form>
+        {% endfor %}
+        {% for canal in c.canais %}{% if canal not in canais_padrao %}
+        <form hx-post="{% url 'marketing:alternar_canal' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML" style="display:inline">
+          {% csrf_token %}<input type="hidden" name="canal" value="{{ canal }}">
+          <button type="submit" class="fx-chip on">{{ canal }}</button>
+        </form>
+        {% endif %}{% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Corpo rolável ── #}
+  <div style="flex:1;min-height:0;overflow-y:auto;padding:18px 22px 26px">
+
+    {# KPIs: travada / gasta / disponível (da campanha) #}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
+      <div class="fx-kpi"><div class="fx-lb">TRAVADA</div>
+        <div class="num" style="margin-top:5px;font-family:var(--fonte-titulo);font-size:16px;font-weight:700;color:var(--alerta)">{{ c.verba_travada|intcomma_brl }}</div></div>
+      <div class="fx-kpi"><div class="fx-lb">GASTA</div>
+        <div class="num" style="margin-top:5px;font-family:var(--fonte-titulo);font-size:16px;font-weight:700;color:var(--perigo)">{{ c.gasta|intcomma_brl }}</div></div>
+      <div class="fx-kpi"><div class="fx-lb">DISPONÍVEL</div>
+        <div class="num" style="margin-top:5px;font-family:var(--fonte-titulo);font-size:16px;font-weight:700;color:var(--tinta)">{{ c.sobra_travada|intcomma_brl }}</div></div>
+    </div>
+
+    {# ── Portão da fase ── #}
+    {% if portao.total or portao.eh_aprovacao %}
+    <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-bottom:4px">
+      <h3 class="fx-h3" style="margin:0">Para sair de {{ portao.fase_nome }}</h3>
+      {% if portao.total %}<span style="font-size:11.5px;font-weight:700;color:{% if portao.pode_avancar %}var(--musgo){% else %}var(--perigo){% endif %}">{{ portao.feitos }}/{{ portao.total }}</span>{% endif %}
+    </div>
+    {% if portao.eh_aprovacao %}
+    <p class="fx-sub">Decisão da gerência. Aprovar trava a verba prevista no teto do mês.</p>
+    {% else %}
+    <p class="fx-sub">Esta lista vem da fase — é o que o portão cobra. Item obrigatório em aberto trava o avanço.</p>
+    <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:20px">
+      {% for it in portao.itens %}
+      <div class="fx-row" style="{% if it.resolvido %}border-color:var(--sucesso);background:var(--sucesso-bg){% elif it.obrigatorio %}border-color:var(--perigo){% endif %}">
+        {% if it.manual and not it.dispensado %}
+        <form hx-post="{% url 'marketing:marcar_check' c.pk it.chave %}" hx-target="#ficha-slot" hx-swap="innerHTML" style="flex:none">
+          {% csrf_token %}<button class="fx-chk {% if it.resolvido %}on{% endif %}" type="submit" aria-label="Alternar">{% if it.resolvido %}✓{% endif %}</button>
+        </form>
+        {% else %}
+        <span class="fx-chk {% if it.dispensado %}disp{% elif it.resolvido %}on{% endif %}">{% if it.dispensado %}–{% elif it.resolvido %}✓{% endif %}</span>
+        {% endif %}
+        <span style="flex:1;min-width:0">
+          <span style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:600;color:{% if it.resolvido %}var(--tinta-suave){% else %}var(--tinta){% endif %}">{{ it.rotulo }}</span>
+            {% if it.obrigatorio %}<span class="fx-obrig">OBRIGATÓRIO</span>{% endif %}
+          </span>
+          {% if it.dispensado %}<span style="display:block;margin-top:3px;font-size:11px;color:var(--tinta-suave)">Dispensado pela gerência</span>
+          {% elif it.meta %}<span style="display:block;margin-top:3px;font-size:11px;color:var(--tinta-suave)">{{ it.meta }}</span>{% endif %}
+        </span>
+        {% if eh_gerente and not it.resolvido %}
+        <form hx-post="{% url 'marketing:dispensar_check' c.pk it.chave %}" hx-target="#ficha-slot" hx-swap="innerHTML"
+              hx-prompt="Motivo da dispensa (fica na trilha):" style="flex:none">
+          {% csrf_token %}<button type="submit" style="border:none;background:none;font-size:11px;font-weight:700;color:var(--tinta-suave);cursor:pointer">Dispensar</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {# ── Etapas desta campanha ── #}
+    <h3 class="fx-h3">Etapas desta campanha</h3>
+    <p class="fx-sub">O que é só desta campanha. Não trava o portão — organiza quem faz o quê.</p>
+    <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:9px">
+      {% for e in etapas %}
+      <div class="fx-row">
+        <form hx-post="{% url 'marketing:alternar_etapa' e.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML" style="flex:none">
+          {% csrf_token %}<button class="fx-chk {% if e.feito %}on{% endif %}" type="submit" aria-label="Alternar">{% if e.feito %}✓{% endif %}</button>
+        </form>
+        <span style="flex:1;min-width:0">
+          <span style="display:block;font-size:13px;font-weight:600;color:{% if e.feito %}var(--tinta-suave){% else %}var(--tinta){% endif %};{% if e.feito %}text-decoration:line-through{% endif %}">{{ e.texto }}</span>
+          <span style="display:block;margin-top:2px;font-size:11px;color:var(--tinta-suave)">{% if e.dono %}{{ e.dono.get_full_name|default:e.dono.username }}{% else %}sem dono{% endif %}{% if e.prazo %} · até {{ e.prazo|date:"d/m" }}{% endif %}</span>
+        </span>
+        <form hx-post="{% url 'marketing:remover_etapa' e.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML" style="flex:none">
+          {% csrf_token %}<button type="submit" style="border:none;background:none;color:var(--tinta-suave);cursor:pointer;font-size:16px" aria-label="Remover">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    <form hx-post="{% url 'marketing:adicionar_etapa' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML"
+          style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px">
+      {% csrf_token %}
+      <input class="fx-in" type="text" name="texto" placeholder="Nova etapa" required style="flex:1;min-width:130px">
+      <select class="fx-sel" name="dono"><option value="">Quem faz</option>
+        {% for u in usuarios %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+      </select>
+      <input class="fx-in" type="date" name="prazo" style="width:140px">
+      <button class="fx-btn-n" type="submit">Adicionar</button>
+    </form>
+
+    {# ── Quem está envolvido ── #}
+    <h3 class="fx-h3">Quem está envolvido</h3>
+    <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:22px">
+      {% for e in envolvidos %}
+      <div class="fx-row" style="align-items:center">
+        <span class="fx-av">{{ e.iniciais }}</span>
+        <span style="flex:1;min-width:0">
+          <span style="display:block;font-size:11px;letter-spacing:.05em;font-weight:700;color:var(--tinta-suave)">{{ e.papel }}</span>
+          <span style="display:block;font-size:11.5px;color:var(--tinta-suave)">{{ e.dica }}</span>
+        </span>
+        {% if e.campo == 'fornecedor' %}
+        <form hx-post="{% url 'marketing:atribuir_papel' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML" hx-trigger="change from:find input" style="flex:none">
+          {% csrf_token %}<input type="hidden" name="papel" value="fornecedor">
+          <input class="fx-in" type="text" name="valor" value="{{ e.atual_texto }}" placeholder="—" style="width:150px">
+        </form>
+        {% else %}
+        <form hx-post="{% url 'marketing:atribuir_papel' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML" hx-trigger="change from:find select" style="flex:none">
+          {% csrf_token %}<input type="hidden" name="papel" value="{{ e.campo }}">
+          <select class="fx-sel" name="valor"><option value="">—</option>
+            {% for u in usuarios %}<option value="{{ u.pk }}" {% if u.pk == e.atual_id %}selected{% endif %}>{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+          </select>
+        </form>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    {# ── Conversa ── #}
+    <h3 class="fx-h3">Conversa</h3>
+    <p class="fx-sub">O que foi decidido fica aqui, junto da campanha — não no WhatsApp.</p>
+    {% if not conversa %}<p style="margin:0 0 12px;font-size:12.5px;color:var(--tinta-suave)">Ninguém comentou ainda.</p>{% endif %}
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+      {% for m in conversa %}
+      <div class="fx-row" style="align-items:flex-start;background:var(--superficie-2)">
+        <span class="fx-av" style="width:26px;height:26px">{{ m.autor.get_full_name|default:m.autor.username|slice:":2"|upper }}</span>
+        <span style="flex:1;min-width:0">
+          <span style="display:flex;align-items:baseline;gap:7px"><span style="font-size:12px;font-weight:700;color:var(--tinta)">{{ m.autor.get_full_name|default:m.autor.username }}</span>
+            <span style="font-size:11px;color:var(--tinta-suave)">{{ m.em|date:"d/m H:i" }}</span></span>
+          <span style="display:block;margin-top:2px;font-size:12.5px;line-height:1.5;color:var(--tinta)">{{ m.texto }}</span>
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+    <form hx-post="{% url 'marketing:comentar' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML"
+          style="display:flex;gap:8px;margin-bottom:22px">
+      {% csrf_token %}
+      <input class="fx-in" type="text" name="texto" placeholder="Escreva uma decisão…" required style="flex:1;min-width:0">
+      <button class="fx-btn-n" type="submit">Enviar</button>
+    </form>
+
+    {# ── Aquisição ── #}
+    <h3 class="fx-h3">Aquisição</h3>
+    <div class="fx-sec">
+      <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px">
+        <span>Total <b>{{ aq.total }}</b></span><span>Abertos <b>{{ aq.abertos }}</b></span>
+        <span style="color:var(--sucesso)">Ganhos <b>{{ aq.ganhos }}</b></span>
+        <span style="color:var(--perigo)">Perdidos <b>{{ aq.perdidos }}</b></span>
+        <span>Receita <b class="num">{{ aq.receita|intcomma_brl }}</b></span>
+        <span>Conversão <b>{{ aq.conversao }}%</b></span>
+      </div>
+      {% if aq.motivos %}<div class="mkt-meta" style="margin-top:7px">Perdas: {% for m in aq.motivos %}{{ m.motivo }} ({{ m.n }}){% if not forloop.last %} · {% endif %}{% endfor %}</div>{% endif %}
+    </div>
+
+    {# ── Peças ── #}
+    <h3 class="fx-h3">Peças</h3>
+    {% if not c.pecas.all %}<p class="fx-sub">Nenhuma peça ainda — a Estruturação exige pelo menos uma.</p>{% endif %}
+    <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:9px">
+      {% for p in c.pecas.all %}
+      <div class="fx-row">
+        <form hx-post="{% url 'marketing:marcar_peca' p.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML" style="flex:none">
+          {% csrf_token %}
+          <input type="hidden" name="status" value="{% if p.status == 'pronta' %}a_fazer{% else %}pronta{% endif %}">
+          <button class="fx-chk {% if p.status == 'pronta' %}on{% endif %}" type="submit" aria-label="Alternar pronta">{% if p.status == 'pronta' %}✓{% endif %}</button>
+        </form>
+        <span style="flex:1;min-width:0">
+          <span style="display:block;font-size:13px;font-weight:600;color:var(--tinta)">{{ p.nome }}</span>
+          <span class="mkt-meta" style="display:block;margin-top:2px">{{ p.canal|default:"sem canal" }} · {{ p.data|date:"d/m/Y"|default:"sem data" }}</span>
+        </span>
+        <form hx-post="{% url 'marketing:remover_peca' p.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML" style="flex:none">
+          {% csrf_token %}<button type="submit" style="border:none;background:none;color:var(--tinta-suave);cursor:pointer;font-size:16px" aria-label="Remover">✕</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    <form hx-post="{% url 'marketing:adicionar_peca' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML"
+          style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px">
+      {% csrf_token %}
+      <input class="fx-in" type="text" name="nome" placeholder="Nova peça" required style="flex:1;min-width:130px">
+      <input class="fx-in" type="text" name="canal" placeholder="Canal" style="width:110px">
+      <input class="fx-in" type="date" name="data" style="width:140px">
+      <button class="fx-btn-n" type="submit">Adicionar</button>
+    </form>
+
+    {# ── Lançar gasto ── #}
+    <h3 class="fx-h3">Lançar gasto</h3>
+    <form hx-post="{% url 'marketing:lancar_gasto' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML"
+          style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+      {% csrf_token %}
+      <input class="fx-in num" type="text" name="valor" placeholder="R$ 0,00" required style="width:120px">
+      <input class="fx-in" type="date" name="data" style="width:140px">
+      <button class="fx-btn-n" type="submit">Lançar</button>
+    </form>
+    <p style="margin:0 0 22px;font-size:11.5px;color:var(--tinta-suave)">Gasto acumulado: <b class="num">{{ c.gasta|intcomma_brl }}</b> — entra no relatório do mês em que o dinheiro saiu.</p>
+
+    {# ── Retrospectiva ── #}
+    <h3 class="fx-h3">Retrospectiva</h3>
+    <p class="fx-sub">Exigida para encerrar a campanha.</p>
+    <form hx-post="{% url 'marketing:salvar_campanha' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML"
+          style="display:grid;gap:9px;margin-bottom:12px">
+      {% csrf_token %}
+      <label style="display:grid;gap:4px"><span class="fx-lb">O QUE FUNCIONOU</span><textarea class="fx-in" name="retro_funcionou" rows="2">{{ c.retro_funcionou }}</textarea></label>
+      <label style="display:grid;gap:4px"><span class="fx-lb">O QUE NÃO FUNCIONOU</span><textarea class="fx-in" name="retro_nao" rows="2">{{ c.retro_nao }}</textarea></label>
+      <label style="display:grid;gap:4px"><span class="fx-lb">O QUE FAZER DIFERENTE</span><textarea class="fx-in" name="retro_diferente" rows="2">{{ c.retro_diferente }}</textarea></label>
+      <button class="fx-btn-n" type="submit" style="justify-self:start">Salvar retrospectiva</button>
+    </form>
+  </div>
+
+  {# ── Rodapé: avançar no funil ── #}
+  <div style="flex:none;display:flex;align-items:center;gap:9px;padding:14px 22px;background:var(--superficie-2);border-top:1px solid var(--fio)">
+    <span style="flex:1;min-width:0;font-size:11.5px;line-height:1.4;color:var(--tinta-suave)">
+      {% if not portao.proxima %}Campanha encerrada.
+      {% elif portao.pode_avancar %}Pode seguir para {{ portao.proxima_nome }}.
+      {% else %}Falta {{ portao.obrig_pendentes|join:", " }} para avançar.{% endif %}
+    </span>
+    {% if portao.proxima %}
+      {% if portao.eh_aprovacao and not eh_gerente %}
+      <span style="font-size:11.5px;color:var(--tinta-suave)">Aprovar é da gerência.</span>
+      {% else %}
+      <form hx-post="{% url 'marketing:avancar_fase' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML">
+        {% csrf_token %}<button class="fx-btn" type="submit" {% if not portao.pode_avancar %}disabled{% endif %}>{{ portao.avancar_label }}</button>
+      </form>
+      {% endif %}
+    {% endif %}
+  </div>
+</aside>

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block titulo %}Relatório — Marketing{% endblock %}
+
+{% block conteudo %}
+{# Transcrição do protótipo. Seleção de período em pílulas (sem controle nativo). #}
+
+<div style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.11em;color:var(--tinta-suave);font-weight:700;margin-bottom:7px">MARKETING<span aria-hidden="true">›</span><span style="color:var(--musgo)">CAMPANHAS</span></div>
+  <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+    <a href="{% url 'marketing:quadro' %}" style="font-size:13px;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio)">Quadro</a>
+    <a href="{% url 'marketing:calendario' %}" style="font-size:13px;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio)">Calendário</a>
+    <a href="{% url 'marketing:ocupacao' %}" style="font-size:13px;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio)">Ocupação</a>
+    <a href="{% url 'marketing:relatorio' %}" style="font-size:13px;font-weight:700;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--tinta);color:var(--superficie)">Relatório</a>
+  </div>
+</div>
+
+<section style="border-radius:20px;background:var(--superficie);border:1px solid var(--fio);box-shadow:var(--sombra-cartao);overflow:hidden;margin-bottom:18px">
+  {# filtro em pílulas #}
+  <div style="display:flex;flex-direction:column;gap:9px;padding:15px 20px;border-bottom:1px solid var(--fio)">
+    <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+      <span style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700;margin-right:3px">MÊS</span>
+      {% for n, nome in meses %}
+      <a href="?mes={{ n }}&ano={{ ano_sel }}" style="font-size:12.5px;font-weight:700;padding:6px 12px;border-radius:99px;text-decoration:none;{% if n == mes_sel %}background:var(--tinta);color:var(--superficie){% else %}background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio){% endif %}">{{ nome|slice:":3" }}</a>
+      {% endfor %}
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+      <span style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700;margin-right:3px">ANO</span>
+      {% for a in anos %}
+      <a href="?mes={{ mes_sel }}&ano={{ a }}" style="font-size:12.5px;font-weight:700;padding:6px 12px;border-radius:99px;text-decoration:none;{% if a == ano_sel %}background:var(--tinta);color:var(--superficie){% else %}background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio){% endif %}">{{ a }}</a>
+      {% endfor %}
+      <span style="width:1px;height:22px;background:var(--fio)"></span>
+      <a href="?mes={{ mes_sel }}&ano={{ ano_sel }}&export=csv" style="font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:99px;text-decoration:none;background:var(--superficie);color:var(--tinta);border:1px solid var(--fio)">Exportar CSV</a>
+      <button type="button" onclick="window.print()" style="font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:99px;background:var(--superficie);color:var(--tinta);border:1px solid var(--fio);cursor:pointer">Imprimir</button>
+      <span style="font-size:12px;color:var(--tinta-suave);margin-left:2px">Período: <b>{{ rotulo }}</b></span>
+    </div>
+  </div>
+
+  {# KPIs #}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:1px;background:var(--fio)">
+    <div style="padding:16px 20px;background:var(--superficie)">
+      <div style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">TETO</div>
+      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:var(--tinta);white-space:nowrap">R$ {{ dados.teto }}</div>
+    </div>
+    <div style="padding:16px 20px;background:var(--superficie)">
+      <div style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">GASTO</div>
+      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:var(--perigo);white-space:nowrap">R$ {{ dados.gasto }}</div>
+    </div>
+    <div style="padding:16px 20px;background:var(--superficie)">
+      <div style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">SOBRA</div>
+      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:{% if dados.sobra < 0 %}var(--perigo){% else %}var(--musgo){% endif %};white-space:nowrap">R$ {{ dados.sobra }}</div>
+    </div>
+    <div style="padding:16px 20px;background:var(--superficie)">
+      <div style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">RITMO/DIA</div>
+      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:var(--tinta);white-space:nowrap">R$ {{ dados.ritmo }}</div>
+    </div>
+  </div>
+</section>
+
+<section style="border-radius:20px;background:var(--superficie);border:1px solid var(--fio);box-shadow:var(--sombra-cartao);overflow:hidden;margin-bottom:18px">
+  <div style="padding:15px 20px;border-bottom:1px solid var(--fio)">
+    <h2 style="margin:0;font-family:var(--fonte-titulo);font-size:16.5px;font-weight:700;color:var(--tinta)">Campanha por campanha</h2>
+    <p style="margin:4px 0 0;font-size:12px;line-height:1.45;color:var(--tinta-suave)">Retorno conta só a receita <strong>rastreada</strong> — fechamentos vindos de lead atribuído à campanha. A receita estimada pela janela de vigência aparece ao lado, separada: nunca somada.</p>
+  </div>
+  <div style="padding:12px 16px 18px;display:flex;flex-direction:column;gap:8px">
+    {% for l in dados.linhas %}
+    <div style="padding:12px 15px;border-radius:14px;background:var(--superficie-2);border:1px solid var(--fio)">
+      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <span style="flex:1;min-width:140px;font-size:13.5px;font-weight:700;color:var(--tinta)">{{ l.nome }}</span>
+        <span style="flex:none;text-align:right">
+          <span class="num" style="display:block;font-family:var(--fonte-titulo);font-size:18px;font-weight:700;color:var(--musgo)">R$ {{ l.rastreada }}</span>
+          <span style="display:block;margin-top:1px;font-size:11px;color:var(--tinta-suave)">rastreada</span>
+        </span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-top:10px">
+        <span style="font-size:11px;color:var(--tinta-suave)">gasto<br><strong class="num" style="font-size:12.5px;color:var(--tinta)">R$ {{ l.gasto }}</strong></span>
+        <span style="font-size:11px;color:var(--tinta-suave)">na janela<br><strong class="num" style="font-size:12.5px;color:var(--tinta-suave)" title="Coincidência de calendário — nunca somar com a rastreada">R$ {{ l.janela }}</strong></span>
+        <span style="font-size:11px;color:var(--tinta-suave)">fechamentos<br><strong class="num" style="font-size:12.5px;color:var(--tinta)">{{ l.fechamentos }}</strong></span>
+        <span style="font-size:11px;color:var(--tinta-suave)">por venda (CAC)<br><strong class="num" style="font-size:12.5px;color:var(--tinta)">{% if l.cac %}R$ {{ l.cac }}{% else %}—{% endif %}</strong></span>
+      </div>
+    </div>
+    {% empty %}
+    <p style="padding:14px 4px;font-size:12px;color:var(--tinta-suave)">Sem gasto ou retorno no período.</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

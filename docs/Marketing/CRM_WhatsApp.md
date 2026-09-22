@@ -357,3 +357,68 @@ zero acoplamento com os outros módulos.
 **Recomendação para estrear rápido e barato:** Twilio (voz + gravação + softphone WebRTC)
 → Whisper (transcrição) → Claude (análise) → dashboard atual (BI). Faseado, começando por
 "discar + gravar".
+
+> **⚠️ Atualização (14/09/2026) — plano refinado para a equipe de vendas remota.** Com a
+> equipe em **Concórdia** (a central UnniTI é da pousada, em **Itá**) e a **Vupt já
+> contratada (R$ 59,90/mês)**, a decisão mudou: **manter a Vupt como operadora** e usar
+> **Asterisk** (PBX open-source numa VM, **custo zero de licença**, controlado por Python
+> via **ARI**) + **SIP.js** (softphone no navegador) — em vez do Twilio (celular BR caro,
+> Vupt sem uso). O plano executável (arquitetura, papéis, custos e **passo a passo**) está
+> em **`docs/Implementar_Telefonia_Vendas.md`**. As fases Whisper/Claude/BI deste anexo
+> seguem valendo.
+
+---
+
+# Anexo C — Estado da implementação (Trilha B) + go-live
+
+> Atualizado em 10/09/2026. Código **implementado, testado e no ar** (modo `simulado`).
+> Vira `cloud` só preenchendo o `.env` de produção com as credenciais do número.
+
+## C.1 O que já está pronto no CRM (commits na `main`)
+- **GatewayCloud real** (`apps/comercial/whatsapp_gateways.py`): envia **texto** (janela
+  24h) e **template** via Graph API (urllib, sem dependência nova); `normalizar_telefone`
+  em E.164 (país 55).
+- **Webhook público** `POST/GET /whatsapp/webhook/` (`views_whatsapp.py`): verify-token no
+  GET; no POST processa **mensagens + status + opt-out**, idempotente por `wamid`, e
+  **valida a assinatura `X-Hub-Signature-256`** quando `WHATSAPP_APP_SECRET` está setado.
+- **Trava de janela de 24h** no envio livre (fora do simulado); status `failed` **nunca
+  reverte**.
+- **Disparo em lote** (`services.disparar_campanha_whatsapp` + comando
+  `manage.py enviar_campanha_whatsapp`) com throttle e opt-in.
+- **Consentimento por canal:** `Pessoa.aceita_whatsapp` (migração 0034, com backfill dos
+  leads já opt-in). O "sair" no WhatsApp desliga só o WhatsApp.
+- **Resiliência:** mensagem recebida anexa à oportunidade mais recente (não exige ABERTA)
+  — reply de quem já reservou não se perde.
+
+## C.2 Variáveis de ambiente (produção)
+| Var | O que é |
+|---|---|
+| `WHATSAPP_GATEWAY=cloud` | liga o provedor real (padrão `simulado`) |
+| `WHATSAPP_CLOUD_TOKEN` | token permanente (System User) da Meta |
+| `WHATSAPP_CLOUD_PHONE_ID` | Phone Number ID do número na WABA |
+| `WHATSAPP_VERIFY_TOKEN` | segredo do handshake do webhook (você escolhe) |
+| `WHATSAPP_APP_SECRET` | App Secret da Meta — valida a assinatura do webhook |
+| `WHATSAPP_WABA_ID` | (futuro) gestão de templates |
+| `WHATSAPP_API_VERSION` | default `v21.0` |
+
+## C.3 Checklist de go-live (amanhã, com o número)
+**Lado Meta (portfólio "Pousada Vô Testa"):**
+- [ ] Registrar o número novo na **WABA do portfólio Pousada Vô Testa** (via
+      `business.facebook.com/settings` → Contas → Contas do WhatsApp → Adicionar) —
+      **não** instalar o número no app comum do WhatsApp.
+- [ ] Aprovar o template **`boas_vindas_fundador`** (categoria Marketing, pt-BR).
+- [ ] Gerar **token permanente** + anotar **Phone Number ID** e **App Secret**.
+- [ ] Configurar o webhook: URL `https://www.pousadavotesta.com.br/whatsapp/webhook/`,
+      **Verify Token** = o mesmo do `.env`, assinar o campo `messages`.
+
+**Lado CRM:**
+- [ ] Preencher o `.env` de produção (tabela C.2) e deployar.
+- [ ] Teste: `manage.py enviar_campanha_whatsapp --template boas_vindas_fundador
+      --slug fundador --limite 1` → depois sem `--limite`.
+
+## C.4 Ainda NÃO feito (fast-follow futuros)
+- Painel de campanha na UI (hoje o disparo é por comando/serviço).
+- Rastrear `delivered`/`read` como estados próprios (hoje viram "enviada").
+- Gestão de templates pela API (WABA_ID).
+- Verificação de negócio na Meta: **só quando for escalar** (aumentar limites); fazer no
+  portfólio **Pousada Vô Testa** por *Autorizações e verificações*.

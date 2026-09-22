@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block titulo %}Conciliação manual — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Financeiro</p>
+<div class="pagina-cabecalho">
+  <h1>Conciliação manual</h1>
+</div>
+<p class="subtitulo">Case o que não foi automático, <b>ignore</b> o que não é receita/despesa
+  (tarifas, transferências entre contas próprias) e <b>desfaça</b> se errar.
+  <a href="{% url 'conciliacao:painel' %}">← voltar ao painel</a></p>
+
+<div class="eleg">
+{% include "comercial/_estilo_elegante.html" %}
+
+  {# ── Extrato pendente ── #}
+  <h2 class="secao-titulo letreiro" style="margin-top:1rem">Extrato — pendentes</h2>
+  <div class="quadro">
+    <table class="tabela">
+      <thead>
+        <tr><th>Data</th><th>Descrição</th><th class="num">Valor</th><th>Casar com…</th></tr>
+      </thead>
+      <tbody>
+        {% for l, cands in linhas_ext %}
+        <tr>
+          <td>{{ l.data|date:"d/m/Y" }}</td>
+          <td>{{ l.descricao|default:"—" }}</td>
+          <td class="num">
+            {% if l.credito %}<span class="selo selo-sucesso">+ {{ l.valor }}</span>
+            {% else %}<span class="selo selo-perigo">{{ l.valor }}</span>{% endif %}
+          </td>
+          <td>
+            <form method="post" action="{% url 'conciliacao:casar_extrato' %}"
+                  style="display:inline-flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+              {% csrf_token %}
+              <input type="hidden" name="lancamento" value="{{ l.id }}">
+              <select name="escolha" style="max-width:340px">
+                <option value="">— escolher registro do CRM —</option>
+                {% for c in cands %}
+                <option value="{{ c.origem }}:{{ c.id }}">{% if c.exato %}★ {% endif %}{{ c.rotulo }} · R$ {{ c.valor }} · {{ c.data|date:"d/m" }}</option>
+                {% endfor %}
+              </select>
+              <button class="botao-mini" type="submit">Casar</button>
+            </form>
+            <form method="post" action="{% url 'conciliacao:ignorar_extrato' %}" style="display:inline">
+              {% csrf_token %}<input type="hidden" name="lancamento" value="{{ l.id }}">
+              <button class="botao-mini" type="submit"
+                      title="Tarifa, transferência entre contas próprias, etc.">Ignorar</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="vazio">Nada pendente no extrato. 🎉</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# ── Cartão pendente ── #}
+  <h2 class="secao-titulo letreiro" style="margin-top:1.6rem">Cartão (SafraPay) — pendentes</h2>
+  <div class="quadro">
+    <table class="tabela">
+      <thead>
+        <tr><th>Venda</th><th>NSU</th><th class="num">Bruto</th><th>Casar com recebimento de caixa…</th></tr>
+      </thead>
+      <tbody>
+        {% for t, cands in linhas_cartao %}
+        <tr>
+          <td>{{ t.data_venda|date:"d/m/Y" }}</td>
+          <td class="num">{{ t.nsu }}</td>
+          <td class="num">{{ t.bruto }}</td>
+          <td>
+            <form method="post" action="{% url 'conciliacao:casar_cartao' %}"
+                  style="display:inline-flex;gap:.4rem;align-items:center;flex-wrap:wrap">
+              {% csrf_token %}<input type="hidden" name="transacao" value="{{ t.id }}">
+              <select name="escolha" style="max-width:340px">
+                <option value="">— escolher recebimento —</option>
+                {% for c in cands %}
+                <option value="{{ c.origem }}:{{ c.id }}">{% if c.exato %}★ {% endif %}{{ c.rotulo }} · R$ {{ c.valor }}</option>
+                {% endfor %}
+              </select>
+              <button class="botao-mini" type="submit">Casar</button>
+            </form>
+            <form method="post" action="{% url 'conciliacao:sem_venda_cartao' %}" style="display:inline">
+              {% csrf_token %}<input type="hidden" name="transacao" value="{{ t.id }}">
+              <button class="botao-mini" type="submit">Sem venda</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="vazio">Nada pendente no cartão. 🎉</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# ── Conciliados recentes (desfazer) ── #}
+  {% if conciliados_ext or conciliados_cartao %}
+  <h2 class="secao-titulo letreiro" style="margin-top:1.6rem">Conciliados recentes</h2>
+  <div class="quadro">
+    <table class="tabela">
+      <thead>
+        <tr><th>Tipo</th><th>Referência</th><th class="num">Valor</th><th>Como</th><th class="num">Ação</th></tr>
+      </thead>
+      <tbody>
+        {% for l in conciliados_ext %}
+        <tr>
+          <td>Extrato</td>
+          <td>{{ l.data|date:"d/m" }} · {{ l.descricao|default:"—"|truncatechars:40 }}</td>
+          <td class="num">{{ l.valor }}</td>
+          <td><span class="selo">{{ l.confianca|default:"auto" }}</span></td>
+          <td class="num">
+            <form method="post" action="{% url 'conciliacao:desfazer_extrato' %}" style="display:inline">
+              {% csrf_token %}<input type="hidden" name="lancamento" value="{{ l.id }}">
+              <button class="botao-mini" type="submit">Desfazer</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        {% for t in conciliados_cartao %}
+        <tr>
+          <td>Cartão</td>
+          <td>NSU {{ t.nsu }}{% if t.divergencia_valor %} <span class="selo selo-alerta" title="Divergência bruto × caixa">Δ {{ t.divergencia_valor }}</span>{% endif %}</td>
+          <td class="num">{{ t.bruto }}</td>
+          <td><span class="selo">NSU</span></td>
+          <td class="num">
+            <form method="post" action="{% url 'conciliacao:desfazer_cartao' %}" style="display:inline">
+              {% csrf_token %}<input type="hidden" name="transacao" value="{{ t.id }}">
+              <button class="botao-mini" type="submit">Desfazer</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

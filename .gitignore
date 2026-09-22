@@ -69,3 +69,8 @@ evidencias/safrapay/prints/*
 
 # Referência pesada — manter local, fora do git
 docs/Foco_Tecnologia.pdf
+
+# Ferramentas locais de IA/editor (não versionar)
+.claude/
+.cursor/
+.impeccable/

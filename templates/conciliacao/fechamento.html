@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block titulo %}Fechamento de conciliação — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Financeiro</p>
+<div class="pagina-cabecalho">
+  <h1>Fechamento de conciliação</h1>
+</div>
+<p class="subtitulo">Resumo do período: quanto do extrato e das vendas no cartão foi
+  conciliado, taxas e divergências. <a href="{% url 'conciliacao:painel' %}">← painel</a></p>
+
+<form method="get" style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap;margin:.9rem 0">
+  <label style="display:grid;gap:.3rem">
+    <span class="letreiro" style="font-size:.8rem">Mês</span>
+    <select name="mes">
+      {% for n, nome in meses %}<option value="{{ n }}" {% if n == mes_sel %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+    </select>
+  </label>
+  <label style="display:grid;gap:.3rem">
+    <span class="letreiro" style="font-size:.8rem">Ano</span>
+    <select name="ano">
+      {% for a in anos %}<option value="{{ a }}" {% if a == ano_sel %}selected{% endif %}>{{ a }}</option>{% endfor %}
+    </select>
+  </label>
+  <button class="botao-primario" type="submit">Ver</button>
+  <a class="botao-neutro" href="?{{ request.GET.urlencode }}&export=csv">Exportar CSV</a>
+  <button class="botao-neutro" type="button" onclick="window.print()">Imprimir</button>
+  <span class="tinta-suave" style="font-size:.9rem">Período: <b>{{ rotulo }}</b></span>
+</form>
+
+<div class="eleg">
+{% include "comercial/_estilo_elegante.html" %}
+
+  <div class="kpis" style="margin-top:.3rem">
+    <div class="kpi kpi-destaque"><span class="kpi-rotulo letreiro">Extrato conciliado</span><span class="kpi-valor num">{{ dados.extrato.pct }}%</span></div>
+    <div class="kpi"><span class="kpi-rotulo letreiro">Créditos conciliados</span><span class="kpi-valor num">R$ {{ dados.extrato.creditos }}</span></div>
+    <div class="kpi"><span class="kpi-rotulo letreiro">Débitos conciliados</span><span class="kpi-valor num">R$ {{ dados.extrato.debitos }}</span></div>
+    <div class="kpi kpi-destaque"><span class="kpi-rotulo letreiro">Cartão conciliado</span><span class="kpi-valor num">{{ dados.cartao.pct }}%</span></div>
+    <div class="kpi"><span class="kpi-rotulo letreiro">Taxa de cartão</span><span class="kpi-valor num">R$ {{ dados.cartao.taxa }}</span></div>
+  </div>
+
+  {# Gráficos conciliado × pendente #}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.2rem;margin-top:1.2rem">
+    <div class="cartao cartao-el">
+      <span class="letreiro" style="font-size:.8rem">Extrato — conciliado × pendente</span>
+      {% if dados.extrato.total %}
+        <div style="height:210px;margin-top:.6rem"><canvas id="g-ext"></canvas></div>
+      {% else %}<p class="vazio" style="margin-top:.6rem">Sem linhas no período.</p>{% endif %}
+    </div>
+    <div class="cartao cartao-el">
+      <span class="letreiro" style="font-size:.8rem">Cartão — conciliado × pendente</span>
+      {% if dados.cartao.total %}
+        <div style="height:210px;margin-top:.6rem"><canvas id="g-car"></canvas></div>
+      {% else %}<p class="vazio" style="margin-top:.6rem">Sem transações no período.</p>{% endif %}
+    </div>
+  </div>
+
+  <h2 class="secao-titulo letreiro" style="margin-top:1.4rem">Extrato bancário</h2>
+  <div class="quadro">
+    <table class="tabela">
+      <tbody>
+        <tr><td>Linhas no período</td><td class="num">{{ dados.extrato.total }}</td></tr>
+        <tr><td>Conciliadas</td><td class="num">{{ dados.extrato.conciliado }}</td></tr>
+        <tr><td>Pendentes</td><td class="num">{{ dados.extrato.pendente }}</td></tr>
+        <tr><td>Ignoradas</td><td class="num">{{ dados.extrato.ignorado }}</td></tr>
+        <tr><td>Créditos conciliados (R$)</td><td class="num">{{ dados.extrato.creditos }}</td></tr>
+        <tr><td>Débitos conciliados (R$)</td><td class="num">{{ dados.extrato.debitos }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2 class="secao-titulo letreiro" style="margin-top:1.4rem">Cartão (SafraPay)</h2>
+  <div class="quadro">
+    <table class="tabela">
+      <tbody>
+        <tr><td>Transações no período</td><td class="num">{{ dados.cartao.total }}</td></tr>
+        <tr><td>Conciliadas</td><td class="num">{{ dados.cartao.conciliado }}</td></tr>
+        <tr><td>Pendentes</td><td class="num">{{ dados.cartao.pendente }}</td></tr>
+        <tr><td>Sem venda no caixa</td><td class="num">{{ dados.cartao.sem_venda }}</td></tr>
+        <tr><td>Bruto (R$)</td><td class="num">{{ dados.cartao.bruto }}</td></tr>
+        <tr><td>Líquido (R$)</td><td class="num">{{ dados.cartao.liquido }}</td></tr>
+        <tr><td>Taxa total (R$)</td><td class="num">{{ dados.cartao.taxa }}</td></tr>
+        <tr><td>Divergências de valor</td><td class="num">{{ dados.cartao.divergencias }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if dados.extrato.total or dados.cartao.total %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  if (!window.Chart) return;
+  Chart.defaults.font.family = "'Hanken Grotesk', -apple-system, sans-serif";
+  Chart.defaults.color = '#64717B';
+  const MUSGO = '#2E483E', LAMPIAO = '#D7A048', MADEIRA = '#4F2C1D';
+  const ctx = id => { const el = document.getElementById(id); return el ? el.getContext('2d') : null; };
+  const opc = {
+    responsive: true, maintainAspectRatio: false, cutout: '68%',
+    plugins: { legend: { position: 'right', labels: {
+      usePointStyle: true, pointStyle: 'circle', boxWidth: 8, padding: 10,
+      generateLabels: chart => {
+        const ds = chart.data.datasets[0], t = ds.data.reduce((a, b) => a + b, 0) || 1;
+        return chart.data.labels.map((l, i) => ({
+          text: l + ' · ' + ds.data[i] + ' (' + Math.round(ds.data[i] * 100 / t) + '%)',
+          fillStyle: ds.backgroundColor[i], strokeStyle: ds.backgroundColor[i],
+          pointStyle: 'circle', index: i,
+        }));
+      } } } },
+  };
+  const ext = ctx('g-ext');
+  if (ext) new Chart(ext, {
+    type: 'doughnut',
+    data: { labels: ['Conciliado', 'Pendente', 'Ignorado'], datasets: [{
+      data: [{{ dados.extrato.conciliado }}, {{ dados.extrato.pendente }}, {{ dados.extrato.ignorado }}],
+      backgroundColor: [MUSGO, LAMPIAO, MADEIRA], borderColor: '#fff', borderWidth: 3, hoverOffset: 4 }] },
+    options: opc });
+  const car = ctx('g-car');
+  if (car) new Chart(car, {
+    type: 'doughnut',
+    data: { labels: ['Conciliado', 'Pendente', 'Sem venda'], datasets: [{
+      data: [{{ dados.cartao.conciliado }}, {{ dados.cartao.pendente }}, {{ dados.cartao.sem_venda }}],
+      backgroundColor: [MUSGO, LAMPIAO, MADEIRA], borderColor: '#fff', borderWidth: 3, hoverOffset: 4 }] },
+    options: opc });
+})();
+</script>
+{% endif %}
+{% endblock %}

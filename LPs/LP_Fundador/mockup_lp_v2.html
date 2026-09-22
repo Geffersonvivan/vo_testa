@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>A casa do Vô, à beira do Lago de Itá — Pousada Vô Testa</title>
-<meta name="description" content="Acolhimento de família, conforto de hotel e o Lago de Itá na porta. Entre para a lista de fundadores e seja dos primeiros a reservar quando as portas abrirem, em Itá (SC).">
+<title>O Vô Testa está prestes a abrir as portas do fantástico mundo — Pousada Vô Testa</title>
+<meta name="description" content="Antes de abrir ao público, um grupo pequeno conhece tudo primeiro — os valores, os pacotes e a condição de fundador. Entre para a lista da Pousada Vô Testa, em Itá, Santa Catarina.">
 
 <!-- Open Graph -->
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://www.pousadavotesta.com.br/lp/fundador-2/">
-<meta property="og:title" content="A casa do Vô, à beira do Lago de Itá">
-<meta property="og:description" content="Acolhimento de família, conforto de hotel e o Lago de Itá. Entre para a lista de fundadores e reserve primeiro quando abrir.">
-<meta property="og:image" content="https://www.pousadavotesta.com.br/static/lp/og.jpg">
+<meta property="og:url" content="https://www.pousadavotesta.com.br/">
+<meta property="og:title" content="O fantástico mundo do Vô Testa está prestes a abrir">
+<meta property="og:description" content="Antes de abrir ao público, um grupo pequeno conhece tudo primeiro. Entre para a lista de fundadores.">
+<meta property="og:image" content="https://www.pousadavotesta.com.br../../static/lp/og.jpg">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="A casa do Vô, à beira do Lago de Itá">
-<meta name="twitter:description" content="Acolhimento de família, conforto de hotel e o Lago de Itá. Entre para a lista de fundadores e reserve primeiro quando abrir.">
-<meta name="twitter:image" content="https://www.pousadavotesta.com.br/static/lp/og.jpg">
+<meta name="twitter:title" content="O fantástico mundo do Vô Testa está prestes a abrir">
+<meta name="twitter:description" content="Antes de abrir ao público, um grupo pequeno conhece tudo primeiro. Entre para a lista de fundadores.">
+<meta name="twitter:image" content="https://www.pousadavotesta.com.br../../static/lp/og.jpg">
 
 <!-- Google tag (gtag.js) — ID injetado pelo servidor via GOOGLE_TAG_ID. Sem ID, não carrega. -->
 <script>
@@ -144,11 +144,43 @@ header{
 }
 .hero-logo{width:min(100%,380px);height:auto}
 
+/* Console da oficina (contagem reimaginada) */
+.oficina{
+  margin-top:2.8rem;max-width:530px;
+  border:1px solid var(--noturno-borda);border-radius:12px;
+  background:color-mix(in srgb,var(--noturno) 55%,#000 8%);
+  overflow:hidden;box-shadow:0 20px 50px -30px #000;
+}
+.of-top{
+  display:flex;align-items:center;gap:.6rem;
+  padding:.55rem .9rem;border-bottom:1px solid var(--noturno-borda);
+  font-size:.78rem;color:var(--pergaminho-45);letter-spacing:.03em;
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+.of-dot{width:8px;height:8px;border-radius:50%;background:var(--lampiao);flex:0 0 auto;
+  animation:pulso 1.9s var(--ease) infinite}
+@keyframes pulso{
+  0%{box-shadow:0 0 0 0 rgba(215,160,72,.55)}
+  70%{box-shadow:0 0 0 7px rgba(215,160,72,0)}
+  100%{box-shadow:0 0 0 0 rgba(215,160,72,0)}
+}
+.of-title{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.of-date{color:var(--lampiao);white-space:nowrap}
+.of-line{
+  margin:0;padding:.95rem .95rem 1.05rem;min-height:3.1em;
+  font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  font-size:.96rem;line-height:1.55;color:var(--pergaminho);
+}
+.of-prompt{color:var(--lampiao);margin-right:.5ch}
+.of-cursor{color:var(--lampiao);animation:pisca 1s steps(1) infinite}
+@keyframes pisca{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.of-cursor,.of-dot{animation:none}}
 
 @media(max-width:860px){
   .hero-grid{grid-template-columns:minmax(0,1fr);text-align:left}
   .hero-logo-holder{order:-1;margin-bottom:1rem}
   .hero-logo{width:min(66%,300px)}
+  .oficina{max-width:100%}
 }
 
 /* ---------- História ---------- */
@@ -306,7 +338,7 @@ footer .links a:hover{color:var(--lampiao)}
   padding:.55rem 1rem;border-radius:100px;font-size:1.02rem;color:var(--pergaminho);line-height:1.3}
 .escassez b{color:var(--lampiao);font-weight:600;font-variant-numeric:tabular-nums}
 .escassez .pulse{width:9px;height:9px;border-radius:50%;background:var(--lampiao);flex:0 0 auto;
-  box-shadow:0 0 0 3px rgba(215,160,72,.16)}
+  box-shadow:0 0 0 0 rgba(215,160,72,.6);animation:pulso 1.9s var(--ease) infinite}
 
 .form-card{background:var(--pergaminho);color:var(--madeira);border-radius:22px;
   padding:clamp(1.5rem,3vw,2.1rem);box-shadow:0 44px 100px -55px #000}
@@ -321,10 +353,6 @@ footer .links a:hover{color:var(--lampiao)}
 .form-card .fc-consent{display:flex;gap:.5rem;align-items:flex-start;font-size:.86rem;margin:.3rem 0 .7rem;
   color:color-mix(in srgb,var(--madeira) 72%,transparent);line-height:1.35}
 .form-card .fc-consent a{color:var(--musgo);text-decoration:underline}
-.form-card .fc-err{display:none;color:#9c3a24;font-weight:600}
-.form-card .fc-consent.invalid{color:#9c3a24}
-.form-card .fc-consent.invalid .fc-err{display:inline}
-.form-card .fc-consent.invalid input{outline:2px solid #9c3a24;outline-offset:2px}
 .form-card .btn{width:100%;margin-top:.2rem}
 .form-card .fc-micro{text-align:center;font-size:.9rem;margin-top:.85rem;font-style:italic;
   color:color-mix(in srgb,var(--madeira) 58%,transparent)}
@@ -523,44 +551,6 @@ footer .links{ font-size:1.1rem }
 /* No celular a história vira coluna única (as regras de measure acima são desktop).
    Precisa vir por último pra vencer na cascata os overrides sem media query. */
 @media(max-width:820px){ .historia-grid{ grid-template-columns:1fr } }
-
-/* ===== POSICIONAMENTO (gancho do filme + "o que é" + três motivos) ===== */
-.posic{border-block:1px solid var(--noturno-borda)}
-.posic .inner{padding-block:var(--gap-sec)}
-.posic-hook{font-family:"Gloock",serif;font-size:clamp(2.2rem,1.3rem + 3.6vw,4.8rem);
-  letter-spacing:-.028em;line-height:1.05;max-width:15ch}
-.posic-hook b{color:var(--lampiao);font-weight:400}
-.posic-oque{margin-top:1.6rem;max-width:50ch;color:var(--pergaminho-70);
-  font-size:clamp(1.25rem,1rem + .9vw,1.75rem);line-height:1.45}
-.posic-oque b{color:var(--pergaminho);font-weight:600}
-.tres-motivos{margin-top:clamp(2.8rem,6vw,4.8rem);display:grid;
-  grid-template-columns:repeat(3,1fr);gap:clamp(1.6rem,3vw,2.8rem)}
-@media(max-width:820px){.tres-motivos{grid-template-columns:1fr}}
-.tres-motivos > div{border-top:1px solid var(--noturno-borda);padding-top:1.4rem}
-.tres-motivos h3{font-family:"Gloock",serif;font-size:clamp(1.5rem,1.1rem + 1.3vw,2.2rem);
-  letter-spacing:-.02em;margin-bottom:.55rem}
-.tres-motivos p{color:var(--pergaminho-70);font-size:clamp(1.12rem,1rem + .55vw,1.45rem);line-height:1.4;max-width:34ch}
-
-/* ===== Polish: sem estouro horizontal no mobile ===== */
-.escassez{max-width:100%;align-items:flex-start}
-.escassez .pulse{margin-top:.42rem}
-.nav .btn .lbl-short{display:none}
-@media(max-width:560px){
-  .hero h1{font-size:clamp(2rem,1rem + 5.2vw,2.9rem);letter-spacing:-.02em}
-  .posic-hook{font-size:clamp(2rem,1rem + 5.2vw,3rem)}
-  .nav .brand img{height:40px}
-  .nav .btn{font-size:.98rem;min-height:42px;padding:.5rem 1.15rem}
-  .nav .btn .lbl-full{display:none}
-  .nav .btn .lbl-short{display:inline}
-}
-
-/* ===== Polish: superfícies do navegador vestem a marca ===== */
-::selection{background:var(--lampiao);color:var(--noturno)}
-html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
-::-webkit-scrollbar{width:12px;height:12px}
-::-webkit-scrollbar-track{background:var(--noturno-painel)}
-::-webkit-scrollbar-thumb{background:var(--noturno-borda);border-radius:100px;border:3px solid var(--noturno-painel)}
-::-webkit-scrollbar-thumb:hover{background:var(--lampiao)}
 </style>
 </head>
 <body>
@@ -571,7 +561,7 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
       <img src="https://www.pousadavotesta.com.br/static/site/img/logo-header.png" alt="Pousada Vô Testa" onerror="this.style.display='none'">
     </a>
     <span class="date">A abertura está chegando</span>
-    <a class="btn btn-ghost" href="#captura"><span class="lbl-full">Entrar para a lista</span><span class="lbl-short">Entrar</span></a>
+    <a class="btn btn-ghost" href="#captura">Entrar para a lista</a>
   </div>
 </header>
 
@@ -579,33 +569,26 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
 <section class="hero">
   <div class="wrap hero-grid-v2">
     <div>
-      <p class="eyebrow reveal d1">A casa do Vô, à beira do Lago de Itá</p>
-      <h1 class="reveal d2">As portas da casa do Vô estão prestes a abrir.</h1>
-      <p class="oferta reveal d3">Entre na lista e seja dos <b>primeiros a reservar</b> na inauguração — com a <b>primeira proposta</b> e a condição de fundador. <b>Sem custo e sem compromisso.</b></p>
+      <p class="eyebrow reveal d1">uma engenhoca, uma história, um lugar fora do tempo</p>
+      <h1 class="reveal d2">O Vô Testa está prestes a abrir as portas do fantástico mundo.</h1>
+      <p class="oferta reveal d3">Como <b>fundador</b>, você recebe a <b>primeira proposta</b> e as <b>condições especiais de inauguração</b> — antes de todo mundo.</p>
       <div class="escassez reveal d4"><span class="pulse"></span>
-        <span><b>__QTD_FUNDADORES__ pessoas</b> já estão na lista de fundadores. As <b>24 cabanas</b> abrem primeiro para elas.</span>
+        <span><b>47 fundadores</b> já querem uma das <b>24 cabanas</b>. A procura já passou da casa.</span>
       </div>
     </div>
 
     <div class="form-card reveal d3" id="captura">
       <p class="fc-titulo">Entre para a lista de fundadores</p>
       <p class="fc-sub">Leva 20 segundos. Você é dos primeiros a saber.</p>
-      <form class="lista" id="form-lista" novalidate>
+      <form onsubmit="return false" novalidate>
         <div class="campo"><label for="h-nome">Seu nome</label>
-          <input type="text" id="h-nome" name="nome" autocomplete="name" placeholder="Como vamos chamar você" aria-invalid="false"></div>
+          <input type="text" id="h-nome" placeholder="Como vamos chamar você"></div>
         <div class="campo"><label for="h-whats">WhatsApp</label>
-          <input type="tel" id="h-whats" name="whats" inputmode="numeric" autocomplete="tel" placeholder="(00) 00000-0000" aria-invalid="false"></div>
-        <!-- honeypot anti-bot: fora da tela, invisível a leitores de tela; se vier preenchido, é robô -->
-        <input type="text" id="empresa" name="empresa" tabindex="-1" autocomplete="off" aria-hidden="true"
-               style="position:absolute!important;left:-9999px;width:1px;height:1px;opacity:0">
-        <label class="fc-consent" id="consent-wrap"><input type="checkbox" id="consent">
-          <span>Autorizo receber as novidades por WhatsApp e e-mail. <a href="/privacidade/">Privacidade</a>. <span class="fc-err">Marque esta caixa para continuar.</span></span></label>
+          <input type="tel" id="h-whats" placeholder="(00) 00000-0000"></div>
+        <label class="fc-consent"><input type="checkbox">
+          Autorizo receber as novidades por WhatsApp e e-mail. <a href="/privacidade/">Privacidade</a>.</label>
         <button class="btn btn-primary">Quero minha condição de fundador</button>
       </form>
-      <div class="sucesso" id="sucesso" role="status" tabindex="-1">
-        <h2>Pronto! Você está na lista.</h2>
-        <p>Você é dos primeiros a saber. Em breve chamamos você no WhatsApp com a sua condição de fundador.</p>
-      </div>
       <p class="fc-micro">Sem compromisso · a vaga de fundador não se repete</p>
     </div>
   </div>
@@ -613,34 +596,12 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
 
 <!-- (form da segunda dobra removido — agora há UM só, no hero) -->
 
-<!-- ============ POSICIONAMENTO (o que é a Vô Testa) ============ -->
-<section class="posic">
-  <div class="wrap inner">
-    <p class="posic-hook appear">Nem resort. Nem cabana.<br><b>É a casa do Vô, no lago.</b></p>
-    <p class="posic-oque appear d-1"><b>Acolhimento de família, conforto de hotel</b> e o Lago de Itá logo ali. Um lugar para reunir quem importa, respirar sem pressa e viver a cidade — porque a melhor hospedagem não tira você do destino, ela aproxima.</p>
-    <div class="tres-motivos">
-      <div class="appear d-1">
-        <h3>Acolhimento</h3>
-        <p>Recebem você como família — o jeito do Vô de receber, agora com o conforto de um hotel.</p>
-      </div>
-      <div class="appear d-2">
-        <h3>Personalidade</h3>
-        <p>Uma casa autoral: roda d'água, engenhocas e detalhes feitos à mão. Nada de padrão de rede.</p>
-      </div>
-      <div class="appear d-3">
-        <h3>Ponto de partida para Itá</h3>
-        <p>À beira do Lago: as Torres da antiga igreja, a cidade e o pôr do sol a poucos passos.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- ============ HISTÓRIA ============ -->
 <section class="historia" id="historia">
   <div class="wrap inner">
     <div class="historia-grid">
-      <img class="historia-foto appear" src="/static/lp/fundador-2/inventor.webp"
-           alt="O Vô Testa, o inventor, diante da fachada da pousada" loading="lazy">
+      <img class="historia-foto appear" src="Fotos/votestanapousada.png"
+           alt="O Vô Testa, o inventor, diante da fachada da pousada">
       <div class="appear d-1">
         <h2>O inventor que moveu as águas</h2>
         <p>Numa época sem energia elétrica, o Vô Testa construiu com as próprias mãos uma roda d'água para gerar a própria luz. Fazia engenhocas, apreciava um bom vinho e recebia quem chegasse como se fosse da família.</p>
@@ -713,11 +674,11 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
     <p class="rotulo appear">Cabanas <b>Família</b>, estilo Hobbit</p>
     <div class="galeria">
       <div class="cartao-foto appear d-1">
-        <img src="/static/lp/fundador-2/cabanas-vista.webp" alt="Vista das cabanas família estilo Hobbit na encosta" loading="lazy">
+        <img src="Fotos/vista das cabanas.png" alt="Vista das cabanas família estilo Hobbit na encosta">
         <div class="leg"><h3>Cabanas Família, estilo Hobbit</h3><p>Telhado que brota da encosta, entre a mata e as flores — espaço pra família toda respirar.</p></div>
       </div>
       <div class="cartao-foto appear d-2">
-        <img src="/static/lp/fundador-2/cabanas-detalhe.webp" alt="Detalhe das cabanas Hobbit — portas em arco, janelas-roda" loading="lazy">
+        <img src="Fotos/cabanas.png" alt="Detalhe das cabanas Hobbit — portas em arco, janelas-roda">
         <div class="leg"><h3>Feito à mão, nos detalhes</h3><p>Portas em arco, janelas-roda e varanda curva — cada canto conta uma história.</p></div>
       </div>
     </div>
@@ -739,7 +700,7 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
 
 <!-- ============ BANDA: RELÓGIO AO PÔR DO SOL (mockup) ============ -->
 <section class="banda-lugar">
-  <img src="/static/lp/fundador-2/relogio.webp" alt="A casa do relógio ao pôr do sol, às margens do Lago" loading="lazy">
+  <img src="Fotos/relógio.png" alt="A casa do relógio ao pôr do sol, às margens do Lago">
   <div class="grad"></div>
   <div class="cap"><div class="inner2 appear">
     <h2>Onde o tempo trabalha a seu favor.</h2>
@@ -754,10 +715,6 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
     <details>
       <summary>Entrar na lista me compromete com alguma coisa?</summary>
       <p>Não. É só para você saber primeiro e ter prioridade quando as reservas abrirem.</p>
-    </details>
-    <details>
-      <summary>Quando a pousada abre?</summary>
-      <p>A abertura está chegando. Quem está na lista de fundadores é avisado primeiro — antes de qualquer anúncio público — e tem prioridade nas reservas.</p>
     </details>
     <details>
       <summary>Quando vou saber os valores?</summary>
@@ -782,7 +739,6 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
 <!-- ============ CTA FINAL (mockup) ============ -->
 <section class="cta-final">
   <div class="wrap inner appear">
-    <p style="font-family:'Gloock',serif;color:var(--lampiao);font-size:clamp(1.4rem,1rem + 1.4vw,2.2rem);letter-spacing:-.02em;line-height:1.1;margin-bottom:1rem">Reunir. Descansar. Viver Itá.</p>
     <h2>São 24 cabanas. E a lista de fundadores só cresce.</h2>
     <a class="btn btn-primary" href="#captura">Quero minha condição de fundador</a>
     <p style="margin-top:1rem;color:var(--pergaminho-70)">Entre agora e receba a primeira proposta, com as condições de inauguração.</p>
@@ -807,80 +763,153 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
 /* ---------- CONFIG ---------- */
 const CONFIG = {
   // Endpoint do CRM (funil Vô Testa). Vazio = modo demonstração (não envia).
-  CRM_ENDPOINT: "/lp/fundador-2/lead/",
+  CRM_ENDPOINT: "/lp/fundador/lead/",
   // Referência interna — NÃO é exibida em nenhum lugar da página.
   INAUGURACAO: "2026-10-31T00:00:00-03:00"
 };
 
-/* ---------- Validação + envio (form enxuto: nome + WhatsApp) ---------- */
+/* ---------- Console da oficina (frases que passam) ---------- */
+(function(){
+  const out = document.getElementById('of-text');
+  if(!out) return;
+
+  // Frases: código + recados da equipe + Vô Testa viajando no tempo + ganchos
+  // de "tá quase" — sem revelar a data. Edite à vontade.
+  const base = [
+    "iniciando ajustes finais…",
+    "caldeira: pressão ok. vapor: subindo.",
+    "Emerson apertando o último parafuso. de novo.",
+    "roda_dagua.status → girando desde 1950 [ok]",
+    "Vô Testa voltou de 1953 só pra conferir a fiação.",
+    "Cris terminando de pintar a cabana 14…",
+    "ERRO 404: pressa não encontrada.",
+    "a abertura está mais perto do que o calendário admite.",
+    "sincronizando os relógios (todos discordam).",
+    "Vô Testa passou aqui agora. e em 1947. ao mesmo tempo.",
+    "calibrando o pôr do sol do Deck Sol Poente…",
+    "engrenagem do tempo: levemente adiantada.",
+    "ensinando o Grilô a dar boas-vindas.",
+    "quase pronto. respira.",
+    "recado do futuro: 'já vai abrir'. — Vô Testa",
+    "contando as cartolas… faltam algumas.",
+    "paradoxo temporal resolvido. de nada.",
+    "vinho do inventor: envelhecendo rápido demais (de propósito).",
+    "faltam poucos giros de roda.",
+    "Vô Testa esqueceu em que década deixou a chave de fenda.",
+    "compilando memórias… inclusive as que ainda não aconteceram.",
+    "o tempo aqui anda diferente. e tá acelerando.",
+    "enrolando o bigode antes de abrir…",
+    "o futuro chegou adiantado. como sempre.",
+    "testando se a roda ainda gira. (gira. desde sempre.)",
+    "muito em breve — o Vô Testa diria 'já era pra ter sido ontem'."
+  ];
+
+  // Embaralha uma vez pra não repetir sempre na mesma ordem
+  function montar(){
+    const s = base.slice();
+    for(let i=s.length-1;i>0;i--){ const j=Math.random()*(i+1)|0; [s[i],s[j]]=[s[j],s[i]]; }
+    return s;
+  }
+
+  let seq = montar(), idx = 0;
+  const reduzido = matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+  if(reduzido){
+    out.textContent = seq[0];
+    setInterval(()=>{ idx=(idx+1)%seq.length; if(idx===0) seq=montar(); out.textContent=seq[idx]; }, 2800);
+    return;
+  }
+
+  let ch = 0, fase = 'digita';
+  function passo(){
+    const linha = seq[idx];
+    if(fase === 'digita'){
+      ch++; out.textContent = linha.slice(0, ch);
+      if(ch >= linha.length){ fase='segura'; setTimeout(passo, 1700); return; }
+      setTimeout(passo, 34 + Math.random()*46);
+    } else { // segura -> limpa -> próxima
+      out.textContent = "";
+      ch = 0;
+      idx = (idx+1) % seq.length;
+      if(idx === 0) seq = montar();
+      fase = 'digita';
+      setTimeout(passo, 320);
+    }
+  }
+  passo();
+})();
+
+/* ---------- Validação + envio ---------- */
 const form = document.getElementById('form-lista');
-const nome = document.getElementById('h-nome');
-const whats = document.getElementById('h-whats');
+const nome = document.getElementById('nome');
+const email = document.getElementById('email');
+const whats = document.getElementById('whats');
 const consent = document.getElementById('consent');
 const consentWrap = document.getElementById('consent-wrap');
 const FORM_T0 = Date.now();   // p/ medir o tempo de preenchimento (anti-bot)
+const reEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-if(form && whats){
-  /* Máscara de WhatsApp (BR) */
-  whats.addEventListener('input', e=>{
-    let v = e.target.value.replace(/\D/g,'').slice(0,11);
-    if(v.length>10)      v=v.replace(/(\d{2})(\d{5})(\d{4}).*/,'($1) $2-$3');
-    else if(v.length>6)  v=v.replace(/(\d{2})(\d{4,5})(\d{0,4}).*/,'($1) $2-$3');
-    else if(v.length>2)  v=v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
-    else if(v.length>0)  v=v.replace(/(\d{0,2})/,'($1');
-    e.target.value=v;
-  });
+/* Máscara de WhatsApp (BR) */
+whats.addEventListener('input', e=>{
+  let v = e.target.value.replace(/\D/g,'').slice(0,11);
+  if(v.length>10)      v=v.replace(/(\d{2})(\d{5})(\d{4}).*/,'($1) $2-$3');
+  else if(v.length>6)  v=v.replace(/(\d{2})(\d{4,5})(\d{0,4}).*/,'($1) $2-$3');
+  else if(v.length>2)  v=v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
+  else if(v.length>0)  v=v.replace(/(\d{0,2})/,'($1');
+  e.target.value=v;
+});
 
-  function clearErr(){
-    nome.setAttribute('aria-invalid','false');
-    whats.setAttribute('aria-invalid','false');
-    if(consentWrap) consentWrap.classList.remove('invalid');
-  }
-
-  form.addEventListener('submit', async e=>{
-    e.preventDefault();
-    clearErr();
-    let ok = true, foco = null;
-
-    if(!nome.value.trim()){ nome.setAttribute('aria-invalid','true'); ok=false; foco=foco||nome; }
-    const digitos = whats.value.replace(/\D/g,'');
-    if(digitos.length < 10){ whats.setAttribute('aria-invalid','true'); ok=false; foco=foco||whats; }
-    if(consent && !consent.checked){ consentWrap.classList.add('invalid'); ok=false; foco=foco||consent; }
-
-    if(!ok){ if(foco) foco.focus(); return; }
-
-    const q = new URLSearchParams(location.search);
-    const rastreio = {};
-    ['utm_source','utm_medium','utm_campaign','utm_content','utm_term','fbclid','gclid']
-      .forEach(k=>{ const v=q.get(k); if(v) rastreio[k]=v; });
-    if(window.__abCTA) rastreio.cta_variant = window.__abCTA;
-    function cookie(n){ var m=document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)'); return m?m.pop():''; }
-    var eventId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(16).slice(2));
-    const dados = { nome:nome.value.trim(), whatsapp:digitos,
-                    origem:'lp-fundador-2', consent:true, rastreio,
-                    event_id:eventId, fbp:cookie('_fbp'), fbc:cookie('_fbc'),
-                    empresa:(document.getElementById('empresa')||{}).value||'',
-                    ms: Date.now() - FORM_T0 };
-
-    try{
-      if(CONFIG.CRM_ENDPOINT){
-        await fetch(CONFIG.CRM_ENDPOINT,{
-          method:'POST', headers:{'Content-Type':'application/json'},
-          body:JSON.stringify(dados)
-        });
-      } else {
-        console.log('[modo demonstração] lead capturado:', dados);
-      }
-      if(window.gtag){ gtag('event','generate_lead',{ variant: window.__abCTA || '' }); }
-      if(window.fbq){ fbq('track','Lead',{ content_name:'LP Fundador II' },{ eventID: eventId }); }
-      document.getElementById('captura').classList.add('enviado');
-      document.getElementById('sucesso').focus?.();
-    }catch(err){
-      console.error(err);
-      alert('Não foi possível enviar agora. Tente de novo em instantes.');
-    }
-  });
+function clearErr(){
+  nome.setAttribute('aria-invalid','false');
+  email.setAttribute('aria-invalid','false');
+  whats.setAttribute('aria-invalid','false');
+  consentWrap.classList.remove('invalid');
 }
+
+form.addEventListener('submit', async e=>{
+  e.preventDefault();
+  clearErr();
+  let ok = true, foco = null;
+
+  if(!nome.value.trim()){ nome.setAttribute('aria-invalid','true'); ok=false; foco=foco||nome; }
+  if(!reEmail.test(email.value.trim())){ email.setAttribute('aria-invalid','true'); ok=false; foco=foco||email; }
+  const digitos = whats.value.replace(/\D/g,'');
+  if(digitos.length < 10){ whats.setAttribute('aria-invalid','true'); ok=false; foco=foco||whats; }
+  if(!consent.checked){ consentWrap.classList.add('invalid'); ok=false; foco=foco||consent; }
+
+  if(!ok){ if(foco) foco.focus(); return; }
+
+  const q = new URLSearchParams(location.search);
+  const rastreio = {};
+  ['utm_source','utm_medium','utm_campaign','utm_content','utm_term','fbclid','gclid']
+    .forEach(k=>{ const v=q.get(k); if(v) rastreio[k]=v; });
+  if(window.__abCTA) rastreio.cta_variant = window.__abCTA;
+  function cookie(n){ var m=document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)'); return m?m.pop():''; }
+  var eventId = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now()+'-'+Math.random().toString(16).slice(2));
+  const dados = { nome:nome.value.trim(), email:email.value.trim(), whatsapp:digitos,
+                  origem:'lp-fundador', consent:true, rastreio,
+                  event_id:eventId, fbp:cookie('_fbp'), fbc:cookie('_fbc'),
+                  empresa:(document.getElementById('empresa')||{}).value||'',
+                  ms: Date.now() - FORM_T0 };
+
+  try{
+    if(CONFIG.CRM_ENDPOINT){
+      await fetch(CONFIG.CRM_ENDPOINT,{
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(dados)
+      });
+    } else {
+      console.log('[modo demonstração] lead capturado:', dados);
+    }
+    if(window.gtag){ gtag('event','generate_lead',{ variant: window.__abCTA || '' }); }
+    if(window.fbq){ fbq('track','Lead',{ content_name:'LP Fundador' },{ eventID: eventId }); }
+    document.getElementById('captura').classList.add('enviado');
+    document.getElementById('sucesso').focus?.();
+  }catch(err){
+    console.error(err);
+    alert('Não foi possível enviar agora. Tente de novo em instantes.');
+  }
+});
 </script>
 
 <!-- ══ Camada de refinamento (apple-design): CTA fixo no mobile + reveal ao rolar ══ -->
@@ -923,7 +952,7 @@ if(form && whats){
     window.__abCTA = ab;
     if(ab === 'B'){
       document.querySelectorAll('a.btn-primary, button.btn-primary').forEach(function(b){
-        if(b.textContent.trim() === 'Quero minha condição de fundador') b.textContent = 'Garantir minha condição de fundador';
+        if(b.textContent.trim() === 'Quero saber primeiro') b.textContent = 'Quero descobrir primeiro';
       });
     }
   }catch(e){ window.__abCTA = 'A'; }

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ c.nome }} — Marketing{% endblock %}
+
+{% comment %}Divergência 1.2 do handoff: a ficha é GAVETA, não página. O acesso direto
+(/campanha/<pk>/) reaproveita a própria gaveta como modal sobre o quadro — mesma
+estrutura, mesmos formulários (HTMX em #ficha-slot). Fechar volta ao quadro.{% endcomment %}
+{% block conteudo %}
+{% include "marketing/_estilo.html" %}
+{% include "marketing/_moeda_js.html" %}
+<div id="ficha-slot">
+  {% include "marketing/_ficha_drawer.html" %}
+</div>
+{% endblock %}

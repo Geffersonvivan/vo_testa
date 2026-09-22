@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block titulo %}Calendário — Marketing{% endblock %}
+
+{% block conteudo %}
+{# Transcrição do protótipo (linha do tempo). Cores → tokens; terra → --madeira. #}
+
+<div style="margin-bottom:14px">
+  <div style="display:flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.11em;color:var(--tinta-suave);font-weight:700;margin-bottom:7px">MARKETING<span aria-hidden="true">›</span><span style="color:var(--musgo)">CAMPANHAS</span></div>
+  <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap">
+    <a href="{% url 'marketing:quadro' %}" style="font-size:13px;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio)">Quadro</a>
+    <a href="{% url 'marketing:calendario' %}" style="font-size:13px;font-weight:700;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--tinta);color:var(--superficie)">Calendário</a>
+    <a href="{% url 'marketing:ocupacao' %}" style="font-size:13px;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio)">Ocupação</a>
+    <a href="{% url 'marketing:relatorio' %}" style="font-size:13px;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio)">Relatório</a>
+  </div>
+</div>
+
+<section style="border-radius:20px;background:var(--superficie-2);border:1px solid var(--fio);box-shadow:var(--sombra-cartao);overflow:hidden">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:15px 20px;border-bottom:1px solid var(--fio)">
+    <a href="?vista={{ escala }}&ano={{ prev.ano }}&mes={{ prev.mes }}" style="width:32px;height:32px;flex:none;border-radius:10px;border:1px solid var(--fio);background:var(--superficie);display:inline-flex;align-items:center;justify-content:center;font-size:18px;color:var(--tinta-suave);text-decoration:none" aria-label="Anterior">‹</a>
+    <h2 style="margin:0;min-width:120px;font-family:var(--fonte-titulo);font-size:17px;font-weight:700;color:var(--tinta);text-transform:capitalize">{{ tl.titulo }}</h2>
+    <a href="?vista={{ escala }}&ano={{ next.ano }}&mes={{ next.mes }}" style="width:32px;height:32px;flex:none;border-radius:10px;border:1px solid var(--fio);background:var(--superficie);display:inline-flex;align-items:center;justify-content:center;font-size:18px;color:var(--tinta-suave);text-decoration:none" aria-label="Próximo">›</a>
+    <span style="width:1px;height:22px;background:var(--fio)"></span>
+    <a href="?vista=mes&ano={{ ano }}&mes={{ mes }}" style="font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:99px;text-decoration:none;{% if escala == 'mes' %}background:var(--tinta);color:var(--superficie){% else %}background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio){% endif %}">Mês</a>
+    <a href="?vista=ano&ano={{ ano }}&mes={{ mes }}" style="font-size:12.5px;font-weight:700;padding:6px 13px;border-radius:99px;text-decoration:none;{% if escala == 'ano' %}background:var(--tinta);color:var(--superficie){% else %}background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio){% endif %}">Ano</a>
+  </div>
+
+  <div style="display:flex;border-bottom:1px solid var(--fio);background:var(--superficie-2)">
+    <span style="flex:none;width:200px;border-right:1px solid var(--fio)"></span>
+    <span style="flex:1;min-width:0;display:flex">
+      {% for c in tl.cols %}
+      <span style="flex:1;min-width:0;text-align:center;font-size:11px;padding:7px 0;{% if c.hoje %}color:var(--madeira);font-weight:700{% else %}color:var(--tinta-suave){% endif %}">{{ c.label }}</span>
+      {% endfor %}
+    </span>
+  </div>
+
+  {% if tl.vazio %}
+  <div style="padding:40px 20px;text-align:center;font-size:13px;color:var(--tinta-suave)">Nenhuma campanha neste período.</div>
+  {% endif %}
+
+  {% for l in tl.linhas %}
+  <div style="display:flex;border-bottom:1px solid var(--fio)">
+    <a href="{% url 'marketing:ficha' l.id %}" hx-get="{% url 'marketing:ficha' l.id %}" hx-target="#ficha-slot" hx-swap="innerHTML"
+       style="flex:none;width:200px;padding:9px 14px;border-right:1px solid var(--fio);min-width:0;text-decoration:none">
+      <span style="display:block;font-size:12.5px;font-weight:700;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.nome }}</span>
+      <span style="display:block;margin-top:2px;font-size:11px;color:var(--tinta-suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ l.sub }}</span>
+    </a>
+    <span style="flex:1;min-width:0;position:relative;height:52px">
+      {% for m in tl.marcos %}
+      <span data-dica="{{ m.dica }}" style="position:absolute;top:0;bottom:0;left:{{ m.left }}%;width:9px;margin-left:-4px;border-left:1px dashed var(--fio-forte);box-sizing:border-box;cursor:help"></span>
+      {% endfor %}
+      <a href="{% url 'marketing:ficha' l.id %}" hx-get="{% url 'marketing:ficha' l.id %}" hx-target="#ficha-slot" hx-swap="innerHTML" data-dica="{{ l.dica }}"
+         style="position:absolute;top:8px;height:24px;left:{{ l.left }}%;width:{{ l.width }}%;border-radius:8px;display:flex;align-items:center;padding:0 9px;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:none;cursor:grab;color:{{ l.fg }};{% if l.hachurado %}background:repeating-linear-gradient(135deg,{{ l.bg }} 0 7px,var(--superficie) 7px 14px);box-shadow:inset 0 0 0 1px var(--fio-forte){% else %}background:{{ l.bg }};box-shadow:inset 0 0 0 1px var(--fio){% endif %}">{{ l.rotulo }}</a>
+      {% if l.corte is not None %}
+      <span style="position:absolute;top:4px;bottom:4px;left:{{ l.corte }}%;width:2px;background:var(--perigo);border-radius:2px"></span>
+      {% endif %}
+      {% for p in l.pecas %}
+      <span data-dica="{{ p.dica }}" style="position:absolute;top:34px;left:{{ p.left }}%;transform:translateX(-50%);width:9px;height:9px;border-radius:50%;border:2px solid var(--superficie);cursor:help;background:{{ p.cor }}"></span>
+      {% endfor %}
+    </span>
+  </div>
+  {% endfor %}
+
+  {% if tl.marcos %}
+  <div style="position:relative;height:34px;border-top:1px solid var(--fio);background:var(--superficie-2)">
+    <span style="position:absolute;left:0;width:200px;height:100%;border-right:1px solid var(--fio)"></span>
+    <span style="position:absolute;left:200px;right:0;height:100%">
+      {% for m in tl.marcos %}{% if m.nome %}
+      <span data-dica="{{ m.dica }}" style="position:absolute;top:{{ m.top }}px;{{ m.ancora }};font-size:11px;font-weight:700;color:var(--tinta-suave);white-space:nowrap;padding:0 4px;background:var(--superficie-2)">{{ m.nome }}</span>
+      {% endif %}{% endfor %}
+    </span>
+  </div>
+  {% endif %}
+
+  <div style="padding:13px 20px;background:var(--canvas);border-top:1px solid var(--fio)">
+    <p style="margin:0;font-size:11.5px;line-height:1.45;color:var(--tinta-suave)">Barra hachurada = planejado; cheia = realizado. A linha vermelha é hoje; os pontos são as peças.</p>
+  </div>
+</section>
+
+<div id="ficha-slot"></div>
+{% include "marketing/_moeda_js.html" %}
+{% include "marketing/_dica.html" %}
+{% endblock %}

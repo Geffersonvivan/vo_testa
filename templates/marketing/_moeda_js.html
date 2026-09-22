@@ -1,0 +1,22 @@
+{% comment %}Campo .js-moeda: formatado em repouso (R$ 18.000,00), cru ao focar (18000),
+reformata ao sair. Delegação no document → pega também inputs que a gaveta injeta por HTMX.
+O back-end (definir_teto/salvar_campanha) aceita as duas formas.{% endcomment %}
+<script>
+(function(){
+  if (window.__mktMoeda) return; window.__mktMoeda = 1;
+  function norm(v){
+    v = String(v == null ? '' : v).replace(/[R$\s]/g, '');
+    if (v.indexOf(',') > -1) v = v.replace(/\./g, '').replace(',', '.');
+    var n = parseFloat(v.replace(/[^0-9.-]/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+  function raw(v){ var n = norm(v); return n ? String(n) : ''; }
+  function fmt(v){ return 'R$ ' + norm(v).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+  document.addEventListener('focusin', function(e){
+    var t = e.target; if (t.classList && t.classList.contains('js-moeda')) t.value = raw(t.value);
+  });
+  document.addEventListener('focusout', function(e){
+    var t = e.target; if (t.classList && t.classList.contains('js-moeda')) t.value = fmt(t.value);
+  });
+})();
+</script>

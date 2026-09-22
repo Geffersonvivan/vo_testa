@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block titulo %}Conciliação — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Financeiro</p>
+<div class="pagina-cabecalho">
+  <h1>Conciliação bancária e de cartão</h1>
+</div>
+<p class="subtitulo">Importe o extrato do banco (OFX) e o arquivo de vendas da SafraPay (CSV),
+  e case automaticamente com os recebimentos e contas do CRM. O que não casar fica na fila
+  para conferência manual.</p>
+
+<div class="eleg">
+{% include "comercial/_estilo_elegante.html" %}
+
+  {# KPIs #}
+  <div class="kpis" style="margin-top:1rem">
+    <div class="kpi kpi-destaque">
+      <span class="kpi-rotulo letreiro">Extrato conciliado</span>
+      <span class="kpi-valor num">{{ pos.extrato_conciliado }}<span style="opacity:.4">/{{ pos.extrato_total }}</span></span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-rotulo letreiro">Extrato pendente</span>
+      <span class="kpi-valor num">{{ pos.extrato_pendente }}</span>
+    </div>
+    <div class="kpi kpi-destaque">
+      <span class="kpi-rotulo letreiro">Cartão conciliado</span>
+      <span class="kpi-valor num">{{ pos.cartao_conciliado }}<span style="opacity:.4">/{{ pos.cartao_total }}</span></span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-rotulo letreiro">Cartão pendente</span>
+      <span class="kpi-valor num">{{ pos.cartao_pendente }}</span>
+    </div>
+  </div>
+
+  {# Ações: importar + conciliar #}
+  <div class="cartao cartao-el" style="margin-top:1.2rem;display:grid;gap:1.1rem">
+    <div style="display:flex;flex-wrap:wrap;gap:1.4rem;align-items:flex-end">
+      <form method="post" action="{% url 'conciliacao:importar_ofx' %}" enctype="multipart/form-data"
+            style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap">
+        {% csrf_token %}
+        <label style="display:grid;gap:.3rem">
+          <span class="letreiro" style="font-size:.8rem">Extrato bancário (OFX)</span>
+          <input type="file" name="arquivo" accept=".ofx,.OFX" required>
+        </label>
+        <label style="display:grid;gap:.3rem">
+          <span class="letreiro" style="font-size:.8rem">Conta</span>
+          <input type="text" name="conta" placeholder="ex.: 12345-6" style="max-width:120px">
+        </label>
+        <button class="botao-primario" type="submit">Importar OFX</button>
+      </form>
+
+      <form method="post" action="{% url 'conciliacao:importar_cartao' %}" enctype="multipart/form-data"
+            style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap">
+        {% csrf_token %}
+        <label style="display:grid;gap:.3rem">
+          <span class="letreiro" style="font-size:.8rem">Vendas SafraPay (CSV)</span>
+          <input type="file" name="arquivo" accept=".csv,.CSV" required>
+        </label>
+        <button class="botao-neutro" type="submit">Importar cartão</button>
+      </form>
+    </div>
+
+    <div style="display:flex;gap:.8rem;align-items:center;flex-wrap:wrap">
+      <form method="post" action="{% url 'conciliacao:conciliar' %}" style="display:inline">
+        {% csrf_token %}
+        <button class="botao-primario" type="submit">⚡ Conciliar agora</button>
+      </form>
+      <a href="{% url 'conciliacao:manual' %}" class="botao-neutro">Conciliação manual →</a>
+      <a href="{% url 'conciliacao:fechamento' %}" class="botao-neutro">Fechamento (mês/ano) →</a>
+      <span class="tinta-suave" style="font-size:.9rem">Casa por valor+data (banco) e por NSU (cartão); o que sobrar você resolve no manual.</span>
+    </div>
+  </div>
+
+  {# Fila do extrato #}
+  <h2 class="secao-titulo letreiro" style="margin-top:1.6rem">Extrato — pendentes de conciliação</h2>
+  <div class="quadro">
+    <table class="tabela">
+      <thead>
+        <tr><th>Data</th><th>Descrição</th><th>Banco</th><th class="num">Valor (R$)</th></tr>
+      </thead>
+      <tbody>
+        {% for l in pendentes_ext %}
+        <tr>
+          <td>{{ l.data|date:"d/m/Y" }}</td>
+          <td>{{ l.descricao|default:"—" }}</td>
+          <td class="tinta-suave">{{ l.extrato.banco }}</td>
+          <td class="num">
+            {% if l.credito %}<span class="selo selo-sucesso">+ {{ l.valor }}</span>
+            {% else %}<span class="selo selo-perigo">{{ l.valor }}</span>{% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="vazio">Nada pendente no extrato. Importe um OFX para começar.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Fila do cartão #}
+  <h2 class="secao-titulo letreiro" style="margin-top:1.6rem">Cartão (SafraPay) — pendentes por NSU</h2>
+  <div class="quadro">
+    <table class="tabela">
+      <thead>
+        <tr><th>Venda</th><th>NSU</th><th>Bandeira</th><th class="num">Bruto</th><th class="num">Líquido</th></tr>
+      </thead>
+      <tbody>
+        {% for t in pendentes_cartao %}
+        <tr>
+          <td>{{ t.data_venda|date:"d/m/Y" }}</td>
+          <td class="num">{{ t.nsu }}</td>
+          <td>{{ t.bandeira|default:"—" }}</td>
+          <td class="num">{{ t.bruto }}</td>
+          <td class="num">{{ t.liquido }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="vazio">Nada pendente no cartão. Importe o CSV de vendas da SafraPay.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

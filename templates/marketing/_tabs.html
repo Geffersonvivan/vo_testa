@@ -1,0 +1,7 @@
+{# Abas do módulo (pílula segmentada — vocabulário de navegação do CRM). `aba` = ativa. #}
+<div class="mkt-tabs">
+  <a href="{% url 'marketing:quadro' %}" class="mkt-tab {% if aba == 'quadro' %}on{% endif %}">Quadro</a>
+  <a href="{% url 'marketing:calendario' %}" class="mkt-tab {% if aba == 'calendario' %}on{% endif %}">Calendário</a>
+  <a href="{% url 'marketing:ocupacao' %}" class="mkt-tab {% if aba == 'ocupacao' %}on{% endif %}">Ocupação</a>
+  <a href="{% url 'marketing:relatorio' %}" class="mkt-tab {% if aba == 'relatorio' %}on{% endif %}">Relatório</a>
+</div>

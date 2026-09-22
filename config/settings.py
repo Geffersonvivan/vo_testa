@@ -76,7 +76,9 @@ INSTALLED_APPS = [
     "apps.fiscal",
     "apps.auditoria",
     "apps.relatorios",
+    "apps.conciliacao",  # conciliação bancária (OFX) + cartão (NSU/SafraPay)
     "apps.comercial.apps.ComercialConfig",
+    "apps.marketing",  # camada de fluxo das campanhas (embrulha comercial.Campanha)
 ]
 
 MIDDLEWARE = [

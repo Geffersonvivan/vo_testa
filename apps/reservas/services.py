@@ -443,14 +443,21 @@ def relatorio_producao(inicio: date, fim: date) -> dict:
     return {"servico": servico, "consumo": consumo, "total": servico + consumo}
 
 
-def relatorio_ocupacao(inicio: date, fim: date) -> dict:
-    """Taxa de ocupação, ADR e RevPAR do período + diárias-quarto por tipo."""
+def relatorio_ocupacao(inicio: date, fim: date, statuses=None) -> dict:
+    """Taxa de ocupação, ADR e RevPAR do período + diárias-quarto por tipo.
+
+    `statuses` (opcional) escolhe quais reservas contam. O padrão — realizado
+    (hospedada/saída) — preserva o comportamento histórico do relatório; para a
+    ocupação PREVISTA (janela futura) passe também as confirmadas (ver
+    `ocupacao_prevista`).
+    """
     from django.db.models import Sum
+    statuses = statuses or [Reserva.Status.HOSPEDADA, Reserva.Status.CHECKOUT]
     dias = (fim - inicio).days + 1
     uhs = list(UH.objects.filter(status=UH.Status.ATIVA).select_related("tipo"))
     disp = len(uhs) * dias
     reservas = Reserva.objects.filter(
-        status__in=[Reserva.Status.HOSPEDADA, Reserva.Status.CHECKOUT],
+        status__in=statuses,
         checkin__lte=fim, checkout__gt=inicio,
     ).select_related("uh__tipo")
     ocupadas = 0
@@ -473,6 +480,17 @@ def relatorio_ocupacao(inicio: date, fim: date) -> dict:
         "revpar": revpar.quantize(Decimal("0.01")), "receita": receita,
         "por_tipo": por_tipo,
     }
+
+
+def ocupacao_prevista(inicio: date, fim: date) -> dict:
+    """Ocupação PREVISTA de uma janela: conta confirmadas + hospedadas + saídas.
+
+    A janela de marketing olha para a frente (próximos 90 dias), onde as reservas
+    ainda são *confirmadas* (check-in futuro) — contá-las evita o falso 0% de quem
+    só olha o realizado. Mesma matemática de `relatorio_ocupacao`, outro recorte.
+    """
+    return relatorio_ocupacao(inicio, fim, statuses=[
+        Reserva.Status.CONFIRMADA, Reserva.Status.HOSPEDADA, Reserva.Status.CHECKOUT])
 
 
 def relatorio_reservas(inicio: date, fim: date) -> dict:

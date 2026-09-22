@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+
+{% block titulo %}Marketing — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+{% load moeda %}
+{% comment %}Transcrição do protótipo (ABRIR-Marketing.html). Cores → tokens app.css;
+terra(#9A4429/#B25837) → --madeira (não há --terra); texto < 11px pisado em 11px
+(Parte 3). Estrutura/medidas/textos copiados do DOM. Ordem: breadcrumb → título →
+descrição → abas → faixa → verba → quadro. Papel vem de request.user (sem seletor).{% endcomment %}
+
+{# ── Título (breadcrumb → título → descrição) ── #}
+<div style="margin-bottom:16px">
+  <div style="display:flex;align-items:center;gap:7px;font-size:11px;letter-spacing:.11em;color:var(--tinta-suave);font-weight:700;margin-bottom:7px">MARKETING<span aria-hidden="true">›</span><span style="color:var(--musgo)">CAMPANHAS</span></div>
+  <h1 style="margin:0;font-family:var(--fonte-titulo);font-size:31px;font-weight:700;letter-spacing:-.015em;color:var(--tinta)">Quadro de campanhas</h1>
+  <p style="margin:7px 0 0;font-size:13.5px;line-height:1.55;color:var(--tinta-suave);max-width:64ch">Cada campanha está numa fase só. Criativo, envolvidos e custos são campos da ficha, não colunas. Arraste para avançar — o quadro recusa quando falta o que a próxima fase exige.</p>
+</div>
+
+{# ── Abas (faixa própria, à esquerda, abaixo da descrição) + Só os meus ── #}
+<div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:18px">
+  <a href="{% url 'marketing:quadro' %}" style="font-size:13px;font-weight:700;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--tinta);color:var(--superficie)">Quadro</a>
+  <a href="{% url 'marketing:calendario' %}" style="font-size:13px;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio)">Calendário</a>
+  <a href="{% url 'marketing:ocupacao' %}" style="font-size:13px;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio)">Ocupação</a>
+  <a href="{% url 'marketing:relatorio' %}" style="font-size:13px;padding:7px 15px;border-radius:99px;text-decoration:none;background:var(--superficie);color:var(--tinta-suave);border:1px solid var(--fio)">Relatório</a>
+  <span style="width:1px;height:22px;background:var(--fio)"></span>
+  <a href="?{% if not so_meus %}meus=1{% endif %}" style="display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:99px;font-size:12.5px;font-weight:700;text-decoration:none;{% if so_meus %}background:var(--tinta);color:var(--superficie){% else %}background:var(--superficie);border:1px solid var(--fio);color:var(--tinta){% endif %}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>Só os meus
+    <span style="font-size:11px;opacity:.72">{{ meus_label }}</span>
+  </a>
+</div>
+
+{# ── Faixa de urgências: dois cartões lado a lado (Parte 2) ── #}
+{% if proximos or atrasados %}
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px;margin-bottom:18px">
+  {% if proximos %}
+  <section style="border-radius:18px;background:var(--superficie);border:1px solid var(--fio);box-shadow:var(--sombra-1);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--fio)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--madeira)" stroke-width="2" style="width:18px;height:18px"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+      <span style="font-size:13.5px;font-weight:700;color:var(--tinta)">Próximos dias</span>
+      <span style="margin-left:auto;font-size:11.5px;color:var(--tinta-suave)">{{ proximos_resumo }}</span>
+    </div>
+    <div style="padding:10px 12px 14px;display:flex;flex-direction:column;gap:6px;max-height:232px;overflow-y:auto">
+      {% for p in proximos %}
+      <a href="{% url 'marketing:ficha' p.id %}" hx-get="{% url 'marketing:ficha' p.id %}" hx-target="#ficha-slot" hx-swap="innerHTML"
+         style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:var(--superficie-2);border:1px solid var(--fio);cursor:pointer;text-decoration:none">
+        <span style="flex:1;min-width:0">
+          <span style="display:block;font-size:12.5px;font-weight:700;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.nome }}</span>
+          <span style="display:block;margin-top:2px;font-size:11px;color:var(--tinta-suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ p.campanha }} · {{ p.canal }} · {{ p.responsavel }}</span>
+        </span>
+        <span style="flex:none;font-size:11px;font-weight:700;letter-spacing:.04em;padding:3px 9px;border-radius:99px;white-space:nowrap;{% if p.hoje %}background:var(--alerta-bg);color:var(--alerta){% else %}background:var(--superficie-2);color:var(--tinta-suave){% endif %}">{{ p.quando }}</span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  {% if atrasados %}
+  <section style="border-radius:18px;background:var(--superficie);border:1px solid var(--perigo);box-shadow:var(--sombra-1);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--perigo);background:var(--perigo-bg)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--perigo)" stroke-width="2" style="width:18px;height:18px"><path d="M12 2 1 21h22z"/><path d="M12 9v5M12 17v.5"/></svg>
+      <span style="font-size:13.5px;font-weight:700;color:var(--perigo)">Atrasado</span>
+      <span style="margin-left:auto;font-size:11.5px;color:var(--perigo)">{{ atrasos_resumo }}</span>
+    </div>
+    <div style="padding:10px 12px 14px;display:flex;flex-direction:column;gap:6px;max-height:232px;overflow-y:auto">
+      {% for a in atrasados %}
+      <a href="{% url 'marketing:ficha' a.id %}" hx-get="{% url 'marketing:ficha' a.id %}" hx-target="#ficha-slot" hx-swap="innerHTML"
+         style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:var(--superficie-2);border:1px solid var(--fio);cursor:pointer;text-decoration:none">
+        <span style="flex:none;font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:99px;white-space:nowrap;background:var(--perigo-bg);color:var(--perigo)">{{ a.tipo }}</span>
+        <span style="flex:1;min-width:0">
+          <span style="display:block;font-size:12.5px;font-weight:700;color:var(--tinta);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.texto }} · {{ a.canal }}</span>
+          <span style="display:block;margin-top:2px;font-size:11px;color:var(--tinta-suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.campanha }} · {{ a.dono }} · {{ a.desde }}</span>
+        </span>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ── Verba do mês ── #}
+<section style="border-radius:20px;background:var(--superficie);border:1px solid var(--fio);box-shadow:var(--sombra-cartao);padding:18px 22px;margin-bottom:18px">
+  <div style="display:flex;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:13px">
+    <div style="flex:1;min-width:190px">
+      <div style="font-size:11px;letter-spacing:.07em;color:var(--tinta-suave);font-weight:700">VERBA DE {{ mes_nome|upper }}</div>
+      <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-top:5px">
+        <span class="num" style="font-family:var(--fonte-titulo);font-size:27px;font-weight:700;color:var(--tinta);white-space:nowrap">{{ verba.disponivel|intcomma_brl }}</span>
+        <span style="font-size:12.5px;color:var(--tinta-suave);white-space:nowrap">livres de {{ verba.teto|intcomma_brl }}</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start">
+      <span style="display:block">
+        <span style="display:block;font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">TRAVADA</span>
+        <span class="num" style="display:block;margin-top:3px;font-size:15px;font-weight:700;color:var(--alerta)">{{ verba.travada|intcomma_brl }}</span></span>
+      <span style="display:block">
+        <span style="display:block;font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">GASTA</span>
+        <span class="num" style="display:block;margin-top:3px;font-size:15px;font-weight:700;color:var(--perigo)">{{ verba.gasta|intcomma_brl }}</span></span>
+      <span style="display:block">
+        <span style="display:block;font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">TETO DO MÊS</span>
+        {% if eh_gerente %}
+        <form method="post" action="{% url 'marketing:editar_teto' %}" style="display:flex;align-items:center;gap:5px;margin-top:3px">
+          {% csrf_token %}<input type="hidden" name="mes" value="{{ verba.mes }}">
+          <input type="text" name="valor" class="js-moeda" value="{{ verba.teto|intcomma_brl }}" style="width:128px;padding:5px 9px;border:1px solid var(--fio);border-radius:12px;font-weight:700;font-size:13px;color:var(--tinta)">
+          <button type="submit" style="border:none;background:none;font-size:11px;font-weight:700;color:var(--madeira);cursor:pointer">Salvar</button>
+        </form>
+        {% else %}
+        <span class="num" style="display:block;margin-top:3px;font-size:15px;font-weight:700;color:var(--tinta)">{{ verba.teto|intcomma_brl }}</span>
+        {% endif %}
+      </span>
+    </div>
+  </div>
+  <div style="height:11px;border-radius:99px;background:var(--superficie-2);overflow:hidden;display:flex">
+    <span style="width:{{ pct_gasta }}%;background:linear-gradient(90deg,var(--madeira),var(--madeira));transition:width .3s"></span>
+    <span style="width:{{ pct_trav_extra }}%;background:repeating-linear-gradient(45deg,var(--lampiao) 0 5px,var(--alerta) 5px 10px);transition:width .3s"></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:11px">
+    <span style="font-size:12px;color:var(--tinta-suave)">{{ verba.pct }}% do mês comprometido</span>
+    {% if verba.alerta %}<span style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;background:var(--perigo-bg);color:var(--perigo);border-radius:99px;padding:5px 12px">Teto quase no limite</span>{% endif %}
+  </div>
+</section>
+
+{# ── Aviso de filtro vazio (só os meus) ── #}
+{% if so_meus and not meus_count %}
+<div style="display:flex;align-items:center;gap:12px;padding:14px 18px;margin-bottom:16px;border-radius:16px;background:var(--perigo-bg);border:1px solid var(--fio)">
+  <span style="flex:1;min-width:0;font-size:13px;line-height:1.45;color:var(--perigo)">Nada seu aqui — há campanhas de outras pessoas no quadro.</span>
+  <a href="{% url 'marketing:quadro' %}" style="flex:none;height:34px;display:inline-flex;align-items:center;padding:0 14px;border-radius:11px;border:1px solid var(--fio);background:var(--superficie);color:var(--tinta);font-size:12.5px;font-weight:700;text-decoration:none">Mostrar todas</a>
+</div>
+{% endif %}
+
+{# ── Colunas ── #}
+<div style="display:flex;gap:13px;overflow-x:auto;padding:2px 2px 16px;align-items:flex-start">
+  {% for col in colunas %}
+  <div data-fase="{{ col.fase }}" style="flex:none;width:268px;background:var(--superficie-2);border:1px solid var(--fio);border-radius:14px"
+       ondragover="colDragOver(event)" ondragleave="colDragLeave(event)" ondrop="soltarMkt(event, '{{ col.fase }}')">
+    <div style="padding:13px 15px 11px;border-bottom:1px solid var(--fio);position:sticky;top:0;background:var(--superficie-2);border-radius:14px 14px 0 0;z-index:1">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="flex:1;min-width:0;font-family:var(--fonte-titulo);font-size:14px;font-weight:700;color:var(--tinta)">{{ col.label }}</span>
+        {% if col.portao %}<svg viewBox="0 0 24 24" fill="none" stroke="var(--madeira)" stroke-width="2" style="width:16px;height:16px" aria-label="Portão: só o gestor libera"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V8a5 5 0 0 1 10 0v3"/></svg>{% endif %}
+        <span style="flex:none;font-size:11px;font-weight:700;color:var(--tinta-suave);background:var(--superficie);border:1px solid var(--fio);border-radius:99px;min-width:22px;height:20px;display:inline-flex;align-items:center;justify-content:center;padding:0 6px">{{ col.conta }}</span>
+      </div>
+      <div style="margin-top:3px;font-size:11.5px;color:var(--tinta-suave);line-height:1.35">{{ col.sub }}</div>
+      {% if col.total %}<div class="num" style="margin-top:6px;font-size:11.5px;font-weight:700;color:var(--alerta)">{{ col.total|intcomma_brl }}</div>{% endif %}
+    </div>
+
+    <div style="padding:11px;display:flex;flex-direction:column;gap:9px;min-height:74px">
+      {% for c in col.cards %}
+      <article draggable="true" data-camp="{{ c.obj.id }}"
+               hx-get="{% url 'marketing:ficha' c.obj.id %}" hx-target="#ficha-slot" hx-swap="innerHTML"
+               ondragstart="cardMktStart(event, '{{ c.obj.id }}')" ondragend="cardMktEnd(event)"
+               style="background:var(--superficie);border:1px solid var(--fio);border-radius:14px;padding:12px;box-shadow:var(--sombra-1);cursor:grab">
+        <div style="display:flex;align-items:flex-start;gap:8px">
+          <span style="flex:1;min-width:0;font-family:var(--fonte-titulo);font-size:13.5px;font-weight:700;line-height:1.3;color:var(--tinta)">{{ c.obj.nome }}</span>
+          <span style="flex:none;font-family:var(--fonte-mono);font-size:11px;color:var(--tinta-suave)">{{ c.codigo }}</span>
+        </div>
+        {% if c.canais %}
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
+          {% for ch in c.canais %}<span style="font-size:11px;font-weight:700;letter-spacing:.03em;background:var(--superficie-2);color:var(--tinta-suave);border-radius:99px;padding:3px 8px">{{ ch }}</span>{% endfor %}
+        </div>
+        {% endif %}
+        <div style="display:flex;align-items:center;gap:8px;margin-top:9px">
+          <span style="flex:none;width:24px;height:24px;border-radius:50%;background:var(--superficie-2);border:1px solid var(--fio);color:var(--tinta);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center">{{ c.iniciais }}</span>
+          <span style="flex:1;min-width:0;font-size:11.5px;color:var(--tinta-suave);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.responsavel }}</span>
+          {% if c.verba %}<span class="num" style="flex:none;font-size:12px;font-weight:700;color:var(--tinta)">{{ c.verba|intcomma_brl }}</span>{% endif %}
+        </div>
+        <div style="display:flex;align-items:center;gap:7px;margin-top:8px">
+          <span style="flex:1;height:5px;border-radius:99px;background:var(--superficie-2);overflow:hidden"><span style="display:block;height:100%;width:{{ c.pct_check }}%;background:{% if c.check_completo %}var(--musgo){% else %}var(--lampiao){% endif %}"></span></span>
+          <span style="flex:none;font-size:11px;font-weight:700;color:{% if c.check_completo %}var(--musgo){% else %}var(--alerta){% endif %};white-space:nowrap">{{ c.check_texto }}</span>
+        </div>
+        {% if c.etapas_abertas %}
+        <div style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:11px;color:var(--tinta-suave)">{{ c.etapas_abertas }} etapa{{ c.etapas_abertas|pluralize }} aberta{{ c.etapas_abertas|pluralize }}</div>
+        {% endif %}
+        {% if c.tem_pecas %}
+        <div style="display:flex;align-items:center;gap:7px;margin-top:6px">
+          <span style="flex:1;height:5px;border-radius:99px;background:var(--superficie-2);overflow:hidden"><span style="display:block;height:100%;width:{{ c.pct_pecas }}%;background:var(--musgo)"></span></span>
+          <span style="flex:none;font-size:11px;color:var(--tinta-suave)">{{ c.pecas_texto }} peças</span>
+        </div>
+        {% endif %}
+        {% if c.motivo_meu %}
+        <div style="display:flex;align-items:center;gap:5px;margin-top:6px;font-size:11px;font-weight:700;color:var(--alerta)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;flex:none"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>{{ c.motivo_meu }}
+        </div>
+        {% endif %}
+        {% if eh_gerente and col.fase == 'aprovacao' %}
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <form method="post" action="{% url 'marketing:mover_fase' c.obj.id %}" style="flex:1" onclick="event.stopPropagation()">
+            {% csrf_token %}<input type="hidden" name="fase" value="estruturacao">
+            <button type="submit" style="width:100%;height:32px;border-radius:10px;border:none;background:linear-gradient(180deg,var(--musgo),var(--musgo));color:var(--superficie);font-size:12px;font-weight:700;cursor:pointer">Aprovar</button>
+          </form>
+          <form method="post" action="{% url 'marketing:mover_fase' c.obj.id %}" style="flex:none" onclick="event.stopPropagation()">
+            {% csrf_token %}<input type="hidden" name="fase" value="proposta">
+            <button type="submit" style="height:32px;padding:0 12px;border-radius:10px;border:1px solid var(--fio);background:var(--superficie);color:var(--perigo);font-size:12px;font-weight:700;cursor:pointer">Reprovar</button>
+          </form>
+        </div>
+        {% endif %}
+      </article>
+      {% empty %}
+      <div style="padding:18px 12px;text-align:center;border-radius:12px;border:1px dashed var(--fio-forte);font-size:11.5px;line-height:1.45;color:var(--tinta-suave)">{{ col.vazio_texto }}</div>
+      {% endfor %}
+      {% if col.fase == 'ideia' %}
+      <form hx-post="{% url 'marketing:nova_campanha' %}" hx-target="#ficha-slot" hx-swap="innerHTML">
+        {% csrf_token %}
+        <button type="submit" style="width:100%;height:36px;border-radius:11px;border:1px dashed var(--fio-forte);background:transparent;color:var(--tinta-suave);font-size:12.5px;font-weight:700;cursor:pointer">+ Nova ideia</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{# A gaveta da ficha entra aqui (HTMX carrega marketing:ficha) #}
+<div id="ficha-slot"></div>
+{% include "marketing/_moeda_js.html" %}
+
+<form id="form-mover-mkt" method="post" style="display:none">{% csrf_token %}
+  <input type="hidden" name="fase" id="mover-mkt-fase">
+</form>
+<script>
+(function () {
+  let arrastado = null;
+  window.cardMktStart = (ev, id) => { arrastado = id; ev.dataTransfer.effectAllowed = 'move'; ev.currentTarget.style.opacity = '.5'; };
+  window.cardMktEnd = (ev) => { ev.currentTarget.style.opacity = '1'; };
+  window.colDragOver = (ev) => { ev.preventDefault(); ev.currentTarget.style.background = 'var(--superficie)'; };
+  window.colDragLeave = (ev) => { ev.currentTarget.style.background = 'var(--superficie-2)'; };
+  window.soltarMkt = (ev, fase) => {
+    ev.preventDefault();
+    ev.currentTarget.style.background = 'var(--superficie-2)';
+    if (!arrastado) return;
+    const form = document.getElementById('form-mover-mkt');
+    form.action = '/crm/marketing/campanha/' + arrastado + '/fase/';
+    document.getElementById('mover-mkt-fase').value = fase;
+    form.submit();
+  };
+})();
+</script>
+{% endblock %}
