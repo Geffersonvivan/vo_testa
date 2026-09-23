@@ -15,6 +15,7 @@ urlpatterns = [
     path("campanha/<int:pk>/salvar/", views.salvar_campanha, name="salvar_campanha"),
     path("campanha/<int:pk>/check/<slug:chave>/", views.marcar_check, name="marcar_check"),
     path("campanha/<int:pk>/dispensar/<slug:chave>/", views.dispensar_check, name="dispensar_check"),
+    path("campanha/<int:pk>/anexar/<slug:chave>/", views.anexar_item, name="anexar_item"),
     # Ficha (gaveta): etapas, envolvidos, canais e conversa
     path("campanha/<int:pk>/etapa/", views.adicionar_etapa, name="adicionar_etapa"),
     path("etapa/<int:pk>/alternar/", views.alternar_etapa, name="alternar_etapa"),

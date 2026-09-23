@@ -26,9 +26,9 @@
     {% for b in blocos %}
     <span data-dica="{{ b.rotulo }} · {{ b.taxa|floatformat:0 }}% ocupada&#10;{{ b.livres }} noites livres{% if b.campanhas %}&#10;{{ b.campanhas }}{% endif %}"
           style="flex:1;min-width:34px;display:flex;flex-direction:column;align-items:center;gap:5px">
-      <span style="font-size:11px;font-weight:700;color:{% if b.situacao == 'problema' %}var(--perigo){% elif b.situacao == 'oportunidade' %}var(--alerta){% else %}var(--musgo){% endif %}">{{ b.taxa|floatformat:0 }}%</span>
-      <span style="position:relative;display:flex;align-items:flex-end;height:60px;width:100%;border-radius:5px;background:repeating-linear-gradient(135deg,var(--superficie-2) 0 5px,var(--superficie) 5px 10px);box-shadow:inset 0 0 0 1px var(--fio)">
-        <span style="display:block;width:100%;border-radius:5px;height:{{ b.taxa|floatformat:0 }}%;background:{% if b.situacao == 'problema' %}var(--perigo){% elif b.situacao == 'oportunidade' %}var(--lampiao){% else %}var(--musgo){% endif %}"></span>
+      <span style="font-size:12px;font-weight:700;color:{% if b.situacao == 'problema' %}var(--perigo){% elif b.situacao == 'oportunidade' %}var(--alerta){% else %}var(--musgo){% endif %}">{{ b.taxa|floatformat:0 }}%</span>
+      <span style="position:relative;display:flex;align-items:flex-end;height:92px;width:100%;border-radius:7px;background:repeating-linear-gradient(135deg,var(--superficie-2) 0 5px,var(--superficie) 5px 10px);box-shadow:inset 0 0 0 1px {% if b.situacao == 'oportunidade' %}var(--alerta-bg){% else %}var(--fio){% endif %}">
+        <span style="display:block;width:100%;border-radius:7px;min-height:{% if b.taxa %}3px{% else %}0{% endif %};height:{{ b.taxa|floatformat:0 }}%;background:{% if b.situacao == 'problema' %}var(--perigo){% elif b.situacao == 'oportunidade' %}var(--lampiao){% else %}var(--musgo){% endif %}"></span>
       </span>
       <span style="font-size:11px;color:var(--tinta-suave);white-space:nowrap">{{ b.rotulo }}</span>
     </span>
@@ -36,6 +36,13 @@
     <p style="font-size:12px;color:var(--tinta-suave)">Sem dados de ocupação.</p>
     {% endfor %}
   </div>
+
+  {% if resumo_tom == 'perigo' %}
+  <div style="margin:0 20px 6px;display:flex;align-items:center;gap:10px;padding:12px 15px;border-radius:13px;background:var(--alerta-bg);border:1px solid var(--fio)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="var(--alerta)" stroke-width="2" style="width:18px;height:18px;flex:none"><path d="M12 2 1 21h22z"/><path d="M12 9v5M12 17v.5"/></svg>
+    <span style="font-size:12.5px;line-height:1.4;color:var(--alerta);font-weight:600">{{ resumo }}</span>
+  </div>
+  {% endif %}
 
   <div style="padding:0 20px 20px;display:flex;flex-direction:column;gap:7px">
     {% for b in blocos %}{% if b.situacao != 'ok' %}

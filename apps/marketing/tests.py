@@ -180,6 +180,9 @@ class PortoesTests(TestCase):
             inicio=self.hoje, fim=self.hoje, verba_prevista=Decimal(verba),
             responsavel=self.user)
         services.avancar(c, self.user)  # Ideia → Proposta
+        services.garantir_itens(c)      # Proposta cobra 3 itens manuais (marcar)
+        for chave in ("objetivo_mensuravel", "publico_delimitado", "verba_base"):
+            services.marcar_item(c.checks.get(chave=chave), self.user, feito=True)
         services.avancar(c, self.user)  # Proposta → Aprovação
         self.assertEqual(c.fase, Campanha.Fase.APROVACAO)
         return c
@@ -230,17 +233,27 @@ class PortoesTests(TestCase):
 
     def test_dispensar_item_obrigatorio_permite_avancar(self):
         from apps.marketing import services
-        # Proposta sem responsável → item obrigatório pendente; dispensa libera o avanço.
-        c = Campanha.objects.create(
-            nome="Z", objetivo="o", publico="p", canais=["Instagram"],
-            inicio=self.hoje, fim=self.hoje, verba_prevista=Decimal("100"),
-            fase=Campanha.Fase.PROPOSTA)
+        # Proposta: 3 itens obrigatórios. Marca 2 e dispensa o 3º → libera o avanço.
+        c = Campanha.objects.create(nome="Z", fase=Campanha.Fase.PROPOSTA)
         services.garantir_itens(c)
-        item = c.checks.get(chave="responsavel")
-        services.dispensar_item(item, self.user, "não se aplica")
+        services.marcar_item(c.checks.get(chave="objetivo_mensuravel"), self.user, feito=True)
+        services.marcar_item(c.checks.get(chave="publico_delimitado"), self.user, feito=True)
+        services.dispensar_item(c.checks.get(chave="verba_base"), self.user, "não se aplica")
         services.avancar(c, self.user)
         c.refresh_from_db()
         self.assertEqual(c.fase, Campanha.Fase.APROVACAO)
+
+    def test_anexar_arquivo_resolve_item(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from apps.marketing import services
+        c = Campanha.objects.create(nome="AF", fase=Campanha.Fase.PROPOSTA)
+        services.garantir_itens(c)
+        item = c.checks.get(chave="referencia_visual")  # item pede_arquivo (opcional)
+        self.assertFalse(services.portao_da(c)["itens"][-1]["resolvido"])
+        services.anexar_arquivo(item, SimpleUploadedFile("ref.png", b"x" * 8, content_type="image/png"), self.user)
+        item.refresh_from_db()
+        self.assertTrue(item.arquivo)
+        self.assertTrue(services.portao_da(c)["itens"][-1]["resolvido"])
 
     def test_encerrar_exige_retrospectiva(self):
         from django.core.exceptions import ValidationError

@@ -306,6 +306,21 @@ def comentar(request, pk):
 @never_cache
 @requer_modulo(Modulo.MARKETING)
 @require_POST
+def anexar_item(request, pk, chave):
+    """Anexa a evidência de um item do portão que 'não fecha sem' arquivo."""
+    c = get_object_or_404(Campanha, pk=pk)
+    services.garantir_itens(c)
+    item = get_object_or_404(c.checks, chave=chave)
+    arquivo = request.FILES.get("arquivo")
+    if arquivo:
+        services.anexar_arquivo(item, arquivo, request.user)
+        messages.success(request, "Arquivo anexado.")
+    return _pos_ficha(request, c)
+
+
+@never_cache
+@requer_modulo(Modulo.MARKETING)
+@require_POST
 def nova_campanha(request):
     """Cria uma ideia em branco e abre a ficha (não há mais campo solto no quadro)."""
     nome = (request.POST.get("nome") or "").strip() or "Nova campanha"

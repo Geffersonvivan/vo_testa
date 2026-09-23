@@ -208,6 +208,9 @@ class ItemChecklist(models.Model):
     em = models.DateTimeField("marcado em", null=True, blank=True)
     dispensado = models.BooleanField("dispensado", default=False)
     motivo_dispensa = models.CharField("motivo da dispensa", max_length=200, blank=True)
+    arquivo = models.FileField(
+        "evidência (anexo)", upload_to="marketing/checklist/", null=True, blank=True,
+        help_text="Alguns itens só fecham com um arquivo anexado (referência, briefing, arte).")
 
     class Meta:
         verbose_name = "item de checklist"

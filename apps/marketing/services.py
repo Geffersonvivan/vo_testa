@@ -159,29 +159,32 @@ def _retro_completa(c) -> bool:
 #   auto(c)->bool  → resolve sozinho a partir dos campos da ficha (não clicável)
 #   auto=None      → item manual (marca-se à mão)
 #   meta(c)->str   → subtítulo do item (ex.: quem/como concluiu), opcional
+# (chave, rótulo, obrigatório, auto|None, meta|None, pede_arquivo)
+#   pede_arquivo=True → o item só fecha com um arquivo anexado (evidência).
 PORTOES = {
     Campanha.Fase.IDEIA: [
         ("objetivo", "Ideia descrita em uma frase", True,
-         lambda c: bool((c.objetivo or "").strip()), lambda c: "Concluído pela ficha"),
-        ("justifica", "Oportunidade ou data que justifica", False, None, None),
+         lambda c: bool((c.objetivo or "").strip()), lambda c: "Concluído pela ficha", False),
+        ("justifica", "Oportunidade ou data que justifica", False, None, None, False),
     ],
     Campanha.Fase.PROPOSTA: [
-        ("publico", "Público-alvo definido", True, lambda c: bool((c.publico or "").strip()), None),
-        ("canais", "Canais escolhidos", True, lambda c: bool(c.canais), None),
-        ("periodo", "Período (início e fim) definido", True, lambda c: bool(c.inicio and c.fim), None),
-        ("verba", "Verba prevista definida", True, lambda c: c.verba_prevista > 0, None),
-        ("responsavel", "Responsável atribuído", True, lambda c: bool(c.responsavel_id), None),
+        ("objetivo_mensuravel", "Objetivo mensurável definido", True, None, None, False),
+        ("publico_delimitado", "Público-alvo delimitado", True, None, None, False),
+        ("verba_base", "Verba estimada com base em quê", True, None, None, False),
+        ("referencia_visual", "Referência visual ou de campanha anterior", False, None, None, True),
     ],
     Campanha.Fase.APROVACAO: [],  # decisão da gerência — o próprio avançar é a aprovação
     Campanha.Fase.ESTRUTURACAO: [
-        ("pecas", "Peças/entregáveis planejados", True, _tem_pecas, None),
-        ("criativo", "Responsável pela criação", False, lambda c: bool(c.criativo_id), None),
+        ("pecas", "Peças/entregáveis planejados", True, _tem_pecas, None, False),
+        ("briefing", "Briefing enviado ao criativo", False, None, None, True),
+        ("criativo", "Responsável pela criação", False, lambda c: bool(c.criativo_id), None, False),
     ],
     Campanha.Fase.PRODUCAO: [
-        ("pecas_prontas", "Todas as peças prontas", True, _todas_pecas_prontas, None),
+        ("pecas_prontas", "Todas as peças prontas", True, _todas_pecas_prontas, None, False),
+        ("arte_final", "Arte final anexada", False, None, None, True),
     ],
     Campanha.Fase.NOAR: [
-        ("retro", "Retrospectiva preenchida", True, _retro_completa, None),
+        ("retro", "Retrospectiva preenchida", True, _retro_completa, None, False),
     ],
     Campanha.Fase.ENCERRADA: [],
 }
@@ -198,9 +201,11 @@ def garantir_itens(campanha) -> None:
 
 
 def _resolvido(criterio, campanha, row) -> bool:
-    _chave, _rot, _obrig, auto, _meta = criterio
+    _chave, _rot, _obrig, auto, _meta, pede_arquivo = criterio
     if row and row.dispensado:
         return True
+    if pede_arquivo:
+        return bool(row and row.arquivo)
     if auto is None:
         return bool(row and row.feito)
     return bool(auto(campanha))
@@ -213,18 +218,31 @@ def portao_da(campanha) -> dict:
     crit = PORTOES.get(campanha.fase, [])
     itens, feitos, obrig_pendentes = [], 0, []
     for c in crit:
-        chave, rotulo, obrig, auto, meta = c
+        chave, rotulo, obrig, auto, meta, pede_arquivo = c
         row = rows.get(chave)
         ok = _resolvido(c, campanha, row)
         if ok:
             feitos += 1
         elif obrig:
             obrig_pendentes.append(rotulo)
+        arquivo_nome = row.arquivo.name.rsplit("/", 1)[-1] if (row and row.arquivo) else ""
+        if row and row.dispensado:
+            meta_txt = "Dispensado pela gerência"
+        elif pede_arquivo and arquivo_nome:
+            meta_txt = arquivo_nome
+        elif auto is None and not pede_arquivo and row and row.feito:
+            quem = (row.por.get_full_name() or row.por.username) if row.por else ""
+            meta_txt = f"Concluído por {quem}" if quem else "Concluído"
+        elif meta and ok:
+            meta_txt = meta(campanha)
+        else:
+            meta_txt = ""
         itens.append({
             "chave": chave, "rotulo": rotulo, "obrigatorio": obrig,
             "resolvido": ok, "dispensado": bool(row and row.dispensado),
-            "manual": auto is None,
-            "meta": (meta(campanha) if meta and ok else ""),
+            "manual": (auto is None and not pede_arquivo),
+            "pede_arquivo": pede_arquivo, "arquivo_nome": arquivo_nome,
+            "meta": meta_txt,
         })
     prox = proxima_fase(campanha.fase)
     if prox is None:
@@ -257,6 +275,16 @@ def marcar_item(item, usuario, feito=True):
     item.feito = feito
     item.por = usuario
     item.em = timezone.now() if feito else None
+    item.save()
+    return item
+
+
+def anexar_arquivo(item, arquivo, usuario=None):
+    """Anexa a evidência de um item (itens `pede_arquivo` só fecham com o arquivo)."""
+    item.arquivo = arquivo
+    if usuario is not None:
+        item.por = usuario
+    item.em = timezone.now()
     item.save()
     return item
 
@@ -648,13 +676,44 @@ def relatorio(inicio, fim) -> dict:
         janela = _retorno_janela(mc)
         if not (g or rastreada or janela):
             continue
+        aq = aquisicao(mc)
+        mult = round(float(rastreada / g), 1) if g else None  # retorno rastreado / gasto (ex.: 1,4×)
+        mult_janela = round(float(janela / g), 1) if g else None
+        ciclo = (mc.fim - mc.inicio).days if (mc.inicio and mc.fim) else None
         linhas.append({
-            "nome": mc.nome, "gasto": g, "rastreada": rastreada, "janela": janela,
-            "fechamentos": fechos,
+            "nome": mc.nome, "canais": mc.canais or [], "gasto": g,
+            "rastreada": rastreada, "janela": janela, "fechamentos": fechos,
             "cac": (g / fechos).quantize(Decimal("0.01")) if fechos else None,
+            "mult": mult, "mult_janela": mult_janela,
+            "mult_txt": (f"{mult:.1f}".replace(".", ",") if mult else None),
+            "mult_janela_txt": (f"{mult_janela:.1f}".replace(".", ",") if mult_janela else None),
+            "conversao": aq["conversao"], "ciclo": ciclo, "com_rastreio": bool(fechos),
         })
     linhas.sort(key=lambda x: x["rastreada"], reverse=True)  # ordena pela RASTREADA
-    return {"teto": teto, "gasto": gasto, "sobra": sobra, "ritmo": ritmo, "linhas": linhas}
+    return {"teto": teto, "gasto": gasto, "sobra": sobra, "ritmo": ritmo,
+            "campanhas": len(linhas), "serie": _serie_mensal(fim), "linhas": linhas}
+
+
+def _serie_mensal(ate, n: int = 5) -> list:
+    """Gasto realizado por mês nos últimos `n` meses (para o gráfico de barras do relatório)."""
+    from apps.comercial.models import GastoDiario
+    y, m, meses = ate.year, ate.month, []
+    for _ in range(n):
+        meses.append((y, m))
+        m -= 1
+        if m < 1:
+            m, y = 12, y - 1
+    meses.reverse()
+    out = []
+    for yy, mm in meses:
+        g = (GastoDiario.objects.filter(campanha__fluxo__isnull=False, data__year=yy, data__month=mm)
+             .aggregate(s=Sum("valor"))["s"] or Decimal("0.00"))
+        out.append({"label": MESES_PT[mm][:3].lower(), "gasto": g,
+                    "sel": (yy == ate.year and mm == ate.month)})
+    mx = max((x["gasto"] for x in out), default=Decimal("0"))
+    for x in out:
+        x["pct"] = int(round(float(x["gasto"] / mx) * 100)) if mx else 0
+    return out
 
 
 # ── Passo 7: atribuição de lead (campanha vigente) ───────────────────────────

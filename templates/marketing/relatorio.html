@@ -3,6 +3,7 @@
 {% block titulo %}Relatório — Marketing{% endblock %}
 
 {% block conteudo %}
+{% load moeda %}
 {# Transcrição do protótipo. Seleção de período em pílulas (sem controle nativo). #}
 
 <div style="margin-bottom:14px">
@@ -39,22 +40,42 @@
   {# KPIs #}
   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:1px;background:var(--fio)">
     <div style="padding:16px 20px;background:var(--superficie)">
-      <div style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">TETO</div>
-      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:var(--tinta);white-space:nowrap">R$ {{ dados.teto }}</div>
+      <div style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">TETO DO MÊS</div>
+      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:var(--tinta);white-space:nowrap">{{ dados.teto|intcomma_brl }}</div>
+      <div style="margin-top:3px;font-size:11px;color:var(--tinta-suave)">definido pela gestão</div>
     </div>
     <div style="padding:16px 20px;background:var(--superficie)">
-      <div style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">GASTO</div>
-      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:var(--perigo);white-space:nowrap">R$ {{ dados.gasto }}</div>
+      <div style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">GASTO REALIZADO</div>
+      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:var(--perigo);white-space:nowrap">{{ dados.gasto|intcomma_brl }}</div>
+      <div style="margin-top:3px;font-size:11px;color:var(--tinta-suave)">{% if dados.teto %}{% widthratio dados.gasto dados.teto 100 %}%{% else %}—{% endif %} do teto</div>
     </div>
     <div style="padding:16px 20px;background:var(--superficie)">
       <div style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">SOBRA</div>
-      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:{% if dados.sobra < 0 %}var(--perigo){% else %}var(--musgo){% endif %};white-space:nowrap">R$ {{ dados.sobra }}</div>
+      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:{% if dados.sobra < 0 %}var(--perigo){% else %}var(--musgo){% endif %};white-space:nowrap">{{ dados.sobra|intcomma_brl }}</div>
+      <div style="margin-top:3px;font-size:11px;color:var(--tinta-suave)">não acumula para o mês seguinte</div>
     </div>
     <div style="padding:16px 20px;background:var(--superficie)">
-      <div style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">RITMO/DIA</div>
-      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:var(--tinta);white-space:nowrap">R$ {{ dados.ritmo }}</div>
+      <div style="font-size:11px;letter-spacing:.06em;color:var(--tinta-suave);font-weight:700">CAMPANHAS</div>
+      <div class="num" style="margin-top:6px;font-family:var(--fonte-titulo);font-size:22px;font-weight:700;color:var(--tinta);white-space:nowrap">{{ dados.campanhas }}</div>
+      <div style="margin-top:3px;font-size:11px;color:var(--tinta-suave)">com movimento no mês</div>
     </div>
   </div>
+
+  {# Gráfico: gasto por mês (barras) #}
+  {% if dados.serie %}
+  <div style="padding:20px 22px 16px;border-top:1px solid var(--fio)">
+    <div style="display:flex;align-items:flex-end;gap:clamp(10px,4vw,40px);height:170px">
+      {% for s in dados.serie %}
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:8px">
+        <span class="num" style="font-size:12.5px;font-weight:700;color:{% if s.sel %}var(--perigo){% else %}var(--tinta-suave){% endif %}">{% if s.gasto %}{{ s.gasto|intcomma_brl }}{% else %}—{% endif %}</span>
+        <span style="width:100%;border-radius:10px 10px 4px 4px;min-height:4px;height:{{ s.pct }}%;{% if s.sel %}background:linear-gradient(180deg,var(--lampiao),var(--madeira)){% else %}background:var(--superficie-2);box-shadow:inset 0 0 0 1px var(--fio){% endif %}"></span>
+        <span style="font-size:12px;color:{% if s.sel %}var(--tinta){% else %}var(--tinta-suave){% endif %};font-weight:{% if s.sel %}700{% else %}400{% endif %}">{{ s.label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <p style="margin:14px 0 0;font-size:11.5px;line-height:1.45;color:var(--tinta-suave)">Gasto realizado por mês, contra o teto daquele ciclo. A sobra não acumula — cada mês tem teto próprio.</p>
+  </div>
+  {% endif %}
 </section>
 
 <section style="border-radius:20px;background:var(--superficie);border:1px solid var(--fio);box-shadow:var(--sombra-cartao);overflow:hidden;margin-bottom:18px">
@@ -64,19 +85,32 @@
   </div>
   <div style="padding:12px 16px 18px;display:flex;flex-direction:column;gap:8px">
     {% for l in dados.linhas %}
-    <div style="padding:12px 15px;border-radius:14px;background:var(--superficie-2);border:1px solid var(--fio)">
-      <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
-        <span style="flex:1;min-width:140px;font-size:13.5px;font-weight:700;color:var(--tinta)">{{ l.nome }}</span>
+    <div style="padding:14px 16px;border-radius:14px;background:var(--superficie-2);border:1px solid var(--fio)">
+      <div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">
+        <span style="flex:1;min-width:160px">
+          <span style="display:block;font-size:13.5px;font-weight:700;color:var(--tinta)">{{ l.nome }}</span>
+          {% if l.canais %}<span style="display:block;margin-top:2px;font-size:11.5px;color:var(--tinta-suave)">{{ l.canais|join:" · " }}</span>{% endif %}
+        </span>
         <span style="flex:none;text-align:right">
-          <span class="num" style="display:block;font-family:var(--fonte-titulo);font-size:18px;font-weight:700;color:var(--musgo)">R$ {{ l.rastreada }}</span>
-          <span style="display:block;margin-top:1px;font-size:11px;color:var(--tinta-suave)">rastreada</span>
+          {% if l.com_rastreio %}
+          <span class="num" style="display:block;font-family:var(--fonte-titulo);font-size:19px;font-weight:700;color:var(--lampiao)">{{ l.mult_txt|default:"—" }}×</span>
+          <span style="display:block;margin-top:1px;font-size:11px;color:var(--tinta-suave)">{{ l.fechamentos }} venda{{ l.fechamentos|pluralize }} rastreada{{ l.fechamentos|pluralize }}</span>
+          {% else %}
+          <span style="display:block;font-family:var(--fonte-titulo);font-size:16px;font-weight:700;color:var(--tinta-suave)">sem rastreio</span>
+          {% if l.mult_janela_txt %}<span style="display:block;margin-top:1px;font-size:11px;color:var(--tinta-suave)">{{ l.mult_janela_txt }}× se contar a janela</span>{% endif %}
+          {% endif %}
         </span>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin-top:10px">
-        <span style="font-size:11px;color:var(--tinta-suave)">gasto<br><strong class="num" style="font-size:12.5px;color:var(--tinta)">R$ {{ l.gasto }}</strong></span>
-        <span style="font-size:11px;color:var(--tinta-suave)">na janela<br><strong class="num" style="font-size:12.5px;color:var(--tinta-suave)" title="Coincidência de calendário — nunca somar com a rastreada">R$ {{ l.janela }}</strong></span>
-        <span style="font-size:11px;color:var(--tinta-suave)">fechamentos<br><strong class="num" style="font-size:12.5px;color:var(--tinta)">{{ l.fechamentos }}</strong></span>
-        <span style="font-size:11px;color:var(--tinta-suave)">por venda (CAC)<br><strong class="num" style="font-size:12.5px;color:var(--tinta)">{% if l.cac %}R$ {{ l.cac }}{% else %}—{% endif %}</strong></span>
+      <div style="height:6px;border-radius:99px;background:var(--superficie);box-shadow:inset 0 0 0 1px var(--fio);margin:11px 0 12px;overflow:hidden">
+        <span style="display:block;height:100%;border-radius:99px;width:{% if l.com_rastreio %}{% widthratio l.mult 2 100 %}{% else %}0{% endif %}%;background:var(--lampiao)"></span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:10px">
+        <span style="font-size:11px;color:var(--tinta-suave)">gasto<br><strong class="num" style="font-size:12.5px;color:var(--tinta)">{{ l.gasto|intcomma_brl }}</strong></span>
+        <span style="font-size:11px;color:var(--tinta-suave)">rastreada<br><strong class="num" style="font-size:12.5px;color:var(--musgo)">{{ l.rastreada|intcomma_brl }}</strong></span>
+        <span style="font-size:11px;color:var(--tinta-suave)">na janela<br><strong class="num" style="font-size:12.5px;color:var(--tinta-suave)" title="Coincidência de calendário — nunca somar com a rastreada">{{ l.janela|intcomma_brl }}</strong></span>
+        <span style="font-size:11px;color:var(--tinta-suave)">por venda<br><strong class="num" style="font-size:12.5px;color:var(--tinta)">{% if l.cac %}{{ l.cac|intcomma_brl }}{% else %}—{% endif %}</strong></span>
+        <span style="font-size:11px;color:var(--tinta-suave)">conversão<br><strong class="num" style="font-size:12.5px;color:var(--tinta)">{{ l.conversao }}%</strong></span>
+        <span style="font-size:11px;color:var(--tinta-suave)">ciclo<br><strong class="num" style="font-size:12.5px;color:var(--tinta)">{% if l.ciclo %}{{ l.ciclo }}d{% else %}—{% endif %}</strong></span>
       </div>
     </div>
     {% empty %}
