@@ -223,10 +223,10 @@ form.lista .btn-primary:hover{box-shadow:0 8px 30px -10px var(--musgo)}
   display:none;padding:2rem;border-radius:var(--radius);
   background:#fff;border:1px solid var(--lampiao);
 }
-.sucesso h3{font-size:1.7rem;color:var(--madeira);margin-bottom:.6rem}
+.sucesso h2,.sucesso h3{font-size:1.7rem;color:var(--madeira);margin-bottom:.6rem}
 .sucesso p{color:color-mix(in srgb,var(--madeira) 78%,transparent)}
-.captura.enviado form.lista{display:none}
-.captura.enviado .sucesso{display:block}
+#captura.enviado form.lista{display:none}
+#captura.enviado .sucesso{display:block}
 
 @media(max-width:860px){ .captura .inner{grid-template-columns:1fr} }
 
@@ -613,8 +613,8 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
         <button class="btn btn-primary">Quero minha vaga de fundador</button>
       </form>
       <div class="sucesso" id="sucesso" role="status" tabindex="-1">
-        <h2>Pronto! Você está na lista.</h2>
-        <p>Você é dos primeiros a saber. Em breve chamamos você no WhatsApp — com prioridade para reservar.</p>
+        <h2>Você está próximo de ser um fundador!</h2>
+        <p>Deu certo — seu nome entrou na lista. Em breve chamamos você no WhatsApp, com prioridade para reservar.</p>
       </div>
       <p class="fc-micro">Sem compromisso · a vaga de fundador não se repete</p>
     </div>
@@ -855,8 +855,10 @@ if(form && whats){
     if(consentWrap) consentWrap.classList.remove('invalid');
   }
 
+  let enviando = false, enviado = false;
   form.addEventListener('submit', async e=>{
     e.preventDefault();
+    if(enviando || enviado) return;   // trava contra clique repetido / reenvio
     clearErr();
     let ok = true, foco = null;
 
@@ -880,6 +882,9 @@ if(form && whats){
                     empresa:(document.getElementById('empresa')||{}).value||'',
                     ms: Date.now() - FORM_T0 };
 
+    enviando = true;
+    const botao = form.querySelector('button[type=submit], .btn-primary');
+    if(botao){ botao.disabled = true; botao.textContent = 'Enviando…'; }
     try{
       if(CONFIG.CRM_ENDPOINT){
         await fetch(CONFIG.CRM_ENDPOINT,{
@@ -891,11 +896,15 @@ if(form && whats){
       }
       if(window.gtag){ gtag('event','generate_lead',{ variant: window.__abCTA || '' }); }
       if(window.fbq){ fbq('track','Lead',{ content_name:'LP Fundador II' },{ eventID: eventId }); }
+      enviado = true;
       document.getElementById('captura').classList.add('enviado');
       document.getElementById('sucesso').focus?.();
     }catch(err){
       console.error(err);
+      if(botao){ botao.disabled = false; botao.textContent = 'Quero minha vaga de fundador'; }
       alert('Não foi possível enviar agora. Tente de novo em instantes.');
+    }finally{
+      enviando = false;
     }
   });
 }
