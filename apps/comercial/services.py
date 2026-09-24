@@ -271,6 +271,36 @@ def _norm_nome(s):
     return " ".join(s.split())
 
 
+def _norm_tel(s):
+    """Só dígitos, sem o DDI do Brasil (55). Ex.: '(49) 99143-8813' → '49991438813'.
+
+    Serve p/ casar o mesmo número gravado com/sem máscara, DDD ou +55.
+    """
+    d = "".join(c for c in (s or "") if c.isdigit())
+    if len(d) >= 12 and d.startswith("55"):
+        d = d[2:]
+    return d
+
+
+def _pessoa_por_telefone(telefone, nome):
+    """Acha a Pessoa ativa do mesmo telefone (compara os últimos 8 dígitos, tolera
+    máscara/DDD/DDI) cujo nome seja compatível. None se não houver — evita duplicar
+    contato quando a LP manda só nome + WhatsApp (sem e-mail nem documento).
+    """
+    from apps.nucleo.models import Pessoa
+    chave = _norm_tel(telefone)[-8:]
+    if len(chave) < 8:
+        return None
+    # Pré-filtra no banco pelos últimos 4 dígitos (sempre contíguos, mesmo com máscara)
+    # e confirma em Python o casamento dos 8 dígitos — o `__contains` sozinho falha
+    # entre '(49) 99143-8813' e '49991438813'.
+    cand = Pessoa.objects.filter(telefone__contains=chave[-4:], ativo=True)
+    for c in cand.iterator():
+        if _norm_tel(c.telefone)[-8:] == chave and _nomes_compativeis(c.nome, nome):
+            return c
+    return None
+
+
 def _nomes_compativeis(a, b):
     """Mesma pessoa? Ignora acento/caixa; aceita prefixo/contido ou mesmo 1º nome.
 
@@ -334,6 +364,10 @@ def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
     # claramente outro, é OUTRA pessoa — não funde leads distintos sob o nome antigo.
     if pessoa is not None and not _nomes_compativeis(pessoa.nome, nome):
         pessoa = None
+    # Dedupe por telefone: a LP manda só nome + WhatsApp (sem e-mail/doc), então sem isto
+    # cada envio criava um contato novo. Reaproveita a Pessoa do mesmo número + nome.
+    if pessoa is None and telefone:
+        pessoa = _pessoa_por_telefone(telefone, nome)
     if pessoa is None:
         pessoa = Pessoa.objects.create(
             nome=nome, email=email, telefone=telefone, documento=documento,

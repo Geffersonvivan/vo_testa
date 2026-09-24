@@ -115,6 +115,25 @@ class CapturaSiteTests(TestCase):
         b.pessoa.refresh_from_db()
         self.assertEqual(b.pessoa.nome, "Flávio Calgaro")   # nome completo vence
 
+    def test_dedupe_por_telefone_sem_email(self):
+        """LP manda só nome + WhatsApp: o mesmo número não pode virar contato novo."""
+        a = services.capturar_lead_site(nome="Gefferson Vivan", telefone="49991338813")
+        b = services.capturar_lead_site(nome="Gefferson Vivan", telefone="49991338813")
+        self.assertEqual(a.pessoa_id, b.pessoa_id)
+        self.assertEqual(Pessoa.objects.filter(nome__icontains="Gefferson").count(), 1)
+
+    def test_dedupe_por_telefone_tolera_mascara_e_ddi(self):
+        """Mesmo número gravado com máscara/+55 casa com o enviado só em dígitos."""
+        a = services.capturar_lead_site(nome="Ana Paula", telefone="(49) 99999-1234")
+        b = services.capturar_lead_site(nome="Ana Paula", telefone="5549999991234")
+        self.assertEqual(a.pessoa_id, b.pessoa_id)
+
+    def test_mesmo_telefone_nome_diferente_cria_pessoa_nova(self):
+        """Número compartilhado (recado/engano) + nome claramente outro = pessoa distinta."""
+        a = services.capturar_lead_site(nome="Maria", telefone="49988887777")
+        b = services.capturar_lead_site(nome="Carlos Souza", telefone="49988887777")
+        self.assertNotEqual(a.pessoa_id, b.pessoa_id)
+
 
 class CacadorTests(TestCase):
     def setUp(self):
