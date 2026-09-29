@@ -77,3 +77,6 @@ docs/Foco_Tecnologia.pdf
 
 # Fontes de vídeo pesados / arquivos de trabalho (o leve vai em static/lp/)
 docs/Vídeos/
+
+# Evidências pessoais (incidente de fraude Meta) — não versionar/deployar
+docs/Prints_Facebook/
