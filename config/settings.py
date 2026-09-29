@@ -287,6 +287,13 @@ WHATSAPP_WABA_ID = os.environ.get("WHATSAPP_WABA_ID", "")  # gestão de template
 # X-Hub-Signature-256 (recomendado em produção). Vazio = sem checagem (dev/simulado).
 WHATSAPP_APP_SECRET = os.environ.get("WHATSAPP_APP_SECRET", "")
 
+# Gateway de DECISÃO do lead (score/canal) — piloto Jev (TypeSafe AI).
+# "simulado" (default, sem rede — Fase 0 sombra) / "jev" (real, exige URL+KEY).
+DECISAO_GATEWAY = os.environ.get("DECISAO_GATEWAY", "simulado")
+JEV_API_URL = os.environ.get("JEV_API_URL", "")
+JEV_API_KEY = os.environ.get("JEV_API_KEY", "")
+JEV_TIMEOUT_MS = int(os.environ.get("JEV_TIMEOUT_MS", "800"))
+
 # Parâmetros fiscais confirmados pelo contador (jul/2026) — Pousada Vô Testa, Itá/SC.
 # Regime Lucro Presumido; NFS-e pelo Emissor Nacional. NFC-e aguarda Inscrição Estadual.
 FISCAL_REGIME = os.environ.get("FISCAL_REGIME", "lucro_presumido")

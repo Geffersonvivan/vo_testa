@@ -201,7 +201,49 @@ def analisar_lead(op):
             "rascunho": _rascunho_lead(op, sinais),
         },
     )
+    _avaliar_sombra_jev(op, analise)  # Fase 0 (sombra) — não afeta score/temperatura
     return analise
+
+
+def features_lead(op) -> dict:
+    """Features derivadas do lead p/ o modelo de decisão — SEM PII (só sinais)."""
+    hoje = timezone.localdate()
+    ci, co = op.checkin_previsto, op.checkout_previsto
+    return {
+        "origem": op.origem,
+        "tipo_interesse": op.tipo_interesse,
+        "faturamento": op.faturamento,
+        "valor_estimado": float(op.valor_estimado or 0),
+        "tem_datas": bool(ci and co),
+        "antecedencia_dias": ((ci - hoje).days if ci else None),
+        "noites": ((co - ci).days if (ci and co) else None),
+        "hospedes": op.hospedes or 0,
+        "n_atividades": op.atividades.count(),
+        "tem_cotacao": op.cotacoes.exists(),
+        "pagina": (op.pagina_captacao.slug if op.pagina_captacao_id else ""),
+        "tem_email": bool(op.pessoa.email),
+        "tem_telefone": bool(op.pessoa.telefone),
+    }
+
+
+def _avaliar_sombra_jev(op, analise):
+    """Fase 0 (sombra): grava a previsão do gateway de decisão em paralelo ao
+    heurístico. Best-effort — nunca estoura e NÃO altera score/temperatura oficiais."""
+    from .decisao_gateway import get_decisao_gateway
+    try:
+        res = get_decisao_gateway().avaliar_lead(features_lead(op))
+    except Exception:  # noqa: BLE001 — sombra nunca quebra a análise
+        res = None
+    if not res:
+        return
+    AnaliseLead.objects.filter(pk=analise.pk).update(
+        score_jev=res.get("score"),
+        confianca_jev=res.get("confianca"),
+        canal_sugerido=res.get("canal") or "",
+        qualificado_jev=res.get("qualificado"),
+        jev_modelo=res.get("modelo") or "",
+        jev_avaliado_em=timezone.now(),
+    )
 
 
 def _abrir_permanencia(oportunidade, etapa, quando=None):

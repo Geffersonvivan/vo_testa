@@ -158,6 +158,44 @@ class CapturaSiteTests(TestCase):
         self.assertNotEqual(a.pessoa_id, b.pessoa_id)
 
 
+class JevSombraTests(TestCase):
+    """Fase 0 (sombra) do piloto Jev — grava a previsão sem afetar o oficial."""
+
+    def setUp(self):
+        self.user = Usuario.objects.create_superuser(username="jv", password="senha-forte-1")
+        self.pessoa = Pessoa.objects.create(nome="Lead Jev", telefone="49999990000")
+
+    def test_gateway_simulado_deterministico_e_formato(self):
+        from apps.comercial.decisao_gateway import get_decisao_gateway
+        gw = get_decisao_gateway()
+        self.assertEqual(gw.nome, "simulado")
+        feats = {"origem": "site", "valor_estimado": 1500, "tem_datas": True,
+                 "n_atividades": 1, "tem_telefone": True}
+        a = gw.avaliar_lead(feats)
+        self.assertEqual(a, gw.avaliar_lead(dict(feats)))       # determinístico
+        self.assertTrue(0 <= a["score"] <= 100)
+        self.assertIn(a["canal"], ("whatsapp", "ligacao", "email"))
+        self.assertEqual(a["modelo"], "simulado-v1")
+
+    def test_analisar_grava_sombra_sem_mexer_no_oficial(self):
+        op = services.criar_oportunidade(
+            usuario=self.user, pessoa=self.pessoa, titulo="X",
+            valor_estimado=Decimal("1500"))
+        analise = AnaliseLead.objects.get(oportunidade=op)
+        self.assertIsNotNone(analise.score_jev)                 # sombra gravada
+        self.assertEqual(analise.jev_modelo, "simulado-v1")
+        self.assertIsNotNone(analise.jev_avaliado_em)
+        # score/temperatura OFICIAIS seguem sendo os heurísticos
+        self.assertEqual(op.score, services.calcular_score(op))
+
+    @override_settings(DECISAO_GATEWAY="jev")  # sem JEV_API_URL → gateway falha → fallback
+    def test_fallback_gracioso_quando_gateway_indisponivel(self):
+        op = services.criar_oportunidade(usuario=self.user, pessoa=self.pessoa, titulo="Y")
+        analise = AnaliseLead.objects.get(oportunidade=op)
+        self.assertIsNone(analise.score_jev)                    # sombra vazia, sem quebrar
+        self.assertTrue(analise.temperatura)                    # análise normal seguiu
+
+
 class CacadorTests(TestCase):
     def setUp(self):
         self.user = Usuario.objects.create_superuser(username="cac", password="senha-forte-123")

@@ -393,6 +393,24 @@ class AnaliseLead(models.Model):
     revisado_em = models.DateTimeField("revisado em", null=True, blank=True)
     gerado_em = models.DateTimeField("analisado em", auto_now=True)
 
+    # ── Fase 0 (sombra) do Jev: previsão do modelo de decisão gravada em PARALELO
+    #    ao heurístico, sem afetar score/temperatura oficiais. Só coleta pra comparar.
+    class Canal(models.TextChoices):
+        WHATSAPP = "whatsapp", "WhatsApp"
+        LIGACAO = "ligacao", "Ligação"
+        EMAIL = "email", "E-mail"
+
+    score_jev = models.PositiveSmallIntegerField(
+        "Jev — prob. de conversão (0–100)", null=True, blank=True)
+    confianca_jev = models.DecimalField(
+        "Jev — confiança (0–1)", max_digits=4, decimal_places=3, null=True, blank=True)
+    canal_sugerido = models.CharField(
+        "Jev — canal sugerido", max_length=10, choices=Canal.choices, blank=True)
+    qualificado_jev = models.DecimalField(
+        "Jev — qualificado (0–1)", max_digits=4, decimal_places=3, null=True, blank=True)
+    jev_modelo = models.CharField("Jev — modelo/versão", max_length=40, blank=True)
+    jev_avaliado_em = models.DateTimeField("Jev — avaliado em", null=True, blank=True)
+
     class Meta:
         verbose_name = "análise de lead"
         verbose_name_plural = "análises de leads"
