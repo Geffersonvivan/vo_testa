@@ -74,6 +74,29 @@ class FunilServiceTests(TestCase):
         tipos = {a["tipo"] for a in services.pendencias_auditoria()}
         self.assertIn("oportunidade_sem_tarefa", tipos)
 
+    def test_kanban_mostra_perdida_recente_e_nao_some(self):
+        """Bug: ao marcar perdido, o card sumia do quadro. Deve aparecer na coluna Perdido."""
+        op = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="X")
+        services.marcar_perdida(op, MotivoPerda.objects.first(), self.op)
+        colunas = services.dados_kanban()
+        perdido = next(c for c in colunas if c["etapa"].tipo == "perdido")
+        self.assertIn(op.id, [o.id for o in perdido["itens"]])  # não some
+        abertos = [o.id for c in colunas if c["etapa"].tipo == "aberta" for o in c["itens"]]
+        self.assertNotIn(op.id, abertos)  # e não fica nas colunas abertas
+
+    def test_kanban_periodo_padrao_mes_corrente_e_todos(self):
+        op = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="X")
+        services.marcar_perdida(op, MotivoPerda.objects.first(), self.op)
+        # fechado no mês passado → fora do padrão (mês corrente)
+        Oportunidade.objects.filter(pk=op.pk).update(
+            fechado_em=timezone.now() - timedelta(days=40))
+        perdido = next(c for c in services.dados_kanban() if c["etapa"].tipo == "perdido")
+        self.assertNotIn(op.id, [o.id for o in perdido["itens"]])  # não aparece
+        # mas com todos=True aparece (histórico inteiro)
+        perdido = next(c for c in services.dados_kanban(todos=True)
+                       if c["etapa"].tipo == "perdido")
+        self.assertIn(op.id, [o.id for o in perdido["itens"]])
+
 
 class CapturaSiteTests(TestCase):
     def test_capturar_lead_cria_oportunidade_e_tarefa(self):

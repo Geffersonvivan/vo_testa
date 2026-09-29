@@ -220,15 +220,36 @@ def _fechar_permanencia(oportunidade, quando=None):
         aberta.save(update_fields=["finalizado_em"])
 
 
-def dados_kanban(faturamento=""):
-    qs = Oportunidade.objects.filter(status=Oportunidade.Status.ABERTA).select_related(
+def dados_kanban(faturamento="", inicio=None, fim=None, todos=False):
+    """Colunas do funil. As etapas abertas mostram os leads em aberto (sempre — o pipeline
+    é "agora", não depende de período); as etapas terminais (Ganho/Perdido) mostram os
+    fechados do PERÍODO (padrão = mês corrente) — ou o histórico inteiro se `todos=True`.
+    Sem isso, o card sumiria do quadro ao marcar ganho/perda (histórico fica em Relatórios).
+    """
+    base = Oportunidade.objects.select_related(
         "pessoa", "etapa", "responsavel", "pagina_captacao", "analise"
     )
+    abertas = base.filter(status=Oportunidade.Status.ABERTA)
     if faturamento:
-        qs = qs.filter(faturamento=faturamento)
+        abertas = abertas.filter(faturamento=faturamento)
     por_etapa = {}
-    for op in qs:
+    for op in abertas:
         por_etapa.setdefault(op.etapa_id, []).append(op)
+
+    # Fechados (ganha/perdida) na sua etapa terminal, filtrados pelo período.
+    fechadas = base.filter(
+        status__in=[Oportunidade.Status.GANHA, Oportunidade.Status.PERDIDA]
+    )
+    if not todos:
+        if inicio is None or fim is None:
+            hoje = timezone.localdate()
+            inicio, fim = hoje.replace(day=1), hoje
+        fechadas = fechadas.filter(fechado_em__date__range=(inicio, fim))
+    if faturamento:
+        fechadas = fechadas.filter(faturamento=faturamento)
+    for op in fechadas.order_by("-fechado_em"):
+        por_etapa.setdefault(op.etapa_id, []).append(op)
+
     colunas = []
     for etapa in etapas():
         itens = por_etapa.get(etapa.id, [])

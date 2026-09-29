@@ -17,6 +17,7 @@ from django.views.decorators.csrf import csrf_protect
 
 from apps.nucleo.models import Pessoa, Prospecto, modulo_ativo
 from apps.nucleo.modulos import Modulo
+from apps.nucleo.periodos import periodo, selecao_periodo
 from apps.nucleo.permissoes import requer_gerencia, requer_modulo
 from apps.nucleo.seletores import pessoas_agrupadas
 
@@ -123,17 +124,24 @@ def _cotacao_inicial(op):
 @requer_modulo(Modulo.COMERCIAL)
 def funil(request):
     fat = request.GET.get("fat", "")
-    colunas = services.dados_kanban(faturamento=fat)
-    itens = [op for col in colunas for op in col["itens"]]
+    todos = request.GET.get("fechados") == "todos"
+    inicio, fim, rotulo = periodo(request)
+    colunas = services.dados_kanban(faturamento=fat, inicio=inicio, fim=fim, todos=todos)
+    # KPIs do topo = só o pipeline ABERTO (as colunas terminais trazem fechados do período).
+    abertos = [op for col in colunas if col["etapa"].tipo == "aberta" for op in col["itens"]]
     ctx = {
         "colunas": colunas,
         "fat": fat,
         "faturamento_filtros": Oportunidade.Faturamento.choices,
-        "valor_total": sum((c["total"] for c in colunas), Decimal("0.00")),
-        "ponderado_total": sum((o.valor_ponderado for o in itens), Decimal("0.00")),
-        "qtd_total": len(itens),
+        "valor_total": sum((c["total"] for c in colunas
+                            if c["etapa"].tipo == "aberta"), Decimal("0.00")),
+        "ponderado_total": sum((o.valor_ponderado for o in abertos), Decimal("0.00")),
+        "qtd_total": len(abertos),
         "agora": timezone.now(),
+        "todos_fechados": todos,
+        "periodo_rotulo": rotulo,
     }
+    ctx.update(selecao_periodo(request))
     ctx.update(_contexto_form())
     return render(request, "comercial/funil.html", ctx)
 
