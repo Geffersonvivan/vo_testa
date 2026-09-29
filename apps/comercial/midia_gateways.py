@@ -79,6 +79,12 @@ class GatewaySimulado:
         return {"ok": True, "id": f"sim-{evento.get('evento')}-{evento.get('ref')}",
                 "detalhe": "simulado (sem rede)"}
 
+    def enviar_evento_crm(self, evento: dict) -> dict:
+        logger.info("MÍDIA[simulado] evento CRM estagio=%s ref=%s",
+                    evento.get("estagio"), evento.get("ref"))
+        return {"ok": True, "id": f"sim-crm-{evento.get('estagio')}-{evento.get('ref')}",
+                "detalhe": "simulado (sem rede)"}
+
     def sincronizar_gastos(self, campanha, desde, ate) -> list:
         """Sem rede: modo manual — não sincroniza gasto (retorna vazio)."""
         return []
@@ -116,6 +122,40 @@ class GatewayMeta:
         if code:
             payload["test_event_code"] = code
         url = f"https://graph.facebook.com/v19.0/{pixel}/events?access_token={token}"
+        return _post_json(url, payload)
+
+    def enviar_evento_crm(self, evento: dict) -> dict:
+        """Evento de ESTÁGIO do lead (integração 'leads qualificados' do CRM). Formato
+        próprio da Meta: action_source=system_generated + custom_data.event_source=crm.
+        `event_name` = o estágio do funil pra onde o lead mudou."""
+        token = getattr(settings, "META_CAPI_TOKEN", "")
+        pixel = getattr(settings, "META_PIXEL_ID", "")
+        if not (token and pixel):
+            raise ValidationError(
+                "Meta: configure META_CAPI_TOKEN e META_PIXEL_ID (ou MIDIA_GATEWAY=simulado).")
+        user_data = {}
+        if evento.get("email_hash"):
+            user_data["em"] = [evento["email_hash"]]
+        if evento.get("telefone_hash"):
+            user_data["ph"] = [evento["telefone_hash"]]
+        if evento.get("lead_id"):  # só existe p/ leads vindos de Lead Ads da Meta
+            user_data["lead_id"] = evento["lead_id"]
+        dado = {
+            "action_source": "system_generated",
+            "event_name": evento["estagio"],
+            "event_time": evento["event_time"],
+            "custom_data": {
+                "event_source": "crm",
+                "lead_event_source": evento.get("crm_nome", "Pousada Vô Testa CRM"),
+            },
+            "user_data": user_data,
+        }
+        payload = {"data": [dado]}
+        code = getattr(settings, "META_CAPI_TEST_CODE", "")
+        if code:
+            payload["test_event_code"] = code
+        versao = getattr(settings, "META_CAPI_VERSION", "v21.0")
+        url = f"https://graph.facebook.com/{versao}/{pixel}/events?access_token={token}"
         return _post_json(url, payload)
 
     def sincronizar_gastos(self, campanha, desde, ate) -> list:
@@ -164,6 +204,9 @@ class GatewayGoogle:
         # Integração real (google-ads) fica para quando o developer token sair.
         raise ValidationError(
             "Google: integração de conversão offline ainda não implementada (stub).")
+
+    def enviar_evento_crm(self, evento: dict) -> dict:
+        return {"ok": False, "erro": "Google não recebe evento de estágio de CRM (só Meta)."}
 
     def sincronizar_gastos(self, campanha, desde, ate) -> list:
         # Google Ads API (relatórios) exige developer token aprovado + OAuth2.

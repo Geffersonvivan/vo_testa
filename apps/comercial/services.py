@@ -315,6 +315,7 @@ def criar_oportunidade(*, usuario, pessoa, titulo, etapa=None, **campos):
     )
     _abrir_permanencia(op, etapa)
     analisar_lead(op)  # Caçador analisa o lead na entrada (score + rascunho)
+    transaction.on_commit(lambda: enviar_evento_crm(op, _estagio_key(op.etapa)))
     return op
 
 
@@ -594,6 +595,7 @@ def mover_etapa(oportunidade, etapa, usuario, motivo=None):
         oportunidade.save(update_fields=["etapa", "status", "fechado_em", "atualizado_em"])
         _abrir_permanencia(oportunidade, etapa)
         _fechar_permanencia(oportunidade)  # ganho é terminal
+        transaction.on_commit(lambda: enviar_evento_crm(oportunidade, _estagio_key(etapa)))
         return oportunidade
 
     if etapa.tipo == EtapaFunil.Tipo.PERDIDO:
@@ -608,6 +610,7 @@ def mover_etapa(oportunidade, etapa, usuario, motivo=None):
     atualizar_score(oportunidade)
     if de != etapa.nome:
         _log_evento(oportunidade, usuario, f"moveu: {de} → {etapa.nome}")
+    transaction.on_commit(lambda: enviar_evento_crm(oportunidade, _estagio_key(etapa)))
     return oportunidade
 
 
@@ -652,6 +655,7 @@ def marcar_perdida(oportunidade, motivo, usuario):
     registrar_auditoria(usuario, "oportunidade_perdida", oportunidade,
                         {"motivo": motivo.nome})
     _log_evento(oportunidade, usuario, f"marcou como perdida — {motivo.nome}")
+    transaction.on_commit(lambda: enviar_evento_crm(oportunidade, "perdido"))
     return oportunidade
 
 
@@ -747,6 +751,8 @@ def converter_em_reserva(oportunidade, *, tipo_uh, checkin, checkout, usuario,
     _valor_conv = oportunidade.valor_estimado
     transaction.on_commit(
         lambda: enviar_conversao(oportunidade, "compra", valor=_valor_conv))
+    # Evento de estágio 'ganho' p/ a integração de leads qualificados (CAPI CRM).
+    transaction.on_commit(lambda: enviar_evento_crm(oportunidade, "ganho"))
 
     if criar_sinal and modulo_ativo(Modulo.PAGAMENTOS):
         from apps.pagamentos.models import Cobranca
@@ -1356,6 +1362,35 @@ def enviar_conversao(oportunidade, evento, valor=None, forcar=False):
                 else ConversaoEnviada.Status.ERRO),
         valor=valor, id_externo=(res.get("id") or "")[:120], erro=res.get("erro", "") or "",
     )
+
+
+def _estagio_key(etapa) -> str:
+    """Nome estável do estágio p/ event_name da Meta (ex.: 'Cotação enviada'→'cotacao_enviada')."""
+    from django.utils.text import slugify
+    return slugify(etapa.nome).replace("-", "_") or "estagio"
+
+
+def enviar_evento_crm(oportunidade, estagio, quando=None):
+    """Manda um evento de ESTÁGIO do lead à Meta (CAPI, integração 'leads qualificados').
+    Casa por e-mail/telefone hasheados — NÃO exige fbclid. Best-effort, nunca estoura."""
+    import time
+
+    from django.conf import settings
+
+    from .midia_gateways import get_midia_gateway, hash_email, hash_telefone
+    p = oportunidade.pessoa
+    evento = {
+        "estagio": estagio,
+        "ref": oportunidade.pk,
+        "event_time": int(quando.timestamp()) if quando else int(time.time()),
+        "email_hash": hash_email(p.email),
+        "telefone_hash": hash_telefone(p.telefone),
+        "crm_nome": getattr(settings, "META_CRM_NOME", "Pousada Vô Testa CRM"),
+    }
+    try:
+        return get_midia_gateway().enviar_evento_crm(evento)
+    except Exception as e:  # noqa: BLE001 — best-effort, provedor sem credencial/rede
+        return {"ok": False, "erro": str(e)[:200]}
 
 
 def _upsert_gastos_sincronizados(campanha, dados) -> int:

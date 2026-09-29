@@ -196,6 +196,52 @@ class JevSombraTests(TestCase):
         self.assertTrue(analise.temperatura)                    # análise normal seguiu
 
 
+class MetaCrmEventoTests(TestCase):
+    """Integração 'leads qualificados' — evento de estágio do CRM → Meta (CAPI)."""
+
+    def setUp(self):
+        self.user = Usuario.objects.create_superuser(username="mc", password="senha-forte-1")
+        self.pessoa = Pessoa.objects.create(nome="Lead CAPI", telefone="49999990000",
+                                            email="lead@ex.com")
+
+    def test_estagio_key_normaliza(self):
+        e = EtapaFunil.objects.get(nome="Novo lead")
+        self.assertEqual(services._estagio_key(e), "novo_lead")
+
+    def test_gateway_simulado_evento_crm(self):
+        from apps.comercial.midia_gateways import get_midia_gateway
+        res = get_midia_gateway().enviar_evento_crm(
+            {"estagio": "novo_lead", "ref": 1, "event_time": 1, "email_hash": "x"})
+        self.assertTrue(res["ok"])
+
+    def test_criar_oportunidade_dispara_evento_estagio(self):
+        with self.captureOnCommitCallbacks(execute=True) as cbs:
+            services.criar_oportunidade(usuario=self.user, pessoa=self.pessoa, titulo="X")
+        self.assertTrue(cbs)  # houve on_commit (o envio do evento de estágio)
+
+    @override_settings(MIDIA_GATEWAY="meta", META_CAPI_TOKEN="tok", META_PIXEL_ID="123",
+                       META_CRM_NOME="Pousada Vô Testa CRM")
+    def test_payload_meta_no_formato_do_guia(self):
+        from unittest.mock import patch
+
+        from apps.comercial.midia_gateways import get_midia_gateway
+        with patch("apps.comercial.midia_gateways._post_json",
+                   return_value={"ok": True}) as m:
+            get_midia_gateway().enviar_evento_crm({
+                "estagio": "ganho", "ref": 5, "event_time": 100,
+                "email_hash": "EMH", "telefone_hash": "PHH",
+                "crm_nome": "Pousada Vô Testa CRM"})
+        url, payload = m.call_args[0]
+        self.assertIn("/123/events", url)
+        d = payload["data"][0]
+        self.assertEqual(d["action_source"], "system_generated")
+        self.assertEqual(d["event_name"], "ganho")
+        self.assertEqual(d["custom_data"], {"event_source": "crm",
+                                            "lead_event_source": "Pousada Vô Testa CRM"})
+        self.assertEqual(d["user_data"]["em"], ["EMH"])
+        self.assertEqual(d["user_data"]["ph"], ["PHH"])
+
+
 class CacadorTests(TestCase):
     def setUp(self):
         self.user = Usuario.objects.create_superuser(username="cac", password="senha-forte-123")

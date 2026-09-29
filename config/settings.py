@@ -335,6 +335,9 @@ GOOGLE_TAG_ID = os.environ.get("GOOGLE_TAG_ID", "G-40Q43DCPR8")
 # Sem token, o CAPI fica dormente (o Pixel do navegador segue funcionando).
 META_PIXEL_ID = os.environ.get("META_PIXEL_ID", "38503344465975740")
 META_CAPI_TOKEN = os.environ.get("META_CAPI_TOKEN", "")
+# Integração de leads qualificados (eventos de estágio do CRM → CAPI).
+META_CRM_NOME = os.environ.get("META_CRM_NOME", "Pousada Vô Testa CRM")
+META_CAPI_VERSION = os.environ.get("META_CAPI_VERSION", "v21.0")
 # Boas-vindas automáticas ao lead que se cadastra (LP/site). Desligável por env.
 LEAD_BOAS_VINDAS = os.environ.get("LEAD_BOAS_VINDAS", "1") == "1"
 # GeoIP de CIDADE do lead (opcional, OFFLINE). Aponte para um GeoLite2-City.mmdb
