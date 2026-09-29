@@ -152,6 +152,14 @@ descrição → abas → faixa → verba → quadro. Papel vem de request.user (
           <span style="flex:1;min-width:0;font-family:var(--fonte-titulo);font-size:13.5px;font-weight:700;line-height:1.3;color:var(--tinta)">{{ c.obj.nome }}</span>
           <span style="flex:none;font-family:var(--fonte-mono);font-size:11px;color:var(--tinta-suave)">{{ c.codigo }}</span>
         </div>
+        {% if c.obj.etapa_funil %}
+        <div style="margin-top:7px">
+          <span style="display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:.03em;background:var(--superficie-2);color:var(--tinta-suave);border-radius:99px;padding:3px 9px">
+            <span style="width:7px;height:7px;border-radius:50%;flex:none;background:{% if c.obj.etapa_funil == 'topo' %}var(--info){% elif c.obj.etapa_funil == 'meio' %}var(--lampiao){% else %}var(--sucesso){% endif %}"></span>
+            {{ c.obj.etapa_funil|capfirst }}{% if c.obj.objetivo_tipo %} · {{ c.obj.get_objetivo_tipo_display }}{% endif %}
+          </span>
+        </div>
+        {% endif %}
         {% if c.canais %}
         <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px">
           {% for ch in c.canais %}<span style="font-size:11px;font-weight:700;letter-spacing:.03em;background:var(--superficie-2);color:var(--tinta-suave);border-radius:99px;padding:3px 8px">{{ ch }}</span>{% endfor %}

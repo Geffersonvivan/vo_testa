@@ -155,6 +155,8 @@ def _ficha_ctx(request, campanha):
         "canais_padrao": services.CANAIS_PADRAO,
         "eh_gerente": eh_gerente(request.user),
         "Fase": Campanha.Fase,
+        "Funil": Campanha.Funil,
+        "Objetivo": Campanha.Objetivo,
         "atual": "marketing",
     }
 
@@ -208,6 +210,17 @@ def salvar_campanha(request, pk):
             c.verba_prevista = services.parse_moeda(p.get("verba_prevista"))
         except Exception:  # noqa: BLE001
             pass
+    if "etapa_funil" in p:
+        c.etapa_funil = p.get("etapa_funil", "").strip()
+    if "objetivo_tipo" in p:
+        c.objetivo_tipo = p.get("objetivo_tipo", "").strip()
+    for campo in ("meta_valor", "realizado_valor"):
+        if campo in p:
+            bruto = (p.get(campo) or "").strip()
+            try:
+                setattr(c, campo, services.parse_moeda(bruto) if bruto else None)
+            except Exception:  # noqa: BLE001
+                setattr(c, campo, None)
     for campo in ("retro_funcionou", "retro_nao", "retro_diferente"):
         if campo in p:
             setattr(c, campo, p.get(campo, "").strip())
@@ -224,6 +237,17 @@ def marcar_check(request, pk, chave):
     services.garantir_itens(c)
     item = get_object_or_404(c.checks, chave=chave)
     services.marcar_item(item, request.user, feito=not item.feito)
+    return _pos_ficha(request, c)
+
+
+@never_cache
+@requer_modulo(Modulo.MARKETING)
+@require_POST
+def salvar_nota_check(request, pk, chave):
+    c = get_object_or_404(Campanha, pk=pk)
+    services.garantir_itens(c)
+    item = get_object_or_404(c.checks, chave=chave)
+    services.salvar_nota(item, request.POST.get("nota", ""))
     return _pos_ficha(request, c)
 
 

@@ -62,10 +62,35 @@ class Campanha(models.Model):
         NOAR = "noar", "No ar"
         ENCERRADA = "encerrada", "Encerrada"
 
+    class Funil(models.TextChoices):
+        TOPO = "topo", "Topo (descoberta)"
+        MEIO = "meio", "Meio (consideração)"
+        FUNDO = "fundo", "Fundo (conversão)"
+
+    class Objetivo(models.TextChoices):
+        LEADS = "leads", "Leads"
+        SEGUIDORES = "seguidores", "Seguidores"
+        ENGAJAMENTO = "engajamento", "Engajamento"
+        ALCANCE = "alcance", "Alcance"
+        TRAFEGO = "trafego", "Tráfego (cliques)"
+        VENDAS = "vendas", "Vendas / Reservas"
+        OUTRO = "outro", "Outro"
+
     nome = models.CharField("nome", max_length=140)
     objetivo = models.TextField("objetivo", blank=True)
     publico = models.CharField("público-alvo", max_length=140, blank=True)
     canais = models.JSONField("canais", default=list, blank=True)  # Instagram, Meta Ads…
+    # Etapa de funil + objetivo medível (meta × realizado; realizado manual por ora — depois
+    # puxa de: leads→Comercial, vendas/reservas→Reservas, seguidores/etc→Meta Ads).
+    etapa_funil = models.CharField(
+        "etapa de funil", max_length=5, choices=Funil.choices, blank=True)
+    objetivo_tipo = models.CharField(
+        "tipo de objetivo", max_length=12, choices=Objetivo.choices, blank=True)
+    meta_valor = models.DecimalField(
+        "meta", max_digits=12, decimal_places=2, null=True, blank=True)
+    realizado_valor = models.DecimalField(
+        "realizado", max_digits=12, decimal_places=2, null=True, blank=True,
+        help_text="Resultado alcançado (manual por enquanto).")
     inicio = models.DateField("início", null=True, blank=True)
     fim = models.DateField("fim", null=True, blank=True)
     fase = models.CharField("fase", max_length=14, choices=Fase.choices, default=Fase.IDEIA)
@@ -148,6 +173,25 @@ class Campanha(models.Model):
         resto = self.verba_travada - self.gasta
         return resto if resto > 0 else Decimal("0.00")
 
+    @property
+    def tem_objetivo_medivel(self) -> bool:
+        """Objetivo mensurável = tipo + meta definidos (satisfaz o portão da Proposta)."""
+        return bool(self.objetivo_tipo and self.meta_valor)
+
+    @property
+    def custo_por_resultado(self):
+        """Gasto ÷ realizado (R$ por lead/seguidor/reserva…). None se não dá pra calcular."""
+        if self.realizado_valor and self.realizado_valor > 0:
+            return (self.gasta / self.realizado_valor).quantize(Decimal("0.01"))
+        return None
+
+    @property
+    def progresso_objetivo(self):
+        """% da meta atingida (0–100+). None sem meta/realizado."""
+        if self.meta_valor and self.meta_valor > 0 and self.realizado_valor is not None:
+            return int((self.realizado_valor / self.meta_valor) * 100)
+        return None
+
 
 class PecaCampanha(models.Model):
     """Peça com DATA: é o que o calendário desenha e o que a equipe consulta hoje."""
@@ -211,6 +255,9 @@ class ItemChecklist(models.Model):
     arquivo = models.FileField(
         "evidência (anexo)", upload_to="marketing/checklist/", null=True, blank=True,
         help_text="Alguns itens só fecham com um arquivo anexado (referência, briefing, arte).")
+    nota = models.CharField(
+        "nota", max_length=280, blank=True,
+        help_text="Observação livre do responsável (opcional) — ex.: a base da verba.")
 
     class Meta:
         verbose_name = "item de checklist"

@@ -178,14 +178,58 @@ class PortoesTests(TestCase):
         c = Campanha.objects.create(
             nome="X", objetivo="obj", publico="pub", canais=["Instagram"],
             inicio=self.hoje, fim=self.hoje, verba_prevista=Decimal(verba),
+            objetivo_tipo=Campanha.Objetivo.LEADS, meta_valor=Decimal("50"),
             responsavel=self.user)
         services.avancar(c, self.user)  # Ideia → Proposta
-        services.garantir_itens(c)      # Proposta cobra 3 itens manuais (marcar)
-        for chave in ("objetivo_mensuravel", "publico_delimitado", "verba_base"):
+        services.garantir_itens(c)
+        # objetivo_mensuravel resolve sozinho (tipo+meta acima); os outros 2 são manuais.
+        for chave in ("publico_delimitado", "verba_base"):
             services.marcar_item(c.checks.get(chave=chave), self.user, feito=True)
         services.avancar(c, self.user)  # Proposta → Aprovação
         self.assertEqual(c.fase, Campanha.Fase.APROVACAO)
         return c
+
+    def test_nota_e_descricao_por_item(self):
+        from apps.marketing import services
+        c = Campanha.objects.create(
+            nome="Z", objetivo="obj", publico="pub", canais=["Instagram"],
+            inicio=self.hoje, fim=self.hoje, verba_prevista=Decimal("500"),
+            responsavel=self.user)
+        services.avancar(c, self.user)  # Ideia → Proposta
+        services.garantir_itens(c)
+        it = next(i for i in services.portao_da(c)["itens"] if i["chave"] == "verba_base")
+        self.assertTrue(it["descricao"])   # tem texto de tooltip
+        self.assertEqual(it["nota"], "")   # começa vazio
+        services.salvar_nota(c.checks.get(chave="verba_base"), "base no CPL anterior")
+        it = next(i for i in services.portao_da(c)["itens"] if i["chave"] == "verba_base")
+        self.assertEqual(it["nota"], "base no CPL anterior")
+        self.assertFalse(it["resolvido"])  # nota não fecha o item (só marcar/anexar/dispensar)
+
+    def test_objetivo_mensuravel_resolve_com_tipo_e_meta(self):
+        from apps.marketing import services
+        c = Campanha.objects.create(nome="F", fase=Campanha.Fase.PROPOSTA,
+                                    etapa_funil=Campanha.Funil.MEIO)
+        services.garantir_itens(c)
+        it = next(i for i in services.portao_da(c)["itens"]
+                  if i["chave"] == "objetivo_mensuravel")
+        self.assertFalse(it["resolvido"])   # sem tipo+meta → pendente
+        self.assertFalse(it["manual"])       # virou automático (não é mais checkbox)
+        c.objetivo_tipo = Campanha.Objetivo.LEADS
+        c.meta_valor = Decimal("40")
+        c.save()
+        it = next(i for i in services.portao_da(c)["itens"]
+                  if i["chave"] == "objetivo_mensuravel")
+        self.assertTrue(it["resolvido"])     # tipo+meta → resolve sozinho
+
+    def test_custo_por_resultado_e_progresso(self):
+        c = Campanha.objects.create(nome="G", objetivo_tipo=Campanha.Objetivo.LEADS,
+                                    meta_valor=Decimal("50"), realizado_valor=Decimal("40"))
+        self.assertEqual(c.progresso_objetivo, 80)                 # 40/50
+        self.assertEqual(c.custo_por_resultado, Decimal("0.00"))   # gasta=0 (sem anúncio)
+        c.realizado_valor = None
+        c.save()
+        self.assertIsNone(c.custo_por_resultado)
+        self.assertIsNone(c.progresso_objetivo)
 
     def test_avancar_bloqueia_sem_o_portao_e_nao_grava(self):
         from django.core.exceptions import ValidationError
@@ -233,10 +277,11 @@ class PortoesTests(TestCase):
 
     def test_dispensar_item_obrigatorio_permite_avancar(self):
         from apps.marketing import services
-        # Proposta: 3 itens obrigatórios. Marca 2 e dispensa o 3º → libera o avanço.
-        c = Campanha.objects.create(nome="Z", fase=Campanha.Fase.PROPOSTA)
+        # Proposta: 3 obrigatórios. objetivo_mensuravel resolve via tipo+meta; marca 1 e
+        # dispensa o 3º → libera o avanço.
+        c = Campanha.objects.create(nome="Z", fase=Campanha.Fase.PROPOSTA,
+                                    objetivo_tipo=Campanha.Objetivo.LEADS, meta_valor=Decimal("50"))
         services.garantir_itens(c)
-        services.marcar_item(c.checks.get(chave="objetivo_mensuravel"), self.user, feito=True)
         services.marcar_item(c.checks.get(chave="publico_delimitado"), self.user, feito=True)
         services.dispensar_item(c.checks.get(chave="verba_base"), self.user, "não se aplica")
         services.avancar(c, self.user)

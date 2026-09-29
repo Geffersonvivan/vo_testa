@@ -168,7 +168,8 @@ PORTOES = {
         ("justifica", "Oportunidade ou data que justifica", False, None, None, False),
     ],
     Campanha.Fase.PROPOSTA: [
-        ("objetivo_mensuravel", "Objetivo mensurável definido", True, None, None, False),
+        ("objetivo_mensuravel", "Objetivo mensurável definido", True,
+         lambda c: c.tem_objetivo_medivel, lambda c: "Objetivo + meta definidos", False),
         ("publico_delimitado", "Público-alvo delimitado", True, None, None, False),
         ("verba_base", "Verba estimada com base em quê", True, None, None, False),
         ("referencia_visual", "Referência visual ou de campanha anterior", False, None, None, True),
@@ -187,6 +188,29 @@ PORTOES = {
         ("retro", "Retrospectiva preenchida", True, _retro_completa, None, False),
     ],
     Campanha.Fase.ENCERRADA: [],
+}
+
+
+# Explicação curta de cada critério — aparece no tooltip (ⓘ) ao passar o mouse.
+DESCRICOES = {
+    "objetivo": "Descreva a ideia da campanha em uma frase clara: o que é e para quê.",
+    "justifica": "Uma oportunidade, sazonalidade ou data que justifica rodar agora "
+                 "(ex.: feriado, inauguração, promoção).",
+    "objetivo_mensuravel": "Uma meta com número: ex. «gerar 50 leads» ou «R$ X em reservas». "
+                           "Sem número não dá para medir o resultado.",
+    "publico_delimitado": "Para quem é o anúncio: região, perfil, interesse. "
+                          "Quanto mais específico, melhor o resultado e menor o custo.",
+    "verba_base": "Quanto investir e com base em quê (ex.: custo por lead da campanha "
+                  "anterior, teto do mês, ticket médio).",
+    "referencia_visual": "Anexe uma arte, vídeo ou campanha anterior que sirva de "
+                         "referência para o criativo. Só fecha com arquivo.",
+    "pecas": "Liste as peças/entregáveis: posts, stories, vídeo, criativo do anúncio.",
+    "briefing": "Briefing enviado a quem vai criar as peças (o que comunicar, tom, formatos). "
+                "Só fecha com arquivo.",
+    "criativo": "Quem é o responsável pela criação das peças.",
+    "pecas_prontas": "Todas as peças planejadas finalizadas e aprovadas.",
+    "arte_final": "Anexe a arte final aprovada, pronta para publicar. Só fecha com arquivo.",
+    "retro": "Retrospectiva: o que funcionou, o que não, e o aprendizado para a próxima.",
 }
 
 
@@ -243,6 +267,8 @@ def portao_da(campanha) -> dict:
             "manual": (auto is None and not pede_arquivo),
             "pede_arquivo": pede_arquivo, "arquivo_nome": arquivo_nome,
             "meta": meta_txt,
+            "descricao": DESCRICOES.get(chave, ""),
+            "nota": (row.nota if row else ""),
         })
     prox = proxima_fase(campanha.fase)
     if prox is None:
@@ -276,6 +302,13 @@ def marcar_item(item, usuario, feito=True):
     item.por = usuario
     item.em = timezone.now() if feito else None
     item.save()
+    return item
+
+
+def salvar_nota(item, texto):
+    """Observação livre do item (opcional). Não interfere no portão (marcar/dispensar)."""
+    item.nota = (texto or "").strip()[:280]
+    item.save(update_fields=["nota"])
     return item
 
 

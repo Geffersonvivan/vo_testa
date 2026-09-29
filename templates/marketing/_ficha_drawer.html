@@ -24,7 +24,37 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
   .fx-btn[disabled]{opacity:.5;cursor:default}
   .fx-btn-n{height:38px;padding:0 15px;border-radius:12px;border:1px solid var(--fio);background:var(--superficie);color:var(--tinta);font-weight:700;font-size:13px;cursor:pointer}
   .fx-kpi{padding:12px 14px;border-radius:14px;background:var(--superficie-2);border:1px solid var(--fio)}
+  /* ⓘ (o balão é um elemento único no body, posicionado por JS — nunca corta) */
+  .fx-info{flex:none;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;color:var(--tinta-suave);cursor:help}
+  .fx-info svg{width:14px;height:14px}
+  #fx-tip{position:fixed;z-index:9999;max-width:260px;padding:8px 11px;background:var(--tinta);color:var(--superficie);font-size:12px;font-weight:500;line-height:1.4;border-radius:10px;box-shadow:var(--sombra-cartao);white-space:normal;text-align:left;pointer-events:none;opacity:0;transition:opacity .1s ease;display:none}
+  /* Nota opcional por item */
+  .fx-nota{width:100%;box-sizing:border-box;background:var(--superficie);border:1px dashed var(--fio-forte);border-radius:9px;padding:6px 9px;font-size:12.5px;color:var(--tinta)}
+  .fx-nota:focus{border-style:solid;outline:none}
 </style>
+<script>
+(function(){
+  if (window.__fxTipInit) return;            // uma vez só (sobrevive aos swaps do HTMX)
+  window.__fxTipInit = true;
+  var tip = document.getElementById('fx-tip');
+  if (!tip){ tip = document.createElement('div'); tip.id = 'fx-tip'; document.body.appendChild(tip); }
+  function show(el){
+    var t = el.getAttribute('data-tip'); if(!t) return;
+    tip.textContent = t; tip.style.display = 'block';
+    var r = el.getBoundingClientRect(), m = 8;
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    var left = Math.max(m, Math.min(r.left + r.width/2 - tw/2, window.innerWidth - tw - m));
+    var top = r.top - th - 8;
+    if (top < m) top = r.bottom + 8;         // não cabe em cima → embaixo
+    tip.style.left = left+'px'; tip.style.top = top+'px'; tip.style.opacity = '1';
+  }
+  function hide(){ tip.style.opacity = '0'; }
+  document.addEventListener('mouseover', function(e){ var el = e.target.closest && e.target.closest('.fx-info'); if(el) show(el); });
+  document.addEventListener('mouseout',  function(e){ var el = e.target.closest && e.target.closest('.fx-info'); if(el) hide(); });
+  document.addEventListener('focusin',   function(e){ var el = e.target.closest && e.target.closest('.fx-info'); if(el) show(el); });
+  document.addEventListener('focusout',  hide);
+})();
+</script>
 
 <div onclick="document.getElementById('ficha-slot').innerHTML=''"
      style="position:fixed;inset:0;background:rgba(4,21,31,.42);z-index:80"></div>
@@ -46,12 +76,14 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
         <textarea class="fx-in" name="objetivo" rows="2" placeholder="Em uma frase: o que esta campanha precisa conseguir">{{ c.objetivo }}</textarea>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <input class="fx-in" type="text" name="publico" value="{{ c.publico }}" placeholder="Público-alvo" style="flex:1;min-width:150px">
-          <input class="fx-in" type="date" name="inicio" value="{{ c.inicio|date:'Y-m-d' }}" style="width:140px">
-          <span style="font-size:12px;color:var(--tinta-suave)">a</span>
-          <input class="fx-in" type="date" name="fim" value="{{ c.fim|date:'Y-m-d' }}" style="width:140px">
+          <div style="display:flex;align-items:center;gap:8px;flex:none">
+            <input class="fx-in" type="date" name="inicio" value="{{ c.inicio|date:'Y-m-d' }}" style="width:138px">
+            <span style="font-size:12px;color:var(--tinta-suave)">a</span>
+            <input class="fx-in" type="date" name="fim" value="{{ c.fim|date:'Y-m-d' }}" style="width:138px">
+          </div>
         </div>
         <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:2px">
-          <span class="fx-lb">VERBA PREVISTA</span>
+          <span class="fx-lb" style="display:inline-flex;align-items:center;gap:5px">VERBA PREVISTA{% include "marketing/_info.html" with tip="Quanto você planeja investir. Vira ‘travada’ (sai do teto do mês) quando a campanha é aprovada." %}</span>
           <input class="fx-in num js-moeda" type="text" name="verba_prevista" value="{{ c.verba_prevista|intcomma_brl }}" style="width:132px">
           <span style="font-size:11.5px;color:var(--tinta-suave)">sai do teto do mês quando for aprovada</span>
           <button class="fx-btn-n" type="submit" style="height:32px">Salvar dados</button>
@@ -65,7 +97,7 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
 
     {# Canais como pílulas (toggle) #}
     <div style="margin-top:12px">
-      <span class="fx-lb">CANAIS</span>
+      <span class="fx-lb" style="display:inline-flex;align-items:center;gap:5px">CANAIS{% include "marketing/_info.html" with tip="Onde a campanha vai rodar (Instagram, Meta Ads, Google…). Clique para ligar/desligar cada canal." %}</span>
       <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">
         {% for canal in canais_padrao %}
         <form hx-post="{% url 'marketing:alternar_canal' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML" style="display:inline">
@@ -88,18 +120,68 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
 
     {# KPIs: travada / gasta / disponível (da campanha) #}
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px">
-      <div class="fx-kpi"><div class="fx-lb">TRAVADA</div>
+      <div class="fx-kpi"><div class="fx-lb" style="display:flex;align-items:center;gap:5px">TRAVADA{% include "marketing/_info.html" with tip="Verba já comprometida com esta campanha (reservada do teto do mês na aprovação)." %}</div>
         <div class="num" style="margin-top:5px;font-family:var(--fonte-titulo);font-size:16px;font-weight:700;color:var(--alerta)">{{ c.verba_travada|intcomma_brl }}</div></div>
-      <div class="fx-kpi"><div class="fx-lb">GASTA</div>
+      <div class="fx-kpi"><div class="fx-lb" style="display:flex;align-items:center;gap:5px">GASTA{% include "marketing/_info.html" with tip="Quanto já foi efetivamente gasto nos anúncios desta campanha." %}</div>
         <div class="num" style="margin-top:5px;font-family:var(--fonte-titulo);font-size:16px;font-weight:700;color:var(--perigo)">{{ c.gasta|intcomma_brl }}</div></div>
-      <div class="fx-kpi"><div class="fx-lb">DISPONÍVEL</div>
+      <div class="fx-kpi"><div class="fx-lb" style="display:flex;align-items:center;gap:5px">DISPONÍVEL{% include "marketing/_info.html" with tip="Verba travada que ainda não foi gasta — volta ao teto do mês se a campanha encerrar." %}</div>
         <div class="num" style="margin-top:5px;font-family:var(--fonte-titulo);font-size:16px;font-weight:700;color:var(--tinta)">{{ c.sobra_travada|intcomma_brl }}</div></div>
     </div>
+
+    {# ── Funil & objetivo ── #}
+    <h3 class="fx-h3" style="display:flex;align-items:center;gap:6px">Funil &amp; objetivo{% include "marketing/_info.html" with tip="A etapa do funil em que a campanha atua e o resultado que persegue. Alimenta o portão (objetivo mensurável) e os relatórios de custo por resultado." %}</h3>
+    <p class="fx-sub">Em que etapa do funil a campanha atua e o resultado que persegue — alimenta o portão e os relatórios.</p>
+    <form hx-post="{% url 'marketing:salvar_campanha' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML" hx-trigger="change"
+          style="display:flex;flex-direction:column;gap:11px;margin-bottom:20px">
+      {% csrf_token %}
+      <div>
+        <span class="fx-lb" style="display:inline-flex;align-items:center;gap:5px">ETAPA DE FUNIL{% include "marketing/_info.html" with tip="Topo (descoberta/alcance), Meio (consideração/leads) ou Fundo (conversão/vendas). Define o tipo de objetivo esperado." %}</span>
+        <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:7px">
+          {% for val, rot in Funil.choices %}
+          <label class="fx-chip {% if c.etapa_funil == val %}on{% endif %}" style="cursor:pointer">
+            <input type="radio" name="etapa_funil" value="{{ val }}" {% if c.etapa_funil == val %}checked{% endif %} style="position:absolute;opacity:0;width:0;height:0">{{ rot }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+        <div style="flex:1;min-width:150px">
+          <span class="fx-lb" style="display:inline-flex;align-items:center;gap:5px">OBJETIVO{% include "marketing/_info.html" with tip="O resultado principal que a campanha persegue (leads, seguidores, vendas…). É o ‘objetivo mensurável’ que o portão da Proposta cobra." %}</span>
+          <select name="objetivo_tipo" class="fx-sel" style="width:100%;margin-top:5px">
+            <option value="">— escolher —</option>
+            {% for val, rot in Objetivo.choices %}
+            <option value="{{ val }}" {% if c.objetivo_tipo == val %}selected{% endif %}>{{ rot }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div style="width:108px">
+          <span class="fx-lb" style="display:inline-flex;align-items:center;gap:5px">META{% include "marketing/_info.html" with tip="O número que você quer atingir (ex.: 50 leads, 1.000 seguidores, 10 reservas)." %}</span>
+          <input class="fx-in num" type="text" inputmode="decimal" name="meta_valor" value="{{ c.meta_valor|default_if_none:'' }}" placeholder="ex.: 50" style="margin-top:5px">
+        </div>
+        <div style="width:108px">
+          <span class="fx-lb" style="display:inline-flex;align-items:center;gap:5px">REALIZADO{% include "marketing/_info.html" with tip="O resultado alcançado. Manual por enquanto; depois puxa de Comercial (leads), Reservas (vendas) e Meta (seguidores/etc). Base do custo por resultado." %}</span>
+          <input class="fx-in num" type="text" inputmode="decimal" name="realizado_valor" value="{{ c.realizado_valor|default_if_none:'' }}" placeholder="—" style="margin-top:5px">
+        </div>
+      </div>
+      <p class="fx-sub" style="margin:0">Sugestão — <b>Topo</b>: alcance/seguidores/engajamento · <b>Meio</b>: leads/cliques · <b>Fundo</b>: vendas/reservas. O realizado é manual por ora (depois puxa de Comercial/Reservas/Meta).</p>
+      {% if c.progresso_objetivo is not None or c.custo_por_resultado is not None %}
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;padding:10px 13px;border-radius:12px;background:var(--superficie-2);border:1px solid var(--fio)">
+        {% if c.progresso_objetivo is not None %}
+        <div><span class="fx-lb" style="display:inline-flex;align-items:center;gap:5px">META × REALIZADO{% include "marketing/_info.html" with tip="Progresso rumo à meta: realizado ÷ meta (em %)." %}</span>
+          <div class="num" style="font-family:var(--fonte-titulo);font-size:15px;font-weight:700;color:var(--tinta);margin-top:3px">{{ c.realizado_valor|floatformat:'-2' }} / {{ c.meta_valor|floatformat:'-2' }} · {{ c.progresso_objetivo }}%</div></div>
+        {% endif %}
+        {% if c.custo_por_resultado is not None %}
+        <div><span class="fx-lb" style="display:inline-flex;align-items:center;gap:5px">CUSTO POR RESULTADO{% include "marketing/_info.html" with tip="Gasto ÷ realizado — quanto custou cada lead/seguidor/venda." %}</span>
+          <div class="num" style="font-family:var(--fonte-titulo);font-size:15px;font-weight:700;color:var(--tinta);margin-top:3px">R$ {{ c.custo_por_resultado|intcomma_brl }}</div></div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </form>
 
     {# ── Portão da fase ── #}
     {% if portao.total or portao.eh_aprovacao %}
     <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin-bottom:4px">
-      <h3 class="fx-h3" style="margin:0">Para sair de {{ portao.fase_nome }}</h3>
+      <h3 class="fx-h3" style="margin:0;display:flex;align-items:center;gap:6px">Para sair de {{ portao.fase_nome }}{% include "marketing/_info.html" with tip="Os critérios que esta fase exige para avançar. Item obrigatório em aberto trava o botão de avançar; a gerência pode dispensar com motivo." %}</h3>
       {% if portao.total %}<span style="font-size:11.5px;font-weight:700;color:{% if portao.pode_avancar %}var(--musgo){% else %}var(--perigo){% endif %}">{{ portao.feitos }}/{{ portao.total }}</span>{% endif %}
     </div>
     {% if portao.eh_aprovacao %}
@@ -120,6 +202,7 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
           <span style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap">
             <span style="font-size:13px;font-weight:600;color:{% if it.resolvido %}var(--tinta-suave){% else %}var(--tinta){% endif %}">{{ it.rotulo }}</span>
             {% if it.obrigatorio %}<span class="fx-obrig">OBRIGATÓRIO</span>{% endif %}
+            {% if it.descricao %}<span class="fx-info" data-tip="{{ it.descricao }}" tabindex="0" aria-label="{{ it.descricao }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg></span>{% endif %}
           </span>
           {% if it.meta %}<span style="display:flex;align-items:center;gap:5px;margin-top:3px;font-size:11px;color:var(--tinta-suave)">{% if it.pede_arquivo and it.arquivo_nome %}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;flex:none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>{% endif %}{{ it.meta }}</span>{% endif %}
           {% if it.pede_arquivo and not it.resolvido and not it.dispensado %}
@@ -132,6 +215,10 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
             </label>
           </form>
           {% endif %}
+          <form hx-post="{% url 'marketing:salvar_nota' c.pk it.chave %}" hx-target="#ficha-slot" hx-swap="innerHTML" hx-trigger="change" style="display:block;margin-top:6px">
+            {% csrf_token %}
+            <input type="text" name="nota" value="{{ it.nota }}" maxlength="280" placeholder="Nota (opcional)…" class="fx-nota">
+          </form>
         </span>
         {% if eh_gerente and not it.resolvido %}
         <form hx-post="{% url 'marketing:dispensar_check' c.pk it.chave %}" hx-target="#ficha-slot" hx-swap="innerHTML"
@@ -146,7 +233,7 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
     {% endif %}
 
     {# ── Etapas desta campanha ── #}
-    <h3 class="fx-h3">Etapas desta campanha</h3>
+    <h3 class="fx-h3" style="display:flex;align-items:center;gap:6px">Etapas desta campanha{% include "marketing/_info.html" with tip="Tarefas de execução da campanha (quem faz o quê, com prazo). Organizam o trabalho — não travam o portão." %}</h3>
     <p class="fx-sub">O que é só desta campanha. Não trava o portão — organiza quem faz o quê.</p>
     <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:9px">
       {% for e in etapas %}
@@ -176,7 +263,7 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
     </form>
 
     {# ── Quem está envolvido ── #}
-    <h3 class="fx-h3">Quem está envolvido</h3>
+    <h3 class="fx-h3" style="display:flex;align-items:center;gap:6px">Quem está envolvido{% include "marketing/_info.html" with tip="Os papéis da campanha: solicitante, responsável e criação. Organiza quem cuida do quê — não trava o portão." %}</h3>
     <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:22px">
       {% for e in envolvidos %}
       <div class="fx-row" style="align-items:center">
@@ -203,7 +290,7 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
     </div>
 
     {# ── Conversa ── #}
-    <h3 class="fx-h3">Conversa</h3>
+    <h3 class="fx-h3" style="display:flex;align-items:center;gap:6px">Conversa{% include "marketing/_info.html" with tip="Trilha de decisões da campanha — registre combinados, dúvidas e o porquê das escolhas." %}</h3>
     <p class="fx-sub">O que foi decidido fica aqui, junto da campanha — não no WhatsApp.</p>
     {% if not conversa %}<p style="margin:0 0 12px;font-size:12.5px;color:var(--tinta-suave)">Ninguém comentou ainda.</p>{% endif %}
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
@@ -226,7 +313,7 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
     </form>
 
     {# ── Aquisição ── #}
-    <h3 class="fx-h3">Aquisição</h3>
+    <h3 class="fx-h3" style="display:flex;align-items:center;gap:6px">Aquisição{% include "marketing/_info.html" with tip="Os leads que a campanha gerou (fonte única: o funil do Comercial), incluindo ganhos e perdas por motivo." %}</h3>
     <div class="fx-sec">
       <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px">
         <span>Total <b>{{ aq.total }}</b></span><span>Abertos <b>{{ aq.abertos }}</b></span>
@@ -239,7 +326,7 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
     </div>
 
     {# ── Peças ── #}
-    <h3 class="fx-h3">Peças</h3>
+    <h3 class="fx-h3" style="display:flex;align-items:center;gap:6px">Peças{% include "marketing/_info.html" with tip="Os entregáveis com data (posts, stories, vídeo, arte do anúncio). É o que o calendário desenha." %}</h3>
     {% if not c.pecas.all %}<p class="fx-sub">Nenhuma peça ainda — a Estruturação exige pelo menos uma.</p>{% endif %}
     <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:9px">
       {% for p in c.pecas.all %}
@@ -269,7 +356,7 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
     </form>
 
     {# ── Lançar gasto ── #}
-    <h3 class="fx-h3">Lançar gasto</h3>
+    <h3 class="fx-h3" style="display:flex;align-items:center;gap:6px">Lançar gasto{% include "marketing/_info.html" with tip="Registre um gasto real da campanha. Soma no ‘Gasta’ e entra no cálculo do custo por resultado." %}</h3>
     <form hx-post="{% url 'marketing:lancar_gasto' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML"
           style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
       {% csrf_token %}
@@ -280,7 +367,7 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
     <p style="margin:0 0 22px;font-size:11.5px;color:var(--tinta-suave)">Gasto acumulado: <b class="num">{{ c.gasta|intcomma_brl }}</b> — entra no relatório do mês em que o dinheiro saiu.</p>
 
     {# ── Retrospectiva ── #}
-    <h3 class="fx-h3">Retrospectiva</h3>
+    <h3 class="fx-h3" style="display:flex;align-items:center;gap:6px">Retrospectiva{% include "marketing/_info.html" with tip="Aprendizados ao encerrar: o que funcionou, o que não, e o que fazer diferente na próxima." %}</h3>
     <p class="fx-sub">Exigida para encerrar a campanha.</p>
     <form hx-post="{% url 'marketing:salvar_campanha' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML"
           style="display:grid;gap:9px;margin-bottom:12px">
