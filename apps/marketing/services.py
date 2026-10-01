@@ -124,8 +124,9 @@ from django.db import transaction  # noqa: E402
 
 from .models import Campanha as _Camp, Comentario, EtapaCampanha, ItemChecklist  # noqa: E402
 
-# Canais oferecidos como pílulas na ficha (o protótipo mostra estes cinco).
-CANAIS_PADRAO = ["Instagram", "Meta Ads", "Google", "WhatsApp", "E-mail"]
+# Canais oferecidos como pílulas na ficha.
+CANAIS_PADRAO = ["Instagram", "Meta Ads", "Google", "WhatsApp", "E-mail",
+                 "LPs", "Influenciadores", "Mídia Offline"]
 
 # Ordem do funil — cada fase "avança" para a próxima (encerrada é terminal).
 ORDEM_FASES = [
