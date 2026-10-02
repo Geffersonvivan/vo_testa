@@ -373,6 +373,23 @@ class CalendarioTests(TestCase):
         self.assertEqual(c.pecas.count(), 1)
         self.assertEqual(c.pecas.first().nome, "Reel")
 
+    def test_barra_posicionada_por_data_com_ponto_decimal(self):
+        # Regressão: a localização pt-BR formatava "left:80,65%" (vírgula), CSS inválido,
+        # e a barra caía para a esquerda. Tem que sair com PONTO e na posição da vigência.
+        import re
+        from datetime import date
+        Campanha.objects.create(nome="Influê No Rolê",
+                                inicio=date(2026, 10, 26), fim=date(2026, 11, 3))
+        r = self.client.get("/crm/marketing/calendario/?vista=mes&ano=2026&mes=10")
+        html = r.content.decode()
+        self.assertIn("left:80.65%", html)          # dia 26 de 31 → 80.65%, com ponto
+        # Nenhuma posição pode sair com vírgula decimal.
+        self.assertIsNone(re.search(r"(left|width|top):\d+,\d+(%|px)", html))
+        # Nenhum comentário de template pode vazar (o {# #} multi-linha renderiza o
+        # literal "{#"…"#}" na tela — este guarda pega qualquer um deles).
+        self.assertNotIn("{#", html)
+        self.assertIn('data-nome="Influê No Rolê"', html)  # nome instantâneo no toque
+
 
 class RelatorioTests(TestCase):
     def setUp(self):
