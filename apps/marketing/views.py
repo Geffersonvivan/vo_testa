@@ -225,7 +225,9 @@ def salvar_campanha(request, pk):
         if campo in p:
             setattr(c, campo, p.get(campo, "").strip())
     c.save()
-    messages.success(request, "Campanha salva.")
+    # Autosave (change) é silencioso; só o clique explícito em "Salvar dados" avisa.
+    if "salvar" in p:
+        messages.success(request, "Campanha salva.")
     return _pos_ficha(request, c)
 
 

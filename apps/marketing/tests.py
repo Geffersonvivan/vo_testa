@@ -781,6 +781,29 @@ class FichaCompletaTests(TestCase):
         self.c.save()
         self.assertTrue(services.portao_da(self.c)["pode_avancar"])
 
+    def test_autosave_objetivo_libera_portao_sem_clicar_salvar(self):
+        # Autosave (change, sem a chave "salvar") grava o objetivo e abre o portão —
+        # era o que travava: preencher "Em uma frase" e o item ficar vermelho.
+        from apps.marketing import services
+        r = self.client.post(self._url("salvar/"),
+                             {"objetivo": "Flyer de apresentação para equipe comercial"},
+                             HTTP_HX_REQUEST="true")
+        self.assertEqual(r.status_code, 200)
+        self.c.refresh_from_db()
+        self.assertEqual(self.c.objetivo, "Flyer de apresentação para equipe comercial")
+        self.assertTrue(services.portao_da(self.c)["pode_avancar"])
+
+    def test_autosave_e_silencioso_salvar_explicito_avisa(self):
+        # Autosave não deve enfileirar toast a cada campo (senão estouram no próximo
+        # load); só o clique em "Salvar dados" avisa. (O parcial não renderiza o toast;
+        # checamos a fila de mensagens direto.)
+        from django.contrib.messages import get_messages
+        r = self.client.post(self._url("salvar/"), {"objetivo": "x"}, HTTP_HX_REQUEST="true")
+        self.assertEqual(len(list(get_messages(r.wsgi_request))), 0)
+        r = self.client.post(self._url("salvar/"), {"objetivo": "x", "salvar": "1"},
+                             HTTP_HX_REQUEST="true")
+        self.assertEqual(len(list(get_messages(r.wsgi_request))), 1)
+
 
 class CincoCorrecoesTests(TestCase):
     """As 5 correções: só-meus (4 vínculos), sem papel, ordem, moeda, canal no atraso."""
