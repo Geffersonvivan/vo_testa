@@ -14,6 +14,7 @@ urlpatterns = [
     path("webhook/", views.webhook, name="webhook"),
     path("<int:pk>/", views.detalhe, name="detalhe"),
     path("<int:pk>/simular/", views.simular, name="simular"),
+    path("<int:pk>/confirmar-recebimento/", views.confirmar_recebimento, name="confirmar_recebimento"),
     path("<int:pk>/cancelar/", views.cancelar, name="cancelar"),
     path("<int:pk>/estornar/", views.estornar, name="estornar"),
     # Link público de pagamento

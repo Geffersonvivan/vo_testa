@@ -1,11 +1,61 @@
 # Implementar Safrapay (pagamento online)
 
-Estado: **código pronto** (Pix, cartão e boleto batem na API HML de verdade; webhook
-confirma a reserva; site já cria a cobrança e mostra "Pagar agora"). O gargalo é o
-**processo de homologação com a Safrapay** — não é programação.
+Estado: **código pronto e os 3 meios VALIDADOS na HML** (Pix, cartão e boleto batem na
+API de verdade; **cartão autoriza e captura** com os cartões homologados; webhook confirma
+a reserva; site já cria a cobrança e mostra "Pagar agora"). O gargalo é o **processo de
+homologação com a Safrapay** — não é programação.
 
 > **Atalho para acelerar:** não espere o cartão. **Pix já está 100%.** Assim que o Token
 > chegar, dá para vender no site por Pix imediatamente; cartão e boleto vêm logo atrás.
+
+## Pix direto (fora do PSP) — implementado 01/10/2026
+
+Opção para **não pagar taxa de adquirente no Pix**: as cobranças Pix saem por um **BR Code
+gerado localmente** (padrão BACEN/EMV) a partir da chave da própria pousada — sem passar
+pela Safrapay. **Cartão e boleto continuam pela Safrapay** normalmente. Como não há PSP,
+**não há webhook**: a confirmação é **manual** (a recepção confere o extrato e dá baixa).
+
+- **Ligar:** no `.env` → `PIX_DIRETO=1` + `PIX_CHAVE=<chave da pousada>` (CNPJ/e-mail/
+  telefone/aleatória) + `PIX_RECEBEDOR_NOME` + `PIX_RECEBEDOR_CIDADE`.
+- **Fluxo:** cobrança Pix → página pública mostra QR + copia-e-cola; hóspede paga no app do
+  banco e toca "Já paguei" (só **avisa** a recepção). Recepção abre a cobrança no CRM →
+  **"Confirmar recebimento do Pix"** → confirma o pagamento (e a reserva, se for sinal).
+- **Código:** `apps/pagamentos/pix_br.py` (gerador EMV + CRC-16/CCITT), roteado em
+  `services.criar_cobranca` (`gateway = "pix_direto"`); view `confirmar_recebimento`.
+  Testes: `PixBRCodeTests`, `PixDiretoTests`.
+- Desligado (`PIX_DIRETO=0`, default) → Pix volta a sair pelo `PAGAMENTOS_GATEWAY`.
+
+## Homologação do cartão — CONCLUÍDA do nosso lado (01/10/2026)
+
+A Safrapay (último e-mail) confirmou que o **antifraude deles está OK** e pediu "um novo
+teste enviando todos os dados obrigatórios". Feito: rodamos a bateria completa pela nossa
+integração contra a API HML, enviando o pacote antifraude inteiro (`remoteIp`,
+`charge.sessionId`, `customer.phone/address`, `card.brand/cardholderDocument/
+billingAddress/isPrivateLabel`).
+
+**Resultado (estabelecimento HOMOL EC 1001188):**
+
+- **6 cartões da tabela aprovados** a R$ 16,00 → `Authorized / Captured`
+  (MC `5502093769921690`, MC `5502091221618516`, ELO `6277800000002390`,
+  VISA `4444585001234562`, VISA `4444585006543215`, AMEX `375177012458884`).
+- **ELO e AMEX a R$ 3,33** → `NotAuthorized / Denied` (caminho de recusa da tabela).
+- **Pix** (EMV copia-e-cola) e **boleto** (linha digitável) criados na mesma rodada.
+
+Confirmado que a API aceita o CVV tanto como `securityCode` quanto `cvv` (ambos
+`Authorized/Captured`). O cartão genérico `4111…` continua recusado — use os homologados.
+
+**Evidências para enviar** (pasta `evidencias/safrapay/`):
+- `evidencias-safrapay-2026-10-01.json` — 10 transações com `merchantChargeId`,
+  `sessionId`, `chargeId` e status de cada uma.
+- `Resposta_Safrapay_2026-10-01.md` — texto do e-mail de resposta + tabela de IDs.
+
+Regerar a qualquer momento: a tela **Pagamentos → Safrapay → «Gerar evidências»**
+(`gerar_evidencias`) cria Pix + cartão + boleto; a bateria dos 6 cartões foi rodada via
+`GatewaySafrapay` direto na HML.
+
+**Suíte do projeto:** `manage.py test` → **715 testes OK** (skipped=8) em 01/10/2026,
+incluindo os 39 de `apps.pagamentos` (fluxo da página, JSON do webhook, idempotência,
+PAN não persistido, rate limit, segurança do webhook).
 
 ---
 
@@ -44,19 +94,20 @@ confirmam; **Denied/NotAuthorized/desconhecido não confirmam**.
 
 ## Caminho crítico (o que destrava tudo)
 
-### Passo 1 — Gerar e enviar o pacote de evidências  ⛔ **ainda não foi feito — fazer agora**
+### Passo 1 — Gerar e enviar o pacote de evidências  ✅ **evidências geradas (01/10/2026) — falta só ENVIAR o e-mail**
 
-A Safrapay **só libera o Token** depois de receber evidências de teste (Pix + cartão +
-boleto no formato HML). Como fazer:
+A Safrapay pede as evidências de teste (Pix + cartão + boleto na HML) antes de avançar a
+homologação. Estado:
 
-1. Entrar no CRM em **Pagamentos → Safrapay** (`/crm/pagamentos/safrapay/`).
-2. Clicar em **«Gerar evidências (Pix + cartão + boleto)»** — o CRM cria 3 cobranças no
-   sandbox e monta o **JSON no formato HML** + prints.
-3. **Baixar o JSON** e os prints.
-4. **Anexar no formulário de integração da Safrapay** (ou enviar no e-mail de integração
-   que eles indicarem). É este envio que dispara a liberação.
+1. ✅ Bateria rodada contra a HML (10 transações: 6 cartões aprovados, 2 recusados, Pix,
+   boleto) — IDs em `evidencias/safrapay/evidencias-safrapay-2026-10-01.json`.
+2. ✅ E-mail de resposta redigido — `evidencias/safrapay/Resposta_Safrapay_2026-10-01.md`.
+3. ⛔ **Enviar** o e-mail (texto pronto) + anexar o JSON, respondendo o último e-mail deles.
+4. As transações já aparecem no painel HML (Visão geral de transações, EC 1001188).
 
-> Mantenha `PAGAMENTOS_GATEWAY=simulado` enquanto o Token não existir.
+> Em **produção** mantenha `PAGAMENTOS_GATEWAY=simulado` enquanto o Token de prod não
+> existir (hoje o Railway está em `simulado` — correto). O `.env` **local** já está em
+> `safrapay`/HML para os testes.
 
 ### Passo 2 — Homologação assistida  ⛔ *depende deles*
 
@@ -114,11 +165,12 @@ Validar em HML → **primeira venda por Pix sai imediatamente** → depois cart�
 
 ## Checklist rápido
 
-- [ ] **Gerar evidências no CRM e enviar à Safrapay** ← próximo passo real
-- [ ] Receber o Token (Developers → Keys)
-- [ ] `.env`: `PAGAMENTOS_GATEWAY=safrapay` + credenciais + `SAFRAPAY_ENV=hml`
-- [ ] Cadastrar webhook `/crm/pagamentos/webhook/` no painel
-- [ ] Testar Pix em HML → ligar; depois cartão e boleto
-- [ ] Virar `SAFRAPAY_ENV=prod` após validação
+- [x] Gerar evidências (Pix + cartão + boleto) na HML — 01/10/2026
+- [x] Validar cartão (6 homologados aprovados + recusa) na HML — 01/10/2026
+- [ ] **Enviar o e-mail de resposta + JSON à Safrapay** ← próximo passo real
+- [ ] Receber o Token de **produção** (Developers → Keys)
+- [ ] Railway (produção): `PAGAMENTOS_GATEWAY=safrapay` + credenciais + `SAFRAPAY_ENV=prod`
+- [ ] Cadastrar webhook `/crm/pagamentos/webhook/` no painel Safrapay
+- [ ] Primeira venda real por Pix → depois cartão e boleto
 
 _Relacionado: tela `Pagamentos → Safrapay` (checklist ao vivo via `status_credenciais`)._

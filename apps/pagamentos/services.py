@@ -5,6 +5,7 @@ reserva (via reservas.services). Estorno pelo gateway. Tudo auditado por eventos
 """
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
@@ -34,7 +35,11 @@ def criar_cobranca(operador, *, valor, metodo, descricao, finalidade=Cobranca.Fi
         descricao=descricao, finalidade=finalidade, pagador=pagador,
         reserva_id=reserva_id or None, grupo_id=grupo_id or None, criado_por=operador,
     )
-    dados = get_gateway().criar_cobranca(cobranca)
+    # Pix direto (fora do PSP): gera o BR Code localmente; cartão/boleto seguem no gateway.
+    if metodo == Cobranca.Metodo.PIX and getattr(settings, "PIX_DIRETO", False):
+        dados = _pix_direto(cobranca)
+    else:
+        dados = get_gateway().criar_cobranca(cobranca)
     for campo in ("gateway", "gateway_id", "pix_copia_cola", "expira_em", "payload"):
         if campo in dados:
             setattr(cobranca, campo, dados[campo])
@@ -42,6 +47,38 @@ def criar_cobranca(operador, *, valor, metodo, descricao, finalidade=Cobranca.Fi
     EventoPagamento.objects.create(cobranca=cobranca, tipo="criada",
                                    origem="sistema", detalhe={"gateway": cobranca.gateway})
     return cobranca
+
+
+GATEWAY_PIX_DIRETO = "pix_direto"
+
+
+def _pix_direto(cobranca):
+    """Monta a cobrança Pix pela chave da pousada (sem PSP). Confirmação é manual."""
+    from .pix_br import montar_br_code
+    try:
+        codigo = montar_br_code(
+            chave=getattr(settings, "PIX_CHAVE", ""),
+            nome=getattr(settings, "PIX_RECEBEDOR_NOME", "POUSADA VO TESTA"),
+            cidade=getattr(settings, "PIX_RECEBEDOR_CIDADE", "ITA"),
+            valor=cobranca.valor,
+            txid=f"VT{cobranca.pk}",
+        )
+    except ValueError as erro:
+        raise ValidationError(
+            f"Pix direto ligado, mas a chave não está configurada: {erro} "
+            "Defina PIX_CHAVE no .env (ou desligue PIX_DIRETO)."
+        )
+    return {
+        "gateway": GATEWAY_PIX_DIRETO,
+        "gateway_id": f"VT{cobranca.pk}",
+        "pix_copia_cola": codigo,
+        "expira_em": timezone.now() + timezone.timedelta(hours=24),
+        "payload": {"pix_direto": True, "confirmacao": "manual"},
+    }
+
+
+def pix_direto_ativo() -> bool:
+    return bool(getattr(settings, "PIX_DIRETO", False))
 
 
 @transaction.atomic

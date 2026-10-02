@@ -41,10 +41,18 @@
     <div class="painel-bloco" style="margin-bottom:1.2rem">
       <h2 style="margin-top:0">Ações</h2>
       {% if cobranca.pendente %}
-        <form method="post" action="{% url 'pagamentos:simular' cobranca.pk %}">
-          {% csrf_token %}
-          <button type="submit" class="botao-primario" style="width:100%">Simular pagamento (sandbox)</button>
-        </form>
+        {% if cobranca.gateway == 'pix_direto' %}
+          <form method="post" action="{% url 'pagamentos:confirmar_recebimento' cobranca.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="botao-primario" style="width:100%">Confirmar recebimento do Pix</button>
+          </form>
+          <p class="subtitulo" style="margin:.5rem 0 0">Pix direto (sem gateway). Confirme só depois de ver o valor na conta da pousada.</p>
+        {% else %}
+          <form method="post" action="{% url 'pagamentos:simular' cobranca.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="botao-primario" style="width:100%">Simular pagamento (sandbox)</button>
+          </form>
+        {% endif %}
         <form method="post" action="{% url 'pagamentos:cancelar' cobranca.pk %}" style="margin-top:.6rem">
           {% csrf_token %}
           <button type="submit" class="botao-neutro" style="width:100%">Cancelar cobrança</button>

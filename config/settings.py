@@ -227,6 +227,15 @@ SAFRAPAY_GATEWAY_URL = os.environ.get(
     _SAFRAPAY_BASE.get(SAFRAPAY_ENV, _SAFRAPAY_BASE["hml"]),
 )
 
+# Pix direto (fora do PSP): quando ligado, as cobranças Pix saem por um BR Code
+# gerado localmente a partir da chave da própria pousada — sem taxa de adquirente e
+# sem passar pela Safrapay. Cartão/boleto seguem pelo PAGAMENTOS_GATEWAY normalmente.
+# Como não há PSP, a confirmação é MANUAL (recepção confere o extrato e dá baixa).
+PIX_DIRETO = os.environ.get("PIX_DIRETO", "0") == "1"
+PIX_CHAVE = os.environ.get("PIX_CHAVE", "")  # CNPJ/e-mail/telefone/chave aleatória
+PIX_RECEBEDOR_NOME = os.environ.get("PIX_RECEBEDOR_NOME", "POUSADA VO TESTA")
+PIX_RECEBEDOR_CIDADE = os.environ.get("PIX_RECEBEDOR_CIDADE", "ITA")
+
 # Retenção da pré-reserva vinda de canal (site): minutos que seguram o quarto
 # antes de expirar automaticamente sem confirmação/pagamento.
 RESERVA_RETENCAO_MINUTOS = int(os.environ.get("RESERVA_RETENCAO_MINUTOS", "30"))

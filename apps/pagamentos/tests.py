@@ -582,3 +582,76 @@ class RedacaoWebhookTests(PagamentosBase):
         self.assertIn("[REDACTED]", blob)
         # Dados de reconciliação (id/status) permanecem.
         self.assertIn("paid", blob)
+
+
+class PixBRCodeTests(TestCase):
+    """Gerador local do Pix copia-e-cola (sem PSP)."""
+
+    def test_crc16_vetor_conhecido(self):
+        # CRC-16/CCITT-FALSE de "123456789" = 0x29B1 (vetor de referência).
+        from .pix_br import crc16
+        self.assertEqual(crc16("123456789"), "29B1")
+
+    def test_estrutura_e_crc_do_br_code(self):
+        from .pix_br import crc16, montar_br_code
+        codigo = montar_br_code(
+            chave="pousada@votesta.com.br", nome="Pousada Vô Testa",
+            cidade="Itá", valor=Decimal("30.00"), txid="VT99",
+        )
+        self.assertTrue(codigo.startswith("000201"))        # Payload Format Indicator
+        self.assertIn("br.gov.bcb.pix", codigo)             # GUI do Pix
+        self.assertIn("pousada@votesta.com.br", codigo)     # chave
+        self.assertIn("540530.00", codigo)                  # campo valor (54, tam 05) = 30.00
+        self.assertIn("5303986", codigo)                    # moeda BRL
+        # CRC: os 4 últimos chars batem com o cálculo sobre o resto.
+        self.assertEqual(codigo[-4:], crc16(codigo[:-4]))
+
+    def test_sem_chave_erro(self):
+        from .pix_br import montar_br_code
+        with self.assertRaises(ValueError):
+            montar_br_code(chave="", nome="X", cidade="Y", valor=Decimal("1.00"))
+
+
+@override_settings(PIX_DIRETO=True, PIX_CHAVE="pousada@votesta.com.br",
+                   PIX_RECEBEDOR_NOME="Pousada Vo Testa", PIX_RECEBEDOR_CIDADE="Ita")
+class PixDiretoTests(PagamentosBase):
+    """Pix fora do PSP: gerado localmente, confirmado manualmente."""
+
+    def test_criar_pix_usa_gerador_local(self):
+        c = self.cobranca(metodo="pix", valor=Decimal("30.00"))
+        self.assertEqual(c.gateway, services.GATEWAY_PIX_DIRETO)
+        self.assertTrue(c.pix_copia_cola.startswith("000201"))
+        self.assertIn("br.gov.bcb.pix", c.pix_copia_cola)
+        self.assertEqual(c.payload.get("confirmacao"), "manual")
+
+    @override_settings(PAGAMENTOS_GATEWAY="safrapay")
+    def test_cartao_nao_usa_pix_direto(self):
+        # Mesmo com PIX_DIRETO ligado, o cartão continua indo pelo gateway (Safrapay).
+        from unittest.mock import patch
+        with patch("apps.pagamentos.gateways.GatewaySafrapay.criar_cobranca",
+                   return_value={"gateway": "safrapay", "gateway_id": "VT-CARD"}) as m:
+            c = self.cobranca(metodo="cartao", valor=Decimal("30.00"))
+        m.assert_called_once()
+        self.assertEqual(c.gateway, "safrapay")
+
+    @override_settings(PIX_CHAVE="")
+    def test_sem_chave_erro_claro(self):
+        with self.assertRaises(ValidationError):
+            self.cobranca(metodo="pix", valor=Decimal("30.00"))
+
+    def test_confirmacao_manual_pelo_operador(self):
+        c = self.cobranca(metodo="pix", valor=Decimal("30.00"))
+        self.client.force_login(self.op)
+        r = self.client.post(reverse("pagamentos:confirmar_recebimento", args=[c.pk]))
+        self.assertEqual(r.status_code, 302)
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PAGO)
+
+    def test_ja_paguei_publico_nao_confirma_no_escuro(self):
+        c = self.cobranca(metodo="pix", valor=Decimal("30.00"))
+        self.client.post(reverse("pagamentos:pagar_simular", args=[c.token]))
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PENDENTE)  # só avisou a recepção
+        self.assertTrue(
+            EventoPagamento.objects.filter(cobranca=c, origem="cliente_informou").exists()
+        )

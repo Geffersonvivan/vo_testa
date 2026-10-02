@@ -122,12 +122,14 @@
         <form method="post" action="{% url 'pagamentos:pagar_simular' cobranca.token %}" data-verificar>
           {% csrf_token %}
           <button type="submit" class="botao-primario" style="width:100%;margin-top:1rem">
-            <span class="btn-label">{% if sandbox %}Já paguei{% else %}Já paguei — verificar pagamento{% endif %}</span>
+            <span class="btn-label">Já paguei</span>
             <span class="btn-spin" aria-hidden="true"></span>
           </button>
         </form>
         {% if sandbox %}
           <p class="subtitulo" style="margin-top:1rem;font-size:.78rem">Ambiente de testes (sandbox). Nenhum valor real é cobrado.</p>
+        {% elif pix_direto %}
+          <p class="subtitulo" style="margin-top:1rem;font-size:.78rem">Depois de pagar pelo app do seu banco, toque em “Já paguei”. Confirmamos o valor na conta e liberamos sua reserva.</p>
         {% else %}
           <p class="subtitulo" style="margin-top:1rem;font-size:.78rem">Após pagar, clique acima — verificamos a confirmação com o banco. Pode levar alguns instantes.</p>
         {% endif %}

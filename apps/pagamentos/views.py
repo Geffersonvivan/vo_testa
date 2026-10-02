@@ -187,6 +187,23 @@ def simular(request, pk):
 
 @requer_modulo(Modulo.PAGAMENTOS)
 @require_POST
+def confirmar_recebimento(request, pk):
+    """Baixa manual do Pix direto: a recepção confere o extrato e confirma.
+    É o equivalente ao webhook, só que humano (não há PSP para avisar)."""
+    cobranca = get_object_or_404(Cobranca, pk=pk)
+    if cobranca.gateway != services.GATEWAY_PIX_DIRETO:
+        messages.error(request, "Confirmação manual só vale para Pix direto.")
+        return redirect("pagamentos:detalhe", pk=pk)
+    try:
+        services.confirmar_pagamento(cobranca, request.user, origem="recebimento_manual")
+        messages.success(request, "Recebimento do Pix confirmado.")
+    except ValidationError as erro:
+        messages.error(request, " ".join(erro.messages))
+    return redirect("pagamentos:detalhe", pk=pk)
+
+
+@requer_modulo(Modulo.PAGAMENTOS)
+@require_POST
 def cancelar(request, pk):
     cobranca = get_object_or_404(Cobranca, pk=pk)
     try:
@@ -223,6 +240,7 @@ def pagar(request, token):
         "cobranca": cobranca,
         "url_recibo_site": _url_recibo_site(cobranca),
         "sandbox": sandbox,
+        "pix_direto": cobranca.gateway == services.GATEWAY_PIX_DIRETO,
         "qr_svg": qr_svg,
     })
 
@@ -303,7 +321,20 @@ def pagar_simular(request, token):
     no escuro (o webhook não chega em localhost, daí a consulta ativa)."""
     cobranca = get_object_or_404(Cobranca, token=token)
     gateway = getattr(settings, "PAGAMENTOS_GATEWAY", "simulado")
-    if gateway == "simulado":
+    if cobranca.gateway == services.GATEWAY_PIX_DIRETO:
+        # Pix fora do PSP: não há como consultar o pagamento. Só registra o aviso do
+        # hóspede; a recepção confere o extrato e confirma o recebimento manualmente.
+        if cobranca.status == Cobranca.Status.PENDENTE:
+            EventoPagamento.objects.create(
+                cobranca=cobranca, tipo=EventoPagamento.Tipo.WEBHOOK,
+                origem="cliente_informou", detalhe={"canal": "link_publico"},
+            )
+            messages.info(
+                request,
+                "Recebemos o seu aviso! Assim que confirmarmos o Pix na conta, "
+                "sua reserva é liberada.",
+            )
+    elif gateway == "simulado":
         try:
             services.confirmar_pagamento(cobranca, cobranca.criado_por, origem="link_publico")
         except ValidationError:
