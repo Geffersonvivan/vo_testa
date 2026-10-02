@@ -723,6 +723,8 @@ class FichaCompletaTests(TestCase):
         for txt in ("CANAIS", "TRAVADA", "DISPONÍVEL", "Para sair de Ideia",
                     "Etapas desta campanha", "Quem está envolvido", "Conversa"):
             self.assertContains(r, txt)
+        # Comentários de template não podem vazar pra tela (o {# #} multi-linha vazava).
+        self.assertNotContains(r, "Autosave ao sair")
 
     def test_canal_pilula_alterna(self):
         self.client.post(self._url("canal/"), {"canal": "Instagram"}, HTTP_HX_REQUEST="true")

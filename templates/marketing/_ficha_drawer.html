@@ -64,8 +64,8 @@ Fecha esvaziando o slot. Todos os formulários re-renderizam a própria gaveta
   {# ── Cabeçalho: dados da campanha (form próprio) ── #}
   <div style="flex:none;padding:18px 22px 15px;border-bottom:1px solid var(--fio)">
     <div style="display:flex;align-items:flex-start;gap:12px">
-      {# Autosave ao sair de um campo (change) + salvar explícito no botão — o portão
-         ("Ideia descrita em uma frase" lê o objetivo) reage sem depender do clique. #}
+      {% comment %}Autosave ao sair de um campo (change) + salvar explícito no botão — o
+      portão ("Ideia descrita em uma frase" lê o objetivo) reage sem depender do clique.{% endcomment %}
       <form hx-post="{% url 'marketing:salvar_campanha' c.pk %}" hx-target="#ficha-slot" hx-swap="innerHTML"
             hx-trigger="submit, change delay:600ms"
             style="flex:1;min-width:0;display:grid;gap:8px">
