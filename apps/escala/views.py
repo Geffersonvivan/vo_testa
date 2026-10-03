@@ -186,6 +186,7 @@ def relatorio_colaborador(request):
     })
 
 
+@requer_modulo(Modulo.ESCALA)
 @requer_gerencia
 @require_POST
 def publicar(request):
@@ -203,6 +204,7 @@ def publicar(request):
     return redirect(destino)
 
 
+@requer_modulo(Modulo.ESCALA)
 @requer_gerencia
 def gerar_semana(request):
     """Gera a escala da semana automaticamente (gestão) e mostra o resultado."""
@@ -322,6 +324,7 @@ def trocas(request):
     })
 
 
+@requer_modulo(Modulo.ESCALA)
 @requer_gerencia
 def decidir_troca(request, pk):
     troca = get_object_or_404(TrocaTurno, pk=pk)

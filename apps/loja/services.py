@@ -138,3 +138,13 @@ def vendas_do_dia():
     hoje = timezone.localdate()
     qs = Venda.objects.filter(status=Venda.Status.FECHADA, criado_em__date=hoje)
     return {"quantidade": qs.count(), "total": qs.aggregate(t=Sum("total"))["t"] or ZERO}
+
+
+def faturamento_periodo(inicio, fim):
+    """Faturamento FECHADO no período, separado por destino (caixa do setor × folio).
+    Interface pública p/ Relatórios não importar os models internos da Loja."""
+    from django.db.models import Sum
+    v = Venda.objects.filter(criado_em__date__range=(inicio, fim), status=Venda.Status.FECHADA)
+    caixa = v.filter(destino=Venda.Destino.CAIXA).aggregate(t=Sum("total"))["t"] or ZERO
+    quarto = v.filter(destino=Venda.Destino.CONTA).aggregate(t=Sum("total"))["t"] or ZERO
+    return {"caixa": caixa, "quarto": quarto}

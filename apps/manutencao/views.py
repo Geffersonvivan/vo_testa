@@ -139,6 +139,7 @@ def concluir(request, pk):
     return redirect("manutencao:detalhe", pk=pk)
 
 
+@requer_modulo(Modulo.MANUTENCAO)
 @requer_gerencia
 def cancelar(request, pk):
     ordem = get_object_or_404(OrdemServico, pk=pk)

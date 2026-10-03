@@ -880,6 +880,18 @@ class FuncionariosTests(TestCase):
         self.assertEqual(self.func.usuario.username, "fulano")
         self.assertIn("caixa", self.func.usuario.areas)
 
+    def test_conceder_acesso_entra_na_trilha(self):
+        # Conceder MÓDULO é M2M — não entra na trilha por signal; registramos à mão.
+        from apps.nucleo.models import TrilhaAuditoria
+        self.client.force_login(self.dono)
+        self.client.post(reverse("funcionario_editar", args=[self.func.pk]), {
+            "nome": "Fulano", "cargo": "Recepcionista",
+            "username": "fulano3", "password": "senha-forte-123",
+            "modulos": ["reservas"], "areas": ["caixa"],
+        })
+        self.assertTrue(
+            TrilhaAuditoria.objects.filter(acao="alterar_acesso").exists())
+
     def test_nao_rebaixa_a_si_mesmo(self):
         from apps.nucleo.models import Funcionario, Pessoa
         ger = Usuario.objects.create_user(username="ger", password="x", is_staff=True)

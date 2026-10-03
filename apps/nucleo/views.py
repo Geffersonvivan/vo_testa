@@ -1185,6 +1185,13 @@ def _aplicar_acesso_funcionario(request, f, modulos_ativos_qs):
     if senha and len(senha) >= 8:
         u.set_password(senha)
     u.save()
+    # Conceder/revogar MÓDULO é M2M — não entra na trilha automática por signal.
+    # Registra explicitamente a mudança de acesso (quem/para quem/o quê).
+    from .models import registrar_auditoria
+    registrar_auditoria(request.user, "alterar_acesso", u, {
+        "modulos": sorted(u.modulos.values_list("codigo", flat=True)),
+        "areas": list(u.areas or []),
+    })
 
 
 def _ficha_contexto(request, f, gerente, form=None):

@@ -101,47 +101,27 @@ def rel_faturamento_modulos(inicio, fim):
         tot_caixa += no_caixa
         tot_quarto += no_quarto
 
+    # Consome o service público de cada módulo (desacoplado — sem importar models
+    # internos de outros apps, como o resto do Relatórios).
     # Hospedagem — as diárias são sempre folio (recebidas pela recepção).
     if modulo_ativo(Modulo.RESERVAS):
-        from apps.reservas.models import LancamentoConta
-        diarias = LancamentoConta.objects.filter(
-            criado_em__date__range=rng, tipo=LancamentoConta.Tipo.DIARIA
-        ).aggregate(t=Sum("valor"))["t"] or Decimal("0")
-        add("Hospedagem (diárias)", Decimal("0"), diarias)
+        from apps.reservas.services import diarias_periodo
+        add("Hospedagem (diárias)", Decimal("0"), diarias_periodo(inicio, fim))
 
-    # Loja — Venda.total é campo: dá para somar no banco.
     if modulo_ativo(Modulo.LOJA):
-        from apps.loja.models import Venda
-        v = Venda.objects.filter(criado_em__date__range=rng, status=Venda.Status.FECHADA)
-        no_caixa = v.filter(destino=Venda.Destino.CAIXA).aggregate(t=Sum("total"))["t"] or Decimal("0")
-        no_quarto = v.filter(destino=Venda.Destino.CONTA).aggregate(t=Sum("total"))["t"] or Decimal("0")
-        add("Loja", no_caixa, no_quarto)
+        from apps.loja.services import faturamento_periodo as loja_fat
+        f = loja_fat(inicio, fim)
+        add("Loja", f["caixa"], f["quarto"])
 
-    # Restaurante — total é método; soma em Python.
     if modulo_ativo(Modulo.RESTAURANTE):
-        from apps.restaurante.models import Comanda
-        c1 = c2 = Decimal("0")
-        for c in Comanda.objects.filter(
-            fechada_em__date__range=rng, status=Comanda.Status.FECHADA
-        ):
-            if c.destino == Comanda.Destino.CAIXA:
-                c1 += c.total()
-            else:
-                c2 += c.total()
-        add("Restaurante", c1, c2)
+        from apps.restaurante.services import faturamento_periodo as rest_fat
+        f = rest_fat(inicio, fim)
+        add("Restaurante", f["caixa"], f["quarto"])
 
-    # Lavanderia — total é método; soma em Python.
     if modulo_ativo(Modulo.LAVANDERIA):
-        from apps.lavanderia.models import OrdemLavanderia
-        l1 = l2 = Decimal("0")
-        for o in OrdemLavanderia.objects.filter(
-            entregue_em__date__range=rng, status=OrdemLavanderia.Status.ENTREGUE
-        ):
-            if o.destino == OrdemLavanderia.Destino.CAIXA:
-                l1 += o.total()
-            else:
-                l2 += o.total()
-        add("Lavanderia", l1, l2)
+        from apps.lavanderia.services import faturamento_periodo as lav_fat
+        f = lav_fat(inicio, fim)
+        add("Lavanderia", f["caixa"], f["quarto"])
 
     return {
         "kpis": [

@@ -73,6 +73,17 @@ class TrocaTests(EscalaBase):
         with self.assertRaises(ValidationError):
             services.solicitar_troca(atrib, self.f2)
 
+    def test_aprovar_revalida_substituto_ausente_depois(self):
+        # A solicitação pode envelhecer: se o substituto ficou ausente DEPOIS,
+        # aprovar deve recusar (antes dava IntegrityError/estado inconsistente).
+        atrib = services.atribuir(self.turno, self.f1, self.hoje, self.op)
+        troca = services.solicitar_troca(atrib, self.f2, "consulta")
+        services.registrar_ausencia(self.f2, "atestado", self.hoje, self.hoje, self.op)
+        with self.assertRaises(ValidationError):
+            services.decidir_troca(troca, self.op, aprovar=True)
+        atrib.refresh_from_db()
+        self.assertEqual(atrib.funcionario, self.f1)  # não reatribuiu
+
 
 class MinhaEscalaTests(EscalaBase):
     def test_minha_escala_filtra_pelo_usuario(self):

@@ -1474,3 +1474,12 @@ def fnrh_pendentes_qs():
         status__in=[Reserva.Status.HOSPEDADA, Reserva.Status.CHECKOUT],
         fnrh_status__in=[Reserva.SincFNRH.PENDENTE, Reserva.SincFNRH.ERRO],
     )
+
+
+def diarias_periodo(inicio, fim) -> Decimal:
+    """Total de diárias lançadas no folio no período (sempre recebidas pela recepção).
+    Interface pública p/ Relatórios não importar LancamentoConta diretamente."""
+    from django.db.models import Sum
+    return (LancamentoConta.objects.filter(
+        criado_em__date__range=(inicio, fim), tipo=LancamentoConta.Tipo.DIARIA
+    ).aggregate(t=Sum("valor"))["t"] or Decimal("0"))

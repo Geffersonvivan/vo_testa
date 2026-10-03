@@ -242,3 +242,16 @@ def pendencias_auditoria():
                 "url": reverse("lavanderia:ordem", args=[o.pk]),
             })
     return achados
+
+
+def faturamento_periodo(inicio, fim):
+    """Faturamento das ordens entregues no período (caixa do setor × folio).
+    Interface pública p/ Relatórios (total é método, soma em Python)."""
+    caixa = quarto = ZERO
+    for o in OrdemLavanderia.objects.filter(entregue_em__date__range=(inicio, fim),
+                                            status=OrdemLavanderia.Status.ENTREGUE):
+        if o.destino == OrdemLavanderia.Destino.CAIXA:
+            caixa += o.total()
+        else:
+            quarto += o.total()
+    return {"caixa": caixa, "quarto": quarto}

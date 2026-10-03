@@ -476,3 +476,30 @@ Três módulos com invariantes relevantes ficaram **abaixo do patamar de confian
 - **reservas**: view `nova` valida `uh_disponivel` (bloqueio de manutenção por datas) antes de salvar.
 
 Suíte: **732 testes OK**. Pendentes do audit = médias/baixas não-dinheiro (ex.: conversão descarta composição adultos/crianças, gating de módulo em escala) + baixas.
+
+## Correções — médias não-dinheiro (03/10/2026) ✅
+
+9 médias funcionais/permissões/arquitetura (a #5 ficou pendente — depende do WIP de
+composição adultos/crianças, ver abaixo):
+
+- **gating** (`@requer_modulo` ausente): fiscal `cancelar`, manutenção `cancelar`,
+  escala `publicar`/`gerar_semana`/`decidir_troca` — módulo inativo → 404 consistente.
+- **escala** `decidir_troca`: revalida ausência/duplicidade na aprovação + try/except
+  IntegrityError (troca envelhecida não dá mais 500/estado inconsistente).
+- **estoque** inventário: contagem inválida não é mais descartada em silêncio (valida
+  Decimal e avisa o operador).
+- **fiscal** webhook: exige token quando gateway real (focus/governo) + `hmac.compare_digest`.
+- **portal** `pedir_restaurante`: `@transaction.atomic` (falha no meio não deixa comanda
+  órfã nem baixa de estoque parcial).
+- **nucleo** Equipe & Acessos: conceder/revogar MÓDULO (M2M) agora entra na trilha
+  (`alterar_acesso`) — antes escapava da auditoria automática por signal.
+- **relatórios** `rel_faturamento_modulos`: desacoplado — consome services públicos
+  (`loja/restaurante/lavanderia.faturamento_periodo`, `reservas.diarias_periodo`) em vez
+  de importar models internos de outros apps (respeita a regra de arquitetura).
+
+**Pendente (não commitado):** #5 comercial — conversão de lead passa `hospedes` como
+`adultos` e descarta crianças. O fix (`adultos=…adultos, criancas=…criancas`) depende dos
+campos `Oportunidade.adultos/criancas`, que são WIP local ainda não commitado (migração
+0016). Fecha junto quando o Descritivo de Quartos/composição subir.
+
+Suíte: **734 testes OK**. Restam só baixas (23) e info (3) — nenhuma de dinheiro/segurança.

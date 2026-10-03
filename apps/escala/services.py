@@ -604,8 +604,19 @@ def decidir_troca(troca, operador, aprovar):
     if aprovar:
         troca.status = TrocaTurno.Status.APROVADA
         atrib = troca.atribuicao
+        # Revalida na aprovação: a solicitação pode ter envelhecido (o substituto ficou
+        # ausente ou já foi escalado nesse turno/dia) — evita IntegrityError/estado ruim.
+        if ausencia_no_dia(troca.substituto, atrib.data):
+            raise ValidationError("O substituto está ausente nesse dia.")
+        if (Atribuicao.objects
+                .filter(turno=atrib.turno, data=atrib.data, funcionario=troca.substituto)
+                .exclude(pk=atrib.pk).exists()):
+            raise ValidationError("O substituto já está escalado nesse turno/dia.")
         atrib.funcionario = troca.substituto
-        atrib.save(update_fields=["funcionario"])
+        try:
+            atrib.save(update_fields=["funcionario"])
+        except IntegrityError:
+            raise ValidationError("Conflito ao reatribuir o turno.")
     else:
         troca.status = TrocaTurno.Status.RECUSADA
     troca.save(update_fields=["status", "decidido_por", "decidido_em"])

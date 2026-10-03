@@ -240,14 +240,24 @@ def inventario(request, pk):
         Inventario.objects.select_related("local"), pk=pk
     )
     if request.method == "POST" and inv.status == Inventario.Status.ABERTO:
+        from decimal import Decimal, InvalidOperation
+        invalidos = []
         for item in inv.itens.all():
             valor = request.POST.get(f"item_{item.pk}")
-            if valor is not None:
-                try:
-                    item.quantidade_contada = valor.replace(",", ".")
-                    item.save(update_fields=["quantidade_contada"])
-                except (ValueError, Exception):
-                    pass
+            if valor is None or valor.strip() == "":
+                continue
+            try:
+                item.quantidade_contada = Decimal(valor.replace(",", "."))
+            except (InvalidOperation, ValueError):
+                invalidos.append(item.produto.nome)   # não grava lixo silenciosamente
+                continue
+            item.save(update_fields=["quantidade_contada"])
+        if invalidos:
+            messages.error(
+                request,
+                "Contagem inválida (ignorada) em: " + ", ".join(invalidos[:8])
+                + (" …" if len(invalidos) > 8 else "") + ". Use só números.",
+            )
         if "aplicar" in request.POST:
             try:
                 inv.aplicar(request.user)

@@ -58,8 +58,14 @@ def webhook(request):
     """Recebe o retorno do Focus NFe (autorização/cancelamento da nota) e atualiza o
     documento (status + PDF/DANFSE + XML). Configurar esta URL no painel do Focus."""
     # Valida o header de autorização (mesmo segredo posto na 'Chave de Autorização' do Focus).
+    import hmac
+    gateway = getattr(settings, "FISCAL_GATEWAY", "simulado")
     esperado = getattr(settings, "FISCAL_WEBHOOK_TOKEN", "")
-    if esperado and request.headers.get("Authorization") != esperado:
+    if gateway in ("focus", "governo") and not esperado:
+        # Gateway real sem token = webhook aberto. Recusa até configurar o segredo.
+        return JsonResponse({"erro": "webhook não configurado"}, status=503)
+    recebido = request.headers.get("Authorization", "")
+    if esperado and not hmac.compare_digest(recebido, esperado):
         return JsonResponse({"erro": "não autorizado"}, status=401)
     try:
         payload = json.loads(request.body or b"{}")
@@ -71,6 +77,7 @@ def webhook(request):
     return JsonResponse({"ok": True, "status": doc.status})
 
 
+@requer_modulo(Modulo.FISCAL)
 @requer_gerencia
 def cancelar(request, pk):
     doc = get_object_or_404(DocumentoFiscal, pk=pk)

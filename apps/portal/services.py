@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import transaction
 
 from apps.nucleo.models import UH, LocalEstoque, Produto, modulo_ativo, saldo
 from apps.nucleo.modulos import Modulo
@@ -66,9 +67,11 @@ def cardapio():
     return itens
 
 
+@transaction.atomic
 def pedir_restaurante(estadia, pedidos):
     """`pedidos`: lista de (produto_id, quantidade). Abre uma comanda no quarto e
-    lança os itens (a cozinha vê na lista de comandas)."""
+    lança os itens (a cozinha vê na lista de comandas). Atômico: se um item falhar
+    (saldo insuficiente), a comanda e as baixas de estoque já feitas são revertidas."""
     if not modulo_ativo(Modulo.RESTAURANTE):
         raise ValidationError("O restaurante não está disponível no momento.")
     from apps.restaurante import services as restaurante
