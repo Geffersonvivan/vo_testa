@@ -80,9 +80,6 @@ class SinalCheckoutTests(GovernancaBase):
             conta, self.user, FormaPagamento.objects.get(tipo="dinheiro"),
             conta.saldo(),
         )
-        from apps.frigobar.services import registrar_conferencia
-
-        registrar_conferencia(self.user, conta, "checkout", [])
         r.fazer_checkout(self.user)
         self.assertTrue(
             TarefaGovernanca.objects.filter(uh=self.uh, status="pendente").exists()

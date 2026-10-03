@@ -120,11 +120,10 @@ class Command(BaseCommand):
 
     def _estoque(self):
         cats = {}
-        for nome in ["Bebidas", "Alimentos", "Limpeza", "Frigobar"]:
+        for nome in ["Bebidas", "Alimentos", "Limpeza"]:
             cats[nome], _ = CategoriaProduto.objects.get_or_create(nome=nome)
         locais = {"Almoxarifado central": "nucleo"}
         for nome, mod in [("Depósito da Loja", "loja"),
-                          ("Frigobar central", "frigobar"),
                           ("Cozinha/Restaurante", "restaurante")]:
             locais[nome] = mod
         for nome, mod in locais.items():
@@ -135,8 +134,6 @@ class Command(BaseCommand):
             ("Água mineral 500ml", "Bebidas", "un", D("1.20"), D("4.00"), D("24"), 60),
             ("Refrigerante lata", "Bebidas", "un", D("2.50"), D("7.00"), D("24"), 48),
             ("Cerveja long neck", "Bebidas", "un", D("3.80"), D("12.00"), D("48"), 30),
-            ("Barra de cereal", "Frigobar", "un", D("1.80"), D("6.00"), D("20"), 10),
-            ("Amendoim pacote", "Frigobar", "pct", D("2.20"), D("8.00"), D("20"), 8),
             ("Detergente 5L", "Limpeza", "l", D("18.00"), D("0"), D("3"), 5),
             ("Café em grãos", "Alimentos", "kg", D("32.00"), D("0"), D("5"), 4),
         ]
@@ -206,7 +203,7 @@ class Command(BaseCommand):
                       status=Reserva.Status.CONFIRMADA)
         conta = r_hosp.fazer_checkin(self.user)
         services.lancar_na_conta(conta, "consumo", "consumo",
-                                 "Frigobar — refrigerante", D("7.00"), self.user)
+                                 "Loja — refrigerante", D("7.00"), self.user)
         services.receber_pagamento(conta, self.user, dinheiro, D("200.00"))
         # Saída concluída (paga e encerrada)
         r_out = cria(1, hosp("Maria Silva"), -3, -1,

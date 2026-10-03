@@ -62,8 +62,6 @@ urlpatterns = [
     path("crm/restaurante/", include("apps.restaurante.urls")),
     path("crm/manutencao/", include("apps.manutencao.urls")),
     path("crm/lavanderia/", include("apps.lavanderia.urls")),
-    # Frigobar aposentado (a pousada não trabalha com frigobar) — rotas removidas;
-    # app permanece em INSTALLED_APPS (código/tabelas dormentes).
     path("crm/escala/", include("apps.escala.urls")),
     path("crm/pagamentos/", include("apps.pagamentos.urls")),
     path("crm/fiscal/", include("apps.fiscal.urls")),

@@ -665,8 +665,6 @@ class GrupoReservaTests(ReservasTestsBase):
     def setUp(self):
         super().setUp()
         from apps.nucleo.models import ConfiguracaoUH, PosicaoCama
-        # Frigobar não é o foco aqui; desliga o bloqueio de check-out por conferência.
-        ModuloContratado.objects.filter(codigo=Modulo.FRIGOBAR).update(ativo=False)
         self.qa = UH.objects.create(numero="G-A", tipo=self.tipo)
         self.qb = UH.objects.create(numero="G-B", tipo=self.tipo)
         # Duplo com sofá + 2 colchões para testar o colchão no folio-mãe.

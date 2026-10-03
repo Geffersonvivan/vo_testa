@@ -43,7 +43,7 @@ class AutenticacaoTests(TestCase):
 class RegistroDeModulosTests(TestCase):
     def test_seed_ativou_os_modulos_da_fase_1(self):
         # 11 da fase 1 + Auditoria + Relatórios + Comercial = 14, menos Frigobar
-        # (aposentado na 0029) = 13, + Marketing (novo módulo) = 14.
+        # (removido) = 13, + Marketing (novo módulo) = 14.
         self.assertEqual(ModuloContratado.objects.filter(ativo=True).count(), 14)
         self.assertTrue(modulo_ativo(Modulo.RESERVAS))
         self.assertTrue(modulo_ativo(Modulo.LOJA))

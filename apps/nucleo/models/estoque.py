@@ -1,6 +1,6 @@
 """
 Motor de estoque (ESPECIFICACAO §4.4) — engine interna do núcleo e fonte de
-verdade única do estoque. Loja, Restaurante, Frigobar e Lavanderia baixam/entram
+verdade única do estoque. Loja, Restaurante e Lavanderia baixam/entram
 produtos SEMPRE por estas funções (nunca mexendo direto nos movimentos).
 
 Regras que não se quebram:

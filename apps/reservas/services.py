@@ -1,7 +1,7 @@
 """
 Interface pública do módulo Reservas.
 
-Outros módulos (Loja, Frigobar, APP/Site...) consultam disponibilidade e
+Outros módulos (Loja, Restaurante, APP/Site...) consultam disponibilidade e
 lançam consumo na conta SOMENTE por estas funções — nunca importando os
 models internos.
 """
@@ -1042,10 +1042,8 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
     """Situação ao vivo de cada UH — mapa de portas / herói do dashboard.
 
     `ler_limpeza=True` consulta Governança via service (se o módulo estiver ativo).
-    Cada item traz: in/out, saldo (hospedada), limpeza, PCD, badge frigobar.
+    Cada item traz: in/out, saldo (hospedada), limpeza, PCD.
     """
-    from django.conf import settings as dj_settings
-
     from apps.nucleo.estrutura import capacidade as capacidade_estrutura
     from apps.nucleo.models import modulo_ativo
     from apps.nucleo.modulos import Modulo
@@ -1082,14 +1080,6 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
         from apps.manutencao.services import motivos_bloqueio
 
         manutencao_hoje = motivos_bloqueio()
-
-    frigobar_on = (
-        modulo_ativo(Modulo.FRIGOBAR)
-        and getattr(dj_settings, "FRIGOBAR_BLOQUEAR_CHECKOUT", True)
-    )
-    conferencia_feita = None
-    if frigobar_on:
-        from apps.frigobar.services import conferencia_checkout_feita as conferencia_feita
 
     quartos, contagem = [], {k: 0 for k in SITUACOES_QUARTO}
     # Mapa operacional = só hospedagem (24 quartos). Day use tem fluxo próprio.
@@ -1129,7 +1119,6 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
                 situacao = "livre"
 
         saldo = None
-        frigobar_pendente = False
         periodo = ""
         if reserva:
             periodo = f"{reserva.checkin:%d/%m}→{reserva.checkout:%d/%m}"
@@ -1138,8 +1127,6 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
                     saldo = reserva.conta.saldo()
                 except ContaHospedagem.DoesNotExist:
                     saldo = None
-                if frigobar_on and conferencia_feita and saldo is not None:
-                    frigobar_pendente = not conferencia_feita(conta=reserva.conta)
 
         contagem[situacao] += 1
         quartos.append({
@@ -1160,7 +1147,6 @@ def mapa_quartos_hoje(*, ler_limpeza: bool = True) -> dict:
             ),
             "limpeza_cod": limpeza_cod,
             "limpeza_label": _LIMPEZA_LABEL.get(limpeza_cod or "", ""),
-            "frigobar_pendente": frigobar_pendente,
             "tipo_nome": uh.tipo.nome,
             "lotacao": capacidade_estrutura(uh)["maxima_criancas"],
             "grupo": (reserva.grupo.rotulo if reserva and reserva.grupo_id else ""),

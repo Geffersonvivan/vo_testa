@@ -67,7 +67,6 @@ INSTALLED_APPS = [
     "apps.restaurante",
     "apps.manutencao",
     "apps.lavanderia",
-    "apps.frigobar",
     "apps.escala",
     "apps.pagamentos",
     "apps.portal",
@@ -244,9 +243,6 @@ RESERVA_RETENCAO_MINUTOS = int(os.environ.get("RESERVA_RETENCAO_MINUTOS", "30"))
 # aplicado sobre a tarifa do tipo e arredondado à dezena. Ex.: 250 → 400 (× 1.6).
 # `tarifa_override` na unidade vence este cálculo.
 ACRESCIMO_TARIFA_DUPLO = float(os.environ.get("ACRESCIMO_TARIFA_DUPLO", "1.6"))
-
-# Frigobar: bloquear check-out até haver conferência (mesmo consumo zero). §5.9
-FRIGOBAR_BLOQUEAR_CHECKOUT = os.environ.get("FRIGOBAR_BLOQUEAR_CHECKOUT", "1") == "1"
 
 # FNRH: bloquear check-in até haver ficha completa de cada hóspede (Embratur). §5.1
 # Nos testes fica desligado por padrão; as classes de teste da FNRH religam

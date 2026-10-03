@@ -17,10 +17,6 @@ class Modulo(models.TextChoices):
     LOJA = "loja", "Loja"
     RESTAURANTE = "restaurante", "Restaurante Piscina"
     LAVANDERIA = "lavanderia", "Lavanderia"
-    # Aposentado: a pousada não trabalha com frigobar. Fora do catálogo
-    # (APRESENTACAO/DEPENDENCIAS) e das rotas; o membro fica só para compat de
-    # código guardado por modulo_ativo() (ex.: reservas.services).
-    FRIGOBAR = "frigobar", "Frigobar"
     PAGAMENTOS = "pagamentos", "Pagamentos Online"
     APPSITE = "appsite", "APP/Site"
     CRM_HOSPEDE = "crm_hospede", "CRM do Hóspede"

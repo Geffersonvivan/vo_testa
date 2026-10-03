@@ -194,7 +194,7 @@ class FNRHPortalTests(TestCase):
         self.assertEqual(self.reserva.status, Reserva.Status.HOSPEDADA)
 
 
-@override_settings(FNRH_BLOQUEAR_CHECKIN=False, FRIGOBAR_BLOQUEAR_CHECKOUT=False)
+@override_settings(FNRH_BLOQUEAR_CHECKIN=False)
 class TokenPosCheckoutTests(PortalBase):
     """TM-003: o token do portal deixa de dar acesso após o check-out."""
 

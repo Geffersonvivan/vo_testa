@@ -2,8 +2,7 @@
 Limpa pendências operacionais envelhecidas do banco local de demo e
 reabre espaço para uma lotação fresca.
 
-- Encerra hospedagens [lotacao]/[demo] com check-out vencido (paga saldo,
-  conferência frigobar zerada, check-out).
+- Encerra hospedagens [lotacao]/[demo] com check-out vencido (paga saldo, check-out).
 - Cancela pré-reservas/confirmadas [lotacao] vencidas.
 - Fecha caixas abertos de dias anteriores (conferência = esperado).
 - Desbloqueia UHs que ficaram BLOQUEADA pelo seed de lotação.
@@ -83,13 +82,6 @@ class Command(BaseCommand):
                     from apps.reservas import services as rs
 
                     rs.receber_pagamento(conta, self.user, dinheiro, saldo)
-                from apps.frigobar.services import (
-                    conferencia_checkout_feita,
-                    registrar_conferencia,
-                )
-
-                if not conferencia_checkout_feita(conta=conta):
-                    registrar_conferencia(self.user, conta, "checkout", [])
                 r.fazer_checkout(self.user)
                 n += 1
             except Exception as erro:
