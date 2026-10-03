@@ -149,3 +149,47 @@ class FormatacaoTrilhaTests(TestCase):
         self.assertIn("Abriu ordem de serviço", self._frase("criar", "OrdemServico", alvo_id="12"))
         self.assertIn("Registrou venda", self._frase("criar", "Venda", alvo_id="45"))
         self.assertIn("Abriu comanda", self._frase("criar", "Comanda", alvo_id="3"))
+
+
+class TrilhaSalarioTests(TestCase):
+    """Salário é sensível: a mudança é auditada, mas o VALOR só aparece na trilha
+    para quem tem a área Remuneração (achado alta da auditoria multiagente)."""
+
+    def _user(self, username, areas):
+        from apps.nucleo.models import ModuloContratado
+        u = Usuario.objects.create_user(username=username, password="senha-forte-123")
+        u.areas = areas
+        u.save()
+        u.modulos.add(ModuloContratado.objects.get(codigo="auditoria"))
+        return u
+
+    def setUp(self):
+        from apps.nucleo.models import TrilhaAuditoria
+        TrilhaAuditoria.objects.create(
+            acao="editar", alvo="Funcionario", alvo_id="7",
+            detalhe={"alteracoes": {"salario": ["1500.00", "9999.00"],
+                                    "cargo": ["Camareira", "Governanta"]}},
+        )
+
+    def test_redigir_sensiveis_helper(self):
+        from apps.nucleo.audit import redigir_sensiveis
+        r = redigir_sensiveis({"alteracoes": {"salario": ["1", "2"], "cargo": ["a", "b"]}})
+        self.assertEqual(r["alteracoes"]["salario"], ["•••", "•••"])
+        self.assertEqual(r["alteracoes"]["cargo"], ["a", "b"])
+        r2 = redigir_sensiveis({"valores": {"salario": "3000.00", "nome": "X"}})
+        self.assertEqual(r2["valores"]["salario"], "•••")
+        self.assertEqual(r2["valores"]["nome"], "X")
+
+    def test_sem_remuneracao_nao_ve_salario(self):
+        self._user("semrem", [])
+        self.client.login(username="semrem", password="senha-forte-123")
+        r = self.client.get(reverse("auditoria:trilha"))
+        self.assertEqual(r.status_code, 200)
+        self.assertNotContains(r, "9999.00")   # valor do salário mascarado
+        self.assertContains(r, "Governanta")   # mudança não-sensível continua visível
+
+    def test_com_remuneracao_ve_salario(self):
+        self._user("comrem", ["remuneracao"])
+        self.client.login(username="comrem", password="senha-forte-123")
+        r = self.client.get(reverse("auditoria:trilha"))
+        self.assertContains(r, "9999.00")

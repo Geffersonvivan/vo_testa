@@ -655,3 +655,22 @@ class PixDiretoTests(PagamentosBase):
         self.assertTrue(
             EventoPagamento.objects.filter(cobranca=c, origem="cliente_informou").exists()
         )
+
+
+class SimularGuardTests(PagamentosBase):
+    """Achado alta: a view `simular` confirmava pagamento sem checar sandbox."""
+
+    def test_simular_bloqueado_fora_do_sandbox(self):
+        c = self.cobranca()  # criada no simulado
+        self.client.force_login(self.op)
+        with override_settings(PAGAMENTOS_GATEWAY="safrapay"):
+            self.client.post(reverse("pagamentos:simular", args=[c.pk]))
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PENDENTE)  # não confirmou no escuro
+
+    def test_simular_ok_no_sandbox(self):
+        c = self.cobranca()
+        self.client.force_login(self.op)
+        self.client.post(reverse("pagamentos:simular", args=[c.pk]))
+        c.refresh_from_db()
+        self.assertEqual(c.status, Cobranca.Status.PAGO)

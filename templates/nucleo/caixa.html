@@ -21,6 +21,14 @@
     Caixa <strong>{{ sessao.get_modulo_display }}</strong>, aberto em {{ sessao.aberta_em|date:"d/m/Y H:i" }}
     com fundo de R$ {{ sessao.fundo_troco }}.
   </p>
+  {% if sessoes_abertas.count > 1 %}
+  <p class="subtitulo" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <span class="letreiro">Seus caixas abertos:</span>
+    {% for s in sessoes_abertas %}
+      <a href="?modulo={{ s.modulo }}" class="botao-mini {% if s.pk == sessao.pk %}botao-primario{% else %}botao-neutro{% endif %}">{{ s.get_modulo_display }}</a>
+    {% endfor %}
+  </p>
+  {% endif %}
 
   <div class="cartoes cartoes-indicadores">
     <div class="cartao">
@@ -42,6 +50,7 @@
       </h2>
       <form method="post" action="{% url 'caixa_movimento' %}" class="form-cartao">
         {% csrf_token %}
+        <input type="hidden" name="modulo" value="{{ sessao.modulo }}">
         {% include "nucleo/partials/campos.html" with form=form_movimento %}
         <div class="acoes">
           <button type="submit" class="botao-primario">Registrar</button>
@@ -53,6 +62,7 @@
       <h2>Fechar caixa</h2>
       <form method="post" action="{% url 'caixa_fechar' %}" class="form-cartao">
         {% csrf_token %}
+        <input type="hidden" name="modulo" value="{{ sessao.modulo }}">
         {% include "nucleo/partials/campos.html" with form=form_fechar %}
         <div class="acoes">
           <button type="submit" class="botao-perigo"

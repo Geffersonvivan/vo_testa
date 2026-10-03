@@ -175,7 +175,13 @@ def detalhe(request, pk):
 @requer_modulo(Modulo.PAGAMENTOS)
 @require_POST
 def simular(request, pk):
-    """Simula o webhook do gateway confirmando o pagamento (sandbox)."""
+    """Simula o webhook do gateway confirmando o pagamento — SÓ no sandbox.
+    Fora do sandbox confirmar no escuro burlaria a fonte da verdade (o PSP): a
+    confirmação real vem do webhook/consulta de status. Barra por conta própria."""
+    if getattr(settings, "PAGAMENTOS_GATEWAY", "simulado") != "simulado":
+        messages.error(request, "Confirmação manual só no sandbox. Em produção o "
+                                 "pagamento é confirmado pelo provedor (webhook/consulta).")
+        return redirect("pagamentos:detalhe", pk=pk)
     cobranca = get_object_or_404(Cobranca, pk=pk)
     try:
         services.confirmar_pagamento(cobranca, request.user, origem="simulado")

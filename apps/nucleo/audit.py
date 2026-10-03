@@ -30,6 +30,29 @@ CAMPOS_IGNORADOS = {
     "criado_em", "atualizado_em", "modificado_em", "last_login", "password",
 }
 
+# Campos sensíveis: a mudança É auditada (quem/quando), mas o VALOR só aparece na
+# trilha para quem tem a área Remuneração — para os demais fica redigido ("•••").
+CAMPOS_SENSIVEIS = {"salario"}
+
+
+def redigir_sensiveis(detalhe, campos=CAMPOS_SENSIVEIS):
+    """Devolve uma cópia do detalhe com os valores dos campos sensíveis mascarados.
+    Cobre os dois formatos da trilha: {"valores": {...}} e {"alteracoes": {c:[a,b]}}.
+    """
+    if not isinstance(detalhe, dict):
+        return detalhe
+    masc = dict(detalhe)
+    for chave in ("valores", "alteracoes"):
+        bloco = masc.get(chave)
+        if not isinstance(bloco, dict):
+            continue
+        novo = dict(bloco)
+        for campo in list(novo):
+            if campo in campos:
+                novo[campo] = ["•••", "•••"] if chave == "alteracoes" else "•••"
+        masc[chave] = novo
+    return masc
+
 # Denylist: por PADRÃO auditamos TODOS os models dos nossos apps (apps.*) —
 # qualquer escrita de qualquer usuário, independente de permissão, vira registro.
 # Aqui ficam só os que NÃO devem ser auditados (técnicos/loop/trilhas próprias).

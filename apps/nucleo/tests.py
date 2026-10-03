@@ -341,6 +341,30 @@ class RegrasDeCaixaTests(CaixaTestsBase):
         self.assertEqual(sessao.status, SessaoCaixa.Status.FECHADA)
         self.assertEqual(sessao.diferenca, Decimal("0.00"))
 
+    def test_dois_caixas_abertos_opera_o_modulo_escolhido(self):
+        # Operador com 2 caixas abertos (reservas + loja): o movimento vai pro caixa
+        # do módulo escolhido — não dá 500 nem lança no caixa errado.
+        u = Usuario.objects.create_user(username="multi", password="senha-forte-123")
+        u.areas = ["financeiro"]
+        u.save()
+        self.client.login(username="multi", password="senha-forte-123")
+        cx_res = SessaoCaixa.objects.create(
+            operador=u, modulo="reservas", fundo_troco=Decimal("0"))
+        cx_loja = SessaoCaixa.objects.create(
+            operador=u, modulo="loja", fundo_troco=Decimal("0"))
+        r = self.client.post(reverse("caixa_movimento"), {
+            "modulo": "loja", "tipo": "recebimento", "forma_pagamento": self.dinheiro.pk,
+            "valor": "25.00", "parcelas": "1", "descricao": "Venda"})
+        self.assertEqual(r.status_code, 302)          # não 500
+        self.assertEqual(cx_loja.movimentos.count(), 1)   # foi pro caixa certo
+        self.assertEqual(cx_res.movimentos.count(), 0)
+        # Sem informar o módulo com 2 abertos → pede seleção, não lança (e não 500).
+        r2 = self.client.post(reverse("caixa_movimento"), {
+            "tipo": "recebimento", "forma_pagamento": self.dinheiro.pk,
+            "valor": "9.00", "parcelas": "1", "descricao": "x"})
+        self.assertEqual(r2.status_code, 302)
+        self.assertEqual(cx_loja.movimentos.count(), 1)
+
 
 class AreaCaixaTests(TestCase):
     """Operar o próprio caixa (área 'caixa') é separado da gestão financeira."""
@@ -375,6 +399,9 @@ class AreaCaixaTests(TestCase):
         self._user("atendente", ["caixa"])
         self.assertEqual(self.client.get(reverse("contas")).status_code, 403)
         self.assertEqual(self.client.get(reverse("lancamentos")).status_code, 403)
+        # Baixar título (escrita financeira) exige a área Financeiro, não só login.
+        self.assertEqual(
+            self.client.post(reverse("conta_baixar", args=[1])).status_code, 403)
 
 
 class FinanceiroTests(CaixaTestsBase):

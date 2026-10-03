@@ -17,7 +17,8 @@ from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import DecimalField, F, Sum
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from apps.nucleo.models.financeiro import (
@@ -218,6 +219,17 @@ def _crm_usados():
     return mc, cpr
 
 
+def _sem_estornados(qs):
+    """Tira do pool de conciliação os recebimentos TOTALMENTE estornados. O estorno é
+    uma linha separada (related_name="estornos") e o recebimento original sobrevive como
+    tipo=RECEBIMENTO; se o total estornado >= o valor, ele nunca virou crédito real no
+    banco e não pode casar com uma linha do extrato (conciliaria dinheiro inexistente)."""
+    return (qs.annotate(_estornado=Coalesce(
+                Sum("estornos__valor"), Decimal("0.00"),
+                output_field=DecimalField(max_digits=12, decimal_places=2)))
+              .exclude(_estornado__gte=F("valor")))
+
+
 @transaction.atomic
 def conciliar_banco(*, extrato=None, janela_dias=2, usuario=None):
     """Casa linhas pendentes do extrato com recebimentos de caixa e contas baixadas."""
@@ -229,10 +241,9 @@ def conciliar_banco(*, extrato=None, janela_dias=2, usuario=None):
 
     mc_usados, cpr_usados = _crm_usados()
     crm = []
-    for m in (MovimentoCaixa.objects
-              .filter(tipo=MovimentoCaixa.Tipo.RECEBIMENTO)
-              .exclude(id__in=mc_usados)
-              .select_related(None)):
+    for m in _sem_estornados(MovimentoCaixa.objects
+                             .filter(tipo=MovimentoCaixa.Tipo.RECEBIMENTO)
+                             .exclude(id__in=mc_usados)):
         crm.append(ItemCrm(id=("mc", m.id), data=m.criado_em.date(), valor=m.valor, entrada=True))
     for c in (ContaPagarReceber.objects
               .filter(status=ContaPagarReceber.Status.BAIXADA, baixada_em__isnull=False)
@@ -273,7 +284,7 @@ def conciliar_cartao(*, lote=None, usuario=None):
     formas = [FormaPagamento.Tipo.CARTAO_CREDITO, FormaPagamento.Tipo.CARTAO_DEBITO]
     caixa = [
         ItemCaixaCartao(id=m.id, nsu=m.autorizacao, valor=m.valor)
-        for m in (MovimentoCaixa.objects
+        for m in _sem_estornados(MovimentoCaixa.objects
                   .filter(tipo=MovimentoCaixa.Tipo.RECEBIMENTO, forma_pagamento__tipo__in=formas)
                   .exclude(autorizacao="").exclude(id__in=mc_usados))
     ]
@@ -326,7 +337,7 @@ def candidatos_para_extrato(lancamento, limite: int = 20) -> list[Candidato]:
     alvo = abs(lancamento.valor)
     cands: list[Candidato] = []
     if lancamento.valor > 0:
-        for m in (MovimentoCaixa.objects
+        for m in _sem_estornados(MovimentoCaixa.objects
                   .filter(tipo=MovimentoCaixa.Tipo.RECEBIMENTO).exclude(id__in=mc_usados)):
             cands.append(Candidato("mc", m.id, f"Caixa: {m.descricao}", m.valor,
                                    m.criado_em.date(), m.valor == alvo))
@@ -401,7 +412,7 @@ def candidatos_para_cartao(transacao, limite: int = 20) -> list[Candidato]:
                  .values_list("movimento_caixa_id", flat=True))
     formas = [FormaPagamento.Tipo.CARTAO_CREDITO, FormaPagamento.Tipo.CARTAO_DEBITO]
     cands: list[Candidato] = []
-    for m in (MovimentoCaixa.objects
+    for m in _sem_estornados(MovimentoCaixa.objects
               .filter(tipo=MovimentoCaixa.Tipo.RECEBIMENTO, forma_pagamento__tipo__in=formas)
               .exclude(id__in=usados)):
         cands.append(Candidato("mc", m.id, f"{m.descricao} — NSU {m.autorizacao or '—'}",

@@ -1636,6 +1636,19 @@ class PropostaSinalTests(TestCase):
         cob = services.criar_cobranca_sinal(self.op, self.u)
         self.assertEqual(cob.valor, Decimal("175.50"))  # 30% de 585
 
+    def test_sinal_idempotente_cancela_anterior(self):
+        # Reemitir o sinal não pode deixar dois links pagáveis (pagamento em dobro).
+        from apps.pagamentos.models import Cobranca
+        c1 = services.criar_cobranca_sinal(self.op, self.u)
+        self.op.refresh_from_db()
+        c2 = services.criar_cobranca_sinal(self.op, self.u)  # reemitido
+        c1.refresh_from_db()
+        self.assertEqual(c1.status, Cobranca.Status.CANCELADO)
+        self.assertEqual(c2.status, Cobranca.Status.PENDENTE)
+        self.assertEqual(
+            Cobranca.objects.filter(finalidade=Cobranca.Finalidade.SINAL,
+                                    status=Cobranca.Status.PENDENTE).count(), 1)
+
     def test_copy_da_proposta_e_calorosa_e_formata_brl(self):
         from types import SimpleNamespace
         cob = SimpleNamespace(valor=Decimal("175.50"))  # só o valor importa p/ a copy

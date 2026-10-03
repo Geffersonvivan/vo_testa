@@ -375,3 +375,42 @@ class FechamentoGraficoTests(TestCase):
     def test_sem_dados_nao_injeta_chart(self):
         r = self.client.get("/crm/conciliacao/fechamento/?mes=1&ano=2020")
         self.assertNotIn("chart.umd.min.js", r.content.decode("utf-8"))
+
+
+class EstornoNaConciliacaoTests(TestCase):
+    """Achado alta: recebimento estornado continuava no pool e conciliava crédito
+    inexistente. Totalmente estornado sai; parcialmente estornado (ainda tem crédito
+    real) permanece."""
+
+    def setUp(self):
+        self.user = Usuario.objects.create_user(username="op", password="x123456789")
+        self.sessao = SessaoCaixa.objects.create(operador=self.user, modulo="reservas")
+        self.forma = FormaPagamento.objects.get(tipo=FormaPagamento.Tipo.DINHEIRO)
+
+    def _receb(self, valor):
+        return MovimentoCaixa.objects.create(
+            sessao=self.sessao, tipo=MovimentoCaixa.Tipo.RECEBIMENTO,
+            forma_pagamento=self.forma, valor=Decimal(valor),
+            descricao="Recebimento", criado_por=self.user)
+
+    def _estorno(self, origem, valor):
+        return MovimentoCaixa.objects.create(
+            sessao=self.sessao, tipo=MovimentoCaixa.Tipo.ESTORNO,
+            forma_pagamento=self.forma, valor=Decimal(valor), movimento_origem=origem,
+            descricao="Estorno", motivo="teste", criado_por=self.user)
+
+    def _pool_ids(self):
+        return set(services._sem_estornados(
+            MovimentoCaixa.objects.filter(tipo=MovimentoCaixa.Tipo.RECEBIMENTO)
+        ).values_list("id", flat=True))
+
+    def test_totalmente_estornado_sai_parcial_fica(self):
+        bom = self._receb("100.00")
+        ruim = self._receb("100.00")
+        self._estorno(ruim, "100.00")       # totalmente estornado
+        parcial = self._receb("100.00")
+        self._estorno(parcial, "30.00")     # estorno parcial — resta R$ 70 real
+        ids = self._pool_ids()
+        self.assertIn(bom.id, ids)
+        self.assertNotIn(ruim.id, ids)       # não concilia dinheiro inexistente
+        self.assertIn(parcial.id, ids)

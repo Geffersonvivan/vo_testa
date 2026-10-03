@@ -5,10 +5,11 @@ from django.http import HttpResponse
 from django.shortcuts import render
 from django.views.decorators.cache import never_cache
 
+from apps.nucleo.audit import redigir_sensiveis
 from apps.nucleo.models import TrilhaAuditoria
 from apps.nucleo.modulos import Modulo
 from apps.nucleo.periodos import periodo, selecao_periodo
-from apps.nucleo.permissoes import requer_modulo
+from apps.nucleo.permissoes import pode_ver_salario, requer_modulo
 
 from . import services
 
@@ -43,6 +44,9 @@ def _trilha_filtrada(request):
 @requer_modulo(Modulo.AUDITORIA)
 def trilha(request):
     qs, rotulo = _trilha_filtrada(request)
+    # Salário é sensível: quem não tem a área Remuneração vê o valor redigido na
+    # trilha (a mudança continua registrada — só o número é mascarado).
+    ocultar_sensivel = not pode_ver_salario(request.user)
     if request.GET.get("export") == "csv":
         resp = HttpResponse(content_type="text/csv")
         resp["Content-Disposition"] = 'attachment; filename="trilha_auditoria.csv"'
@@ -50,13 +54,19 @@ def trilha(request):
         w = csv.writer(resp)
         w.writerow(["quando", "usuario", "descricao", "acao", "alvo", "alvo_id", "detalhe"])
         for t in qs[:5000]:
+            if ocultar_sensivel:
+                t.detalhe = redigir_sensiveis(t.detalhe)
             w.writerow([
                 t.criado_em.strftime("%d/%m/%Y %H:%M"),
                 t.usuario or "—", frase(t), t.acao, t.alvo, t.alvo_id, t.detalhe,
             ])
         return resp
+    registros = list(qs[:300])
+    if ocultar_sensivel:
+        for t in registros:
+            t.detalhe = redigir_sensiveis(t.detalhe)
     return render(request, "auditoria/trilha.html", {
-        "registros": qs[:300],
+        "registros": registros,
         "rotulo": rotulo,
         "acoes": TrilhaAuditoria.objects.order_by("acao").values_list("acao", flat=True).distinct(),
         "usuarios": Usuario.objects.filter(auditorias__isnull=False).distinct(),

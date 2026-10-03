@@ -742,11 +742,26 @@ def temporada_form(request, pk=None):
 # ---------- Caixa ----------
 
 
+def _sessoes_abertas(user):
+    return (SessaoCaixa.objects.filter(operador=user, status=SessaoCaixa.Status.ABERTA)
+            .order_by("modulo"))
+
+
+def _sessao_a_operar(request, modulo=None):
+    """A sessão de caixa selecionada do operador. Um operador pode ter um caixa
+    aberto POR MÓDULO (gaveta separada) — escolher pelo módulo evita lançar no caixa
+    errado e o 500 que `get` com múltiplos resultados dava."""
+    qs = _sessoes_abertas(request.user)
+    if modulo:
+        return qs.filter(modulo=modulo).first()
+    return qs.first() if qs.count() == 1 else None
+
+
 @requer_area(Area.CAIXA, Area.FINANCEIRO)
 def caixa(request):
-    sessao = SessaoCaixa.objects.filter(
-        operador=request.user, status=SessaoCaixa.Status.ABERTA
-    ).first()
+    abertas = _sessoes_abertas(request.user)
+    modulo_sel = request.GET.get("modulo") or ""
+    sessao = abertas.filter(modulo=modulo_sel).first() if modulo_sel else abertas.first()
     form_abrir = AbrirCaixaForm(usuario=request.user)
     form_movimento = MovimentoCaixaForm()
     form_fechar = FecharCaixaForm()
@@ -755,6 +770,7 @@ def caixa(request):
         "nucleo/caixa.html",
         {
             "sessao": sessao,
+            "sessoes_abertas": abertas,
             "form_abrir": form_abrir,
             "form_movimento": form_movimento,
             "form_fechar": form_fechar,
@@ -787,9 +803,10 @@ def caixa_abrir(request):
 def caixa_movimento(request):
     if request.method != "POST":
         return redirect("caixa")
-    sessao = get_object_or_404(
-        SessaoCaixa, operador=request.user, status=SessaoCaixa.Status.ABERTA
-    )
+    sessao = _sessao_a_operar(request, request.POST.get("modulo"))
+    if not sessao:
+        messages.error(request, "Selecione o caixa (módulo) a operar.")
+        return redirect("caixa")
     form = MovimentoCaixaForm(request.POST)
     if form.is_valid():
         movimento = form.save(commit=False)
@@ -815,9 +832,10 @@ def caixa_movimento(request):
 def caixa_fechar(request):
     if request.method != "POST":
         return redirect("caixa")
-    sessao = get_object_or_404(
-        SessaoCaixa, operador=request.user, status=SessaoCaixa.Status.ABERTA
-    )
+    sessao = _sessao_a_operar(request, request.POST.get("modulo"))
+    if not sessao:
+        messages.error(request, "Selecione o caixa (módulo) a fechar.")
+        return redirect("caixa")
     form = FecharCaixaForm(request.POST)
     if form.is_valid():
         sessao.observacoes_fechamento = form.cleaned_data["observacoes"]
@@ -960,7 +978,7 @@ def conta_form(request):
     )
 
 
-@login_required
+@requer_area(Area.FINANCEIRO)
 def conta_baixar(request, pk):
     if request.method != "POST":
         return redirect("contas")

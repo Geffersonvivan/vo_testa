@@ -761,6 +761,7 @@ def converter_em_reserva(oportunidade, *, tipo_uh, checkin, checkout, usuario,
         if valor is None:
             valor = (oportunidade.valor_estimado * Decimal("0.30")).quantize(Decimal("0.01"))
         if valor and valor > 0:
+            _cancelar_sinal_pendente(oportunidade, usuario)
             cobranca = criar_cobranca(
                 usuario, valor=valor, metodo="pix",
                 descricao=f"Sinal — oportunidade #{oportunidade.pk} / reserva #{reserva.pk}",
@@ -2010,6 +2011,20 @@ def enviar_campanha_email(campanha, usuario=None):
     return campanha
 
 
+def _cancelar_sinal_pendente(oportunidade, usuario):
+    """Idempotência do sinal: cancela a cobrança de sinal PENDENTE anterior do lead,
+    para nunca haver dois links pagáveis para a mesma estadia (risco de pagamento em
+    dobro na conciliação)."""
+    if not oportunidade.cobranca_sinal_id:
+        return
+    from apps.pagamentos.models import Cobranca
+    from apps.pagamentos.services import cancelar
+    anterior = Cobranca.objects.filter(
+        pk=oportunidade.cobranca_sinal_id, status=Cobranca.Status.PENDENTE).first()
+    if anterior:
+        cancelar(anterior, usuario)
+
+
 def criar_cobranca_sinal(oportunidade, usuario, valor=None, metodo="pix"):
     """Cria a cobrança do sinal (Safrapay/simulado) para o lead e a vincula.
 
@@ -2025,6 +2040,7 @@ def criar_cobranca_sinal(oportunidade, usuario, valor=None, metodo="pix"):
     if valor <= 0:
         raise ValidationError("Defina o valor estimado do lead para gerar o sinal.")
 
+    _cancelar_sinal_pendente(oportunidade, usuario)
     from apps.pagamentos.models import Cobranca
     from apps.pagamentos.services import criar_cobranca
     cobranca = criar_cobranca(
