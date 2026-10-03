@@ -80,3 +80,7 @@ docs/Vídeos/
 
 # Evidências pessoais (incidente de fraude Meta) — não versionar/deployar
 docs/Prints_Facebook/
+
+# Cobertura de testes (auditoria)
+.coverage
+htmlcov/
