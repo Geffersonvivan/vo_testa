@@ -201,13 +201,16 @@ def salvar_campanha(request, pk):
         c.publico = p.get("publico", "").strip()
     if "canais" in p:
         c.canais = [x.strip() for x in p.get("canais", "").split(",") if x.strip()]
-    if "inicio" in p:
+    # O mês da verba travada é o `inicio`; congela na aprovação (não remexer o teto
+    # de um mês já comprometido). verba_prevista idem + nunca negativa (infla o teto).
+    if "inicio" in p and not c.aprovada_em:
         c.inicio = p.get("inicio") or None
     if "fim" in p:
         c.fim = p.get("fim") or None
-    if "verba_prevista" in p:
+    if "verba_prevista" in p and not c.aprovada_em:
         try:
-            c.verba_prevista = services.parse_moeda(p.get("verba_prevista"))
+            v = services.parse_moeda(p.get("verba_prevista"))
+            c.verba_prevista = v if v >= 0 else c.verba_prevista
         except Exception:  # noqa: BLE001
             pass
     if "etapa_funil" in p:

@@ -457,3 +457,22 @@ Três módulos com invariantes relevantes ficaram **abaixo do patamar de confian
 
 **Pendente (médias/baixas):** concorrência (`select_for_update` em estoque/loja/lavanderia), gating de módulo (escala/fiscal), liquidação por webhook sem verificação na fonte (pagamentos), estorno PARCIAL na conciliação (hoje só o total sai do pool). Suíte: 727 testes OK.
 
+
+## Correções — médias de dinheiro/concorrência (03/10/2026) ✅
+
+12 médias atacadas, cada uma com teste onde determinístico:
+
+**Concorrência (lock/serialização):**
+- **estoque** `registrar_saida`: `select_for_update` por produto×local — sem corrida pra saldo negativo (corrige loja e todos os PDVs na raiz).
+- **lavanderia** `entregar`: `select_for_update` na ordem — duplo POST não cobra 2×.
+- **fiscal** `emitir_nfse_da_conta`: lock da conta — não duplica NFS-e em duplo clique.
+- **governança** `concluir_tarefa`/`iniciar_tarefa`: guard de estado (idempotente) — não re-dispara sinal/auditoria.
+
+**Correção de dinheiro:**
+- **marketing**: `verba_prevista` nunca negativa; `inicio`/`verba` congelados após a aprovação (mês do teto não remexe).
+- **pagamentos**: liquidação (líquido/taxa) do webhook só no sandbox — fora dele vem de conferência/provedor, não do corpo forjável.
+- **conciliação**: recebimento totalmente estornado fora do pool (feito antes); `conciliar_cartao` sem operador usa usuário de sistema (taxa sempre lançada); dedupe do OFX por FITID sempre (banco+conta), mesmo sem conta.
+- **site**: desconto Pix propagado para a diária da pré-reserva no CRM (fonte da verdade), não só no recibo.
+- **reservas**: view `nova` valida `uh_disponivel` (bloqueio de manutenção por datas) antes de salvar.
+
+Suíte: **732 testes OK**. Pendentes do audit = médias/baixas não-dinheiro (ex.: conversão descarta composição adultos/crianças, gating de módulo em escala) + baixas.

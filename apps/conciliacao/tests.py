@@ -414,3 +414,34 @@ class EstornoNaConciliacaoTests(TestCase):
         self.assertIn(bom.id, ids)
         self.assertNotIn(ruim.id, ids)       # não concilia dinheiro inexistente
         self.assertIn(parcial.id, ids)
+
+
+class CartaoSemOperadorTests(TestCase):
+    """Médio: conciliar_cartao(usuario=None) marcava CONCILIADO sem lançar a taxa."""
+
+    def test_usuario_none_ainda_lanca_taxa(self):
+        user = Usuario.objects.create_user(username="op2", password="x123456789")
+        sessao = SessaoCaixa.objects.create(operador=user, modulo="reservas")
+        forma = FormaPagamento.objects.create(
+            nome="Crédito CRON", tipo=FormaPagamento.Tipo.CARTAO_CREDITO)
+        MovimentoCaixa.objects.create(
+            sessao=sessao, tipo=MovimentoCaixa.Tipo.RECEBIMENTO, forma_pagamento=forma,
+            valor=Decimal("200.00"), autorizacao="NSU123", descricao="Venda",
+            criado_por=user)
+        services.importar_cartao_csv(conteudo=CSV_CARTAO)
+        services.conciliar_cartao(usuario=None)   # cron, sem operador
+        t = TransacaoCartao.objects.get()
+        self.assertEqual(t.status, TransacaoCartao.Status.CONCILIADO)
+        self.assertIsNotNone(t.lancamento_taxa)   # taxa lançada mesmo sem operador
+        self.assertEqual(t.lancamento_taxa.valor, Decimal("5.00"))
+
+
+class DedupeOfxSemContaTests(TestCase):
+    """Médio: reimportar o OFX sem informar a conta duplicava todas as linhas."""
+
+    def test_reimportar_sem_conta_nao_duplica(self):
+        services.importar_ofx(conteudo=OFX_EXEMPLO, conta="")
+        n1 = LancamentoExtrato.objects.count()
+        self.assertEqual(n1, 2)
+        services.importar_ofx(conteudo=OFX_EXEMPLO, conta="")  # reimporta o mesmo
+        self.assertEqual(LancamentoExtrato.objects.count(), 2)  # dedupe por FITID

@@ -264,6 +264,18 @@ def nova(request):
                 f"Alterar a diária (tarifa vigente: R$ {sugerida}) exige gerência.",
             )
             return render(request, template, contexto)
+        # Orçamento é só cotação; reserva de verdade respeita a disponibilidade
+        # (reserva ativa OU bloqueio de manutenção por datas — a constraint só pega
+        # reserva×reserva, então validamos aqui também).
+        if "orcamento" not in request.POST and not services.uh_disponivel(
+            reserva.uh, reserva.checkin, reserva.checkout
+        ):
+            form.add_error(
+                None,
+                f"O quarto {reserva.uh.numero} não está disponível nesse período "
+                "(reserva ativa ou bloqueio de manutenção).",
+            )
+            return render(request, template, contexto)
         if "orcamento" in request.POST:
             reserva.status = Reserva.Status.ORCAMENTO
         try:

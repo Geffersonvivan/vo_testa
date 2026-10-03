@@ -82,6 +82,10 @@ def emitir_nfse_da_conta(conta_id, operador):
     fica para quando a Inscrição Estadual sair."""
     if not modulo_ativo(Modulo.RESERVAS):
         raise ValidationError("Módulo Reservas inativo.")
+    # Serializa a emissão por conta: sem o lock, duplo clique/concorrência passa os dois
+    # pelo check de idempotência e cria duas NFS-e para a mesma hospedagem.
+    from apps.reservas.models import ContaHospedagem
+    ContaHospedagem.objects.select_for_update().filter(pk=conta_id).first()
     from apps.reservas.services import resumo_fiscal_conta
     resumo = resumo_fiscal_conta(conta_id)
     if not resumo:

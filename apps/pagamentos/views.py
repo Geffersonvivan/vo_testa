@@ -416,10 +416,12 @@ def webhook(request):
         origem="webhook",
         detalhe={"gateway_id": gid, "status": status_gw, "body": _redigir(body)},
     )
-    # Notificação de liquidação (o dinheiro caiu na conta) pode vir junto do
-    # pagamento ou num webhook próprio, depois. Se a cobrança já está paga,
-    # registramos a liquidação e encerramos.
-    liq = _extrair_liquidacao(body)
+    # Notificação de liquidação (o dinheiro caiu na conta). Valores (líquido/taxa) são
+    # dinheiro de conciliação: FORA do sandbox NÃO confiamos no corpo (forjável) — a
+    # liquidação real entra por conferência manual (view `liquidar`) ou relatório do
+    # provedor. No sandbox (sem provedor) aceitamos o corpo para exercitar o fluxo.
+    sandbox = getattr(settings, "PAGAMENTOS_GATEWAY", "simulado") == "simulado"
+    liq = _extrair_liquidacao(body) if sandbox else None
     if liq and cobranca.status == Cobranca.Status.PAGO:
         try:
             services.registrar_liquidacao(cobranca, origem="webhook", **liq)

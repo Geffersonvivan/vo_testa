@@ -892,3 +892,38 @@ class CincoCorrecoesTests(TestCase):
         self.assertEqual(at[0]["canal"], "Meta Ads")
         r = self.client.get("/crm/marketing/")
         self.assertContains(r, "Três estáticos · Meta Ads")
+
+
+class VerbaGuardTests(TestCase):
+    """Médio: verba_prevista aceitava negativo (inflava o teto) e o mês/verba eram
+    editáveis após a aprovação."""
+
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+        from apps.nucleo.models import ModuloContratado
+        ModuloContratado.objects.update_or_create(
+            codigo=Modulo.MARKETING, defaults={"ativo": True})
+        self.u = get_user_model().objects.create_superuser(
+            username="mkt", password="forte-123-abc")
+        self.client.force_login(self.u)
+        self.c = Campanha.objects.create(nome="X", verba_prevista=Decimal("100.00"))
+
+    def _salvar(self, **data):
+        from django.urls import reverse
+        return self.client.post(
+            reverse("marketing:salvar_campanha", args=[self.c.pk]), data)
+
+    def test_verba_negativa_rejeitada(self):
+        self._salvar(verba_prevista="-50,00")
+        self.c.refresh_from_db()
+        self.assertEqual(self.c.verba_prevista, Decimal("100.00"))  # manteve, não negativou
+
+    def test_verba_e_inicio_congelados_apos_aprovar(self):
+        from django.utils import timezone
+        self.c.aprovada_em = timezone.now()
+        self.c.inicio = timezone.localdate()
+        self.c.save()
+        self._salvar(verba_prevista="999,00", inicio="2030-01-01")
+        self.c.refresh_from_db()
+        self.assertEqual(self.c.verba_prevista, Decimal("100.00"))   # congelada
+        self.assertNotEqual(str(self.c.inicio), "2030-01-01")        # congelado

@@ -101,12 +101,12 @@ def importar_ofx(*, conteudo, banco="Banco Safra", conta="", arquivo_nome="", us
         banco=banco, conta=conta, arquivo_nome=arquivo_nome,
         periodo_inicio=min(datas), periodo_fim=max(datas), importado_por=usuario,
     )
-    existentes = set()
-    if conta:
-        existentes = set(
-            LancamentoExtrato.objects.filter(extrato__conta=conta)
-            .exclude(fitid="").values_list("fitid", flat=True)
-        )
+    # Dedupe por FITID SEMPRE (por banco+conta, mesmo com conta vazia) — senão
+    # reimportar o mesmo arquivo sem informar a conta duplicaria todas as linhas.
+    existentes = set(
+        LancamentoExtrato.objects.filter(extrato__banco=banco, extrato__conta=conta)
+        .exclude(fitid="").values_list("fitid", flat=True)
+    )
     novos = ignorados = 0
     for x in linhas:
         if x["fitid"] and x["fitid"] in existentes:
@@ -230,6 +230,20 @@ def _sem_estornados(qs):
               .exclude(_estornado__gte=F("valor")))
 
 
+def _usuario_sistema():
+    """Ator de sistema p/ lançamentos automáticos (taxa de cartão) quando a
+    conciliação roda sem operador (cron) — a taxa (LancamentoFinanceiro) exige
+    criado_por, então nunca marcamos CONCILIADO sem registrar a taxa."""
+    from django.contrib.auth import get_user_model
+    user, criado = get_user_model().objects.get_or_create(
+        username="_conciliacao",
+        defaults={"is_active": True, "first_name": "Conciliação"})
+    if criado:
+        user.set_unusable_password()
+        user.save(update_fields=["password"])
+    return user
+
+
 @transaction.atomic
 def conciliar_banco(*, extrato=None, janela_dias=2, usuario=None):
     """Casa linhas pendentes do extrato com recebimentos de caixa e contas baixadas."""
@@ -273,6 +287,8 @@ def conciliar_banco(*, extrato=None, janela_dias=2, usuario=None):
 @transaction.atomic
 def conciliar_cartao(*, lote=None, usuario=None):
     """Casa transações pendentes com recebimentos de cartão no caixa (por NSU) e lança a taxa."""
+    if usuario is None:
+        usuario = _usuario_sistema()  # taxa sempre lançada, mesmo sem operador
     qs = TransacaoCartao.objects.filter(status=TransacaoCartao.Status.PENDENTE)
     if lote:
         qs = qs.filter(lote=lote)

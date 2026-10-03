@@ -770,13 +770,21 @@ def finalizar_reserva(request):
 
     config = ConfiguracaoSite.load()
     desconto = Decimal(config.desconto_pix) if metodo == 'pix' else Decimal('0')
+    # O desconto Pix precisa valer na CONTA do CRM (fonte da verdade), não só no recibo
+    # do site. Baixa a diária da pré-reserva; o recibo guarda o preço cheio + o %.
+    preco_cheio = crm_reserva.valor_diaria
+    if desconto > 0 and preco_cheio:
+        crm_reserva.valor_diaria = (
+            preco_cheio * (Decimal('100') - desconto) / Decimal('100')
+        ).quantize(Decimal('0.01'))
+        crm_reserva.save(update_fields=['valor_diaria'])
     reserva = Reserva.objects.create(
         hospede=hospede,
         quarto=quarto,
         data_checkin=checkin,
         data_checkout=checkout,
         num_hospedes=hospedes,
-        preco_noite=crm_reserva.valor_diaria,
+        preco_noite=preco_cheio,
         desconto_percentual=desconto,
         metodo_pagamento=metodo,
         status='aguardando',

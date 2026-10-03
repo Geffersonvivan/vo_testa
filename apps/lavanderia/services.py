@@ -69,6 +69,11 @@ def avancar_status(ordem):
 
 @transaction.atomic
 def entregar(ordem, operador, destino, forma=None, conta_id=None, desconto=ZERO):
+    # Trava a linha p/ serializar a entrega: sem o lock, um duplo POST cobra duas vezes
+    # (dois entregar() passam no `em_producao` antes de qualquer um gravar). Atualiza a
+    # instância recebida com o estado já travado (sem trocar a referência do chamador).
+    OrdemLavanderia.objects.select_for_update().get(pk=ordem.pk)
+    ordem.refresh_from_db()
     if not ordem.em_producao:
         raise ValidationError("Esta ordem já foi encerrada.")
     if not ordem.itens.exists():

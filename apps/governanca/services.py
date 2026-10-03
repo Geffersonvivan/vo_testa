@@ -43,6 +43,8 @@ def abrir_faxina(uh, tipo=TarefaGovernanca.Tipo.FAXINA, usuario=None, origem="ma
 
 
 def iniciar_tarefa(tarefa, usuario=None):
+    if tarefa.status != TarefaGovernanca.Status.PENDENTE:
+        return tarefa  # já iniciada/concluída — idempotente
     tarefa.status = TarefaGovernanca.Status.EM_ANDAMENTO
     tarefa.iniciada_em = timezone.now()
     tarefa.save()
@@ -51,6 +53,8 @@ def iniciar_tarefa(tarefa, usuario=None):
 
 
 def concluir_tarefa(tarefa, usuario=None):
+    if tarefa.status == TarefaGovernanca.Status.CONCLUIDA:
+        return tarefa  # idempotente — não re-dispara o sinal nem re-audita
     tarefa.status = TarefaGovernanca.Status.CONCLUIDA
     tarefa.concluida_em = timezone.now()
     tarefa.save()

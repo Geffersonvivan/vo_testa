@@ -112,3 +112,23 @@ class PermissaoTests(GovernancaBase):
         ModuloContratado.objects.filter(codigo=Modulo.GOVERNANCA).update(ativo=False)
         self.client.login(username="governanta", password="senha-forte-123")
         self.assertEqual(self.client.get(reverse("governanca:painel")).status_code, 404)
+
+
+class TarefaIdempotenteTests(GovernancaBase):
+    """Médio: concluir_tarefa duas vezes re-disparava o sinal e re-auditava."""
+
+    def test_concluir_duas_vezes_nao_redispara(self):
+        t = TarefaGovernanca.objects.create(
+            uh=self.uh, tipo=TarefaGovernanca.Tipo.FAXINA,
+            status=TarefaGovernanca.Status.PENDENTE)
+        from apps.governanca.signals import faxina_concluida
+        recebidos = []
+        def _h(sender, **kw):
+            recebidos.append(1)
+        faxina_concluida.connect(_h)
+        try:
+            services.concluir_tarefa(t, self.user)
+            services.concluir_tarefa(t, self.user)  # 2ª vez — idempotente
+        finally:
+            faxina_concluida.disconnect(_h)
+        self.assertEqual(len(recebidos), 1)
