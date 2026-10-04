@@ -93,7 +93,6 @@ def rel_faturamento_modulos(inicio, fim):
     """
     from apps.nucleo.models import modulo_ativo
 
-    rng = (inicio, fim)
     linhas = []
     tot_caixa = tot_quarto = Decimal("0")
 
