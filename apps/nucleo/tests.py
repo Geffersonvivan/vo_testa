@@ -1197,3 +1197,24 @@ class SalarioFlagETela1EtapaTests(TestCase):
         resp = self.client.post(reverse("funcionario_novo"), {"nome": "Só Nome"})
         self.assertRedirects(resp, reverse("funcionarios"))
         self.assertTrue(Funcionario.objects.filter(pessoa__nome="Só Nome").exists())
+
+
+class SistemaHelpersTests(TestCase):
+    """Helpers compartilhados extraídos no code-review (usuario_de_sistema, travar)."""
+
+    def test_usuario_de_sistema_idempotente_e_nao_logavel(self):
+        from apps.nucleo.sistema import usuario_de_sistema
+        u1 = usuario_de_sistema("_bot", "Bot")
+        u2 = usuario_de_sistema("_bot", "Bot")
+        self.assertEqual(u1.pk, u2.pk)                 # idempotente (get_or_create)
+        self.assertFalse(u1.has_usable_password())     # nunca é conta logável
+
+    def test_travar_recarrega_a_instancia_passada(self):
+        from django.db import transaction
+        from apps.nucleo.models import Pessoa
+        from apps.nucleo.sistema import travar
+        p = Pessoa.objects.create(nome="Antigo")
+        Pessoa.objects.filter(pk=p.pk).update(nome="Novo")  # muda no banco por fora
+        with transaction.atomic():
+            travar(p)
+        self.assertEqual(p.nome, "Novo")               # a instância foi recarregada

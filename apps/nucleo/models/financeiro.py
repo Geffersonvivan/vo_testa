@@ -356,7 +356,8 @@ def estornar_movimento(origem: MovimentoCaixa, sessao: SessaoCaixa, usuario, mot
     """
     # Trava a origem p/ serializar estornos parciais concorrentes — sem o lock, dois
     # estornos leem o mesmo "já estornado" e podem passar do valor original.
-    origem = MovimentoCaixa.objects.select_for_update().get(pk=origem.pk)
+    from apps.nucleo.sistema import travar
+    origem = travar(origem)
     estorno = MovimentoCaixa(
         sessao=sessao,
         tipo=MovimentoCaixa.Tipo.ESTORNO,

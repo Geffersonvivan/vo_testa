@@ -631,7 +631,8 @@ def receber_pagamento(
     só fecha quando o saldo zera. `observacao` registra quem pagou cada parte.
     `autorizacao` guarda o NSU/código do comprovante do cartão (conciliação)."""
     # Trava a conta p/ serializar pagamentos concorrentes (duplo POST não superpaga).
-    conta = ContaHospedagem.objects.select_for_update().get(pk=conta.pk)
+    from apps.nucleo.sistema import travar
+    conta = travar(conta)
     if not conta.aberta:
         raise ValidationError("A conta desta hospedagem já foi fechada.")
     valor = Decimal(str(valor or 0))
@@ -799,14 +800,21 @@ def total_grupo(grupo) -> dict:
 
 
 @transaction.atomic
+@transaction.atomic
 def receber_folio_grupo(grupo, usuario, forma: FormaPagamento, valor: Decimal,
                         parcelas: int = 1, observacao: str = "",
                         autorizacao: str = "") -> PagamentoConta:
     """Recebe (parcial ou total) o folio-mãe pelo caixa do operador. O folio só fecha
     no `encerrar_grupo`, quando o saldo zera."""
-    folio = grupo.folio
+    from apps.nucleo.sistema import travar
+    folio = travar(grupo.folio)
     if not folio.aberta:
         raise ValidationError("O folio deste grupo já foi fechado.")
+    valor = Decimal(str(valor or 0))
+    if valor <= 0:
+        raise ValidationError("O valor do pagamento deve ser positivo.")
+    if valor > folio.saldo():
+        raise ValidationError(f"Valor acima do saldo do folio (R$ {folio.saldo()}).")
     sufixo = f" ({observacao})" if observacao else ""
     movimento = _receber_no_caixa(
         usuario, forma, valor, f"Folio grupo #{grupo.pk} — {grupo.rotulo}{sufixo}",

@@ -257,8 +257,8 @@ def registrar_entrada(
         raise ValidationError("A quantidade de entrada deve ser positiva.")
     # Custo médio é read-modify-write: trava o produto p/ serializar entradas
     # concorrentes (senão uma corrida grava um custo médio corrompido).
-    Produto.objects.select_for_update().get(pk=produto.pk)
-    produto.refresh_from_db()
+    from apps.nucleo.sistema import travar
+    produto = travar(produto)
     saldo_atual = saldo(produto)
     valor_atual = saldo_atual * produto.custo_medio
     novo_saldo = saldo_atual + quantidade
@@ -284,7 +284,8 @@ def registrar_saida(
     # Serializa baixas concorrentes (e contra entradas) travando a LINHA DO PRODUTO —
     # mesmo âncora de registrar_entrada. O(1) e cobre a 1ª saída (kardex vazio), ao
     # contrário de travar as linhas do kardex (que cresce e não trava nada no início).
-    Produto.objects.select_for_update().get(pk=produto.pk)
+    from apps.nucleo.sistema import travar
+    travar(produto)
     if saldo(produto, local) < quantidade:
         raise ValidationError(
             f"Saldo insuficiente de {produto} em {local} "

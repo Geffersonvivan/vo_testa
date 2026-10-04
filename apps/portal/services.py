@@ -6,7 +6,6 @@ opcional estiver inativo.
 """
 from decimal import Decimal
 
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
@@ -15,17 +14,10 @@ from apps.nucleo.modulos import Modulo
 
 from .models import AcessoPortal, SolicitacaoPortal
 
-Usuario = get_user_model()
-
 
 def _usuario_sistema():
-    user, criado = Usuario.objects.get_or_create(
-        username="_portal", defaults={"is_active": True, "first_name": "Portal"}
-    )
-    if criado:
-        user.set_unusable_password()
-        user.save(update_fields=["password"])
-    return user
+    from apps.nucleo.sistema import usuario_de_sistema
+    return usuario_de_sistema("_portal", "Portal")
 
 
 def get_acesso(reserva_id) -> AcessoPortal:

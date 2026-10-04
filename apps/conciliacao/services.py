@@ -232,16 +232,9 @@ def _sem_estornados(qs):
 
 def _usuario_sistema():
     """Ator de sistema p/ lançamentos automáticos (taxa de cartão) quando a
-    conciliação roda sem operador (cron) — a taxa (LancamentoFinanceiro) exige
-    criado_por, então nunca marcamos CONCILIADO sem registrar a taxa."""
-    from django.contrib.auth import get_user_model
-    user, criado = get_user_model().objects.get_or_create(
-        username="_conciliacao",
-        defaults={"is_active": True, "first_name": "Conciliação"})
-    if criado:
-        user.set_unusable_password()
-        user.save(update_fields=["password"])
-    return user
+    conciliação roda sem operador (cron) — a taxa exige criado_por."""
+    from apps.nucleo.sistema import usuario_de_sistema
+    return usuario_de_sistema("_conciliacao", "Conciliação")
 
 
 @transaction.atomic

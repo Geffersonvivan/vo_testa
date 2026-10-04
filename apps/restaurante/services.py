@@ -69,8 +69,8 @@ def remover_item(item, operador):
 @transaction.atomic
 def fechar_comanda(comanda, operador, destino, forma=None, conta_id=None, desconto=ZERO):
     # Trava a comanda p/ serializar o fechamento — duplo POST não cobra/lança 2×.
-    Comanda.objects.select_for_update().get(pk=comanda.pk)
-    comanda.refresh_from_db()
+    from apps.nucleo.sistema import travar
+    comanda = travar(comanda)
     if not comanda.aberta:
         raise ValidationError("Esta comanda já foi fechada.")
     if not comanda.itens.exists():

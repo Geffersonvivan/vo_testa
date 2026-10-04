@@ -54,13 +54,8 @@ def _etapa_cotacao():
 
 
 def _usuario_site():
-    user, criado = Usuario.objects.get_or_create(
-        username="_site", defaults={"is_active": True, "first_name": "Site"},
-    )
-    if criado:
-        user.set_unusable_password()
-        user.save(update_fields=["password"])
-    return user
+    from apps.nucleo.sistema import usuario_de_sistema
+    return usuario_de_sistema("_site", "Site")
 
 
 def calcular_score(oportunidade) -> int:

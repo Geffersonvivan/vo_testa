@@ -52,15 +52,8 @@ def _limite_excedido(request, escopo, limite, janela_seg):
 
 def _usuario_sistema():
     """Usuário de sistema para atribuir reservas vindas do site (auditoria)."""
-    from django.contrib.auth import get_user_model
-    U = get_user_model()
-    user, criado = U.objects.get_or_create(
-        username="_site", defaults={"is_active": True, "first_name": "Site"}
-    )
-    if criado:
-        user.set_unusable_password()
-        user.save(update_fields=["password"])
-    return user
+    from apps.nucleo.sistema import usuario_de_sistema
+    return usuario_de_sistema("_site", "Site")
 
 
 def home(request):
