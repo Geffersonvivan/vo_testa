@@ -255,6 +255,10 @@ def registrar_entrada(
     custo_unitario = Decimal(custo_unitario)
     if quantidade <= ZERO:
         raise ValidationError("A quantidade de entrada deve ser positiva.")
+    # Custo médio é read-modify-write: trava o produto p/ serializar entradas
+    # concorrentes (senão uma corrida grava um custo médio corrompido).
+    Produto.objects.select_for_update().get(pk=produto.pk)
+    produto.refresh_from_db()
     saldo_atual = saldo(produto)
     valor_atual = saldo_atual * produto.custo_medio
     novo_saldo = saldo_atual + quantidade

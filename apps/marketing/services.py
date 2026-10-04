@@ -823,6 +823,10 @@ def ocupacao_x_campanha(dias: int = 91) -> list[dict]:
       - **problema**: semana vazia COM campanha ativa → o problema é a campanha, não a falta dela.
     A barra é em **escala absoluta** (0–100%); o branco (o vazio) é a informação.
     """
+    from apps.nucleo.models import modulo_ativo
+    from apps.nucleo.modulos import Modulo
+    if not modulo_ativo(Modulo.RESERVAS):
+        return []  # depende de Reservas; sem ele, sem dados de ocupação (degrada)
     from apps.reservas.services import ocupacao_prevista
     hoje = timezone.localdate()
     fim_janela = hoje + timedelta(days=dias)

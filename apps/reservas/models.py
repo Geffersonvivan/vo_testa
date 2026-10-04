@@ -263,6 +263,10 @@ class Reserva(models.Model):
             raise ValidationError(
                 {"checkout": "A saída (check-out) deve ser depois da entrada (check-in)."}
             )
+        # Pelo menos 1 adulto: 0 hóspedes burlaria a trava de FNRH (len>=0) e zeraria
+        # o cálculo de colchão/diária.
+        if (self.adultos or 0) < 1:
+            raise ValidationError({"adultos": "Informe ao menos 1 adulto."})
         if self.faturamento != self.Faturamento.PARTICULAR and not self.titular_id:
             raise ValidationError(
                 {"titular": "Faturamento por agência/empresa exige o titular."}

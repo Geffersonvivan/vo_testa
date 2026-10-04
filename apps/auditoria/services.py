@@ -66,25 +66,28 @@ def varrer():
     """Roda todas as varreduras e devolve os achados ordenados por gravidade."""
     achados = list(_checagens_nucleo())
 
+    import importlib
+    import logging
+
     from apps.nucleo.models import modulo_ativo
-    if modulo_ativo(Modulo.RESERVAS):
-        from apps.reservas.services import pendencias_auditoria
-        achados += pendencias_auditoria()
-    if modulo_ativo(Modulo.MANUTENCAO):
-        from apps.manutencao.services import pendencias_auditoria
-        achados += pendencias_auditoria()
-    if modulo_ativo(Modulo.RESTAURANTE):
-        from apps.restaurante.services import pendencias_auditoria
-        achados += pendencias_auditoria()
-    if modulo_ativo(Modulo.LAVANDERIA):
-        from apps.lavanderia.services import pendencias_auditoria
-        achados += pendencias_auditoria()
-    if modulo_ativo(Modulo.FISCAL):
-        from apps.fiscal.services import pendencias_auditoria
-        achados += pendencias_auditoria()
-    if modulo_ativo(Modulo.COMERCIAL):
-        from apps.comercial.services import pendencias_auditoria
-        achados += pendencias_auditoria()
+    # Cada módulo dono expõe pendencias_auditoria(); uma falha num deles NÃO pode
+    # derrubar toda a varredura (degradação graciosa prometida no docstring).
+    donos = [
+        (Modulo.RESERVAS, "apps.reservas.services"),
+        (Modulo.MANUTENCAO, "apps.manutencao.services"),
+        (Modulo.RESTAURANTE, "apps.restaurante.services"),
+        (Modulo.LAVANDERIA, "apps.lavanderia.services"),
+        (Modulo.FISCAL, "apps.fiscal.services"),
+        (Modulo.COMERCIAL, "apps.comercial.services"),
+    ]
+    for mod, caminho in donos:
+        if not modulo_ativo(mod):
+            continue
+        try:
+            achados += importlib.import_module(caminho).pendencias_auditoria()
+        except Exception:
+            logging.getLogger(__name__).exception(
+                "varredura de pendências falhou: %s", caminho)
 
     achados.sort(key=lambda a: _ORDEM_GRAVIDADE.get(a["gravidade"], 9))
     return achados

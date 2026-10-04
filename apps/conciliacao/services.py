@@ -258,7 +258,7 @@ def conciliar_banco(*, extrato=None, janela_dias=2, usuario=None):
     for m in _sem_estornados(MovimentoCaixa.objects
                              .filter(tipo=MovimentoCaixa.Tipo.RECEBIMENTO)
                              .exclude(id__in=mc_usados)):
-        crm.append(ItemCrm(id=("mc", m.id), data=m.criado_em.date(), valor=m.valor, entrada=True))
+        crm.append(ItemCrm(id=("mc", m.id), data=timezone.localtime(m.criado_em).date(), valor=m.valor, entrada=True))
     for c in (ContaPagarReceber.objects
               .filter(status=ContaPagarReceber.Status.BAIXADA, baixada_em__isnull=False)
               .exclude(id__in=cpr_usados)):
@@ -356,7 +356,7 @@ def candidatos_para_extrato(lancamento, limite: int = 20) -> list[Candidato]:
         for m in _sem_estornados(MovimentoCaixa.objects
                   .filter(tipo=MovimentoCaixa.Tipo.RECEBIMENTO).exclude(id__in=mc_usados)):
             cands.append(Candidato("mc", m.id, f"Caixa: {m.descricao}", m.valor,
-                                   m.criado_em.date(), m.valor == alvo))
+                                   timezone.localtime(m.criado_em).date(), m.valor == alvo))
         for c in (ContaPagarReceber.objects
                   .filter(tipo=ContaPagarReceber.Tipo.RECEBER,
                           status=ContaPagarReceber.Status.BAIXADA).exclude(id__in=cpr_usados)):
@@ -432,7 +432,7 @@ def candidatos_para_cartao(transacao, limite: int = 20) -> list[Candidato]:
               .filter(tipo=MovimentoCaixa.Tipo.RECEBIMENTO, forma_pagamento__tipo__in=formas)
               .exclude(id__in=usados)):
         cands.append(Candidato("mc", m.id, f"{m.descricao} — NSU {m.autorizacao or '—'}",
-                               m.valor, m.criado_em.date(), m.autorizacao == transacao.nsu))
+                               m.valor, timezone.localtime(m.criado_em).date(), m.autorizacao == transacao.nsu))
     cands.sort(key=lambda x: (not x.exato, abs(x.valor - transacao.bruto)))
     return cands[:limite]
 

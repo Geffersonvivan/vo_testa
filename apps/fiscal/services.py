@@ -128,6 +128,14 @@ def processar_retorno_focus(payload: dict):
     if not doc:
         return None
     status = (payload.get("status") or "").lower()
+    # Status intermediário/desconhecido: não sobrescreve número/chave definitivos nem
+    # salva — só registra um evento informativo (evita corromper a nota por um retorno
+    # que não casa nenhum ramo).
+    if status not in ("autorizado", "autorizada", "cancelado", "cancelada") \
+            and not status.startswith("erro"):
+        EventoFiscal.objects.create(documento=doc, tipo="webhook_info",
+                                    detalhe={"status": status, "origem": "webhook"})
+        return doc
     doc.numero = str(payload.get("numero", doc.numero) or doc.numero)
     doc.chave = payload.get("codigo_verificacao") or payload.get("chave_nfe") or doc.chave
     doc.pdf_url = payload.get("url_danfse") or payload.get("url") or doc.pdf_url

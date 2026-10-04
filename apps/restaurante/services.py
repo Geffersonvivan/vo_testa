@@ -68,6 +68,9 @@ def remover_item(item, operador):
 
 @transaction.atomic
 def fechar_comanda(comanda, operador, destino, forma=None, conta_id=None, desconto=ZERO):
+    # Trava a comanda p/ serializar o fechamento — duplo POST não cobra/lança 2×.
+    Comanda.objects.select_for_update().get(pk=comanda.pk)
+    comanda.refresh_from_db()
     if not comanda.aberta:
         raise ValidationError("Esta comanda já foi fechada.")
     if not comanda.itens.exists():
@@ -134,6 +137,10 @@ def cancelar_comanda(comanda, usuario, motivo):
 def transferir_mesa(comanda, nova_mesa):
     if not comanda.aberta:
         raise ValidationError("Esta comanda já foi fechada.")
+    if not nova_mesa:
+        raise ValidationError("Selecione o ponto de atendimento de destino.")
+    if nova_mesa == comanda.mesa:
+        raise ValidationError("A comanda já está nesse ponto.")
     comanda.mesa = nova_mesa
     comanda.save(update_fields=["mesa"])
     return comanda

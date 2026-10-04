@@ -616,6 +616,7 @@ def _receber_no_caixa(
     )
 
 
+@transaction.atomic
 def receber_pagamento(
     conta: ContaHospedagem,
     usuario,
@@ -631,6 +632,12 @@ def receber_pagamento(
     `autorizacao` guarda o NSU/código do comprovante do cartão (conciliação)."""
     if not conta.aberta:
         raise ValidationError("A conta desta hospedagem já foi fechada.")
+    valor = Decimal(str(valor or 0))
+    if valor <= 0:
+        raise ValidationError("O valor do pagamento deve ser positivo.")
+    if valor > conta.saldo():
+        raise ValidationError(
+            f"Valor acima do saldo da conta (R$ {conta.saldo()}).")
     sufixo = f" ({observacao})" if observacao else ""
     movimento = _receber_no_caixa(
         usuario, forma, valor,
@@ -956,6 +963,7 @@ def conta_aberta(conta_id):
     )
 
 
+@transaction.atomic
 def receber_adiantamento(
     reserva: Reserva, usuario, forma: FormaPagamento, valor: Decimal, parcelas: int = 1,
     autorizacao: str = "",

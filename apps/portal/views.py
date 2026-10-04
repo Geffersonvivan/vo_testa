@@ -44,6 +44,10 @@ def nps(request, token):
 def pedir(request, token):
     estadia = _estadia_ou_404(token)
     if request.method == "POST":
+        if limite_excedido(request, "portal_acoes", limite=20, janela_seg=300,
+                           sufixo=str(token)):
+            messages.error(request, "Muitas solicitações em pouco tempo. Aguarde um instante.")
+            return redirect("portal:home", token=token)
         pedidos = []
         for chave, valor in request.POST.items():
             if chave.startswith("qtd_") and valor.strip():
@@ -59,6 +63,10 @@ def pedir(request, token):
 def solicitar(request, token):
     estadia = _estadia_ou_404(token)
     if request.method == "POST":
+        if limite_excedido(request, "portal_acoes", limite=20, janela_seg=300,
+                           sufixo=str(token)):
+            messages.error(request, "Muitas solicitações em pouco tempo. Aguarde um instante.")
+            return redirect("portal:home", token=token)
         tipo = request.POST.get("tipo")
         if tipo == "limpeza":
             services.solicitar_limpeza(estadia)

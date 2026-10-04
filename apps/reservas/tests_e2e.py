@@ -102,3 +102,36 @@ class FluxoMestre1E2ETests(TestCase):
         st = StatusLimpeza.objects.filter(uh=self.uh).first()
         self.assertIsNotNone(st, "Governança não marcou o quarto no check-out")
         self.assertEqual(st.situacao, StatusLimpeza.Situacao.SUJA)
+
+
+@override_settings(FNRH_BLOQUEAR_CHECKIN=False)
+class ReceberPagamentoGuardTests(TestCase):
+    """Baixa: receber_pagamento aceitava valor acima do saldo (overpayment) e
+    travava o check-out."""
+
+    def setUp(self):
+        from apps.nucleo.models import ModuloContratado
+        ModuloContratado.objects.update_or_create(codigo=Modulo.RESERVAS,
+                                                   defaults={"ativo": True})
+        self.op = Usuario.objects.create_superuser(username="rp", password="senha-forte-123")
+        self.tipo = TipoUH.objects.create(nome="Standard", tarifa_base=Decimal("200"))
+        self.uh = UH.objects.create(numero="RP-1", tipo=self.tipo)
+        self.hospede = Pessoa.objects.create(nome="Hóspede RP")
+        self.dinheiro = FormaPagamento.objects.get(tipo="dinheiro")
+
+    def test_pagamento_acima_do_saldo_recusado(self):
+        from apps.reservas import services as rsv
+        from apps.reservas.models import Reserva
+        hoje = timezone.localdate()
+        r = Reserva.objects.create(
+            uh=self.uh, hospede=self.hospede, checkin=hoje, checkout=hoje + timedelta(days=1),
+            status=Reserva.Status.CONFIRMADA, valor_diaria=Decimal("200"), criado_por=self.op)
+        conta = r.fazer_checkin(self.op)
+        SessaoCaixa.objects.create(operador=self.op, modulo="reservas",
+                                   fundo_troco=Decimal("0.00"))
+        saldo = conta.saldo()
+        with self.assertRaises(ValidationError):
+            rsv.receber_pagamento(conta, self.op, self.dinheiro, saldo + Decimal("50.00"))
+        rsv.receber_pagamento(conta, self.op, self.dinheiro, saldo)  # exato = ok
+        conta.refresh_from_db()
+        self.assertEqual(conta.saldo(), Decimal("0.00"))

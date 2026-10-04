@@ -143,6 +143,7 @@ def entregar(request, pk):
         return redirect("lavanderia:ordem", pk=pk)
 
 
+@requer_modulo(Modulo.LAVANDERIA)
 @requer_gerencia
 def cancelar(request, pk):
     o = get_object_or_404(OrdemLavanderia, pk=pk)
@@ -240,4 +241,6 @@ def rouparia_mover(request):
         messages.success(request, f"{item.nome}: movimento registrado.")
     except ValidationError as erro:
         messages.error(request, " ".join(erro.messages))
+    except (ValueError, TypeError):   # quantidade não-numérica → sem 500
+        messages.error(request, "Quantidade inválida — use um número inteiro.")
     return redirect("lavanderia:rouparia")

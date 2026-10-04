@@ -16,7 +16,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
 
@@ -286,6 +286,12 @@ class MovimentoCaixa(models.Model):
                 raise ValidationError(
                     {"valor": "O estorno excede o valor restante do recebimento."}
                 )
+        if self.tipo == self.Tipo.SANGRIA and self.sessao_id and not self.pk:
+            disponivel = self.sessao.esperado_em_dinheiro()
+            if self.valor > disponivel:
+                raise ValidationError(
+                    {"valor": f"Sangria acima do dinheiro em caixa (R$ {disponivel})."}
+                )
         if (
             self.parcelas > 1
             and self.forma_pagamento_id
@@ -341,12 +347,16 @@ def receber_no_caixa(usuario, forma, valor: Decimal, descricao: str, parcelas: i
     return movimento
 
 
+@transaction.atomic
 def estornar_movimento(origem: MovimentoCaixa, sessao: SessaoCaixa, usuario, motivo: str,
                        valor: Decimal | None = None) -> MovimentoCaixa:
     """
     Cria o movimento inverso de um recebimento (total ou parcial) e audita.
     A permissão de gerência é verificada na view.
     """
+    # Trava a origem p/ serializar estornos parciais concorrentes — sem o lock, dois
+    # estornos leem o mesmo "já estornado" e podem passar do valor original.
+    origem = MovimentoCaixa.objects.select_for_update().get(pk=origem.pk)
     estorno = MovimentoCaixa(
         sessao=sessao,
         tipo=MovimentoCaixa.Tipo.ESTORNO,

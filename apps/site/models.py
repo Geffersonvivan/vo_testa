@@ -403,8 +403,11 @@ class Reserva(models.Model):
     def save(self, *args, **kwargs):
         novo = self._state.adding
         if not self.codigo:
+            import secrets
             now = datetime.now()
-            self.codigo = f"VT-{now:%d%m%y}-{now:%H%M}"
+            # Sufixo aleatório (não só HH:MM): 2 reservas no mesmo minuto colidiam no
+            # unique e davam 500 (rollback da pré-reserva do CRM junto).
+            self.codigo = f"VT-{now:%d%m%y}-{secrets.token_hex(3).upper()}"
         # Ao criar uma reserva aguardando pagamento, define o prazo de validade.
         if novo and self.status == 'aguardando' and not self.expira_em:
             self.expira_em = timezone.now() + timedelta(minutes=RESERVA_VALIDADE_MINUTOS)

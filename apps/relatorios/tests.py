@@ -111,7 +111,7 @@ class RelatoriosViewTests(TestCase):
     def test_export_csv(self):
         self.client.login(username="ger", password="senha-forte-123")
         r = self.client.get(reverse("relatorios:relatorio", args=["caixa"]), {"export": "csv"})
-        self.assertEqual(r["Content-Type"], "text/csv")
+        self.assertIn("text/csv", r["Content-Type"])  # agora com charset utf-8-sig (BOM)
 
     def test_relatorio_inexistente_404(self):
         self.client.login(username="ger", password="senha-forte-123")

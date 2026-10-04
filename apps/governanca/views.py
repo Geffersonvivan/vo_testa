@@ -28,6 +28,8 @@ def nova_tarefa(request):
     if request.method == "POST":
         uh = get_object_or_404(UH, pk=request.POST.get("uh"))
         tipo = request.POST.get("tipo") or TarefaGovernanca.Tipo.FAXINA
+        if tipo not in TarefaGovernanca.Tipo.values:   # não confia no POST
+            tipo = TarefaGovernanca.Tipo.FAXINA
         services.abrir_faxina(uh, tipo=tipo, usuario=request.user, origem="manual")
         messages.success(request, f"Faxina aberta para o {uh.numero}.")
     return redirect("governanca:painel")

@@ -4,6 +4,7 @@ O bloqueio do quarto usa `UH.status` (a disponibilidade é sempre dona do
 Reservas); a ocupação atual é consultada por `reservas.services` — nunca por
 import de model interno. Operações que mexem no quarto são auditadas.
 """
+import calendar
 from datetime import timedelta
 from decimal import Decimal
 
@@ -16,6 +17,16 @@ from apps.nucleo.modulos import Modulo
 
 from .models import OrdemServico
 from .signals import reparo_concluido
+
+
+def _somar_meses(d, n):
+    """Soma N meses de calendário a uma data, preservando o dia (ajusta ao fim do mês).
+    Evita a deriva de `timedelta(days=30*N)` em preventivas recorrentes."""
+    total = d.month - 1 + int(n)
+    ano = d.year + total // 12
+    mes = total % 12 + 1
+    dia = min(d.day, calendar.monthrange(ano, mes)[1])
+    return d.replace(year=ano, month=mes, day=dia)
 
 
 def _registrar_bloqueio(uh, usuario, ordem):
@@ -106,9 +117,15 @@ def concluir_os(ordem, usuario, *, resolucao="",
     if not ordem.aberta_ou_andamento:
         raise ValidationError("Esta OS já foi encerrada.")
     if custo_maodeobra is not None:
-        ordem.custo_maodeobra = Decimal(custo_maodeobra)
+        v = Decimal(custo_maodeobra)
+        if v < 0:
+            raise ValidationError("Custo de mão de obra não pode ser negativo.")
+        ordem.custo_maodeobra = v
     if custo_pecas is not None:
-        ordem.custo_pecas = Decimal(custo_pecas)
+        v = Decimal(custo_pecas)
+        if v < 0:
+            raise ValidationError("Custo de peças não pode ser negativo.")
+        ordem.custo_pecas = v
     if nota_fiscal is not None:
         ordem.nota_fiscal = nota_fiscal
     if garantia_ate is not None:
@@ -137,7 +154,7 @@ def concluir_os(ordem, usuario, *, resolucao="",
             descricao=ordem.descricao, tipo=OrdemServico.Tipo.PREVENTIVA,
             prioridade=ordem.prioridade, responsavel=ordem.responsavel,
             recorrencia_meses=ordem.recorrencia_meses,
-            agendada_para=base + timedelta(days=30 * ordem.recorrencia_meses),
+            agendada_para=_somar_meses(base, ordem.recorrencia_meses),
             criado_por=usuario,
         )
     return proxima

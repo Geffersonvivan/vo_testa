@@ -136,6 +136,7 @@ def estornar(cobranca, operador):
     return cobranca
 
 
+@transaction.atomic
 def cancelar(cobranca, operador):
     if cobranca.status != Cobranca.Status.PENDENTE:
         raise ValidationError("Só cobranças pendentes podem ser canceladas.")

@@ -57,6 +57,11 @@ def finalizar_venda(operador, local, itens, destino, forma=None, cliente=None,
 
     if destino == Venda.Destino.CAIXA and not forma:
         raise ValidationError("Escolha a forma de pagamento.")
+    if destino == Venda.Destino.CONTA:
+        from apps.nucleo.models import modulo_ativo
+        from apps.nucleo.modulos import Modulo
+        if not modulo_ativo(Modulo.RESERVAS):
+            raise ValidationError("Lançar no quarto exige o módulo Reservas ativo.")
 
     venda = Venda.objects.create(
         local=local, destino=destino, cliente=cliente, forma_pagamento=forma,

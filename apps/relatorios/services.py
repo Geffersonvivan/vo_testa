@@ -86,8 +86,10 @@ def rel_faturamento_modulos(inicio, fim):
     Faturamento por setor, separando ONDE o dinheiro é recebido:
       - "no caixa do setor" = venda paga na hora, entra na gaveta do próprio setor;
       - "lançado no quarto" = foi pro folio; quem recebe é a RECEPÇÃO (caixa Reservas).
-    Fecha o ciclo do caixa por módulo: a soma da coluna "lançado no quarto" é
-    exatamente o que a recepção coleta de outros setores (+ as diárias).
+    É faturamento por COMPETÊNCIA (o que foi vendido no período, por timestamp de cada
+    setor) — uma visão gerencial, não a batida exata da gaveta da recepção (essa se faz
+    pelo caixa/conciliação). A coluna "lançado no quarto" aproxima o que a recepção
+    coleta de outros setores (+ diárias), mas não é igualdade contábil ao centavo.
     """
     from apps.nucleo.models import modulo_ativo
 

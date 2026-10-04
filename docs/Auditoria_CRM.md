@@ -503,3 +503,37 @@ campos `Oportunidade.adultos/criancas`, que são WIP local ainda não commitado 
 0016). Fecha junto quando o Descritivo de Quartos/composição subir.
 
 Suíte: **734 testes OK**. Restam só baixas (23) e info (3) — nenhuma de dinheiro/segurança.
+
+## Correções — baixas (03/10/2026) ✅
+
+~25 baixas fechadas. Destaques por tipo:
+- **Locks de concorrência** (`select_for_update`): estoque `registrar_entrada` (custo médio),
+  estorno de caixa (parcial), restaurante `fechar_comanda`.
+- **Atomicidade** (`@transaction.atomic`): reservas `receber_pagamento`/`receber_adiantamento`,
+  pagamentos `cancelar`.
+- **Validações**: manutenção custos ≥ 0; reservas adultos ≥ 1; reservas pagamento ≤ saldo
+  (overpayment); caixa sangria ≤ dinheiro em caixa; governança `tipo` contra choices;
+  escala `atribuir` com data nula; lavanderia rouparia com quantidade não-numérica (sem 500);
+  restaurante `transferir_mesa` (destino válido/≠ atual); site código com entropia (sem colisão).
+- **Gating**: lavanderia `cancelar` ganha `@requer_modulo`.
+- **Degradação**: loja destino=conta exige Reservas ativo; marketing `ocupacao` degrada sem
+  Reservas; auditoria `varrer()` isola falha de um módulo.
+- **Segurança/export**: CSV da trilha e dos relatórios sanitizam CSV/formula-injection + BOM
+  (`; ` p/ Excel pt-BR); trilha serializa `detalhe` com `json.dumps`.
+- **Correção de data**: conciliação usa `localtime` no dia; manutenção recorrência por mês
+  real (não 30 dias fixos).
+- **Fiscal**: webhook de status desconhecido não sobrescreve número/chave (só evento informativo).
+
+### Baixas/info aceitas ou deferidas (baixo risco, documentadas)
+- **marketing** (#16/#17/#18): aprovação sem lock de linha e edge-cases de mês/reabertura de
+  campanha — mono-operador, baixo risco; o congelamento de verba pós-aprovação (média #6) já
+  cobre o pior caso.
+- **restaurante** (#9 desconto por natureza; #10 devolução por ajuste absoluto): auditados e
+  mono-operador; refinar quando houver concorrência real.
+- **conciliação** (#31): unicidade do vínculo por constraint — mono-operador; o dedupe em
+  memória já evita o caso comum.
+- **loja** (#8): cancelar venda só com o caixa de origem aberto — decisão de política.
+- **info** (#24 X-Forwarded-For atrás do proxy Railway; #25 dupla checagem modulo_ativo é o
+  comportamento correto 404-antes-de-403).
+
+Suíte: **734 testes OK**. Auditoria do CRM concluída.

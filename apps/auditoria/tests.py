@@ -90,7 +90,7 @@ class PainelTrilhaTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, "estorno_pagamento")
         csv_resp = self.client.get(reverse("auditoria:trilha"), {"export": "csv"})
-        self.assertEqual(csv_resp["Content-Type"], "text/csv")
+        self.assertIn("text/csv", csv_resp["Content-Type"])  # agora com charset utf-8-sig (BOM)
         self.assertIn("estorno_pagamento", csv_resp.content.decode())
 
     def test_sem_acesso_da_403(self):

@@ -67,6 +67,8 @@ def resumo_funcionario(funcionario, inicio, fim):
 
 
 def atribuir(turno, funcionario, data, operador):
+    if data is None:
+        raise ValidationError("Informe uma data válida para a escala.")
     if ausencia_no_dia(funcionario, data):
         raise ValidationError(
             f"{funcionario.pessoa.nome} está ausente em {data:%d/%m} — remova a ausência antes."
