@@ -281,10 +281,10 @@ def registrar_saida(
     quantidade = Decimal(quantidade)
     if quantidade <= ZERO:
         raise ValidationError("A quantidade de saída deve ser positiva.")
-    # Serializa baixas concorrentes do mesmo produto×local: sem o lock, duas saídas
-    # simultâneas leem o mesmo saldo antes de gravar e deixam o estoque negativo.
-    list(MovimentoEstoque.objects.filter(produto=produto, local=local)
-         .select_for_update())
+    # Serializa baixas concorrentes (e contra entradas) travando a LINHA DO PRODUTO —
+    # mesmo âncora de registrar_entrada. O(1) e cobre a 1ª saída (kardex vazio), ao
+    # contrário de travar as linhas do kardex (que cresce e não trava nada no início).
+    Produto.objects.select_for_update().get(pk=produto.pk)
     if saldo(produto, local) < quantidade:
         raise ValidationError(
             f"Saldo insuficiente de {produto} em {local} "

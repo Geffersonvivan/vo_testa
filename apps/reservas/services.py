@@ -630,6 +630,8 @@ def receber_pagamento(
     Vários pagamentos na mesma conta = rateio (formas/pagadores diferentes). A conta
     só fecha quando o saldo zera. `observacao` registra quem pagou cada parte.
     `autorizacao` guarda o NSU/código do comprovante do cartão (conciliação)."""
+    # Trava a conta p/ serializar pagamentos concorrentes (duplo POST não superpaga).
+    conta = ContaHospedagem.objects.select_for_update().get(pk=conta.pk)
     if not conta.aberta:
         raise ValidationError("A conta desta hospedagem já foi fechada.")
     valor = Decimal(str(valor or 0))

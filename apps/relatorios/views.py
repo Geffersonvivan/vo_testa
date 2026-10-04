@@ -31,22 +31,16 @@ def relatorio(request, chave):
     dados = r["builder"](inicio, fim)
 
     if request.GET.get("export") == "csv":
-        resp = HttpResponse(content_type="text/csv; charset=utf-8-sig")
+        from apps.nucleo.export import resposta_csv, sanitizar_celula
         nome = slugify(r["nome"])
-        resp["Content-Disposition"] = f'attachment; filename="{nome}_{inicio}_{fim}.csv"'
-        resp.write("﻿")  # BOM p/ Excel pt-BR (padrão do BOH)
-
-        def _celula(v):
-            s = "" if v is None else str(v)
-            return ("'" + s) if s[:1] in ("=", "+", "-", "@", "\t", "\r") else s
-
+        resp = resposta_csv(f"{nome}_{inicio}_{fim}.csv")
         w = csv.writer(resp, delimiter=";")
         for rotulo_kpi, valor in dados["kpis"]:
-            w.writerow([_celula(rotulo_kpi), _celula(valor)])
+            w.writerow([sanitizar_celula(rotulo_kpi), sanitizar_celula(valor)])
         w.writerow([])
-        w.writerow([_celula(c) for c in dados["colunas"]])
+        w.writerow([sanitizar_celula(c) for c in dados["colunas"]])
         for linha in dados["linhas"]:
-            w.writerow([_celula(c) for c in linha])
+            w.writerow([sanitizar_celula(c) for c in linha])
         return resp
 
     return render(request, "relatorios/relatorio.html", {

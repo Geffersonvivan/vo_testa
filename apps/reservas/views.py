@@ -673,6 +673,7 @@ def boh(request):
 def _boh_csv(dados):
     import csv
 
+    from apps.nucleo.export import sanitizar_celula
     resp = HttpResponse(content_type="text/csv; charset=utf-8")
     resp["Content-Disposition"] = (
         f'attachment; filename="BOH_{dados["ano"]}_{dados["mes"]:02d}.csv"'
@@ -694,7 +695,8 @@ def _boh_csv(dados):
         w.writerow([])
         w.writerow([titulo, "Hóspedes"])
         for nome, n in itens:
-            w.writerow([nome, n])
+            # procedência/cidade vem do cadastro → neutraliza formula-injection no Excel.
+            w.writerow([sanitizar_celula(nome), n])
         if not itens:
             w.writerow(["(sem dados)", 0])
 

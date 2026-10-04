@@ -49,22 +49,16 @@ def trilha(request):
     ocultar_sensivel = not pode_ver_salario(request.user)
     if request.GET.get("export") == "csv":
         import json as _json
-        resp = HttpResponse(content_type="text/csv; charset=utf-8-sig")
-        resp["Content-Disposition"] = 'attachment; filename="trilha_auditoria.csv"'
-        resp.write("﻿")  # BOM p/ Excel pt-BR
+
+        from apps.nucleo.export import resposta_csv, sanitizar_celula
+        resp = resposta_csv("trilha_auditoria.csv")
         from .formatacao import frase
-
-        def _celula(v):
-            # Neutraliza CSV/formula injection: texto que começa com =,+,-,@ vira texto.
-            s = "" if v is None else str(v)
-            return ("'" + s) if s[:1] in ("=", "+", "-", "@", "\t", "\r") else s
-
         w = csv.writer(resp, delimiter=";")
         w.writerow(["quando", "usuario", "descricao", "acao", "alvo", "alvo_id", "detalhe"])
         for t in qs[:5000]:
             if ocultar_sensivel:
                 t.detalhe = redigir_sensiveis(t.detalhe)
-            w.writerow([_celula(x) for x in (
+            w.writerow([sanitizar_celula(x) for x in (
                 t.criado_em.strftime("%d/%m/%Y %H:%M"),
                 t.usuario or "—", frase(t), t.acao, t.alvo, t.alvo_id,
                 _json.dumps(t.detalhe, ensure_ascii=False),

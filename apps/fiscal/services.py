@@ -128,6 +128,12 @@ def processar_retorno_focus(payload: dict):
     if not doc:
         return None
     status = (payload.get("status") or "").lower()
+    # CANCELADA é terminal: um retorno fora de ordem (retry/fila) não pode "ressuscitar"
+    # a nota de volta para autorizada.
+    if doc.status == DocumentoFiscal.Status.CANCELADA:
+        EventoFiscal.objects.create(documento=doc, tipo="webhook_ignorado",
+                                    detalhe={"status": status, "atual": "cancelada"})
+        return doc
     # Status intermediário/desconhecido: não sobrescreve número/chave definitivos nem
     # salva — só registra um evento informativo (evita corromper a nota por um retorno
     # que não casa nenhum ramo).
