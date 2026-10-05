@@ -6,7 +6,7 @@ psycopg-binary==3.3.4
 python-dotenv==1.2.2
 whitenoise==6.12.0
 django-storages==1.14.6
-boto3==1.43.78
+boto3==1.43.107
 qrcode
 Pillow
 pyotp>=2.9.0        # MFA (TOTP) — autenticação de dois fatores
