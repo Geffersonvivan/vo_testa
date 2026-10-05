@@ -51,12 +51,16 @@ def consumir_backup(usuario, codigo: str) -> bool:
 
 
 def qr_svg(uri: str) -> str:
-    """SVG do QR do otpauth URI (inline, sem servir arquivo)."""
+    """SVG do QR do otpauth URI (inline, sem servir arquivo).
+
+    Usa SvgPathImage (como o portal) — gera um <path> com viewBox que renderiza
+    embutido no HTML. O SvgImage emite rects + prolog XML que quebram inline.
+    """
     import qrcode
     import qrcode.image.svg
-
-    img = qrcode.make(uri, image_factory=qrcode.image.svg.SvgImage, box_size=9)
     from io import BytesIO
+
+    img = qrcode.make(uri, image_factory=qrcode.image.svg.SvgPathImage, box_size=10, border=2)
     buf = BytesIO()
     img.save(buf)
     return buf.getvalue().decode("utf-8")
