@@ -27,7 +27,7 @@
 
 <table class="tabela">
   <thead>
-    <tr><th>#</th><th>Hóspede</th><th>Quarto</th><th>Período</th><th>Noites</th><th>Diária</th><th>Status</th></tr>
+    <tr><th>#</th><th>Hóspede</th><th>Quarto</th><th>Período</th><th class="num">Noites</th><th class="num">Diária</th><th>Status</th></tr>
   </thead>
   <tbody>
     {% for r in reservas %}
@@ -36,8 +36,8 @@
         <td>{{ r.hospede.nome }}</td>
         <td>{{ r.uh.numero }}</td>
         <td>{{ r.checkin|date:"d/m/Y" }} → {{ r.checkout|date:"d/m/Y" }}</td>
-        <td>{{ r.noites }}</td>
-        <td>R$ {{ r.valor_diaria }}</td>
+        <td class="num">{{ r.noites }}</td>
+        <td class="num">R$ {{ r.valor_diaria }}</td>
         <td><span class="selo mapa-cor-{{ r.status }} dica" data-dica="{{ r.status_ajuda }}">{{ r.get_status_display }}</span></td>
       </tr>
     {% empty %}

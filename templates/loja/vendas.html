@@ -11,7 +11,7 @@
 
 <table class="tabela">
   <thead>
-    <tr><th>#</th><th>Data</th><th>Destino</th><th>Cliente</th><th>Total</th><th>Status</th></tr>
+    <tr><th>#</th><th>Data</th><th>Destino</th><th>Cliente</th><th class="num">Total</th><th>Status</th></tr>
   </thead>
   <tbody>
     {% for v in vendas %}
@@ -20,7 +20,7 @@
         <td>{{ v.criado_em|date:"d/m/Y H:i" }}</td>
         <td>{% if v.destino == 'conta' %}Conta — {{ v.conta_ref }}{% else %}{{ v.forma_pagamento.nome|default:"—" }}{% endif %}</td>
         <td>{{ v.cliente.nome|default:"Avulso" }}</td>
-        <td>R$ {{ v.total }}</td>
+        <td class="num">R$ {{ v.total }}</td>
         <td>{{ v.get_status_display }}</td>
       </tr>
     {% empty %}

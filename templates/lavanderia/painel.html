@@ -24,7 +24,7 @@
     {% csrf_token %}
     {% include "componentes/combo_pessoa.html" with dados=clientes dados_id="clientes-data" campo="cliente" placeholder="Hóspede/cliente…" %}
     <input type="text" name="rotulo" placeholder="Ou identifique (ex.: quarto 12)">
-    <label class="prazo-campo">Pronto para <input type="date" name="prazo"></label>
+    <label class="prazo-campo">Pronto para <input type="date" name="prazo" class="combo-input" style="flex:0 0 auto;width:auto"></label>
     <button type="submit" class="botao-primario">Abrir</button>
   </form>
 </section>

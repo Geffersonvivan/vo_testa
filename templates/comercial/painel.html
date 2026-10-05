@@ -69,7 +69,7 @@
 
   <aside>
     <h2>Meta do mês</h2>
-    <form method="post" action="{% url 'comercial:meta' %}" class="cartao" style="padding:1rem;margin-bottom:1rem">
+    <form method="post" action="{% url 'comercial:meta' %}" class="form-cartao" style="max-width:none">
       {% csrf_token %}
       <div class="campo">{{ meta_form.valor_meta.label_tag }}{{ meta_form.valor_meta }}</div>
       <div class="campo">{{ meta_form.oportunidades_meta.label_tag }}{{ meta_form.oportunidades_meta }}</div>

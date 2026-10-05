@@ -40,10 +40,16 @@
       <form method="post" action="{% url 'conciliacao:importar_ofx' %}" enctype="multipart/form-data"
             style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap">
         {% csrf_token %}
-        <label style="display:grid;gap:.3rem">
+        <div style="display:grid;gap:.3rem">
           <span class="letreiro" style="font-size:.8rem">Extrato bancário (OFX)</span>
-          <input type="file" name="arquivo" accept=".ofx,.OFX" required>
-        </label>
+          <label class="botao-neutro" style="cursor:pointer">
+            Escolher arquivo…
+            <input type="file" name="arquivo" accept=".ofx,.OFX" required
+                   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
+                   onchange="this.parentNode.nextElementSibling.textContent = this.files.length ? this.files[0].name : ''">
+          </label>
+          <span class="tinta-suave" style="font-size:.82rem"></span>
+        </div>
         <label style="display:grid;gap:.3rem">
           <span class="letreiro" style="font-size:.8rem">Conta</span>
           <input type="text" name="conta" placeholder="ex.: 12345-6" style="max-width:120px">
@@ -54,10 +60,16 @@
       <form method="post" action="{% url 'conciliacao:importar_cartao' %}" enctype="multipart/form-data"
             style="display:flex;gap:.6rem;align-items:flex-end;flex-wrap:wrap">
         {% csrf_token %}
-        <label style="display:grid;gap:.3rem">
+        <div style="display:grid;gap:.3rem">
           <span class="letreiro" style="font-size:.8rem">Vendas SafraPay (CSV)</span>
-          <input type="file" name="arquivo" accept=".csv,.CSV" required>
-        </label>
+          <label class="botao-neutro" style="cursor:pointer">
+            Escolher arquivo…
+            <input type="file" name="arquivo" accept=".csv,.CSV" required
+                   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
+                   onchange="this.parentNode.nextElementSibling.textContent = this.files.length ? this.files[0].name : ''">
+          </label>
+          <span class="tinta-suave" style="font-size:.82rem"></span>
+        </div>
         <button class="botao-neutro" type="submit">Importar cartão</button>
       </form>
     </div>

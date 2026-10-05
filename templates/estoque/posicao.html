@@ -25,7 +25,7 @@
 
 <table class="tabela">
   <thead>
-    <tr><th>Produto</th><th>Categoria</th><th>Saldo</th><th>Mínimo</th><th>Custo médio</th><th>Valor</th><th></th></tr>
+    <tr><th>Produto</th><th>Categoria</th><th class="num">Saldo</th><th class="num">Mínimo</th><th class="num">Custo médio</th><th class="num">Valor</th><th></th></tr>
   </thead>
   <tbody>
     {% for l in linhas %}
@@ -33,10 +33,10 @@
         <td><a href="{% url 'estoque:kardex' l.produto.pk %}">{{ l.produto.nome }}</a>
           {% if l.abaixo_minimo %}<span class="selo selo-alerta">mínimo</span>{% endif %}</td>
         <td>{{ l.produto.categoria.nome }}</td>
-        <td>{{ l.saldo }} {{ l.produto.get_unidade_display|lower }}</td>
-        <td>{{ l.produto.estoque_minimo }}</td>
-        <td>R$ {{ l.produto.custo_medio }}</td>
-        <td>R$ {{ l.valor }}</td>
+        <td class="num">{{ l.saldo }} {{ l.produto.get_unidade_display|lower }}</td>
+        <td class="num">{{ l.produto.estoque_minimo }}</td>
+        <td class="num">R$ {{ l.produto.custo_medio }}</td>
+        <td class="num">R$ {{ l.valor }}</td>
         <td><a href="{% url 'estoque:kardex' l.produto.pk %}" class="botao-neutro">Kardex</a></td>
       </tr>
     {% empty %}

@@ -32,7 +32,7 @@
 
 <table class="tabela">
   <thead>
-    <tr><th>Nome</th><th>Tipo</th><th>Papéis</th><th>Documento</th><th>Telefone</th><th>Situação</th></tr>
+    <tr><th>Nome</th><th>Tipo</th><th>Papéis</th><th class="num">Documento</th><th>Telefone</th><th>Situação</th></tr>
   </thead>
   <tbody>
     {% for p in pessoas %}
@@ -42,7 +42,7 @@
         <td>
           {% for papel in p.papeis %}<span class="selo">{{ papel }}</span>{% empty %}<span class="selo selo-neutro">Cliente avulso</span>{% endfor %}
         </td>
-        <td>{{ p.documento|default:"—" }}</td>
+        <td class="num">{{ p.documento|default:"—" }}</td>
         <td>{{ p.telefone|default:"—" }}</td>
         <td>{% if p.ativo %}Ativa{% else %}Inativa{% endif %}</td>
       </tr>

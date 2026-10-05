@@ -68,7 +68,7 @@
       {% for s in dados.serie %}
       <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:8px">
         <span class="num" style="font-size:12.5px;font-weight:700;color:{% if s.sel %}var(--perigo){% else %}var(--tinta-suave){% endif %}">{% if s.gasto %}{{ s.gasto|intcomma_brl }}{% else %}—{% endif %}</span>
-        <span style="width:100%;border-radius:10px 10px 4px 4px;min-height:4px;height:{{ s.pct }}%;{% if s.sel %}background:linear-gradient(180deg,var(--lampiao),var(--madeira)){% else %}background:var(--superficie-2);box-shadow:inset 0 0 0 1px var(--fio){% endif %}"></span>
+        <span style="width:100%;border-radius:10px 10px 4px 4px;min-height:4px;height:{{ s.pct }}%;{% if s.sel %}background:linear-gradient(180deg,var(--lampiao),var(--madeira)){% elif s.gasto %}background:color-mix(in srgb, var(--madeira) 32%, var(--superficie-2)){% else %}background:var(--superficie-2);box-shadow:inset 0 0 0 1px var(--fio){% endif %}"></span>
         <span style="font-size:12px;color:{% if s.sel %}var(--tinta){% else %}var(--tinta-suave){% endif %};font-weight:{% if s.sel %}700{% else %}400{% endif %}">{{ s.label }}</span>
       </div>
       {% endfor %}

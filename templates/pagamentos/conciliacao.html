@@ -14,10 +14,10 @@
 </p>
 
 <div class="kpi-grade" style="margin:1rem 0">
-  <div class="kpi"><span class="kpi-rotulo">Recebido (bruto)</span><strong class="kpi-valor">R$ {{ totais.recebido }}</strong></div>
-  <div class="kpi"><span class="kpi-rotulo">Taxa</span><strong class="kpi-valor">R$ {{ totais.taxa }}</strong></div>
-  <div class="kpi kpi-destaque"><span class="kpi-rotulo">Líquido (banco)</span><strong class="kpi-valor">R$ {{ totais.liquido }}</strong></div>
-  <div class="kpi"><span class="kpi-rotulo">A liquidar</span><strong class="kpi-valor">{{ totais.a_liquidar_qtd }}</strong></div>
+  <div class="kpi"><span class="kpi-rotulo letreiro">Recebido (bruto)</span><strong class="kpi-valor num">R$ {{ totais.recebido }}</strong></div>
+  <div class="kpi"><span class="kpi-rotulo letreiro">Taxa</span><strong class="kpi-valor num">R$ {{ totais.taxa }}</strong></div>
+  <div class="kpi kpi-destaque"><span class="kpi-rotulo letreiro">Líquido (banco)</span><strong class="kpi-valor num">R$ {{ totais.liquido }}</strong></div>
+  <div class="kpi"><span class="kpi-rotulo letreiro">A liquidar (qtd)</span><strong class="kpi-valor num">{{ totais.a_liquidar_qtd }}</strong></div>
 </div>
 
 <form method="get" class="filtro-barra">

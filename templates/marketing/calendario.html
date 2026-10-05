@@ -16,6 +16,11 @@
   </div>
 </div>
 
+<style>
+  /* Gantt rola na horizontal em telas estreitas (eixo de dias não espreme) */
+  .cal-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .cal-track { min-width: 680px; }
+</style>
 <section style="border-radius:20px;background:var(--superficie-2);border:1px solid var(--fio);box-shadow:var(--sombra-cartao);overflow:hidden">
   <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:15px 20px;border-bottom:1px solid var(--fio)">
     <a href="?vista={{ escala }}&ano={{ prev.ano }}&mes={{ prev.mes }}" style="width:32px;height:32px;flex:none;border-radius:10px;border:1px solid var(--fio);background:var(--superficie);display:inline-flex;align-items:center;justify-content:center;font-size:18px;color:var(--tinta-suave);text-decoration:none" aria-label="Anterior">‹</a>
@@ -29,6 +34,7 @@
   {% comment %}As posições das barras saem em % — forçar PONTO decimal: a localização
   pt-BR geraria "left:80,65%", CSS inválido que jogava a barra para a esquerda.{% endcomment %}
   {% localize off %}
+  <div class="cal-scroll"><div class="cal-track">
   <div style="display:flex;border-bottom:1px solid var(--fio);background:var(--superficie-2)">
     <span style="flex:none;width:200px;border-right:1px solid var(--fio)"></span>
     <span style="flex:1;min-width:0;display:flex">
@@ -76,6 +82,7 @@
     </span>
   </div>
   {% endif %}
+  </div></div>
   {% endlocalize %}
 
   <div style="padding:13px 20px;background:var(--canvas);border-top:1px solid var(--fio)">
@@ -100,7 +107,7 @@ curtas (onde o rótulo não cabe). A navegação para a ficha segue normal.{% en
     if (!chip) {
       chip = document.createElement('div');
       chip.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;' +
-        'background:var(--noturno,#2b2824);color:#fff;font-size:12px;font-weight:700;' +
+        'background:var(--noturno,#2b2824);color:var(--pergaminho,#fff);font-size:12px;font-weight:700;' +
         'padding:5px 10px;border-radius:8px;box-shadow:var(--sombra-cartao,0 6px 20px rgba(0,0,0,.18));' +
         'max-width:60vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
         'opacity:0;transition:opacity .12s';

@@ -20,7 +20,7 @@
 
   <table class="tabela tabela-limpeza">
     <thead>
-      <tr><th>Quarto</th><th>Situação</th><th>Camareira</th><th>Ação</th></tr>
+      <tr><th>Quarto</th><th>Situação</th><th>Camareira</th><th class="col-acao">Ação</th></tr>
     </thead>
     <tbody>
       {% for ln in linhas %}
@@ -40,7 +40,7 @@
             <span class="celula-vazia">—</span>
           {% endif %}
         </td>
-        <td class="acoes-limpeza">
+        <td class="acoes-limpeza col-acao">
           {% if ln.situacao == 'suja' %}
             {% if ln.tarefa %}
               <form method="post" action="{% url 'governanca:tarefa_acao' ln.tarefa.pk %}">{% csrf_token %}<input type="hidden" name="acao" value="iniciar"><button type="submit" class="botao-primario">Iniciar limpeza</button></form>

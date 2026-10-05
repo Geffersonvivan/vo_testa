@@ -9,7 +9,7 @@
 
 <table class="tabela">
   <thead>
-    <tr><th>Aberta em</th><th>Operador</th><th>Módulo</th><th>Status</th><th>Diferença</th></tr>
+    <tr><th>Aberta em</th><th>Operador</th><th>Módulo</th><th>Status</th><th class="num">Diferença</th></tr>
   </thead>
   <tbody>
     {% for s in sessoes %}
@@ -18,7 +18,7 @@
         <td>{{ s.operador }}</td>
         <td>{{ s.get_modulo_display }}</td>
         <td>{{ s.get_status_display }}</td>
-        <td>
+        <td class="num">
           {% if s.diferenca is not None %}
             <span class="{% if s.diferenca != 0 %}texto-alerta{% endif %}">R$ {{ s.diferenca }}</span>
           {% else %}—{% endif %}

@@ -10,7 +10,7 @@
         <div class="text-center mb-12">
             <p class="text-lampiao text-xs sm:text-sm tracking-[0.3em] uppercase mb-3">Acomodações</p>
             <h1 class="font-display text-3xl sm:text-4xl md:text-5xl font-black text-pergaminho mb-3">Todos os Quartos</h1>
-            <p class="text-pergaminho/50 max-w-2xl mx-auto text-sm sm:text-base px-2">
+            <p class="text-pergaminho/70 max-w-2xl mx-auto text-sm sm:text-base px-2">
                 Cada quarto tem seu nome, sua vista e seus detalhes. Escolha em qual história você quer despertar —
                 a disponibilidade e o preço aparecem ao informar as suas datas.
             </p>
@@ -23,7 +23,10 @@
                     {% if quarto.foto_principal %}
                     <img src="{{ quarto.foto_principal.url }}" alt="{{ quarto.nome }}" class="w-full h-full object-cover">
                     {% else %}
-                    <p class="text-pergaminho/30 text-sm">[ Foto do Quarto ]</p>
+                    <div class="flex flex-col items-center gap-2 text-pergaminho/70">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 19.5h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z"/></svg>
+                        <span class="text-xs tracking-wide uppercase">Foto em breve</span>
+                    </div>
                     {% endif %}
                     {% if quarto.tour_360_url %}
                     <span class="absolute bottom-3 right-3 bg-noturno/80 text-pergaminho text-xs font-semibold px-3 py-1.5 rounded-full border border-lampiao/30 flex items-center gap-1">
@@ -38,32 +41,34 @@
                         <span class="text-lampiao text-xs">★ {{ quarto.nota_avaliacao }}</span>
                     </div>
                     <a href="{% url 'core:quarto_detalhe' quarto.uh_id %}" class="block"><h3 class="font-display text-xl font-bold text-pergaminho mb-2 hover:text-lampiao transition">{{ quarto.nome }}</h3></a>
-                    <p class="text-pergaminho/50 text-sm mb-3">{{ quarto.descricao_curta }}</p>
+                    {% if quarto.descricao_curta and quarto.descricao_curta != quarto.nome %}
+                    <p class="text-pergaminho/70 text-sm mb-3">{{ quarto.descricao_curta }}</p>
+                    {% endif %}
                     {% if quarto.qualidades %}
                     <div class="flex flex-wrap gap-1.5 mb-4">
                         {% for qual in quarto.qualidades %}
-                        <span class="text-pergaminho/50 text-xs border border-lampiao/20 px-2 py-0.5 rounded-full">{{ qual }}</span>
+                        <span class="text-pergaminho/70 text-xs border border-lampiao/20 px-2 py-0.5 rounded-full">{{ qual }}</span>
                         {% endfor %}
                     </div>
                     {% endif %}
                     <div class="flex items-end justify-between mt-auto pt-4 border-t border-pergaminho/10">
                         <div>
-                            <span class="text-pergaminho/40 text-xs block">a partir de</span>
+                            <span class="text-pergaminho/70 text-xs block">a partir de</span>
                             <span class="text-lampiao font-body text-2xl font-bold">R$ {{ quarto.preco_base|floatformat:0 }}</span>
-                            <span class="text-pergaminho/40 text-xs"> /noite</span>
+                            <span class="text-pergaminho/70 text-xs"> /noite</span>
                         </div>
-                        <a href="{% url 'core:reservar' %}?uh={{ quarto.uh_id }}" class="bg-lampiao/10 text-lampiao text-sm px-4 py-2 rounded-lg border border-lampiao/30 hover:bg-lampiao hover:text-noturno transition">
+                        <a href="{% url 'core:reservar' %}?uh={{ quarto.uh_id }}" class="bg-lampiao text-noturno text-sm font-semibold px-4 py-2 rounded-lg border border-lampiao hover:bg-lampiao/90 transition">
                             Reservar
                         </a>
                     </div>
-                    <div class="flex gap-3 mt-3 text-pergaminho/40 text-xs">
+                    <div class="flex gap-3 mt-3 text-pergaminho/70 text-xs">
                         <span>{{ quarto.capacidade }} hóspedes</span>
                         {% if quarto.metragem %}<span>· {{ quarto.metragem }}m²</span>{% endif %}
                     </div>
                 </div>
             </div>
             {% empty %}
-            <p class="text-pergaminho/50 col-span-full text-center py-16">Em breve, os quartos aparecem aqui.</p>
+            <p class="text-pergaminho/70 col-span-full text-center py-16">Em breve, os quartos aparecem aqui.</p>
             {% endfor %}
         </div>
 

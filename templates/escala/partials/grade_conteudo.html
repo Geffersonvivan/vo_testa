@@ -1,12 +1,29 @@
 {% comment %}Validação + grade. Devolvido tal-qual pelo editor (escala:editar)
 para atualizar a tela após cada arrasto. Elementos com data-* alimentam o DnD.{% endcomment %}
 {% if validacao %}
+<style>
+  /* Alerta com várias violações: quebra em lista (1 por linha), sem parede de texto */
+  .escala-al .al-texto { line-height: 1.5; }
+  .escala-al ul.al-itens { list-style: none; margin: .15rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .2rem; }
+  .escala-al ul.al-itens li { position: relative; padding-left: .9rem; }
+  .escala-al ul.al-itens li::before { content: "•"; position: absolute; left: 0; opacity: .6; }
+  .escala-al .al-rot { font-weight: 700; }
+</style>
 <section class="escala-val">
   <h3>Validação</h3>
   {% for a in validacao %}
     <div class="escala-al escala-al-{{ a.nivel }}">
       <span class="ic">{% if a.nivel == 'ok' %}✓{% elif a.nivel == 'perigo' %}✕{% elif a.nivel == 'aviso' %}!{% else %}i{% endif %}</span>
-      <span>{{ a.texto }}</span>
+      <div class="al-texto">
+        {% if a.itens %}
+          {% if a.rotulo %}<span class="al-rot">{{ a.rotulo }}</span>{% endif %}
+          <ul class="al-itens">
+            {% for it in a.itens %}<li>{{ it }}</li>{% endfor %}
+          </ul>
+        {% else %}
+          {{ a.texto }}
+        {% endif %}
+      </div>
     </div>
   {% endfor %}
 </section>

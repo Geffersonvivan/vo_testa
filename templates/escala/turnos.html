@@ -13,12 +13,12 @@
 <div class="colunas">
   <section>
     <table class="tabela">
-      <thead><tr><th>Nome</th><th>Setor</th><th>Horário</th><th>Situação</th></tr></thead>
+      <thead><tr><th>Nome</th><th>Setor</th><th class="num">Horário</th><th>Situação</th></tr></thead>
       <tbody>
         {% for t in turnos %}
           <tr><td>{{ t.nome }}</td><td>{{ t.get_setor_display }}</td>
-              <td>{{ t.inicio|time:"H:i" }}–{{ t.fim|time:"H:i" }}</td>
-              <td>{% if t.ativo %}Ativo{% else %}Inativo{% endif %}</td></tr>
+              <td class="num">{{ t.inicio|time:"H:i" }}–{{ t.fim|time:"H:i" }}</td>
+              <td>{% if t.ativo %}<span class="selo selo-limpa">Ativo</span>{% else %}<span class="selo selo-neutro">Inativo</span>{% endif %}</td></tr>
         {% empty %}
           <tr><td colspan="4" class="vazio">Nenhum turno ainda.</td></tr>
         {% endfor %}

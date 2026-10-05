@@ -33,11 +33,15 @@ html {
 .gear-spin { animation: rotate-gear 12s linear infinite; }
 .gear-spin-reverse { animation: rotate-gear 15s linear infinite reverse; }
 
-/* Fade in ao scroll */
+/* Fade in ao scroll.
+   O opacity:0 só vale com JS ativo (html.js, setado logo no <head>): sem JS o
+   IntersectionObserver não roda e o conteúdo precisa nascer visível. */
 .fade-section {
+    transition: opacity 0.8s ease, transform 0.8s ease;
+}
+html.js .fade-section {
     opacity: 0;
     transform: translateY(40px);
-    transition: opacity 0.8s ease, transform 0.8s ease;
 }
 .fade-section.visible {
     opacity: 1;
@@ -113,6 +117,15 @@ header { view-transition-name: site-header; }
     ::view-transition-group(*),
     ::view-transition-old(*),
     ::view-transition-new(*) {
+        animation: none !important;
+    }
+    /* Desliga também as animações contínuas da interface */
+    .wheel-spin,
+    .gear-spin,
+    .gear-spin-reverse,
+    .social-proof,
+    .pulse-btn,
+    .float-anim {
         animation: none !important;
     }
 }

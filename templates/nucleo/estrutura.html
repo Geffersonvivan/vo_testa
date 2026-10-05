@@ -14,16 +14,16 @@
 </div>
 <table class="tabela">
   <thead>
-    <tr><th>Nome</th><th>Lotação</th><th>A partir de</th><th>Tarifa base</th><th>Quartos</th><th>Situação</th></tr>
+    <tr><th>Nome</th><th class="num">Lotação</th><th class="num">A partir de</th><th class="num">Tarifa base</th><th class="num">Quartos</th><th>Situação</th></tr>
   </thead>
   <tbody>
     {% for t in tipos %}
       <tr>
         <td><a href="{% url 'tipo_uh_editar' t.pk %}">{{ t.nome }}</a></td>
-        <td>{{ t.faixa_lotacao }}</td>
-        <td>{% if t.tarifa_min %}{{ t.tarifa_min|intcomma_brl }}{% else %}—{% endif %}</td>
-        <td class="ajuda">{{ t.tarifa_base|intcomma_brl }}</td>
-        <td>{{ t.uhs.count }}</td>
+        <td class="num">{{ t.faixa_lotacao }}</td>
+        <td class="num">{% if t.tarifa_min %}{{ t.tarifa_min|intcomma_brl }}{% else %}—{% endif %}</td>
+        <td class="num ajuda">{{ t.tarifa_base|intcomma_brl }}</td>
+        <td class="num">{{ t.uhs.count }}</td>
         <td>{% if t.ativo %}Ativo{% else %}Inativo{% endif %}</td>
       </tr>
     {% empty %}
@@ -39,7 +39,7 @@
 </div>
 <table class="tabela">
   <thead>
-    <tr><th>Número/nome</th><th>Tipo</th><th>Camas</th><th>Lotação</th><th>Bloco</th><th>Status</th><th class="col-acao"></th></tr>
+    <tr><th>Número/nome</th><th>Tipo</th><th>Camas</th><th class="num">Lotação</th><th>Bloco</th><th>Status</th><th class="col-acao"></th></tr>
   </thead>
   <tbody>
     {% for uh in uhs %}
@@ -50,7 +50,7 @@
         </td>
         <td>{{ uh.tipo.nome }}</td>
         <td class="ajuda">{{ uh|camas_uh }}</td>
-        <td>{% with n=uh|lotacao_uh %}{% if n %}até {{ n }}{% else %}—{% endif %}{% endwith %}</td>
+        <td class="num">{% with n=uh|lotacao_uh %}{% if n %}até {{ n }}{% else %}—{% endif %}{% endwith %}</td>
         <td>{{ uh.bloco|default:"—" }}</td>
         <td>{{ uh.get_status_display }}</td>
         <td class="col-acao"><a href="{% url 'uh_editar' uh.pk %}" class="botao-mini">Editar</a></td>

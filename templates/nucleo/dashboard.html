@@ -192,7 +192,10 @@
         {% endfor %}
       </div>
     {% else %}
-      <p class="bloco-vazio">Sem chegadas previstas para hoje.</p>
+      <div class="estado-vazio">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>
+        <p>Sem chegadas previstas para hoje.</p>
+      </div>
     {% endif %}
   </section>
 
@@ -212,7 +215,10 @@
         {% endfor %}
       </div>
     {% else %}
-      <p class="bloco-vazio">Sem saídas previstas para hoje.</p>
+      <div class="estado-vazio">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M14 3h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"/><path d="M3 12h11M11 8l4 4-4 4"/></svg>
+        <p>Sem saídas previstas para hoje.</p>
+      </div>
     {% endif %}
   </section>
 </div>
@@ -226,16 +232,22 @@
   if (!window.Chart) return;
   Chart.defaults.font.family = "'Hanken Grotesk', -apple-system, sans-serif";
   Chart.defaults.font.size = 12;
-  Chart.defaults.color = '#64717B';
-  const NOTURNO = '#051C2C', LAMPIAO = '#D7A048', MUSGO = '#2E483E', MADEIRA = '#4F2C1D';
-  const PALETA = [NOTURNO, LAMPIAO, MUSGO, MADEIRA, '#2C6E7A', '#B0741C'];
+  // Paleta vem dos tokens da marca (app.css :root) — sem hex paralelo.
+  const css = getComputedStyle(document.documentElement);
+  const tk = (n, fb) => (css.getPropertyValue(n).trim() || fb);
+  Chart.defaults.color = tk('--tinta-suave', '#64717B');
+  const NOTURNO = tk('--noturno', '#051C2C'), LAMPIAO = tk('--lampiao', '#D7A048'),
+        MUSGO = tk('--musgo', '#2E483E'), MADEIRA = tk('--madeira', '#4F2C1D'),
+        INFO = tk('--info', '#2C6E7A'), ALERTA = tk('--alerta', '#B0741C'),
+        SUPERF = tk('--superficie', '#fff'), FIO = tk('--fio-forte', '#E7DFCF');
+  const PALETA = [NOTURNO, LAMPIAO, MUSGO, MADEIRA, INFO, ALERTA];
   const semGrade = { grid: { display: false }, border: { display: false } };
-  const gradeY = { grid: { color: '#E7DFCF' }, border: { display: false } };
+  const gradeY = { grid: { color: FIO }, border: { display: false } };
   const ctx = id => { const el = document.getElementById(id); return el ? el.getContext('2d') : null; };
   const reais = v => 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
 
   if (dados.ocupacao) {
-    const cores = dados.ocupacao.fds.map(f => f ? '#B0741C' : LAMPIAO);
+    const cores = dados.ocupacao.fds.map(f => f ? ALERTA : LAMPIAO);
     new Chart(ctx('g-ocupacao'), {
       type: 'line',
       data: { labels: dados.ocupacao.labels, datasets: [{
@@ -294,7 +306,7 @@
   if (dados.canais) {
     new Chart(ctx('g-canais'), {
       type: 'doughnut',
-      data: { labels: dados.canais.labels, datasets: [{ data: dados.canais.valores, backgroundColor: PALETA, borderColor: '#fff', borderWidth: 3, hoverOffset: 4 }] },
+      data: { labels: dados.canais.labels, datasets: [{ data: dados.canais.valores, backgroundColor: PALETA, borderColor: SUPERF, borderWidth: 3, hoverOffset: 4 }] },
       options: opcoesPizza(inteiro, { tooltip: { callbacks: { label: c => c.label + ': ' + inteiro(c.parsed) + ' reserva' + (c.parsed > 1 ? 's' : '') } } })
     });
   }
@@ -310,7 +322,7 @@
   if (dados.pagamento) {
     new Chart(ctx('g-pagamento'), {
       type: 'doughnut',
-      data: { labels: dados.pagamento.labels, datasets: [{ data: dados.pagamento.valores, backgroundColor: PALETA, borderColor: '#fff', borderWidth: 3, hoverOffset: 4 }] },
+      data: { labels: dados.pagamento.labels, datasets: [{ data: dados.pagamento.valores, backgroundColor: PALETA, borderColor: SUPERF, borderWidth: 3, hoverOffset: 4 }] },
       options: opcoesPizza(reaisCurto, { tooltip: { callbacks: { label: c => c.label + ': ' + reais(c.parsed) } } })
     });
   }

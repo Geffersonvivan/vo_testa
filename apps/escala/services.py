@@ -435,7 +435,12 @@ def analisar_semana(inicio, setor=None):
             if tem < t.min_pessoas:
                 faltas.append(f"{t.get_setor_display()} {t.nome} {d:%d/%m} ({tem}/{t.min_pessoas})")
     if faltas:
-        alertas.append({"nivel": "perigo", "texto": "Cobertura abaixo do mínimo: " + "; ".join(faltas) + "."})
+        alertas.append({
+            "nivel": "perigo",
+            "texto": "Cobertura abaixo do mínimo: " + "; ".join(faltas) + ".",
+            "rotulo": "Cobertura abaixo do mínimo",
+            "itens": faltas,
+        })
         bloqueios.append("cobertura abaixo do mínimo")
     else:
         alertas.append({"nivel": "ok", "texto": "Cobertura completa nos 7 dias (mínimo por turno atendido)."})

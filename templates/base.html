@@ -94,7 +94,7 @@
           {% for m in grupo.itens %}
             {% if m.url %}
               <a href="{{ m.url }}" class="nav-item {% if request.resolver_match.namespace == m.codigo and request.resolver_match.url_name != 'instagram' and request.resolver_match.url_name != 'cacador' %}ativo{% endif %}">
-                <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></svg>
+                {% include "componentes/icone_modulo.html" with codigo=m.codigo %}
                 <span class="rotulo">{{ m.nome }}</span>
               </a>
               {% if m.codigo == 'comercial' %}
@@ -121,7 +121,7 @@
               {% endif %}
             {% else %}
               <span class="nav-item desabilitado" title="Em construção">
-                <svg viewBox="0 0 24 24" class="ico"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
+                {% include "componentes/icone_modulo.html" with codigo=m.codigo %}
                 <span class="rotulo">{{ m.nome }}</span>
               </span>
             {% endif %}

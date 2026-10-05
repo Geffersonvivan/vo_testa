@@ -29,7 +29,7 @@
 
 <table class="tabela">
   <thead>
-    <tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Centro</th><th>Descrição</th><th>Valor</th></tr>
+    <tr><th>Data</th><th>Tipo</th><th>Categoria</th><th>Centro</th><th>Descrição</th><th class="num">Valor</th></tr>
   </thead>
   <tbody>
     {% for l in lancamentos %}
@@ -39,7 +39,7 @@
         <td>{{ l.categoria.nome }}</td>
         <td>{{ l.get_centro_display }}</td>
         <td>{{ l.descricao }}</td>
-        <td>R$ {{ l.valor }}</td>
+        <td class="num">R$ {{ l.valor }}</td>
       </tr>
     {% empty %}
       <tr><td colspan="6" class="vazio">Nenhum lançamento. Cadastre categorias no admin e registre o primeiro.</td></tr>

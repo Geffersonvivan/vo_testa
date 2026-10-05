@@ -17,7 +17,7 @@
       <thead><tr><th>Nome/número</th><th>Situação</th></tr></thead>
       <tbody>
         {% for m in mesas %}
-          <tr><td>{{ m.nome }}</td><td>{% if m.ativa %}Ativa{% else %}Inativa{% endif %}</td></tr>
+          <tr><td>{{ m.nome }}</td><td>{% if m.ativa %}<span class="selo selo-limpa">Ativa</span>{% else %}<span class="selo selo-neutro">Inativa</span>{% endif %}</td></tr>
         {% empty %}
           <tr><td colspan="2" class="vazio">Nenhum ponto ainda.</td></tr>
         {% endfor %}
