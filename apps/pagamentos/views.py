@@ -1,4 +1,5 @@
 import json
+import logging
 
 from django.conf import settings
 from django.contrib import messages
@@ -14,6 +15,8 @@ from apps.nucleo.modulos import Modulo
 from apps.nucleo.permissoes import eh_gerente, requer_gerencia, requer_modulo
 from apps.nucleo.ratelimit import limite_excedido
 from apps.nucleo.seletores import pessoas_agrupadas
+
+logger = logging.getLogger(__name__)
 
 from . import services
 from .gateways import get_gateway, status_credenciais
@@ -314,7 +317,10 @@ def pagar_cartao(request, token):
         if destino:
             return redirect(destino)
     else:
-        messages.error(request, msg or "Não foi possível autorizar o cartão.")
+        # S-M4: não vazar o detalhe cru do provedor na página pública (oráculo p/
+        # card-testing + info da integração) — genérico pro hóspede, detalhe só no log.
+        logger.warning("Autorização de cartão falhou (cobrança %s): %s", cobranca.pk, msg)
+        messages.error(request, "Não foi possível autorizar o cartão. Confira os dados ou tente outro cartão.")
     return redirect("pagamentos:pagar", token=token)
 
 
@@ -420,7 +426,10 @@ def webhook(request):
     # dinheiro de conciliação: FORA do sandbox NÃO confiamos no corpo (forjável) — a
     # liquidação real entra por conferência manual (view `liquidar`) ou relatório do
     # provedor. No sandbox (sem provedor) aceitamos o corpo para exercitar o fluxo.
-    sandbox = getattr(settings, "PAGAMENTOS_GATEWAY", "simulado") == "simulado"
+    # S-A4: valores de liquidação do corpo só são confiáveis no sandbox local/testes;
+    # em produção a liquidação entra por conferência manual / relatório do provedor.
+    sandbox = (getattr(settings, "PAGAMENTOS_WEBHOOK_CONFIA_CORPO", False)
+               and getattr(settings, "PAGAMENTOS_GATEWAY", "simulado") == "simulado")
     liq = _extrair_liquidacao(body) if sandbox else None
     if liq and cobranca.status == Cobranca.Status.PAGO:
         try:
@@ -434,7 +443,12 @@ def webhook(request):
     # consulta a fonte da verdade e ignora o status do corpo.
     gateway = getattr(settings, "PAGAMENTOS_GATEWAY", "simulado")
     if gateway == "simulado":
-        # Sandbox não envia status: ausência = confirma; senão exige status pago.
+        # S-A4: o webhook é público e o corpo é forjável. Confiar no corpo SÓ no sandbox
+        # local/testes. Em produção-simulado a confirmação legítima vem do link do hóspede
+        # (pagar_simular, autenticado por token opaco) ou da recepção — nunca deste webhook.
+        if not getattr(settings, "PAGAMENTOS_WEBHOOK_CONFIA_CORPO", False):
+            return _json({"ok": True, "status": cobranca.status,
+                          "ignorado": "webhook não confirma por corpo em produção"})
         pago = True if status_gw in (None, "") else (_status_pago(status_gw) is True)
     else:
         try:

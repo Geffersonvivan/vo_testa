@@ -21,6 +21,21 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+# S-M5: blocos com PII do pagador que NÃO devem ser persistidos em Cobranca.payload
+# (a reconciliação só precisa de id/status/valor/qrCode).
+_CHAVES_PII = {"customer", "card", "cardholder", "cardHolder", "document",
+               "buyer", "payer", "holder", "billingAddress", "address"}
+
+
+def _redigir_resposta(data):
+    """Remove recursivamente blocos de PII da resposta do provedor antes de salvar."""
+    if isinstance(data, dict):
+        return {k: ("[redigido]" if k in _CHAVES_PII else _redigir_resposta(v))
+                for k, v in data.items()}
+    if isinstance(data, list):
+        return [_redigir_resposta(i) for i in data]
+    return data
+
 
 def _brand_do_cartao(numero: str) -> int:
     """Código de bandeira SafraPay a partir da BIN (Mastercard=2 confirmado no exemplo
@@ -90,7 +105,7 @@ class GatewaySafrapay:
     POST /v2/charge/pix (ou outros). Token vazio no portal = conta sem API liberada.
     """
     nome = "safrapay"
-    CACHE_TOKEN = "safrapay_access_token"
+    CACHE_TOKEN = "safrapay_access_token"  # noqa: S105 — nome da chave de cache, não um segredo
 
     def _credenciais(self):
         token = (getattr(settings, "SAFRAPAY_TOKEN", "") or "").strip()
@@ -299,7 +314,7 @@ class GatewaySafrapay:
             "gateway_id": gid,
             "pix_copia_cola": pix,
             "expira_em": timezone.now() + timezone.timedelta(hours=24),
-            "payload": {"safrapay": data, "merchantChargeId": merchant_charge_id},
+            "payload": {"safrapay": _redigir_resposta(data), "merchantChargeId": merchant_charge_id},
         }
 
     def _criar_cartao(self, cobranca, *, como_link=False) -> dict:
@@ -365,7 +380,7 @@ class GatewaySafrapay:
             "status_raw": status_raw,
             "expira_em": timezone.now() + timezone.timedelta(hours=24),
             "payload": {
-                "safrapay": data,
+                "safrapay": _redigir_resposta(data),
                 "merchantChargeId": merchant_charge_id,
                 "checkout_url": f"/crm/pagamentos/pagar/{cobranca.token}/",
             },

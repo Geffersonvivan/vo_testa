@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block titulo %}Ativar MFA — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Segurança</p>
+<div class="pagina-cabecalho"><h1>Ativar verificação em duas etapas</h1></div>
+<p class="subtitulo">Escaneie o QR no seu app autenticador (Google Authenticator, Authy,
+1Password…) e confirme com o código gerado.</p>
+
+<div class="cartao" style="max-width:520px;align-items:center;gap:1rem">
+  {% if erro %}<div class="mensagem error" style="align-self:stretch">{{ erro }}</div>{% endif %}
+  <div style="width:220px">{{ qr_svg|safe }}</div>
+  <p style="color:var(--tinta-suave);font-size:.82rem;text-align:center;margin:0">
+    Não consegue escanear? Cadastre esta chave manualmente:<br>
+    <code class="mono-num" style="font-size:.9rem;letter-spacing:.06em">{{ secret }}</code>
+  </p>
+  <form method="post" style="align-self:stretch;display:flex;flex-direction:column;gap:.6rem">
+    {% csrf_token %}
+    <label for="id_codigo">Código do app</label>
+    <input type="text" name="codigo" id="id_codigo" inputmode="numeric"
+           autocomplete="one-time-code" autofocus required placeholder="123 456">
+    <button type="submit" class="botao-primario">Confirmar e ativar</button>
+  </form>
+</div>
+{% endblock %}

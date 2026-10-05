@@ -28,6 +28,11 @@ class Usuario(AbstractUser):
         help_text="Áreas do núcleo concedidas (Quartos, Financeiro, Equipe…). "
                   "Gerido em Equipe & Acessos. Superusuário acessa tudo.",
     )
+    # MFA (TOTP) — opt-in; obrigatório para superusuários. Secret e códigos de backup
+    # (estes guardados com hash) ficam aqui. Ver apps/nucleo/mfa.py.
+    mfa_secret = models.CharField("segredo TOTP", max_length=64, blank=True, default="")
+    mfa_ativo = models.BooleanField("MFA ativo", default=False)
+    mfa_backup_codes = models.JSONField("códigos de backup (hash)", default=list, blank=True)
 
     class Meta:
         verbose_name = "usuário"

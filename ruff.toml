@@ -15,9 +15,14 @@ extend-exclude = [
 [lint]
 # Conjunto padrão (pyflakes + erros do pycodestyle) + ordenação de imports (I)
 # e modernizações seguras (UP). Mantém a base verde sem exigir refactors amplos.
-select = ["E4", "E7", "E9", "F", "I", "UP"]
+# Subconjunto de alto sinal do flake8-bandit (S): segredos hard-coded, SQLi por
+# string, hash fraco, pickle, verify=False, shell=True. (Scan completo = bandit no CI.)
+select = ["E4", "E7", "E9", "F", "I", "UP",
+          "S105", "S106", "S107", "S608", "S301", "S302", "S324", "S501", "S602", "S605", "S611"]
 
 [lint.per-file-ignores]
 # Testes e seeds podem ter linhas longas e imports locais por conveniência.
-"**/tests.py" = ["E501"]
-"**/management/commands/*.py" = ["E501"]
+# Senhas em testes/seed são fixtures, não segredos reais (S105/106/107).
+"**/tests.py" = ["E501", "S105", "S106", "S107"]
+"**/tests_e2e.py" = ["E501", "S105", "S106", "S107"]
+"**/management/commands/*.py" = ["E501", "S105", "S106", "S107"]

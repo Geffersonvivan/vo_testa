@@ -8,6 +8,8 @@ from django.views.generic import RedirectView
 from django.views.static import serve
 
 from apps.comercial import views_lp
+from apps.nucleo import mfa_views
+from apps.nucleo.auth_views import LoginComLimite
 from apps.site import views as site_views
 from apps.site.sitemaps import PaginasEstaticas
 
@@ -52,8 +54,12 @@ urlpatterns = [
 
     # Sistema (equipe): todo o CRM sob /crm/.
     path("crm/admin/", admin.site.urls),
-    path("crm/entrar/", auth_views.LoginView.as_view(), name="login"),
+    path("crm/entrar/", LoginComLimite.as_view(), name="login"),  # S-M1: rate-limit
     path("crm/sair/", auth_views.LogoutView.as_view(), name="logout"),
+    # MFA (Fase 4) — desafio no login, ativação (QR) e configuração.
+    path("crm/mfa/desafio/", mfa_views.mfa_desafio, name="mfa_desafio"),
+    path("crm/mfa/ativar/", mfa_views.mfa_ativar, name="mfa_ativar"),
+    path("crm/mfa/", mfa_views.mfa_config, name="mfa_config"),
     path("crm/", include("apps.nucleo.urls")),
     path("crm/reservas/", include("apps.reservas.urls")),
     path("crm/estoque/", include("apps.estoque.urls")),

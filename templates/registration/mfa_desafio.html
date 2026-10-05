@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block titulo %}Verificação em duas etapas — Pousada Vô Testa{% endblock %}
+
+{% block conteudo_publico %}
+<div class="login-pagina">
+  <img src="{% static 'img/logotipo-pergaminho-limpo.png' %}" alt="Pousada Vô Testa" class="login-lockup">
+
+  <div class="login-cartao">
+    <p class="letreiro">Segurança</p>
+    <h1>Código de verificação</h1>
+    <p style="color:var(--tinta-suave);font-size:.9rem;margin:.2rem 0 1rem">
+      Abra o seu app autenticador e digite o código de 6 dígitos. Sem o celular?
+      Use um código de backup.</p>
+    {% if erro %}<div class="mensagem error">{{ erro }}</div>{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <label for="id_codigo">Código</label>
+      <input type="text" name="codigo" id="id_codigo" inputmode="numeric" autocomplete="one-time-code"
+             autofocus required placeholder="123 456" style="letter-spacing:.2em">
+      <button type="submit" class="botao-primario">Verificar</button>
+    </form>
+  </div>
+
+  <a href="{% url 'login' %}" style="display:inline-flex;align-items:center;gap:.4rem;color:var(--pergaminho);opacity:.7;font-size:.85rem;text-decoration:none">
+    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+    Voltar ao login
+  </a>
+</div>
+{% endblock %}

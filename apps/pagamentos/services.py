@@ -84,6 +84,8 @@ def pix_direto_ativo() -> bool:
 @transaction.atomic
 def confirmar_pagamento(cobranca, usuario=None, origem="webhook"):
     """Confirmação (idempotente) — o webhook do gateway chama por aqui."""
+    from apps.nucleo.sistema import travar
+    cobranca = travar(cobranca)  # S-M3: lock da linha evita confirmação/efeito duplicado (TOCTOU)
     if cobranca.status == Cobranca.Status.PAGO:
         return cobranca  # idempotência: já processado
     if cobranca.status not in (Cobranca.Status.PENDENTE,):

@@ -315,6 +315,9 @@ def salvar_nota(item, texto):
 
 def anexar_arquivo(item, arquivo, usuario=None):
     """Anexa a evidência de um item (itens `pede_arquivo` só fecham com o arquivo)."""
+    # S-A3: o .save() direto não roda os validators do campo — valida extensão/tamanho aqui.
+    for validador in item._meta.get_field("arquivo").validators:
+        validador(arquivo)
     item.arquivo = arquivo
     if usuario is not None:
         item.por = usuario

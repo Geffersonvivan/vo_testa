@@ -159,11 +159,15 @@ def relatorio_colaborador(request):
     dados = services.relatorio_colaborador(func, inicio, fim) if func else None
 
     if request.GET.get("export") == "csv" and dados:
+        from django.utils.text import slugify
+
+        from apps.nucleo.export import sanitizar_celula  # S-M2: anti CSV formula-injection
         resp = HttpResponse(content_type="text/csv; charset=utf-8")
         resp.write("﻿")
-        resp["Content-Disposition"] = f'attachment; filename="relatorio_{func.pessoa.nome}_{inicio}.csv"'
+        nome_arq = slugify(func.pessoa.nome) or "colaborador"
+        resp["Content-Disposition"] = f'attachment; filename="relatorio_{nome_arq}_{inicio}.csv"'
         w = csv.writer(resp, delimiter=";")
-        w.writerow(["Colaborador", func.pessoa.nome])
+        w.writerow(["Colaborador", sanitizar_celula(func.pessoa.nome)])
         w.writerow(["Período", rotulo])
         w.writerow(["Dias trabalhados", dados["dias_trabalhados"]])
         w.writerow(["Horas normais", dados["horas_normais_txt"]])
@@ -173,7 +177,8 @@ def relatorio_colaborador(request):
         w.writerow([])
         w.writerow(["Feriado", "Turno", "Compensação"])
         for fe in dados["feriados_trabalhados"]:
-            w.writerow([fe["data"].strftime("%d/%m/%Y"), fe["turno"], fe["compensacao"]])
+            w.writerow([fe["data"].strftime("%d/%m/%Y"),
+                        sanitizar_celula(fe["turno"]), sanitizar_celula(fe["compensacao"])])
         return resp
 
     iniciais = ""

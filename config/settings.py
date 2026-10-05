@@ -25,6 +25,18 @@ SECRET_KEY = os.environ.get(
 
 DEBUG = os.environ.get("DEBUG", "0") == "1"
 
+# S-A1: em produção a SECRET_KEY é obrigatória e não pode ser o default de dev
+# (que está versionado). Sem isto, env faltante faria o app subir com chave pública
+# → forja de sessão/tokens assinados (auth bypass).
+if not DEBUG and not TESTING and (
+    not os.environ.get("SECRET_KEY") or SECRET_KEY.startswith("dev-inseguro")
+):
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "SECRET_KEY forte é obrigatória em produção (defina a variável de ambiente)."
+    )
+
 ALLOWED_HOSTS = [
     h.strip() for h in os.environ.get("ALLOWED_HOSTS", "").split(",") if h.strip()
 ]
@@ -89,9 +101,16 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # CSP (Fase 4) — report-only por padrão; vira bloqueio com CSP_REPORT_ONLY=False.
+    "apps.nucleo.security_headers.CSPMiddleware",
     # Publica quem/IP da requisição para a auditoria automática (depois do auth).
     "apps.nucleo.audit.AuditContextMiddleware",
+    # MFA obrigatório p/ superusuário (depois do auth — precisa de request.user).
+    "apps.nucleo.security_headers.MFAObrigatorioMiddleware",
 ]
+
+# CSP: começa observando (report-only). Trocar para False quando o console estiver limpo.
+CSP_REPORT_ONLY = os.environ.get("CSP_REPORT_ONLY", "1") == "1"
 
 ROOT_URLCONF = "config.urls"
 
@@ -197,6 +216,15 @@ CSRF_COOKIE_NAME = "vo_testa_csrftoken"
 # (portal do hóspede /hospede/<token>, link de pagamento /pagar/<token>). TM-003.
 SECURE_REFERRER_POLICY = "same-origin"
 
+# Impede o navegador de "adivinhar" o content-type (defesa de XSS em uploads servidos
+# pelo mesmo origin — ver S-A3). Vale em dev e prod.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+
+# Sessão: recepção/caixa é terminal compartilhado — não deixar a sessão viva por semanas.
+SESSION_COOKIE_AGE = 60 * 60 * 10          # 10h
+SESSION_SAVE_EVERY_REQUEST = True          # renova a janela por atividade
+SESSION_COOKIE_SAMESITE = "Lax"
+
 # Segurança em produção (atrás do proxy do Railway)
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -211,6 +239,10 @@ if not DEBUG:
 
 # Pagamentos Online — gateway plugável. "simulado" (sandbox local) ou "safrapay".
 PAGAMENTOS_GATEWAY = os.environ.get("PAGAMENTOS_GATEWAY", "simulado")
+# S-A4: o webhook público só confia no corpo (status/liquidação forjáveis) no sandbox
+# LOCAL ou nos testes — nunca em produção. Em produção a confirmação legítima vem do
+# link do hóspede (pagar_simular, por token) ou da recepção, e a liquidação por conferência.
+PAGAMENTOS_WEBHOOK_CONFIA_CORPO = DEBUG or TESTING
 # Safrapay — 3 campos do portal /keys: ID, Código de Ativação, Token.
 # SAFRAPAY_ENV: hml → payment-hml.safrapay.com.br | prod → payment.safrapay.com.br
 SAFRAPAY_ENV = os.environ.get("SAFRAPAY_ENV", "hml")

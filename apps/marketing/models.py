@@ -12,9 +12,22 @@ services do comercial. Dinheiro é `DecimalField` (nunca float).
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
+
+
+# S-A3: anexo de checklist não pode ser arquivo executável/HTML/SVG (XSS armazenado se
+# servido same-origin) nem grande demais. Allowlist conservadora + teto de tamanho.
+EXTENSOES_ANEXO = ["pdf", "png", "jpg", "jpeg", "webp", "gif", "doc", "docx", "xls", "xlsx", "csv"]
+
+
+def validar_tamanho_anexo(arquivo):
+    limite = 10 * 1024 * 1024  # 10 MB
+    if arquivo and getattr(arquivo, "size", 0) and arquivo.size > limite:
+        raise ValidationError("Arquivo acima de 10 MB.")
 
 
 class VerbaMarketing(models.Model):
@@ -254,6 +267,7 @@ class ItemChecklist(models.Model):
     motivo_dispensa = models.CharField("motivo da dispensa", max_length=200, blank=True)
     arquivo = models.FileField(
         "evidência (anexo)", upload_to="marketing/checklist/", null=True, blank=True,
+        validators=[FileExtensionValidator(EXTENSOES_ANEXO), validar_tamanho_anexo],
         help_text="Alguns itens só fecham com um arquivo anexado (referência, briefing, arte).")
     nota = models.CharField(
         "nota", max_length=280, blank=True,

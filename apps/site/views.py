@@ -938,6 +938,14 @@ def minha_reserva(request):
     erro = None
     sobrenome = codigo = ''
     if request.method == 'POST':
+        # S-M9: rate-limit por IP — o código VT-… tem só 24 bits de aleatório, então
+        # sobrenome+código é força-brutável; limita a varredura de PII da reserva.
+        if _limite_excedido(request, 'minha_reserva', limite=10, janela_seg=300):
+            erro = 'Muitas tentativas. Aguarde alguns minutos e tente de novo.'
+            return render(request, 'site/reservas/minha_reserva.html', {
+                'erro': erro, 'sobrenome': '', 'codigo': '',
+                'config': ConfiguracaoSite.load(),
+            })
         sobrenome = (request.POST.get('sobrenome') or '').strip()
         codigo = (request.POST.get('codigo') or '').strip().upper()
         if sobrenome and codigo:

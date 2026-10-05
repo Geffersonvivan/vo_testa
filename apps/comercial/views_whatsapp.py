@@ -24,11 +24,14 @@ logger = logging.getLogger(__name__)
 def _assinatura_valida(request) -> bool:
     """Confere a assinatura X-Hub-Signature-256 (HMAC do corpo com o App Secret).
 
-    Se WHATSAPP_APP_SECRET não estiver configurado, não checa (dev/simulado).
+    S-M6: falha FECHADA. Só dispensa a assinatura no sandbox local (DEBUG) sem secret;
+    com o gateway real ligado (ou em produção) o secret é obrigatório — sem ele, recusa.
     """
     segredo = getattr(settings, "WHATSAPP_APP_SECRET", "")
     if not segredo:
-        return True
+        gateway_real = getattr(settings, "WHATSAPP_GATEWAY", "simulado") != "simulado"
+        # Dispensa só no sandbox local/testes com gateway simulado; produção = recusa.
+        return (settings.DEBUG or getattr(settings, "TESTING", False)) and not gateway_real
     cabecalho = request.META.get("HTTP_X_HUB_SIGNATURE_256", "")
     if not cabecalho.startswith("sha256="):
         return False
@@ -46,7 +49,7 @@ def webhook(request):
         token = request.GET.get("hub.verify_token")
         desafio = request.GET.get("hub.challenge", "")
         esperado = getattr(settings, "WHATSAPP_VERIFY_TOKEN", "")
-        if modo == "subscribe" and esperado and token == esperado:
+        if modo == "subscribe" and esperado and hmac.compare_digest(token or "", esperado):
             return HttpResponse(desafio, content_type="text/plain")
         return HttpResponseForbidden("token inválido")
 

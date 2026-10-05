@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block titulo %}Códigos de backup — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Segurança</p>
+<div class="pagina-cabecalho"><h1>Guarde os códigos de backup</h1></div>
+<p class="subtitulo">Cada código funciona <strong>uma vez</strong> para entrar sem o celular.
+Guarde num lugar seguro — eles <strong>não serão mostrados de novo</strong>.</p>
+
+<div class="cartao" style="max-width:420px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem 1.2rem;
+              font-family:var(--fonte-mono);font-size:1rem;letter-spacing:.06em">
+    {% for c in codigos %}<span class="mono-num">{{ c }}</span>{% endfor %}
+  </div>
+</div>
+<div class="barra-acao" style="margin-top:1.2rem">
+  <a href="{% url 'mfa_config' %}" class="botao-primario">Já guardei, continuar</a>
+</div>
+{% endblock %}

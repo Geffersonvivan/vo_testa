@@ -1,0 +1,42 @@
+# Hooks de segurança/higiene que rodam ANTES de cada commit (shift-left).
+# Instalar uma vez:  .venv/bin/pre-commit install
+# Rodar em tudo:      .venv/bin/pre-commit run --all-files
+# (O lint geral de estilo segue sendo `ruff check apps/ config/` à parte.)
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: detect-private-key          # chave privada commitada
+      - id: check-added-large-files      # binário/segredo grande por engano
+        args: ["--maxkb=1200"]
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-json
+
+  # Segredos: compara com .secrets.baseline (só falha em segredo NOVO)
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: '\.venv/|staticfiles/|/migrations/|package-lock\.json|tailwind\.css|\.min\.(js|css)$'
+
+  # SAST Python (não roda em testes; B310=urlopen de endpoints https confiáveis, aceito)
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.9.4
+    hooks:
+      - id: bandit
+        args: ["-ll", "-x", "*/tests.py,*/tests_e2e.py", "--skip", "B310"]
+        files: '^(apps|config)/.*\.py$'
+
+  # Regras de segurança de alto sinal do ruff (segredos, SQLi, hash fraco, shell=True…)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.20
+    hooks:
+      - id: ruff
+        name: ruff (regras de segurança)
+        args: ["check", "--force-exclude",
+               "--select", "S105,S106,S107,S608,S301,S302,S324,S501,S602,S605,S611"]
+        files: '^(apps|config)/.*\.py$'

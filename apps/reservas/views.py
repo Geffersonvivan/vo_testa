@@ -497,6 +497,11 @@ def lancamento_novo(request, pk):
         return redirect("reservas:detalhe", pk=pk)
     form = LancamentoContaForm(request.POST)
     if form.is_valid():
+        # S-A2: desconto no folio só com gerência — evita recepcionista zerar o saldo e
+        # liberar check-out sem receber (skimming). Débitos normais seguem liberados.
+        if form.cleaned_data["tipo"] == "desconto" and not eh_gerente(request.user):
+            messages.error(request, "Lançar desconto exige permissão de gerência.")
+            return redirect("reservas:detalhe", pk=pk)
         try:
             services.lancar_na_conta(
                 reserva.conta,

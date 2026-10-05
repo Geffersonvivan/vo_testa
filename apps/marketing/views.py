@@ -95,11 +95,16 @@ def mover_fase(request, pk):
 
 def _rota_pos(request, campanha, destino="marketing:quadro"):
     """HTMX → gaveta re-renderizada; senão o redirect (quadro por padrão, detalhe se pedido)."""
+    from django.utils.http import url_has_allowed_host_and_scheme
     if request.headers.get("HX-Request"):
         return _pos_ficha(request, campanha)
     if destino == "detalhe":
         return redirect("marketing:detalhe", pk=campanha.pk)
-    return redirect(destino if destino != "marketing:quadro" else "marketing:quadro")
+    # S-M7: só redireciona para `next` se for URL interna segura; senão volta ao quadro.
+    if destino and destino != "marketing:quadro" and url_has_allowed_host_and_scheme(
+            destino, allowed_hosts={request.get_host()}):
+        return redirect(destino)
+    return redirect("marketing:quadro")
 
 
 @never_cache
@@ -342,8 +347,11 @@ def anexar_item(request, pk, chave):
     item = get_object_or_404(c.checks, chave=chave)
     arquivo = request.FILES.get("arquivo")
     if arquivo:
-        services.anexar_arquivo(item, arquivo, request.user)
-        messages.success(request, "Arquivo anexado.")
+        try:
+            services.anexar_arquivo(item, arquivo, request.user)
+            messages.success(request, "Arquivo anexado.")
+        except ValidationError as erro:
+            messages.error(request, " ".join(erro.messages))
     return _pos_ficha(request, c)
 
 
@@ -454,8 +462,9 @@ def relatorio(request):
         w.writerow([])
         w.writerow(["Campanha", "Gasto", "Retorno rastreado", "Retorno estimado (janela)",
                     "Fechamentos", "CAC"])
+        from apps.nucleo.export import sanitizar_celula  # S-M2: anti CSV formula-injection
         for l in dados["linhas"]:
-            w.writerow([l["nome"], l["gasto"], l["rastreada"], l["janela"],
+            w.writerow([sanitizar_celula(l["nome"]), l["gasto"], l["rastreada"], l["janela"],
                         l["fechamentos"], l["cac"] if l["cac"] is not None else "—"])
         return resp
     return render(request, "marketing/relatorio.html", {

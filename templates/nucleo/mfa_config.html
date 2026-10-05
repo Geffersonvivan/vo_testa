@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block titulo %}Verificação em duas etapas — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Minha conta</p>
+<div class="pagina-cabecalho"><h1>Verificação em duas etapas (MFA)</h1></div>
+<p class="subtitulo">Uma segunda camada além da senha: um código do seu celular a cada login.</p>
+
+{% if erro %}<div class="mensagem error" style="max-width:520px">{{ erro }}</div>{% endif %}
+
+<div class="cartao" style="max-width:520px">
+  {% if user.mfa_ativo %}
+    <p style="margin:0"><span class="selo selo-limpa">Ativo</span></p>
+    <p style="color:var(--tinta-suave);font-size:.9rem;margin:.2rem 0 0">
+      Códigos de backup restantes: <strong>{{ restantes }}</strong>.</p>
+    {% if obrigatorio %}
+      <p style="color:var(--tinta-suave);font-size:.85rem;margin:.6rem 0 0">
+        O MFA é <strong>obrigatório</strong> na sua conta (superusuário) e não pode ser desativado.</p>
+    {% else %}
+      <form method="post" style="margin-top:1rem;display:flex;flex-direction:column;gap:.5rem">
+        {% csrf_token %}
+        <label for="id_senha">Para desativar, confirme a senha</label>
+        <input type="password" name="senha" id="id_senha" autocomplete="current-password">
+        <button type="submit" class="botao-neutro" style="align-self:flex-start">Desativar MFA</button>
+      </form>
+    {% endif %}
+  {% else %}
+    <p style="margin:0"><span class="selo selo-neutro">Inativo</span></p>
+    {% if obrigatorio %}
+      <p style="color:var(--perigo);font-size:.9rem;margin:.4rem 0 0">
+        Sua conta exige MFA — ative agora para continuar usando o sistema.</p>
+    {% endif %}
+    <div class="barra-acao" style="margin-top:1rem">
+      <a href="{{ ativar_url }}" class="botao-primario">Ativar MFA</a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

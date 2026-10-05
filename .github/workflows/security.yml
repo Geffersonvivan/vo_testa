@@ -1,0 +1,66 @@
+name: Segurança
+
+# Gate de segurança no PR e na main (não interfere no deploy do Railway).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 9 * * 1"   # varredura semanal (segunda 09:00 UTC) pega CVE nova em dep
+
+permissions:
+  contents: read
+
+jobs:
+  sast-deps-secrets:
+    name: SAST + dependências + segredos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # histórico completo p/ o gitleaks
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Instalar dependências + ferramentas
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pip-audit bandit ruff semgrep
+
+      - name: pip-audit (CVEs em dependências)
+        run: pip-audit
+
+      - name: bandit (SAST Python)
+        run: bandit -r apps config -ll -x '*/tests.py,*/tests_e2e.py' --skip B310
+
+      - name: ruff (regras de segurança)
+        run: ruff check apps config --select "S105,S106,S107,S608,S301,S302,S324,S501,S602,S605,S611"
+
+      # Report-only por ora: a 1ª varredura achou injeção de fórmula em CSV e 1
+      # open-redirect guardado — correção real está na auditoria profunda (Fase 3) e
+      # parte vive em arquivos WIP. Trocar para `--error` quando esses forem fechados.
+      - name: semgrep (regras Django/Python/OWASP — report-only)
+        continue-on-error: true
+        run: semgrep --config p/django --config p/python --config p/secrets --exclude '*/tests.py' apps config
+
+      - name: Django check --deploy (hardening de settings)
+        env:
+          DEBUG: "0"
+          SECRET_KEY: "ci-dummy-secret-key-com-mais-de-cinquenta-caracteres-aleatorios-xyz"
+          ALLOWED_HOSTS: "example.com"
+          DATABASE_URL: "sqlite:///ci.db"
+        run: python manage.py check --deploy --fail-level WARNING
+
+  gitleaks:
+    name: Segredos no histórico (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: "false"
