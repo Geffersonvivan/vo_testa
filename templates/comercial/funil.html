@@ -40,6 +40,12 @@
   .card-assumir{background:var(--lampiao);color:#241a08;border:none;font-weight:700}
   .card-wpp{font-size:12px;font-weight:700;color:var(--sucesso);text-decoration:none;white-space:nowrap}
   .card-wpp:hover{text-decoration:underline}
+  /* barra de rolagem horizontal no topo do funil — espelha a de baixo do board */
+  .funil-scroll-topo{overflow-x:auto;overflow-y:hidden;margin:.1rem .1rem .2rem}
+  .funil-scroll-topo>div{height:1px}
+  .funil-scroll-topo::-webkit-scrollbar{height:9px}
+  .funil-scroll-topo::-webkit-scrollbar-thumb{background:var(--fio-forte);border-radius:999px}
+  .funil-scroll-topo[hidden]{display:none}
 </style>
 <div x-data="{ nova: false, perda: false, perdaOp: null, perdaEtapa: null }">
   <div class="pagina-cabecalho">
@@ -82,7 +88,10 @@
     <label class="fp-todos"><input type="checkbox" name="fechados" value="todos" {% if todos_fechados %}checked{% endif %} onchange="this.form.submit()"> Todos</label>
   </form>
 
-  <div class="funil-board">
+  {# barra de rolagem horizontal no topo (espelha a de baixo do board) #}
+  <div class="funil-scroll-topo" id="funilScrollTop" aria-hidden="true"><div></div></div>
+
+  <div class="funil-board" id="funilBoard">
     {% for col in colunas %}
       <div class="funil-coluna" data-etapa="{{ col.etapa.id }}" data-tipo="{{ col.etapa.tipo }}"
            style="--cor-etapa: {% if col.etapa.tipo == 'ganho' %}var(--sucesso){% elif col.etapa.tipo == 'perdido' %}var(--perigo){% else %}var(--lampiao){% endif %}"
@@ -315,5 +324,28 @@
     document.getElementById('mover-etapa').value = etapaId;
     form.submit();
   }
+
+  /* Barra de rolagem no topo do funil, espelhando a de baixo do board. */
+  (function () {
+    const board = document.getElementById('funilBoard');
+    const topo = document.getElementById('funilScrollTop');
+    if (!board || !topo) return;
+    const inner = topo.firstElementChild;
+    let travado = false;
+    function sincronizarLargura() {
+      inner.style.width = board.scrollWidth + 'px';
+      topo.hidden = board.scrollWidth <= board.clientWidth + 1; // some se não há overflow
+    }
+    function espelhar(origem, destino) {
+      if (travado) return;
+      travado = true;
+      destino.scrollLeft = origem.scrollLeft;
+      travado = false;
+    }
+    topo.addEventListener('scroll', () => espelhar(topo, board));
+    board.addEventListener('scroll', () => espelhar(board, topo));
+    window.addEventListener('resize', sincronizarLargura);
+    sincronizarLargura();
+  })();
 </script>
 {% endblock %}
