@@ -3,6 +3,8 @@ from django.contrib import admin
 from .models import (
     Acompanhante,
     Adiantamento,
+    BercoEstoque,
+    ColchoesExtra,
     ContaHospedagem,
     FichaFNRH,
     LancamentoConta,
@@ -18,6 +20,33 @@ class TarifaAdmin(admin.ModelAdmin):
 
     list_display = ["tipo_uh", "classificacao", "valor"]
     list_filter = ["tipo_uh", "classificacao"]
+
+
+@admin.register(ColchoesExtra)
+class ColchoesExtraAdmin(admin.ModelAdmin):
+    """Pool global de colchões extra (singleton editável — recurso compartilhado)."""
+
+    list_display = ["quantidade", "alerta_minimo", "atualizado_em"]
+
+    def has_add_permission(self, request):
+        # Singleton: só edita a linha existente (criada sob demanda por atual()).
+        return not ColchoesExtra.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(BercoEstoque)
+class BercoEstoqueAdmin(admin.ModelAdmin):
+    """Estoque global de berços (singleton editável — recurso compartilhado, grátis)."""
+
+    list_display = ["quantidade", "atualizado_em"]
+
+    def has_add_permission(self, request):
+        return not BercoEstoque.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 class FichaFNRHInline(admin.TabularInline):

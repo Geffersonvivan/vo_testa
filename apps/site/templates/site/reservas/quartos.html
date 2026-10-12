@@ -65,7 +65,7 @@
                         {% endif %}
                         <p class="text-madeira font-display text-2xl font-bold mt-1">R$ {{ r.total|floatformat:0 }} <span class="text-madeira/30 text-xs font-normal">total</span></p>
                     </div>
-                    <a href="{% if r.eh_unidade %}{% url 'core:selecionar_unidade' r.quarto.uh_id %}{% else %}{% url 'core:selecionar_quarto' r.quarto.id %}{% endif %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}{% if busca.modalidade %}&modalidade={{ busca.modalidade }}{% endif %}"
+                    <a href="{% if r.eh_unidade %}{% url 'core:selecionar_unidade' r.quarto.uh_id %}{% else %}{% url 'core:selecionar_quarto' r.quarto.id %}{% endif %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}&criancas_0_5={{ busca.criancas_0_5|default:0 }}&criancas_6_15={{ busca.criancas_6_15|default:0 }}{% if busca.modalidade %}&modalidade={{ busca.modalidade }}{% endif %}"
                        class="bg-madeira text-pergaminho font-bold text-sm px-6 py-2.5 rounded-xl hover:bg-madeira/90 transition shadow-sm">
                         Reservar
                     </a>

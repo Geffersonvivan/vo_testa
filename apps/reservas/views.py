@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.contrib import messages
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -23,8 +23,9 @@ from .forms import (
     LancamentoContaForm,
     RecebimentoForm,
     ReservaForm,
+    TransferenciaForm,
 )
-from .models import GrupoReserva, Reserva
+from .models import ColchoesExtra, GrupoReserva, Reserva
 
 DIAS_MAPA = 14
 
@@ -251,11 +252,18 @@ def nova(request):
         ),
     }
     if request.method == "POST" and form.is_valid():
+        from apps.reservas import precos
+
         reserva = form.save(commit=False)
         reserva.criado_por = request.user
-        sugerida = services.diaria_media(
-            reserva.uh.tipo, reserva.checkin, reserva.checkout
-        )
+        reserva.criancas = form.cleaned_data.get("criancas", 0)
+        # Diária sugerida pela motor de tarifa (Manual §2 — pessoa adicional, single,
+        # criança 6-15 meia, não-reembolsável). A gerência pode sobrepor.
+        sugerida = precos.cotacao(
+            uh=reserva.uh, checkin=reserva.checkin, checkout=reserva.checkout,
+            adultos=reserva.adultos, criancas_0_5=reserva.criancas_0_5,
+            criancas_6_15=reserva.criancas_6_15,
+        )["media_noite"]
         if not form.cleaned_data.get("valor_diaria"):
             reserva.valor_diaria = sugerida
         elif reserva.valor_diaria != sugerida and not eh_gerente(request.user):
@@ -279,7 +287,32 @@ def nova(request):
         if "orcamento" in request.POST:
             reserva.status = Reserva.Status.ORCAMENTO
         try:
-            reserva.save()
+            with transaction.atomic():
+                # Trava global de colchões extra por noite (orçamento não consome pool).
+                # O lock no pool serializa reservas concorrentes na mesma noite.
+                if reserva.status != Reserva.Status.ORCAMENTO:
+                    ColchoesExtra.atual()
+                    ColchoesExtra.objects.select_for_update().first()
+                    conf = services.conferir_arranjo(
+                        reserva.uh, casais=reserva.casais, solteiros=reserva.solteiros,
+                        usa_sofa_cama=reserva.usa_sofa_cama, adultos=reserva.adultos,
+                        criancas=reserva.criancas, checkin=reserva.checkin,
+                        checkout=reserva.checkout,
+                    )
+                    if conf["erros"]:
+                        for erro in conf["erros"]:
+                            form.add_error(None, erro)
+                        return render(request, template, contexto)
+                    for aviso in conf["avisos"]:
+                        messages.warning(request, aviso)
+                    # Berço (grátis, recurso global): bloqueia se não há livre na noite.
+                    if reserva.usa_berco and not services.berco_disponivel(
+                        reserva.checkin, reserva.checkout
+                    ):
+                        form.add_error(
+                            None, "Não há berço disponível em alguma noite do período.")
+                        return render(request, template, contexto)
+                reserva.save()
         except IntegrityError:
             form.add_error(
                 None,
@@ -312,7 +345,8 @@ def tarifa_preview(request):
     if checkout <= checkin:
         return JsonResponse({"erro": "período inválido"})
 
-    diaria = services.diaria_media(uh.tipo, checkin, checkout)
+    from apps.reservas import precos
+
     rotulos = dict(Temporada.Classificacao.choices)
     vistas, temporadas = set(), []
     dia = checkin
@@ -324,13 +358,68 @@ def tarifa_preview(request):
         dia += timedelta(days=1)
     temporada = " + ".join(temporadas) if temporadas else "Tarifa base (fora de temporada)"
     noites = (checkout - checkin).days
+
+    # Arranjo de camas + status do pool de colchões extra (ao vivo no modal).
+    def _int(nome, padrao=None):
+        try:
+            return int(request.GET[nome])
+        except (KeyError, ValueError, TypeError):
+            return padrao
+
+    def _bool(nome, padrao=True):
+        v = request.GET.get(nome)
+        return padrao if v is None else v in ("1", "true", "on")
+
+    adultos = _int("adultos", 2)
+    criancas_0_5 = _int("criancas_0_5", 0)
+    criancas_6_15 = _int("criancas_6_15", 0)
+    criancas = criancas_0_5 + criancas_6_15
+    cobra_iss = _bool("cobra_iss", True)
+    cobra_taxa_turismo = _bool("cobra_taxa_turismo", True)
+
+    # Preço itemizado pela motor de tarifa (Manual §2 + taxas).
+    cot = precos.cotacao(
+        uh=uh, checkin=checkin, checkout=checkout, adultos=adultos,
+        criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15,
+        cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_taxa_turismo)
+    diaria = cot["media_noite"]
+
+    casais_in, solteiros_in = _int("casais"), _int("solteiros")
+    sofa_in = request.GET.get("sofa") in ("1", "true", "on")
+    casais, solteiros, usa_sofa = services._resolver_arranjo(
+        uh, casais=casais_in, solteiros=solteiros_in,
+        usa_sofa_cama=(sofa_in if (casais_in is not None or solteiros_in is not None) else None),
+        adultos=adultos, criancas=criancas,
+    )
+    conf = services.conferir_arranjo(
+        uh, casais=casais, solteiros=solteiros, usa_sofa_cama=usa_sofa,
+        adultos=adultos, criancas=criancas, checkin=checkin, checkout=checkout)
+    if conf["erros"]:
+        colchoes_status, colchoes_msg = "bloqueio", conf["erros"][0]
+    elif conf["avisos"]:
+        colchoes_status, colchoes_msg = "aviso", conf["avisos"][0]
+    elif conf["extra"]:
+        colchoes_status = "ok"
+        colchoes_msg = f"{conf['extra']} colchão(ões) extra neste arranjo — há disponível."
+    else:
+        colchoes_status = "ok"
+        colchoes_msg = "Arranjo dentro da base do quarto (não usa colchão extra)."
+
     return JsonResponse(
         {
             "diaria": f"{diaria:.2f}",
             "temporada": temporada,
             "noites": noites,
-            "total": f"{diaria * noites:.2f}",
+            "hospedagem": f"{cot['hospedagem']:.2f}",
+            "iss": f"{cot['iss']:.2f}",
+            "iss_aliquota": f"{cot['iss_aliquota']:.1f}",
+            "taxa_turismo": f"{cot['taxa_turismo']:.2f}",
+            "total": f"{cot['total']:.2f}",
             "feriado_ou_alta": bool(temporadas),
+            "arranjo": {"casais": casais, "solteiros": solteiros, "sofa": usa_sofa},
+            "colchoes_extra": conf["extra"],
+            "colchoes_status": colchoes_status,
+            "colchoes_msg": colchoes_msg,
         }
     )
 
@@ -364,6 +453,12 @@ def detalhe(request, pk):
                     f"O quarto {reserva.uh.numero} não está limpo/inspecionado."
                 )
 
+    # Prévia da política de cancelamento (quanto reteria/devolveria agora).
+    politica_cancel = None
+    if reserva.ativa:
+        from apps.reservas import cancelamento
+        politica_cancel = cancelamento.resumo_cancelamento(reserva)
+
     return render(
         request,
         "reservas/reserva_detalhe.html",
@@ -371,10 +466,12 @@ def detalhe(request, pk):
             "reserva": reserva,
             "conta": conta,
             "form_cancelamento": CancelamentoForm(),
+            "form_transferencia": TransferenciaForm(),
             "form_recebimento": RecebimentoForm(),
             "form_lancamento": LancamentoContaForm(),
             "form_acompanhante": AcompanhanteForm(),
             "quartos_livres": quartos_livres,
+            "politica_cancel": politica_cancel,
             "eh_gerente": eh_gerente(request.user),
             "aviso_checkin": aviso_checkin,
             "fnrh_pronta": reserva.fnrh_pronta,
@@ -469,8 +566,54 @@ def cancelar(request, pk):
         return redirect("reservas:detalhe", pk=pk)
 
     def acao(reserva):
-        reserva.cancelar(request.user, form.cleaned_data["motivo"])
-        messages.success(request, "Reserva cancelada — motivo registrado.")
+        from apps.nucleo.models import registrar_auditoria
+        from apps.reservas import cancelamento
+
+        resumo = cancelamento.resumo_cancelamento(reserva)
+        nota = _nota_politica(resumo)
+        reserva.cancelar(request.user, f"{form.cleaned_data['motivo']} — {nota}")
+        registrar_auditoria(request.user, "politica_cancelamento", reserva, {
+            "cenario": resumo["cenario"],
+            "retido": str(resumo["cobranca"]),
+            "devolver": str(resumo["devolver"]),
+            "pago": str(resumo["pago"]),
+        })
+        messages.success(request, f"Reserva cancelada. {nota}")
+
+    return _acao_reserva(request, pk, acao)
+
+
+def _nota_politica(resumo) -> str:
+    """Frase da política p/ o motivo/auditoria/mensagem (retém × devolve)."""
+    devolver = resumo["devolver"]
+    if resumo["cenario"] == "em_hospedagem":
+        return (f"Saída antecipada: cobrar {resumo['dias_consumidos']} diária(s) usada(s) "
+                f"+ {resumo['retencao_pct'].normalize()}% de retenção. Devolver R$ {devolver}.")
+    if resumo["dentro_arrependimento"]:
+        return f"Dentro do prazo de arrependimento — devolver 100% (R$ {devolver})."
+    return (f"Fora do prazo: reter {resumo['retencao_pct'].normalize()}% "
+            f"(R$ {resumo['retencao_valor']}). Devolver R$ {devolver}.")
+
+
+@requer_modulo(Modulo.RESERVAS)
+def transferir(request, pk):
+    """Reagenda a reserva para novas datas (1ª opção de cancelamento)."""
+    if request.method != "POST":
+        return redirect("reservas:detalhe", pk=pk)
+    form = TransferenciaForm(request.POST)
+    if not form.is_valid():
+        erros = "; ".join(e for lista in form.errors.values() for e in lista)
+        messages.error(request, f"Datas inválidas: {erros}")
+        return redirect("reservas:detalhe", pk=pk)
+
+    def acao(reserva):
+        services.transferir_datas(
+            reserva, form.cleaned_data["checkin"], form.cleaned_data["checkout"],
+            request.user)
+        messages.success(
+            request,
+            f"Reserva reagendada para {form.cleaned_data['checkin']:%d/%m/%Y}–"
+            f"{form.cleaned_data['checkout']:%d/%m/%Y} (diária recalculada).")
 
     return _acao_reserva(request, pk, acao)
 
@@ -651,6 +794,30 @@ MESES_PT = [
 
 
 @requer_modulo(Modulo.RESERVAS)
+@requer_gerencia
+def painel_colchoes(request):
+    """Painel de colchões extra: usados × livres por noite num período (gerência).
+    Fecha o ciclo do estoque de colchões (docs/Reservas/PLANO_ESTOQUE_COLCHOES.md §5)."""
+    hoje = timezone.localdate()
+    try:
+        dias = int(request.GET.get("dias", 14))
+    except (TypeError, ValueError):
+        dias = 14
+    dias = min(60, max(1, dias))
+    try:
+        inicio = timezone.datetime.strptime(request.GET["inicio"], "%Y-%m-%d").date()
+    except (KeyError, ValueError, TypeError):
+        inicio = hoje
+    fim = inicio + timedelta(days=dias - 1)
+    dados = services.painel_colchoes(inicio, fim)
+    return render(request, "reservas/painel_colchoes.html", {
+        "painel": dados,
+        "inicio": inicio,
+        "fim": fim,
+        "dias": dias,
+    })
+
+
 @requer_gerencia
 def boh(request):
     """Boletim de Ocupação Hoteleira (Embratur) — agregado mensal da FNRH.

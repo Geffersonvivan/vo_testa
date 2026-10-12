@@ -61,4 +61,33 @@
     </tbody>
   </table>
 </div>
+
+{% if montagem %}
+<section class="montagem-camas" style="margin-top:1.5rem">
+  <h2 class="letreiro" style="font-size:.9rem">Montagem de camas — chegadas de hoje</h2>
+  <p class="subtitulo">Como preparar as camas de cada quarto que recebe hóspede hoje.
+    Colchão extra sai do estoque compartilhado; sofá-cama é aberto quando indicado.</p>
+  <table class="tabela">
+    <thead>
+      <tr>
+        <th>Quarto</th><th>Hóspede</th>
+        <th class="num">Casais</th><th class="num">Solteiros</th>
+        <th>Sofá-cama</th><th class="num">Colchões extra</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in montagem %}
+        <tr>
+          <td><strong>{{ m.uh }}</strong></td>
+          <td>{{ m.hospede }}</td>
+          <td class="num">{{ m.casais }}</td>
+          <td class="num">{{ m.solteiros }}</td>
+          <td>{% if m.sofa %}<span class="selo selo-ok">Abrir</span>{% else %}<span class="celula-vazia">—</span>{% endif %}</td>
+          <td class="num">{% if m.extra %}<span class="selo selo-pendente">{{ m.extra }}</span>{% else %}0{% endif %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
 {% endblock %}

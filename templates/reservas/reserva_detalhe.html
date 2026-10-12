@@ -94,7 +94,37 @@
       {% endif %}
     </section>
     <section>
+      <h2>Transferir data</h2>
+      <p class="ajuda">1ª opção: reagenda a reserva para outras datas (revalida disponibilidade
+        e recalcula a diária). Não gera multa.</p>
+      <form method="post" action="{% url 'reservas:transferir' reserva.pk %}" class="form-cartao">
+        {% csrf_token %}
+        {% include "nucleo/partials/campos.html" with form=form_transferencia %}
+        <div class="acoes"><button type="submit" class="botao-neutro">Reagendar</button></div>
+      </form>
+    </section>
+    <section>
       <h2>Cancelar reserva</h2>
+      {% if politica_cancel %}
+        <div class="aviso-politica">
+          {% if politica_cancel.cenario == 'em_hospedagem' %}
+            <strong>Saída antecipada.</strong> Cobrar {{ politica_cancel.dias_consumidos }}
+            diária(s) usada(s) + {{ politica_cancel.retencao_pct|floatformat:"-1" }}% de retenção.
+          {% elif politica_cancel.dentro_arrependimento %}
+            <strong>Dentro do prazo de arrependimento</strong> ({{ politica_cancel.retencao_pct|floatformat:"-1" }}%
+            não se aplica) — devolver 100%.
+          {% else %}
+            <strong>Fora do prazo.</strong> Reter {{ politica_cancel.retencao_pct|floatformat:"-1" }}%
+            (R$ {{ politica_cancel.retencao_valor }}).
+          {% endif %}
+          <div class="politica-valores">
+            <span>Pago: <strong>R$ {{ politica_cancel.pago }}</strong></span>
+            <span>Retém: <strong>R$ {{ politica_cancel.cobranca }}</strong></span>
+            <span>Devolver: <strong>R$ {{ politica_cancel.devolver }}</strong></span>
+          </div>
+          <small class="ajuda">A devolução é processada pelo caixa (estorno). Prefira transferir a data.</small>
+        </div>
+      {% endif %}
       <form method="post" action="{% url 'reservas:cancelar' reserva.pk %}" class="form-cartao">
         {% csrf_token %}
         {% include "nucleo/partials/campos.html" with form=form_cancelamento %}

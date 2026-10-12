@@ -605,58 +605,47 @@ class ColchaoExtraTests(ReservasTestsBase):
         from apps.nucleo.estrutura import extras_para
         self.assertEqual(extras_para(self.duplo, 1), 0)
 
-    def test_cotacao_itemiza_colchao_separado_das_diarias(self):
-        cot = services.cotacao_unidade(
-            self.duplo, HOJE, HOJE + timedelta(days=2), pessoas=7
-        )
-        # duplo base 300 → diária 480; 2 noites = 960 de diárias.
-        self.assertEqual(cot["total_diarias"], Decimal("960"))
-        # 2 colchões × 80 × 2 noites = 320, em linha própria.
-        self.assertEqual(cot["colchoes_qtd"], 2)
-        self.assertEqual(cot["colchoes_total"], Decimal("320.00"))
-        self.assertEqual(cot["bruto"], Decimal("1280.00"))
-
-    def test_cotacao_cruzando_duas_temporadas(self):
-        from apps.nucleo.models import Temporada
-        Temporada.objects.create(
-            nome="Feriadão", classificacao="feriado", inicio=HOJE, fim=HOJE,
-        )
-        Tarifa.objects.create(
-            tipo_uh=self.tipo, classificacao="feriado", valor=Decimal("500.00")
-        )
-        # Noite 1: feriado 500 → duplo 800; noite 2: base 300 → duplo 480. = 1280.
-        cot = services.cotacao_unidade(
-            self.duplo, HOJE, HOJE + timedelta(days=2), pessoas=5
-        )
-        self.assertEqual(cot["total_diarias"], Decimal("1280"))
-        self.assertEqual(cot["colchoes_qtd"], 0)
-        self.assertEqual(cot["bruto"], Decimal("1280"))
-
-    def test_checkin_lanca_colchao_na_conta(self):
+    def test_checkin_nao_cobra_colchao(self):
+        # Fase 6: o colchão virou só disponibilidade — não há mais linha de cobrança.
         r = self.reserva(uh=self.duplo, dias=2)
-        r.adultos, r.criancas = 6, 1  # 7 pessoas → 2 colchões
-        r.save()
-        conta = r.fazer_checkin(self.usuario)
-        linha = conta.lancamentos.filter(descricao__startswith="Colchão extra").first()
-        self.assertIsNotNone(linha)
-        self.assertEqual(linha.descricao, "Colchão extra · 2 unidades · 2 noites")
-        self.assertEqual(linha.valor, Decimal("320.00"))
-        self.assertEqual(linha.tipo, LancamentoConta.Tipo.SERVICO)
-
-    def test_checkin_sem_excesso_nao_lanca_colchao(self):
-        r = self.reserva(uh=self.duplo, dias=2)
-        r.adultos, r.criancas = 4, 0  # cabe → sem colchão
+        r.adultos, r.criancas = 6, 1  # 7 pessoas (antes gerava colchão)
         r.save()
         conta = r.fazer_checkin(self.usuario)
         self.assertFalse(
-            conta.lancamentos.filter(descricao__startswith="Colchão extra").exists()
+            conta.lancamentos.filter(descricao__startswith="Colchão").exists()
         )
+        # Só as diárias (taxas desligadas em teste via PRECO_TAXAS_ATIVAS).
+        self.assertEqual(conta.total_lancamentos(), r.valor_diaria * 2)
 
     def test_colchoes_extras_service_para_governanca(self):
         r = self.reserva(uh=self.duplo, dias=1)
         r.adultos, r.criancas = 5, 2  # 7 → 2
         r.save()
         self.assertEqual(services.colchoes_extras(r), 2)
+
+
+@override_settings(PRECO_TAXAS_ATIVAS=True, FNRH_BLOQUEAR_CHECKIN=False,
+                   PRECO_ISS_ALIQUOTA="4.0", PRECO_TAXA_TURISMO_DIARIA="4.00")
+class TaxasNoCheckinTests(ReservasTestsBase):
+    """Fase 6 — ISS + taxa de turismo lançados no check-in (flag ligada em produção)."""
+
+    def test_checkin_lanca_iss_e_turismo(self):
+        r = self.reserva(dias=2)  # diária 300 × 2 = 600 de hospedagem
+        conta = r.fazer_checkin(self.usuario)
+        iss = conta.lancamentos.filter(descricao__startswith="ISS").first()
+        tur = conta.lancamentos.filter(descricao__startswith="Taxa de turismo").first()
+        self.assertIsNotNone(iss)
+        self.assertEqual(iss.valor, Decimal("24.00"))    # 4% × 600
+        self.assertEqual(tur.valor, Decimal("8.00"))     # R$4 × 2 noites
+        self.assertEqual(conta.total_lancamentos(), Decimal("632.00"))
+
+    def test_desmarcar_taxas_nao_lanca(self):
+        r = self.reserva(dias=2)
+        r.cobra_iss = False
+        r.cobra_taxa_turismo = False
+        r.save()
+        conta = r.fazer_checkin(self.usuario)
+        self.assertEqual(conta.total_lancamentos(), Decimal("600.00"))
 
 
 class GrupoReservaTests(ReservasTestsBase):
@@ -708,6 +697,27 @@ class GrupoReservaTests(ReservasTestsBase):
         with self.assertRaises(ValidationError):
             services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h3, usuario=self.usuario)
 
+    def test_grupo_quarto_preco_por_pessoa(self):
+        # Fase 7/grupos: a diária do quarto do grupo vem pela motor (pessoa adicional).
+        self.tipo.pessoa_adicional = Decimal("50.00")
+        self.tipo.save(update_fields=["pessoa_adicional"])
+        grupo = self._grupo()
+        f = services.adicionar_quarto(
+            grupo, uh=self.duplo, hospede=self.h2, usuario=self.usuario, adultos=3)
+        # duplo base 480 (fator duplo) + (3−2)×50 = 530.
+        self.assertEqual(f.valor_diaria, Decimal("530.00"))
+
+    def test_grupo_quarto_respeita_trava_colchoes(self):
+        from apps.reservas.models import ColchoesExtra
+        pool = ColchoesExtra.atual()  # garante a linha
+        pool.quantidade = 0
+        pool.save()  # pool esgotado
+        grupo = self._grupo()
+        with self.assertRaises(ValidationError):
+            # 7 pessoas no duplo exigem colchão extra — sem pool, bloqueia.
+            services.adicionar_quarto(
+                grupo, uh=self.duplo, hospede=self.h2, usuario=self.usuario, adultos=7)
+
     def test_diaria_no_folio_consumo_no_quarto(self):
         grupo = self._grupo()
         f1 = services.adicionar_quarto(grupo, uh=self.qa, hospede=self.h2, usuario=self.usuario)
@@ -727,19 +737,19 @@ class GrupoReservaTests(ReservasTestsBase):
         self.assertEqual(f1.conta.total_lancamentos(), Decimal("50.00"))
         self.assertEqual(grupo.folio.total_lancamentos(), Decimal("600.00"))
 
-    def test_colchao_extra_vai_ao_folio_mae(self):
+    def test_diarias_vao_ao_folio_mae_sem_colchao(self):
         grupo = self._grupo()
         f = services.adicionar_quarto(
             grupo, uh=self.duplo, hospede=self.h2, usuario=self.usuario,
-            adultos=6, criancas=1,  # 7 pessoas → 2 colchões
+            adultos=6, criancas=1,  # 7 pessoas (antes gerava colchão)
         )
         services.confirmar_grupo(grupo.pk, self.usuario)
         f.refresh_from_db()
         f.fazer_checkin(self.usuario)
-        # duplo: diária 480 × 2 = 960; colchão 2×80×2 = 320 → folio 1280.
-        self.assertEqual(grupo.folio.total_lancamentos(), Decimal("1280.00"))
-        self.assertTrue(
-            grupo.folio.lancamentos.filter(descricao__startswith="Colchão extra").exists()
+        # duplo: diária 480 × 2 = 960 no folio-mãe; colchão não cobra mais (Fase 6).
+        self.assertEqual(grupo.folio.total_lancamentos(), Decimal("960.00"))
+        self.assertFalse(
+            grupo.folio.lancamentos.filter(descricao__startswith="Colchão").exists()
         )
         self.assertEqual(f.conta.total_lancamentos(), Decimal("0.00"))
 

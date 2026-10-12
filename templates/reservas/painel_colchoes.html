@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block titulo %}Colchões extra — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Reservas · Estoque</p>
+<div class="pagina-cabecalho">
+  <h1>Colchões extra por noite</h1>
+  <a href="{% url 'reservas:lista' %}" class="botao-neutro">Voltar às reservas</a>
+</div>
+<p class="subtitulo">A base de casal de cada quarto é garantida e não entra aqui — este painel
+  mostra só o <strong>pool compartilhado de colchões extra</strong> ({{ painel.pool }} no total),
+  usado e livre em cada noite. Avisa quando resta ≤ {{ painel.alerta_minimo }}.</p>
+
+<form method="get" class="filtros">
+  <label>A partir de
+    <input type="date" name="inicio" value="{{ inicio|date:'Y-m-d' }}" onchange="this.form.submit()">
+  </label>
+  <label>Noites
+    <select name="dias" onchange="this.form.submit()">
+      <option value="7"  {% if dias == 7 %}selected{% endif %}>7</option>
+      <option value="14" {% if dias == 14 %}selected{% endif %}>14</option>
+      <option value="30" {% if dias == 30 %}selected{% endif %}>30</option>
+      <option value="60" {% if dias == 60 %}selected{% endif %}>60</option>
+    </select>
+  </label>
+  <noscript><button type="submit" class="botao-neutro">Ver</button></noscript>
+</form>
+
+<div class="quadro">
+  <table class="tabela">
+    <thead>
+      <tr>
+        <th>Noite</th>
+        <th class="num">Usados</th>
+        <th class="num">Livres</th>
+        <th>Situação</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for linha in painel.linhas %}
+        <tr>
+          <td>{{ linha.noite|date:"D, d/m" }}</td>
+          <td class="num">{{ linha.usados }}</td>
+          <td class="num">{{ linha.livres }}</td>
+          <td>
+            {% if linha.status == "esgotado" %}
+              <span class="selo selo-alerta">Esgotado</span>
+            {% elif linha.status == "aviso" %}
+              <span class="selo selo-pendente">No limite</span>
+            {% else %}
+              <span class="selo selo-ok">Folgado</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="vazio">Sem noites no período.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

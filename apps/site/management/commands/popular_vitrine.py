@@ -15,27 +15,8 @@ from django.core.management.base import BaseCommand
 from apps.nucleo.models import UH, TipoUH
 from apps.site.models import VitrineQuarto
 
-# Nomes temáticos por tipo (mesmo espírito de Cabine do Navegador, Oficina do
-# Relojoeiro, Torre do Astrônomo…). São SUGESTÕES — a recepção renomeia à vontade.
-NOMES_POR_TIPO = {
-    "Cabana Hobbit": [
-        "Toca do Lenhador", "Refúgio do Jardineiro", "Casa do Contador de Histórias",
-    ],
-    "Cabana Intermediária": [
-        "Cabine do Navegador", "Torre do Astrônomo", "Estância do Pescador",
-        "Mirante do Faroleiro", "Recanto do Apicultor", "Morada do Ceramista",
-    ],
-    "Intermediário": [
-        "Oficina do Relojoeiro", "Ateliê do Ferreiro", "Estúdio da Cartógrafa",
-        "Gabinete do Inventor",
-    ],
-    "Padrão": [
-        "Vagão do Maquinista", "Quarto do Tipógrafo", "Casa do Boticário",
-        "Sótão do Alfaiate", "Loja do Perfumista", "Camarim do Luthier",
-        "Forja do Ourives", "Celeiro do Moleiro", "Oficina do Tecelão",
-        "Ateliê do Marceneiro", "Quarto do Cronista",
-    ],
-}
+# A pousada usa só o NÚMERO do quarto ("Quarto N") — sem nome temático. Este seed cuida
+# só de qualidades e fotos; não atribui nome (ver manage.py limpar_nomes_quartos).
 
 # Qualidades padrão por tipo (starter — a recepção corrige por quarto).
 PADROES_POR_TIPO = {
@@ -71,40 +52,29 @@ class Command(BaseCommand):
 
     def handle(self, *args, **opts):
         pool = _pool_fotos()
-        nomeados = qualif = fotos = 0
+        qualif = fotos = 0
         k = 0  # índice global para ciclar as fotos disponíveis
         for tipo in TipoUH.objects.filter(modalidade=TipoUH.Modalidade.HOSPEDAGEM):
-            nomes = list(NOMES_POR_TIPO.get(tipo.nome, []))
             padrao = PADROES_POR_TIPO.get(tipo.nome, {})
             uhs = UH.objects.filter(tipo=tipo, status=UH.Status.ATIVA).order_by("numero")
-            for i, uh in enumerate(uhs):
-                # Nome + qualidades: só em quarto ainda não editado.
-                if not uh.nome_tematico:
-                    campos = ["nome_tematico"]
-                    uh.nome_tematico = nomes[i] if i < len(nomes) else f"Quarto {uh.numero}"
+            for uh in uhs:
+                # Qualidades padrão por tipo (starter). Sem nome temático — só o número.
+                if padrao:
                     for campo, valor in padrao.items():
                         setattr(uh, campo, valor)
-                        campos.append(campo)
-                    uh.save(update_fields=campos)
-                    nomeados += 1
-                    if padrao:
-                        qualif += 1
+                    uh.save(update_fields=list(padrao))
+                    qualif += 1
 
                 vitrine, _ = VitrineQuarto.objects.get_or_create(uh=uh)
-                mudou = []
                 # Foto: corrige quebrada/ausente sem sobrescrever foto válida.
                 if pool and not _foto_ok(vitrine.foto_principal.name if vitrine.foto_principal else ""):
                     vitrine.foto_principal = pool[k % len(pool)]
-                    mudou.append("foto_principal")
+                    vitrine.save(update_fields=["foto_principal"])
                     fotos += 1
-                if vitrine.descricao_curta in ("", f"Quarto {uh.numero}") and uh.nome_tematico:
-                    vitrine.descricao_curta = uh.nome_tematico
-                    mudou.append("descricao_curta")
-                if mudou:
-                    vitrine.save(update_fields=mudou)
                 k += 1
 
         self.stdout.write(self.style.SUCCESS(
-            f"Vitrine: {nomeados} nome(s) temático(s), {qualif} com qualidades padrão, "
-            f"{fotos} foto(s) corrigida(s) de {len(pool)} disponível(is). Tour 360° não tocado."
+            f"Vitrine: {qualif} quarto(s) com qualidades padrão, "
+            f"{fotos} foto(s) corrigida(s) de {len(pool)} disponível(is). "
+            f"Nome temático não tocado (a pousada usa só o número). Tour 360° não tocado."
         ))

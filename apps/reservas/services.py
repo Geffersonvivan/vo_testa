@@ -25,6 +25,7 @@ from apps.nucleo.models import (
 
 from .models import (
     Adiantamento,
+    ColchoesExtra,
     ContaHospedagem,
     GrupoReserva,
     LancamentoConta,
@@ -161,41 +162,6 @@ def colchoes_extras(reserva) -> int:
     return extras_para(reserva.uh, reserva.adultos + reserva.criancas)
 
 
-def cotacao_unidade(uh: UH, checkin: date, checkout: date, pessoas: int) -> dict:
-    """Cotação itemizada de uma unidade: diárias + colchões extras, separados.
-
-    O colchão nunca entra embutido na diária — o hóspede vê a linha própria
-    "N colchões extras · R$ X". Sofá-cama e berço não cobram.
-    """
-    from apps.nucleo.estrutura import extras_para
-
-    noites = (checkout - checkin).days
-    if noites <= 0:
-        raise ValidationError("Período inválido: a saída deve ser após a entrada.")
-
-    diarias = [
-        {"dia": checkin + timedelta(days=n),
-         "valor": tarifa_da_unidade(uh, checkin + timedelta(days=n))}
-        for n in range(noites)
-    ]
-    total_diarias = sum((d["valor"] for d in diarias), Decimal("0.00"))
-
-    qtd_extras = extras_para(uh, pessoas)
-    config = getattr(uh, "config", None)
-    tarifa_colchao = config.tarifa_colchao_extra if config else Decimal("0.00")
-    total_colchoes = (tarifa_colchao * qtd_extras * noites) if qtd_extras else Decimal("0.00")
-
-    return {
-        "noites": noites,
-        "diarias": diarias,
-        "total_diarias": total_diarias,
-        "colchoes_qtd": qtd_extras,
-        "colchoes_tarifa": tarifa_colchao,
-        "colchoes_total": total_colchoes,
-        "bruto": total_diarias + total_colchoes,
-    }
-
-
 def reservas_ativas_qs():
     """Reservas que seguram a UH agora — pré-reservas com retenção vencida NÃO contam
     (o quarto já está livre, mesmo antes do job de expiração rodar)."""
@@ -244,36 +210,293 @@ def reserva_conflita(uh: UH, inicio: date, fim: date | None = None) -> bool:
     return qs.exists()
 
 
-def uh_disponivel(uh: UH, checkin: date, checkout: date) -> bool:
-    return (
+def uh_disponivel(uh: UH, checkin: date, checkout: date, *,
+                  adultos=None, criancas=None) -> bool:
+    """O quarto está livre no período? Informe `adultos`/`criancas` para que a
+    disponibilidade também respeite o **pool de colchões extra** por noite (Fase 4):
+    um quarto só é oferecido para aquela lotação se houver colchão extra em todas as
+    noites. Sem a lotação, devolve a disponibilidade-base (comportamento histórico)."""
+    livre = (
         uh.status == UH.Status.ATIVA
         and not reservas_no_periodo(uh, checkin, checkout).exists()
         and uh.pk not in _uhs_bloqueio_manutencao(checkin, checkout)
     )
+    if not livre or adultos is None:
+        return livre
+    return colchoes_extra_suficiente(uh, checkin, checkout, adultos, criancas or 0)
 
 
-def uhs_disponiveis(checkin: date, checkout: date):
+def uhs_disponiveis(checkin: date, checkout: date, *, adultos=None, criancas=None):
     """UHs ativas livres no período — consulta central de disponibilidade
-    (reservas ativas + bloqueios de manutenção por datas)."""
+    (reservas ativas + bloqueios de manutenção por datas). Com `adultos`/`criancas`,
+    descarta também os quartos cujo arranjo sugerido não caberia no pool de colchões
+    extra por noite (Fase 4). Retorna sempre um queryset (encadeável)."""
     ocupadas = set(reservas_ativas_qs().filter(
         checkin__lt=checkout, checkout__gt=checkin,
     ).values_list("uh_id", flat=True))
     ocupadas |= _uhs_bloqueio_manutencao(checkin, checkout)
-    return UH.objects.filter(status=UH.Status.ATIVA).exclude(pk__in=ocupadas)
+    qs = UH.objects.filter(status=UH.Status.ATIVA).exclude(pk__in=ocupadas)
+    if adultos is None or (checkout - checkin).days <= 0:
+        return qs
+
+    from apps.reservas import colchoes
+
+    livres = colchoes_extra_livres(checkin, checkout)
+    min_livre = min(livres.values()) if livres else ColchoesExtra.atual().quantidade
+    insuficientes = set()
+    for uh in qs.select_related("config").prefetch_related("posicoes_cama"):
+        if not colchoes.configurado(uh):
+            continue
+        arr = colchoes.sugerir_arranjo(uh, adultos, criancas or 0)
+        precisa = colchoes.consumo_extra(uh, arr.casais, arr.solteiros)
+        # Quarto que não puxa do pool (base garantida) está sempre disponível, mesmo
+        # com o pool esgotado/negativo numa noite.
+        if precisa > 0 and precisa > min_livre:
+            insuficientes.add(uh.pk)
+    return qs.exclude(pk__in=insuficientes)
+
+
+def colchoes_extra_suficiente(uh: UH, checkin: date, checkout: date,
+                              adultos: int, criancas: int, excluir_id=None) -> bool:
+    """Há colchão extra no pool para acomodar essa lotação neste quarto em TODAS as
+    noites? A base de casal é garantida → True quando o arranjo sugerido não precisa de
+    extra, ou quando o quarto está fora do modelo de colchões (day use / sem camas)."""
+    from apps.reservas import colchoes
+
+    if not colchoes.configurado(uh):
+        return True
+    arr = colchoes.sugerir_arranjo(uh, adultos, criancas)
+    precisa = colchoes.consumo_extra(uh, arr.casais, arr.solteiros)
+    if precisa <= 0 or (checkout - checkin).days <= 0:
+        return True
+    livres = colchoes_extra_livres(checkin, checkout, excluir_id=excluir_id)
+    return all(livre >= precisa for livre in livres.values())
+
+
+# ───────── Estoque de colchões extra — trava global por noite ─────────
+#
+# A base de casal de cada quarto (2×casais_max) é garantida e NÃO disputa o pool.
+# Só o consumo EXTRA (Reserva.colchoes_extra) de cada reserva ativa briga pelo pool
+# global (ColchoesExtra). A trava é por NOITE [checkin, checkout). Sofá-cama não
+# consome colchão. Ver docs/Reservas/PLANO_ESTOQUE_COLCHOES.md.
+
+
+def _noites(checkin: date, checkout: date) -> list:
+    return [checkin + timedelta(days=n) for n in range((checkout - checkin).days)]
+
+
+def colchoes_extra_por_noite(checkin: date, checkout: date, excluir_id=None) -> dict:
+    """{noite: colchões extra JÁ usados pelas reservas ativas naquela noite}.
+
+    Ativas = pré-reserva (retenção válida) + confirmada + hospedada (`reservas_ativas_qs`;
+    exclui orçamento/cancelada/no-show). `excluir_id` tira a própria reserva da soma, para
+    a edição não contar o próprio consumo em dobro."""
+    noites = _noites(checkin, checkout)
+    usados = {n: 0 for n in noites}
+    qs = (reservas_ativas_qs()
+          .filter(checkin__lt=checkout, checkout__gt=checkin)
+          .select_related("uh")
+          .prefetch_related("uh__posicoes_cama"))
+    if excluir_id:
+        qs = qs.exclude(pk=excluir_id)
+    for r in qs:
+        extra = r.colchoes_extra
+        if not extra:
+            continue
+        for n in noites:
+            if r.checkin <= n < r.checkout:
+                usados[n] += extra
+    return usados
+
+
+def colchoes_extra_livres(checkin: date, checkout: date, excluir_id=None) -> dict:
+    """{noite: colchões extra LIVRES} = pool global − usados pelas reservas ativas."""
+    pool = ColchoesExtra.atual().quantidade
+    usados = colchoes_extra_por_noite(checkin, checkout, excluir_id=excluir_id)
+    return {n: pool - u for n, u in usados.items()}
+
+
+def conferir_arranjo(uh, *, casais, solteiros, usa_sofa_cama, adultos, criancas,
+                     checkin, checkout, excluir_id=None) -> dict:
+    """Confere um arranjo de camas: ESTRUTURA do quarto (`colchoes.cabe_no_quarto`) +
+    TRAVA GLOBAL do pool de extras por noite. Pura (não grava), reutilizável por
+    recepção, site, admin e API. Retorna {"erros", "avisos", "extra"}.
+
+    - `erros` bloqueiam (estrutura inválida OU falta colchão extra em alguma noite —
+      a mensagem aponta a(s) noite(s) e quantos faltam).
+    - `avisos` não bloqueiam ("resta só N colchão extra na noite dd/mm").
+    - a **base de casal nunca é bloqueada** por colchão: só o excedente (`extra`) disputa.
+    """
+    from apps.reservas import colchoes as _colchoes
+
+    erros = list(_colchoes.cabe_no_quarto(
+        uh, casais, solteiros, usa_sofa_cama, adultos, criancas))
+    avisos: list = []
+    precisa = _colchoes.consumo_extra(uh, casais, solteiros)
+
+    if precisa and (checkout - checkin).days > 0:
+        cfg = ColchoesExtra.atual()
+        livres = colchoes_extra_livres(checkin, checkout, excluir_id=excluir_id)
+        faltam = [(n, precisa - livre) for n, livre in sorted(livres.items())
+                  if livre < precisa]
+        if faltam:
+            txt = ", ".join(f"{n:%d/%m} (faltam {q})" for n, q in faltam)
+            erros.append(
+                f"Sem colchão extra para este arranjo na(s) noite(s): {txt}. "
+                "Use menos pessoas, o sofá-cama, outro quarto ou outra data."
+            )
+        else:
+            apertadas = [(n, livre - precisa) for n, livre in sorted(livres.items())
+                         if (livre - precisa) <= cfg.alerta_minimo]
+            if apertadas:
+                n, resta = apertadas[0]
+                avisos.append(
+                    f"Atenção: depois desta reserva resta {resta} colchão extra "
+                    f"na noite {n:%d/%m}."
+                )
+    return {"erros": erros, "avisos": avisos, "extra": precisa}
+
+
+# ───────── Berço — recurso global (grátis), trava por noite ─────────
+
+
+def bercos_usados_por_noite(checkin: date, checkout: date, excluir_id=None) -> dict:
+    """{noite: berços já usados pelas reservas ativas naquela noite}. `excluir_id` tira
+    a própria reserva da soma (edição não conta em dobro)."""
+    noites = _noites(checkin, checkout)
+    usados = {n: 0 for n in noites}
+    qs = reservas_ativas_qs().filter(
+        usa_berco=True, checkin__lt=checkout, checkout__gt=checkin)
+    if excluir_id:
+        qs = qs.exclude(pk=excluir_id)
+    for r in qs.values("checkin", "checkout"):
+        for n in noites:
+            if r["checkin"] <= n < r["checkout"]:
+                usados[n] += 1
+    return usados
+
+
+def berco_disponivel(checkin: date, checkout: date, excluir_id=None) -> bool:
+    """Há berço livre em TODAS as noites do período? (estoque global − usados)."""
+    from .models import BercoEstoque
+
+    if (checkout - checkin).days <= 0:
+        return False
+    estoque = BercoEstoque.atual().quantidade
+    usados = bercos_usados_por_noite(checkin, checkout, excluir_id=excluir_id)
+    return all(u < estoque for u in usados.values())
+
+
+def _resolver_arranjo(uh, *, casais, solteiros, usa_sofa_cama, adultos, criancas):
+    """Resolve o arranjo a persistir: usa o informado ou, se vier vazio, a sugestão
+    de `colchoes.sugerir_arranjo` (casal base → sofá → solteiro extra)."""
+    from apps.reservas.colchoes import sugerir_arranjo
+
+    if casais is None and solteiros is None:
+        arr = sugerir_arranjo(uh, adultos, criancas)
+        sofa = arr.usa_sofa_cama if usa_sofa_cama is None else bool(usa_sofa_cama)
+        return arr.casais, arr.solteiros, sofa
+    return int(casais or 0), int(solteiros or 0), bool(usa_sofa_cama)
+
+
+def _travar_e_resolver_arranjo(uh, *, casais, solteiros, usa_sofa_cama,
+                               adultos, criancas, checkin, checkout) -> dict:
+    """Resolve o arranjo de camas e **trava o pool de colchões por noite** (lock), para
+    quartos configurados. Levanta ValidationError se a trava recusa. Devolve o dict de
+    campos a persistir na Reserva. Chamar dentro de uma transação (o lock serializa a
+    corrida). Usado por `criar_prereserva` e `adicionar_quarto`."""
+    from apps.reservas import colchoes
+
+    if not colchoes.configurado(uh):
+        return {chave: valor for chave, valor in (
+            ("casais", casais), ("solteiros", solteiros), ("usa_sofa_cama", usa_sofa_cama))
+            if valor is not None}
+    ColchoesExtra.atual()  # garante a linha única do pool
+    ColchoesExtra.objects.select_for_update().first()  # trava o pool nesta transação
+    casais, solteiros, usa_sofa_cama = _resolver_arranjo(
+        uh, casais=casais, solteiros=solteiros, usa_sofa_cama=usa_sofa_cama,
+        adultos=adultos, criancas=criancas)
+    conf = conferir_arranjo(
+        uh, casais=casais, solteiros=solteiros, usa_sofa_cama=usa_sofa_cama,
+        adultos=adultos, criancas=criancas, checkin=checkin, checkout=checkout)
+    if conf["erros"]:
+        raise ValidationError(conf["erros"])
+    return {"casais": casais, "solteiros": solteiros, "usa_sofa_cama": usa_sofa_cama}
+
+
+def painel_colchoes(inicio: date, fim: date) -> dict:
+    """Ocupação do pool de colchões extra por noite no período [inicio, fim] (fim
+    inclusive). Para o painel de colchões (gerência). Status: ok / aviso / esgotado."""
+    cfg = ColchoesExtra.atual()
+    usados = colchoes_extra_por_noite(inicio, fim + timedelta(days=1))
+    linhas = []
+    for noite in sorted(usados):
+        u = usados[noite]
+        livre = cfg.quantidade - u
+        if livre <= 0:
+            status = "esgotado"
+        elif livre <= cfg.alerta_minimo:
+            status = "aviso"
+        else:
+            status = "ok"
+        linhas.append({"noite": noite, "usados": u, "livres": livre, "status": status})
+    return {"pool": cfg.quantidade, "alerta_minimo": cfg.alerta_minimo, "linhas": linhas}
+
+
+def colchoes_alertas_proximos(dias: int = 14) -> dict | None:
+    """Noites nos próximos `dias` com colchão extra esgotado ou no limite — para o
+    bloco 'Precisa de atenção' do dashboard. None se estiver tudo folgado."""
+    hoje = timezone.localdate()
+    painel = painel_colchoes(hoje, hoje + timedelta(days=dias - 1))
+    esgotadas = [ln for ln in painel["linhas"] if ln["status"] == "esgotado"]
+    apertadas = [ln for ln in painel["linhas"] if ln["status"] == "aviso"]
+    if not esgotadas and not apertadas:
+        return None
+    return {"esgotadas": esgotadas, "apertadas": apertadas}
+
+
+def montagem_do_dia(dia: date) -> list:
+    """Lista de montagem de camas das chegadas do dia `dia` — para a Governança:
+    quarto · casais · solteiros · sofá · colchões extra. Só quartos configurados.
+    Interface pública (a Governança não importa models de Reservas)."""
+    from apps.reservas import colchoes
+
+    qs = (reservas_ativas_qs()
+          .filter(checkin=dia)
+          .select_related("uh", "hospede")
+          .prefetch_related("uh__posicoes_cama")
+          .order_by("uh__numero"))
+    linhas = []
+    for r in qs:
+        if not colchoes.configurado(r.uh):
+            continue
+        linhas.append({
+            "uh": r.uh.numero,
+            "hospede": r.hospede.nome,
+            "casais": r.casais,
+            "solteiros": r.solteiros,
+            "sofa": r.usa_sofa_cama,
+            "extra": r.colchoes_extra,
+        })
+    return linhas
 
 
 # ───────── Interface pública para o canal Site (venda por tipo) ─────────
 
-def uh_livre_do_tipo(tipo_uh, checkin, checkout):
-    """Uma UH livre daquele tipo no período (ordem por número), ou None."""
+def uh_livre_do_tipo(tipo_uh, checkin, checkout, *, adultos=None, criancas=None):
+    """Uma UH livre daquele tipo no período (ordem por número), ou None. Com
+    `adultos`/`criancas`, só devolve um quarto cujo arranjo caiba no pool de colchões."""
     if (checkout - checkin).days <= 0:
         return None
-    return uhs_disponiveis(checkin, checkout).filter(tipo=tipo_uh).order_by("numero").first()
+    return (uhs_disponiveis(checkin, checkout, adultos=adultos, criancas=criancas)
+            .filter(tipo=tipo_uh).order_by("numero").first())
 
 
-def tipo_disponivel(tipo_uh, checkin, checkout) -> bool:
-    """Há ao menos um quarto desse tipo livre no período?"""
-    return uh_livre_do_tipo(tipo_uh, checkin, checkout) is not None
+def tipo_disponivel(tipo_uh, checkin, checkout, *, adultos=None, criancas=None) -> bool:
+    """Há ao menos um quarto desse tipo livre no período (e, com a lotação, com colchão
+    extra no pool)?"""
+    return uh_livre_do_tipo(
+        tipo_uh, checkin, checkout, adultos=adultos, criancas=criancas) is not None
 
 
 def obter_ou_criar_hospede(*, nome, email="", telefone="", documento=""):
@@ -311,24 +534,58 @@ def obter_ou_criar_hospede(*, nome, email="", telefone="", documento=""):
 def criar_prereserva(*, tipo_uh=None, uh=None, checkin, checkout, hospede, usuario,
                      canal=Reserva.Canal.BALCAO, faturamento=None, titular=None,
                      adultos=2, criancas=0, valor_diaria=None, observacoes="",
-                     reter=False):
+                     reter=False, casais=None, solteiros=None, usa_sofa_cama=None,
+                     criancas_0_5=None, criancas_6_15=None,
+                     cobra_iss=True, cobra_taxa_turismo=True, usa_berco=False):
     """Cria uma PRÉ-RESERVA num quarto físico. Passe `uh` para reservar uma unidade
     ESPECÍFICA (venda por quarto) ou `tipo_uh` para alocar qualquer livre do tipo. O
     antioverbooking (constraint) protege da corrida. Interface pública usada pelo Site
-    (com retenção) e por outros canais/módulos, como a conversão do Comercial."""
+    (com retenção) e por outros canais/módulos, como a conversão do Comercial.
+
+    Preço: quando `valor_diaria` é None, calcula pela motor de tarifa (Manual §2 — pessoa
+    adicional, single 70%, criança 6-15 meia). Arranjo de camas: se `casais`/`solteiros`
+    vierem vazios, o sistema sugere; a **trava global de colchões extra por noite** é
+    validada aqui (lock serializa a corrida)."""
+    from apps.reservas import precos
+
     expirar_vencidas()  # solta retenções vencidas para não bloquear a constraint
-    if uh is not None:
+    por_unidade = uh is not None
+    if por_unidade:
         if not uh_disponivel(uh, checkin, checkout):
             raise ValidationError("Este quarto não está disponível no período.")
         tipo_uh = uh.tipo
-        if valor_diaria is None:
-            valor_diaria = diaria_media_unidade(uh, checkin, checkout)
     else:
-        uh = uh_livre_do_tipo(tipo_uh, checkin, checkout)
+        # Aloca um quarto do tipo que também caiba no pool de colchões p/ a lotação
+        # (evita escolher um quarto que a trava recusaria logo em seguida).
+        uh = uh_livre_do_tipo(tipo_uh, checkin, checkout,
+                              adultos=adultos, criancas=criancas)
         if not uh:
             raise ValidationError("Não há quarto desse tipo disponível no período.")
-        if valor_diaria is None:
-            valor_diaria = diaria_media(tipo_uh, checkin, checkout)
+
+    # Faixas de criança p/ o preço: sem o detalhe (chamador legado), trata `criancas`
+    # como 6-15 (meia) — conservador. Mantém `criancas` = total coerente.
+    if criancas_0_5 is None and criancas_6_15 is None:
+        criancas_0_5, criancas_6_15 = 0, criancas
+    else:
+        criancas_0_5, criancas_6_15 = (criancas_0_5 or 0), (criancas_6_15 or 0)
+    criancas = criancas_0_5 + criancas_6_15
+
+    if valor_diaria is None:
+        cot = precos.cotacao(
+            uh=uh if por_unidade else None, tipo=None if por_unidade else tipo_uh,
+            checkin=checkin, checkout=checkout, adultos=adultos,
+            criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15)
+        valor_diaria = cot["media_noite"]
+
+    # Arranjo + trava global de colchões extra por noite (lock serializa a corrida).
+    arranjo = _travar_e_resolver_arranjo(
+        uh, casais=casais, solteiros=solteiros, usa_sofa_cama=usa_sofa_cama,
+        adultos=adultos, criancas=criancas, checkin=checkin, checkout=checkout)
+
+    # Berço (grátis, recurso global): só concede se houver livre em todas as noites.
+    if usa_berco and not berco_disponivel(checkin, checkout):
+        raise ValidationError("Não há berço disponível em alguma noite do período.")
+
     expira = (timezone.now() + timedelta(minutes=settings.RESERVA_RETENCAO_MINUTOS)
               if reter else None)
     extra = {}
@@ -340,32 +597,109 @@ def criar_prereserva(*, tipo_uh=None, uh=None, checkin, checkout, hospede, usuar
         return Reserva.objects.create(
             uh=uh, hospede=hospede, checkin=checkin, checkout=checkout,
             adultos=adultos, criancas=criancas,
+            criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15,
+            cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_taxa_turismo,
+            usa_berco=usa_berco,
             status=Reserva.Status.PRE_RESERVA, canal=canal,
             valor_diaria=valor_diaria, criado_por=usuario, observacoes=observacoes,
-            expira_em=expira, **extra,
+            expira_em=expira, **arranjo, **extra,
         )
     except IntegrityError:
         raise ValidationError("Este quarto acabou de ser reservado. Tente novamente.")
 
 
 def criar_reserva_site(*, tipo_uh, checkin, checkout, hospede, usuario,
-                       adultos=2, criancas=0, valor_diaria=None, observacoes=""):
+                       adultos=2, criancas=0, valor_diaria=None, observacoes="",
+                       criancas_0_5=None, criancas_6_15=None,
+                       cobra_iss=True, cobra_taxa_turismo=True):
     """Pré-reserva do canal Site, com prazo de retenção (fina camada sobre criar_prereserva)."""
     return criar_prereserva(
         tipo_uh=tipo_uh, checkin=checkin, checkout=checkout, hospede=hospede,
         usuario=usuario, canal=Reserva.Canal.SITE, adultos=adultos, criancas=criancas,
         valor_diaria=valor_diaria, observacoes=observacoes, reter=True,
+        criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15,
+        cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_taxa_turismo,
     )
 
 
 def criar_reserva_site_unidade(*, uh, checkin, checkout, hospede, usuario,
-                               adultos=2, criancas=0, valor_diaria=None, observacoes=""):
-    """Pré-reserva do canal Site num quarto ESPECÍFICO (venda por unidade), com retenção."""
+                               adultos=2, criancas=0, valor_diaria=None, observacoes="",
+                               criancas_0_5=None, criancas_6_15=None,
+                               cobra_iss=True, cobra_taxa_turismo=True,
+                               casais=None, solteiros=None, usa_sofa_cama=None):
+    """Pré-reserva do canal Site num quarto ESPECÍFICO (venda por unidade), com retenção.
+    `casais`/`solteiros`/`usa_sofa_cama` deixam o hóspede escolher a montagem das camas;
+    vazio = o sistema sugere."""
     return criar_prereserva(
         uh=uh, checkin=checkin, checkout=checkout, hospede=hospede,
         usuario=usuario, canal=Reserva.Canal.SITE, adultos=adultos, criancas=criancas,
         valor_diaria=valor_diaria, observacoes=observacoes, reter=True,
+        criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15,
+        cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_taxa_turismo,
+        casais=casais, solteiros=solteiros, usa_sofa_cama=usa_sofa_cama,
     )
+
+
+def arranjos_disponiveis(uh) -> list:
+    """Opções de montagem de cama que o hóspede pode escolher no site (venda por
+    unidade). Interface pública — devolve [{rotulo, casais, solteiros, tem_sofa}]."""
+    from apps.reservas import colchoes
+
+    if not colchoes.configurado(uh):
+        return []
+    opcoes = colchoes.presets(uh)
+    tem_sofa = colchoes.tem_sofa(uh)
+    return [{"rotulo": o["rotulo"], "casais": o["casais"], "solteiros": o["solteiros"],
+             "tem_sofa": tem_sofa} for o in opcoes]
+
+
+@transaction.atomic
+def transferir_datas(reserva, novo_checkin, novo_checkout, usuario):
+    """Reagenda a reserva para outras datas (1ª opção de cancelamento — não é
+    cancelamento). Revalida disponibilidade da UH + pool de colchões nas novas datas e
+    recalcula a diária pela motor. Mantém a janela de arrependimento (confirmada_em).
+    Só para reserva NÃO iniciada."""
+    from apps.reservas import colchoes, precos
+
+    if reserva.status not in (Reserva.Status.ORCAMENTO, Reserva.Status.PRE_RESERVA,
+                              Reserva.Status.CONFIRMADA):
+        raise ValidationError("Só dá para transferir a data de uma reserva não iniciada.")
+    if (novo_checkout - novo_checkin).days <= 0:
+        raise ValidationError("Período inválido: a saída deve ser após a entrada.")
+
+    expirar_vencidas()
+    conflito = (reservas_ativas_qs()
+                .filter(uh=reserva.uh, checkin__lt=novo_checkout, checkout__gt=novo_checkin)
+                .exclude(pk=reserva.pk).exists())
+    if conflito or reserva.uh.pk in _uhs_bloqueio_manutencao(novo_checkin, novo_checkout):
+        raise ValidationError("O quarto não está livre nas novas datas.")
+
+    if colchoes.configurado(reserva.uh):
+        ColchoesExtra.objects.select_for_update().first()
+        conf = conferir_arranjo(
+            reserva.uh, casais=reserva.casais, solteiros=reserva.solteiros,
+            usa_sofa_cama=reserva.usa_sofa_cama, adultos=reserva.adultos,
+            criancas=reserva.criancas, checkin=novo_checkin, checkout=novo_checkout,
+            excluir_id=reserva.pk)
+        if conf["erros"]:
+            raise ValidationError(conf["erros"])
+
+    nova_diaria = precos.cotacao(
+        uh=reserva.uh, checkin=novo_checkin, checkout=novo_checkout,
+        adultos=reserva.adultos, criancas_0_5=reserva.criancas_0_5,
+        criancas_6_15=reserva.criancas_6_15)["media_noite"]
+    antigo = (reserva.checkin, reserva.checkout, reserva.valor_diaria)
+    reserva.checkin, reserva.checkout, reserva.valor_diaria = (
+        novo_checkin, novo_checkout, nova_diaria)
+    try:
+        reserva.save(update_fields=["checkin", "checkout", "valor_diaria"])
+    except IntegrityError:
+        raise ValidationError("O quarto acabou de ser reservado nessas datas.")
+    registrar_auditoria(usuario, "transferencia_datas", reserva, {
+        "de": f"{antigo[0]:%d/%m/%Y}–{antigo[1]:%d/%m/%Y}",
+        "para": f"{novo_checkin:%d/%m/%Y}–{novo_checkout:%d/%m/%Y}",
+        "diaria_antiga": str(antigo[2]), "diaria_nova": str(nova_diaria)})
+    return reserva
 
 
 def uh_ocupada(uh: UH) -> bool:
@@ -570,6 +904,29 @@ def resumo_fiscal_conta(conta_id):
     }
 
 
+def historico_hospede(pessoa) -> dict:
+    """Resumo do histórico do hóspede p/ o Comercial (cliente recorrente).
+    Interface pública — não expõe models de Reservas para fora."""
+    if pessoa is None:
+        return {"estadias": 0, "ultima": None, "futuras": 0}
+    from django.db.models import Q
+    qs = Reserva.objects.filter(hospede=pessoa)
+    encerradas = qs.filter(status=Reserva.Status.CHECKOUT)
+    ultima = encerradas.order_by("-checkout").values_list("checkout", flat=True).first()
+    # "Futuras" = reservas que ainda seguram vaga; pré-reserva vencida (retenção
+    # expirada, ex.: carrinho abandonado do site) não conta como cliente recorrente.
+    agora = timezone.now()
+    futuras = qs.filter(
+        status__in=[Reserva.Status.CONFIRMADA, Reserva.Status.PRE_RESERVA,
+                    Reserva.Status.HOSPEDADA]
+    ).filter(Q(expira_em__isnull=True) | Q(expira_em__gt=agora)).count()
+    return {
+        "estadias": encerradas.count(),
+        "ultima": ultima,
+        "futuras": futuras,
+    }
+
+
 def confirmar_reserva(reserva_id, usuario) -> bool:
     """Confirma a reserva (pré-reserva/orçamento → confirmada). Interface pública
     para o módulo Pagamentos: sinal pago online → reserva confirmada."""
@@ -681,25 +1038,46 @@ def criar_grupo(*, rotulo, titular, checkin, checkout, usuario,
 
 @transaction.atomic
 def adicionar_quarto(grupo, *, uh, hospede, usuario, adultos=2, criancas=0,
-                     valor_diaria=None):
+                     valor_diaria=None, casais=None, solteiros=None, usa_sofa_cama=None,
+                     criancas_0_5=None, criancas_6_15=None,
+                     cobra_iss=True, cobra_taxa_turismo=True):
     """Adiciona um quarto (reserva-filha) ao grupo, num UH específico escolhido pela
-    recepção. Antioverbooking valida a UH; herda período e faturamento do grupo."""
+    recepção. Antioverbooking valida a UH; herda período e faturamento do grupo. Preço
+    pela motor (Manual §2) e **trava de colchões por noite** — igual às reservas avulsas."""
+    from apps.reservas import precos
+
     if grupo.encerrado_em:
         raise ValidationError("Este grupo já foi encerrado.")
     if not uh_disponivel(uh, grupo.checkin, grupo.checkout):
         raise ValidationError(
             f"O quarto {uh.numero} não está livre no período do grupo."
         )
+
+    if criancas_0_5 is None and criancas_6_15 is None:
+        criancas_0_5, criancas_6_15 = 0, criancas
+    else:
+        criancas_0_5, criancas_6_15 = (criancas_0_5 or 0), (criancas_6_15 or 0)
+    criancas = criancas_0_5 + criancas_6_15
+
+    arranjo = _travar_e_resolver_arranjo(
+        uh, casais=casais, solteiros=solteiros, usa_sofa_cama=usa_sofa_cama,
+        adultos=adultos, criancas=criancas,
+        checkin=grupo.checkin, checkout=grupo.checkout)
+
     if valor_diaria is None:
-        valor_diaria = diaria_media_unidade(uh, grupo.checkin, grupo.checkout)
+        valor_diaria = precos.cotacao(
+            uh=uh, checkin=grupo.checkin, checkout=grupo.checkout, adultos=adultos,
+            criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15)["media_noite"]
     try:
         return Reserva.objects.create(
             uh=uh, hospede=hospede, grupo=grupo,
             checkin=grupo.checkin, checkout=grupo.checkout,
             adultos=adultos, criancas=criancas,
+            criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15,
+            cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_taxa_turismo,
             status=Reserva.Status.PRE_RESERVA, canal=grupo.canal,
             faturamento=grupo.faturamento, titular=grupo.titular,
-            valor_diaria=valor_diaria, criado_por=usuario,
+            valor_diaria=valor_diaria, criado_por=usuario, **arranjo,
         )
     except IntegrityError:
         raise ValidationError("Este quarto acabou de ser reservado. Tente outro.")

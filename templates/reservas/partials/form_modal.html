@@ -43,8 +43,19 @@
       {% include "reservas/partials/campo.html" with campo=form.checkin %}
       {% include "reservas/partials/campo.html" with campo=form.checkout %}
       {% include "reservas/partials/campo.html" with campo=form.adultos %}
-      {% include "reservas/partials/campo.html" with campo=form.criancas %}
+      {% include "reservas/partials/campo.html" with campo=form.criancas_6_15 %}
+      {% include "reservas/partials/campo.html" with campo=form.criancas_0_5 %}
+      {% include "reservas/partials/campo.html" with campo=form.casais %}
+      {% include "reservas/partials/campo.html" with campo=form.solteiros %}
+      {% include "reservas/partials/campo.html" with campo=form.usa_sofa_cama %}
+      {% include "reservas/partials/campo.html" with campo=form.usa_berco %}
+      <div id="colchoes-hint" class="tarifa-hint col-2"></div>
       {% include "reservas/partials/campo.html" with campo=form.canal %}
+      <div class="campo col-2 taxas-toggle">
+        <span class="letreiro">Taxas (inclusas no total)</span>
+        <label class="check-inline">{{ form.cobra_iss }} {{ form.cobra_iss.label }}</label>
+        <label class="check-inline">{{ form.cobra_taxa_turismo }} {{ form.cobra_taxa_turismo.label }}</label>
+      </div>
       {% include "reservas/partials/campo.html" with campo=form.valor_diaria %}
       <div id="tarifa-hint" class="tarifa-hint col-2" data-url="{% url 'reservas:tarifa_preview' %}"></div>
       {% include "reservas/partials/campo.html" with campo=form.faturamento classe="col-2" %}

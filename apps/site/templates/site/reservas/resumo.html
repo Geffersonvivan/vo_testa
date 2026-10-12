@@ -8,8 +8,11 @@
 <h2 class="font-display text-2xl font-bold text-madeira mb-6 text-center">Confirme sua Reserva</h2>
 
 <div class="max-w-2xl mx-auto" id="resumo-reserva"
-     data-subtotal="{{ sub }}"
-     data-desconto-pct="{{ pct }}">
+     data-subtotal="{{ resumo.subtotal }}"
+     data-desconto-pct="{{ pct }}"
+     data-iss-aliq="{{ resumo.iss_aliquota }}"
+     data-turismo="{{ resumo.taxa_turismo_unitaria }}"
+     data-noites="{{ resumo.noites }}">
     <div class="bg-lampiao/10 border border-lampiao/20 rounded-xl p-3 mb-6 flex items-center justify-center gap-2 text-center">
         <svg class="w-4 h-4 text-madeira flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
         <span class="text-madeira text-sm">Revise os detalhes e escolha como pagar antes de confirmar.</span>
@@ -80,23 +83,54 @@
             <p class="text-madeira/50 text-xs uppercase tracking-wider font-semibold mb-3">Valores</p>
             <div class="space-y-2 text-sm">
                 <div class="flex justify-between">
-                    <span class="text-madeira/50">{{ resumo.noites }} noite{{ resumo.noites|pluralize }} × R$ {{ resumo.preco_noite|floatformat:2 }}{% if resumo.temporada %} ({{ resumo.temporada.get_tipo_display }}){% endif %}</span>
+                    <span class="text-madeira/50">{{ resumo.noites }} {{ resumo.unidade_preco }}{{ resumo.noites|pluralize }} × R$ {{ resumo.preco_noite|floatformat:2 }}{% if resumo.temporada %} ({{ resumo.temporada.get_tipo_display }}){% endif %}</span>
                     <span>R$ {{ resumo.subtotal|floatformat:2 }}</span>
                 </div>
                 <div class="flex justify-between text-musgo" id="linha-desconto" hidden>
                     <span>Desconto Pix (<span id="pct-label">{{ pct }}</span>%)</span>
                     <span>− R$ <span id="desconto-valor">0,00</span></span>
                 </div>
+                <div class="flex justify-between border-t border-madeira/10 pt-2 mt-2">
+                    <span class="text-madeira/50">Hospedagem (paga online)</span>
+                    <span class="text-madeira font-semibold">R$ <span id="online-valor">{{ resumo.total_online|floatformat:2 }}</span></span>
+                </div>
+                <!-- Taxas: pagas no check-out, desmarcáveis -->
+                <div class="flex justify-between items-center">
+                    <label class="flex items-center gap-2 text-madeira/50 cursor-pointer">
+                        <input type="checkbox" id="chk-iss" class="accent-madeira" {% if resumo.cobra_iss %}checked{% endif %}>
+                        ISS ({{ resumo.iss_aliquota|floatformat:"-1" }}%)
+                    </label>
+                    <span class="text-madeira/70">R$ <span id="iss-valor">{{ resumo.iss|floatformat:2 }}</span></span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <label class="flex items-center gap-2 text-madeira/50 cursor-pointer">
+                        <input type="checkbox" id="chk-turismo" class="accent-madeira" {% if resumo.cobra_taxa_turismo %}checked{% endif %}>
+                        Taxa de turismo
+                    </label>
+                    <span class="text-madeira/70">R$ <span id="turismo-valor">{{ resumo.taxa_turismo|floatformat:2 }}</span></span>
+                </div>
                 <div class="flex justify-between border-t border-madeira/10 pt-3 mt-3 text-xl font-bold">
-                    <span class="text-madeira">Total</span>
+                    <span class="text-madeira">Total da estadia</span>
                     <span class="text-madeira">R$ <span id="total-valor">{{ resumo.total|floatformat:2 }}</span></span>
                 </div>
             </div>
+            <p class="text-madeira/40 text-xs mt-3">
+                Online você paga a <strong>hospedagem</strong>; o <strong>ISS</strong> e a
+                <strong>taxa de turismo</strong> são quitados no <strong>check-out</strong>, na pousada.
+                Você pode desmarcar as taxas acima.
+            </p>
         </div>
     </div>
 
+    {% if politica %}
+    <div class="bg-pergaminho/50 border border-madeira/10 rounded-xl p-4 mt-4 text-sm text-madeira/70">
+        <p class="font-semibold text-madeira mb-1">Política de cancelamento</p>
+        <p>{{ politica.resumo }}</p>
+    </div>
+    {% endif %}
+
     <div class="flex justify-between mt-8">
-        <a href="{% if uh_id %}{% url 'core:selecionar_unidade' uh_id %}{% else %}{% url 'core:selecionar_quarto' quarto.id %}{% endif %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}"
+        <a href="{% if uh_id %}{% url 'core:selecionar_unidade' uh_id %}{% else %}{% url 'core:selecionar_quarto' quarto.id %}{% endif %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}&criancas_0_5={{ busca.criancas_0_5|default:0 }}&criancas_6_15={{ busca.criancas_6_15|default:0 }}"
            class="text-madeira/40 hover:text-madeira transition flex items-center gap-2 text-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7"/></svg>
             Editar dados
@@ -108,6 +142,12 @@
             <input type="hidden" name="checkin" value="{{ busca.checkin|date:'Y-m-d' }}">
             <input type="hidden" name="checkout" value="{{ busca.checkout|date:'Y-m-d' }}">
             <input type="hidden" name="hospedes" value="{{ busca.hospedes }}">
+            <input type="hidden" name="criancas_0_5" value="{{ busca.criancas_0_5|default:0 }}">
+            <input type="hidden" name="criancas_6_15" value="{{ busca.criancas_6_15|default:0 }}">
+            {% if arranjo_sel %}<input type="hidden" name="arranjo" value="{{ arranjo_sel }}">{% endif %}
+            {% if arranjo_sofa %}<input type="hidden" name="usa_sofa_cama" value="1">{% endif %}
+            <input type="hidden" name="cobra_iss" id="h-cobra-iss" value="1">
+            <input type="hidden" name="cobra_taxa_turismo" id="h-cobra-turismo" value="1">
             <input type="hidden" name="modalidade" value="{{ modalidade|default:busca.modalidade }}">
             <input type="hidden" name="metodo_pagamento" id="metodo_pagamento" value="{{ metodo|default:'pix' }}">
             <input type="hidden" name="nome" value="{{ dados.nome }}">
@@ -134,31 +174,51 @@
 (function () {
   var root = document.getElementById('resumo-reserva');
   if (!root) return;
-  var subtotal = parseFloat(root.dataset.subtotal || '0');
+  var hospedagem = parseFloat(root.dataset.subtotal || '0');
   var pct = parseFloat(root.dataset.descontoPct || '0');
-  var hidden = document.getElementById('metodo_pagamento');
+  var issAliq = parseFloat(root.dataset.issAliq || '0');
+  var turismoUnit = parseFloat(root.dataset.turismo || '0');
+  var noites = parseInt(root.dataset.noites || '1', 10);
+  var metodoHidden = document.getElementById('metodo_pagamento');
+  var hIss = document.getElementById('h-cobra-iss');
+  var hTur = document.getElementById('h-cobra-turismo');
+  var chkIss = document.getElementById('chk-iss');
+  var chkTur = document.getElementById('chk-turismo');
   var linhaDesc = document.getElementById('linha-desconto');
   var elDesc = document.getElementById('desconto-valor');
+  var elOnline = document.getElementById('online-valor');
+  var elIss = document.getElementById('iss-valor');
+  var elTur = document.getElementById('turismo-valor');
   var elTotal = document.getElementById('total-valor');
 
   function brl(n) {
     return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
+  function round2(n) { return Math.round(n * 100) / 100; }
 
-  function atualizar(metodo) {
-    if (hidden) hidden.value = metodo;
-    var desconto = metodo === 'pix' ? subtotal * pct / 100 : 0;
-    var total = subtotal - desconto;
+  function atualizar() {
+    var metodo = (document.querySelector('input[name="metodo_ui"]:checked') || {}).value || 'pix';
+    if (metodoHidden) metodoHidden.value = metodo;
+    var desconto = metodo === 'pix' ? round2(hospedagem * pct / 100) : 0;
+    var liquida = hospedagem - desconto;
+    var iss = chkIss && chkIss.checked ? round2(liquida * issAliq / 100) : 0;
+    var turismo = chkTur && chkTur.checked ? round2(turismoUnit * noites) : 0;
+    if (hIss) hIss.value = chkIss && chkIss.checked ? '1' : '0';
+    if (hTur) hTur.value = chkTur && chkTur.checked ? '1' : '0';
     if (linhaDesc) linhaDesc.hidden = desconto <= 0;
     if (elDesc) elDesc.textContent = brl(desconto);
-    if (elTotal) elTotal.textContent = brl(total);
+    if (elOnline) elOnline.textContent = brl(liquida);
+    if (elIss) elIss.textContent = brl(iss);
+    if (elTur) elTur.textContent = brl(turismo);
+    if (elTotal) elTotal.textContent = brl(liquida + iss + turismo);
   }
 
   document.querySelectorAll('input[name="metodo_ui"]').forEach(function (radio) {
-    radio.addEventListener('change', function () { atualizar(radio.value); });
+    radio.addEventListener('change', atualizar);
   });
-  var checked = document.querySelector('input[name="metodo_ui"]:checked');
-  atualizar(checked ? checked.value : 'pix');
+  if (chkIss) chkIss.addEventListener('change', atualizar);
+  if (chkTur) chkTur.addEventListener('change', atualizar);
+  atualizar();
 })();
 </script>
 {% endblock %}

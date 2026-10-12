@@ -112,6 +112,10 @@ MIDDLEWARE = [
 # CSP: começa observando (report-only). Trocar para False quando o console estiver limpo.
 CSP_REPORT_ONLY = os.environ.get("CSP_REPORT_ONLY", "1") == "1"
 
+# MFA obrigatório p/ superusuário. Desligado em dev por padrão (não travar o local);
+# ligue com MFA_OBRIGATORIO=1 para testar o fluxo. Sempre ligado em produção (DEBUG=0).
+MFA_OBRIGATORIO = os.environ.get("MFA_OBRIGATORIO", "0" if DEBUG else "1") == "1"
+
 ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
@@ -340,6 +344,22 @@ FISCAL_NFCE_HABILITADA = os.environ.get("FISCAL_NFCE_HABILITADA", "0") == "1"  #
 # Segredo compartilhado com o Focus (campo "Chave de Autorização" do webhook). O Focus
 # envia no header Authorization; o endpoint /crm/fiscal/webhook/ valida.
 FISCAL_WEBHOOK_TOKEN = os.environ.get("FISCAL_WEBHOOK_TOKEN", "")
+
+# Preço ao hóspede (motor de tarifa — Manual de Vendas §2 + taxas).
+# ISS reaproveita a alíquota fiscal (4%). Taxa de turismo = valor fixo por diária (noite).
+PRECO_ISS_ALIQUOTA = os.environ.get("PRECO_ISS_ALIQUOTA", FISCAL_NFSE_ISS_ALIQUOTA)  # %
+PRECO_TAXA_TURISMO_DIARIA = os.environ.get("PRECO_TAXA_TURISMO_DIARIA", "4.00")  # R$/noite
+PRECO_SINGLE_FATOR = os.environ.get("PRECO_SINGLE_FATOR", "0.70")  # hóspede sozinho
+PRECO_PARCELAS_MAX = int(os.environ.get("PRECO_PARCELAS_MAX", "3"))  # cartão sem juros (venda)
+# Lançar ISS + taxa de turismo na conta no check-in (off nos testes p/ não poluir os
+# totais de conta; igual ao padrão do FNRH_BLOQUEAR_CHECKIN).
+PRECO_TAXAS_ATIVAS = not TESTING and os.environ.get("PRECO_TAXAS_ATIVAS", "1") == "1"
+
+# Política de cancelamento (única). Janela de arrependimento (CDC) a partir da
+# confirmação; depois dela, retém a % sobre o valor total da reserva. Estadia já
+# iniciada: cobra diárias consumidas + a retenção (a janela não se aplica).
+CANCELAMENTO_ARREPENDIMENTO_DIAS = int(os.environ.get("CANCELAMENTO_ARREPENDIMENTO_DIAS", "7"))
+CANCELAMENTO_RETENCAO_PCT = os.environ.get("CANCELAMENTO_RETENCAO_PCT", "10")  # %
 
 # E-mail — envio transacional (confirmação de reserva do site).
 # Sem SMTP configurado (dev): imprime no terminal (console). Em produção, defina as

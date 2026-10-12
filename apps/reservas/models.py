@@ -149,8 +149,22 @@ class Reserva(models.Model):
     )
     checkin = models.DateField("entrada (check-in)")
     checkout = models.DateField("saída (check-out)")
-    adultos = models.PositiveSmallIntegerField("adultos", default=2)
+    adultos = models.PositiveSmallIntegerField("adultos (16+)", default=2)
     criancas = models.PositiveSmallIntegerField("crianças", default=0)
+    # Faixas etárias p/ o preço (Manual §2): ≤5 não paga · 6-15 meia pessoa adicional ·
+    # 16+ conta como adulto. `criancas` = total (0-5 + 6-15), mantido pelos forms.
+    criancas_0_5 = models.PositiveSmallIntegerField("crianças até 5 anos", default=0)
+    criancas_6_15 = models.PositiveSmallIntegerField("crianças de 6 a 15 anos", default=0)
+    cobra_iss = models.BooleanField("cobrar ISS", default=True)
+    cobra_taxa_turismo = models.BooleanField("cobrar taxa de turismo", default=True)
+    # Berço (grátis, recurso global limitado — não conta como pessoa/cama/colchão).
+    usa_berco = models.BooleanField("usa berço", default=False)
+    # Arranjo de camas (estoque de colchões — docs/Reservas/PLANO_ESTOQUE_COLCHOES.md).
+    # casal = 2 colchões de solteiro; base do quarto (2×casais_max) é garantida; só o que
+    # passa dela consome o pool de "colchões extra". Sofá-cama NÃO consome colchão.
+    casais = models.PositiveSmallIntegerField("camas de casal", default=1)
+    solteiros = models.PositiveSmallIntegerField("camas de solteiro (avulsas)", default=0)
+    usa_sofa_cama = models.BooleanField("usa o sofá-cama", default=False)
     status = models.CharField(
         "status", max_length=12, choices=Status.choices, default=Status.PRE_RESERVA
     )
@@ -168,6 +182,9 @@ class Reserva(models.Model):
         help_text="Pré-reserva de canal (site) segura o quarto só até aqui; depois expira.",
     )
     checkin_real = models.DateTimeField("entrada realizada em", null=True, blank=True)
+    # Marco da confirmação (pagamento dos 30%) — referência da janela de 7 dias de
+    # arrependimento (CDC). Ver apps/reservas/cancelamento.py.
+    confirmada_em = models.DateTimeField("confirmada em", null=True, blank=True)
     checkout_real = models.DateTimeField("saída realizada em", null=True, blank=True)
     # Sincronização com a FNRH Digital (Embratur/Serpro) — ver fnrh_gateway.py
     fnrh_reserva_id = models.UUIDField("ID da reserva na FNRH", null=True, blank=True)
@@ -237,6 +254,23 @@ class Reserva(models.Model):
         return self.adultos + self.criancas
 
     @property
+    def colchoes_consumidos(self) -> int:
+        """Colchões de solteiro que o arranjo ocupa: casal = 2, solteiro avulso = 1."""
+        return 2 * (self.casais or 0) + (self.solteiros or 0)
+
+    @property
+    def colchoes_extra(self) -> int:
+        """Colchões deste arranjo que saem do POOL de extras (acima da base garantida
+        do quarto = 2×casais_max). Sofá-cama não entra. Day use e quartos sem
+        configuração de camas = 0."""
+        from apps.nucleo.estrutura import casais_max
+        from apps.reservas.colchoes import configurado
+        if not self.uh_id or not configurado(self.uh):
+            return 0
+        base = 2 * casais_max(self.uh)
+        return max(0, self.colchoes_consumidos - base)
+
+    @property
     def fnrh_pronta(self) -> bool:
         """FNRH em ordem para check-in: uma ficha completa por hóspede, com o
         titular entre elas."""
@@ -286,9 +320,25 @@ class Reserva(models.Model):
 
     def confirmar(self, usuario):
         """Pré-reserva/orçamento → confirmada (sinal recebido ou garantia)."""
+        era_orcamento = self.status == self.Status.ORCAMENTO
         self._exige_status(self.Status.ORCAMENTO, self.Status.PRE_RESERVA)
+        # Orçamento não reservava o pool de colchões; ao ativar, revalida a noite
+        # (pré-reserva já contava, então só o orçamento precisa reconferir).
+        if era_orcamento:
+            from apps.reservas.colchoes import configurado
+            from apps.reservas.services import conferir_arranjo
+            if configurado(self.uh):
+                conf = conferir_arranjo(
+                    self.uh, casais=self.casais, solteiros=self.solteiros,
+                    usa_sofa_cama=self.usa_sofa_cama, adultos=self.adultos,
+                    criancas=self.criancas, checkin=self.checkin,
+                    checkout=self.checkout, excluir_id=self.pk)
+                if conf["erros"]:
+                    raise ValidationError(conf["erros"])
         self.status = self.Status.CONFIRMADA
         self.expira_em = None  # confirmada não expira mais
+        if self.confirmada_em is None:
+            self.confirmada_em = timezone.now()  # marca a janela de arrependimento
         self.save()
 
     def fazer_checkin(self, usuario):
@@ -324,8 +374,10 @@ class Reserva(models.Model):
         # Grupo (folio híbrido): diária + colchão vão ao folio-mãe; o consumo fica
         # nesta conta do quarto. Reserva avulsa: tudo na própria conta.
         acomodacao = self.grupo.folio if self.grupo_id else conta
-        acomodacao.lancar_diarias(usuario, reserva=self)
-        acomodacao.lancar_colchoes_extras(usuario, reserva=self)
+        total_diarias = acomodacao.lancar_diarias(usuario, reserva=self)
+        # Colchão extra deixou de cobrar (virou só disponibilidade — Fase 6). A pessoa
+        # extra é cobrada na própria diária (pessoa adicional, Manual §2); aqui só as taxas.
+        acomodacao.lancar_taxas(usuario, reserva=self, base=total_diarias)
         return conta
 
     def fazer_checkout(self, usuario):
@@ -660,13 +712,13 @@ class ContaHospedagem(models.Model):
     def aberta(self) -> bool:
         return self.status == self.Status.ABERTA
 
-    def lancar_diarias(self, usuario, reserva=None):
+    def lancar_diarias(self, usuario, reserva=None) -> Decimal:
         """Lança uma diária (SERVIÇO) por noite, pela diária acordada da reserva.
-
-        `reserva` permite lançar a diária de um quarto do grupo neste folio-mãe;
-        omitido, usa a reserva desta conta (reserva avulsa).
+        Retorna o total de hospedagem lançado (base do ISS). `reserva` permite lançar
+        a diária de um quarto do grupo neste folio-mãe; omitido, usa a desta conta.
         """
         reserva = reserva or self.reserva
+        total = Decimal("0.00")
         for n in range(reserva.noites):
             dia = reserva.checkin + timezone.timedelta(days=n)
             LancamentoConta.objects.create(
@@ -677,36 +729,43 @@ class ContaHospedagem(models.Model):
                 valor=reserva.valor_diaria,
                 criado_por=usuario,
             )
+            total += reserva.valor_diaria
+        return total
 
-    def lancar_colchoes_extras(self, usuario, reserva=None):
-        """Lança o colchão extra da estadia (SERVIÇO), itemizado à parte da diária.
-
-        Quantidade derivada da lotação (adultos + crianças) sobre a estrutura do
-        quarto — o sofá-cama está incluído; só o colchão extra cobra. Retorna o
-        lançamento criado ou None quando não há colchão a cobrar. `reserva` permite
-        lançar no folio-mãe o colchão de um quarto do grupo.
+    def lancar_taxas(self, usuario, reserva=None, base=None):
+        """Lança ISS + taxa de turismo da hospedagem (SERVIÇO), itemizados à parte
+        (Fase 6 — Manual §2). ISS = alíquota × hospedagem (por fora); taxa de turismo =
+        valor fixo × nº de diárias. Cada uma respeita a flag da reserva; desligado em
+        teste por `PRECO_TAXAS_ATIVAS`. `base` = total de hospedagem já lançado.
         """
-        from apps.nucleo.estrutura import extras_para
+        from django.conf import settings
 
+        from apps.reservas.precos import taxas
+
+        if not getattr(settings, "PRECO_TAXAS_ATIVAS", True):
+            return
         reserva = reserva or self.reserva
-        qtd = extras_para(reserva.uh, reserva.adultos + reserva.criancas)
-        if qtd <= 0:
-            return None
-        config = getattr(reserva.uh, "config", None)
-        tarifa = config.tarifa_colchao_extra if config else Decimal("0.00")
-        if tarifa <= 0:
-            return None
+        if base is None:
+            base = reserva.valor_diaria * reserva.noites
         noites = reserva.noites
-        unidades = "unidade" if qtd == 1 else "unidades"
-        rotulo_noites = "noite" if noites == 1 else "noites"
-        return LancamentoConta.objects.create(
-            conta=self,
-            tipo=LancamentoConta.Tipo.SERVICO,
-            natureza=NaturezaFiscal.SERVICO,
-            descricao=f"Colchão extra · {qtd} {unidades} · {noites} {rotulo_noites}",
-            valor=tarifa * qtd * noites,
-            criado_por=usuario,
-        )
+        t = taxas(base, cobra_iss=reserva.cobra_iss,
+                  cobra_taxa_turismo=reserva.cobra_taxa_turismo, diarias=noites)
+
+        if t["iss"] > 0:
+            LancamentoConta.objects.create(
+                conta=self, tipo=LancamentoConta.Tipo.SERVICO,
+                natureza=NaturezaFiscal.SERVICO,
+                descricao=f"ISS {t['iss_aliquota'].normalize()}% — {reserva.uh.numero}",
+                valor=t["iss"], criado_por=usuario,
+            )
+        if t["taxa_turismo"] > 0:
+            rotulo = "diária" if noites == 1 else "diárias"
+            LancamentoConta.objects.create(
+                conta=self, tipo=LancamentoConta.Tipo.SERVICO,
+                natureza=NaturezaFiscal.SERVICO,
+                descricao=f"Taxa de turismo · {noites} {rotulo} — {reserva.uh.numero}",
+                valor=t["taxa_turismo"], criado_por=usuario,
+            )
 
     # ---- Totais ----
 
@@ -866,3 +925,59 @@ class Adiantamento(models.Model):
 
     def __str__(self):
         return f"Adiantamento R$ {self.valor} — reserva #{self.reserva_id}"
+
+
+class ColchoesExtra(models.Model):
+    """Pool GLOBAL de colchões de solteiro EXTRAS — recurso compartilhado e limitado.
+
+    **Só os extras são compartilhados.** As **camas fixas** de cada quarto (2×casais_max =
+    a base) são sempre dele e NUNCA entram nesta disputa — 35 posições de casal = 70
+    colchões fixos (a montagem muda, a quantidade não). Só o que um quarto monta ALÉM da
+    base consome este pool. Por noite, a soma do consumo de extra das reservas ativas não
+    pode passar da `quantidade` (10). Sofá-cama não consome colchão. Singleton (uma linha).
+    Ver docs/Reservas/PLANO_ESTOQUE_COLCHOES.md.
+    """
+
+    quantidade = models.PositiveSmallIntegerField("colchões extra em estoque", default=10)
+    alerta_minimo = models.PositiveSmallIntegerField(
+        "avisar quando restar ≤", default=1,
+        help_text="Quando os colchões extra livres numa noite ficam neste número ou "
+                  "abaixo, o sistema avisa (não bloqueia a reserva).",
+    )
+    atualizado_em = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        verbose_name = "estoque de colchões extra"
+        verbose_name_plural = "estoque de colchões extra"
+
+    def __str__(self):
+        return f"{self.quantidade} colchões extra (avisa ≤ {self.alerta_minimo})"
+
+    @classmethod
+    def atual(cls) -> "ColchoesExtra":
+        """Linha única do estoque (cria com os defaults se ainda não existir)."""
+        return cls.objects.first() or cls.objects.create()
+
+
+class BercoEstoque(models.Model):
+    """Estoque GLOBAL de berços — recurso compartilhado e limitado (a pousada tem 1).
+
+    Berço é **grátis**, não conta como pessoa nem como cama/colchão. Por noite, a soma
+    dos berços das reservas ativas não pode passar da `quantidade`. Singleton (uma linha),
+    editável no admin.
+    """
+
+    quantidade = models.PositiveSmallIntegerField("berços em estoque", default=1)
+    atualizado_em = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        verbose_name = "estoque de berços"
+        verbose_name_plural = "estoque de berços"
+
+    def __str__(self):
+        return f"{self.quantidade} berço(s)"
+
+    @classmethod
+    def atual(cls) -> "BercoEstoque":
+        """Linha única do estoque (cria com o default se ainda não existir)."""
+        return cls.objects.first() or cls.objects.create()

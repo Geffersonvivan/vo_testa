@@ -183,6 +183,42 @@ def _rascunho_lead(op, sinais) -> str:
             "Quer que eu segure e já envie a proposta?")
 
 
+def proxima_acao(op):
+    """O que fazer AGORA neste lead + urgência — selo no topo da oportunidade.
+    Deriva do estado (sinal pendente, validade da cotação, SLA do 1º contato). None se
+    a oportunidade não está aberta."""
+    if not op.aberta:
+        return None
+    hoje = timezone.localdate()
+    agora = timezone.now()
+
+    # 1. Sinal gerado, aguardando pagamento.
+    if op.cobranca_sinal_id and modulo_ativo(Modulo.PAGAMENTOS):
+        from apps.pagamentos.models import Cobranca
+        cob = Cobranca.objects.filter(pk=op.cobranca_sinal_id).first()
+        if cob and cob.status == Cobranca.Status.PENDENTE:
+            return {"nivel": "info", "texto": "Aguardando pagamento do sinal"}
+
+    # 2. Cotação: validade.
+    cot = op.cotacoes.order_by("-criado_em").first()
+    if cot and cot.validade:
+        dias = (cot.validade - hoje).days
+        if dias < 0:
+            return {"nivel": "alerta", "texto": "Cotação vencida — refazer ou cobrar"}
+        if dias <= 2:
+            return {"nivel": "aviso",
+                    "texto": f"Cotação vence em {dias} dia{'s' if dias != 1 else ''}"}
+
+    # 3. Sem cotação ainda — 1º contato (SLA 24h).
+    if not op.valor_estimado or op.valor_estimado <= 0:
+        horas = (agora - op.criado_em).total_seconds() / 3600
+        if horas >= SLA_PRIMEIRO_CONTATO_HORAS:
+            return {"nivel": "alerta", "texto": "1º contato atrasado (SLA 24h)"}
+        return {"nivel": "info", "texto": "Fazer 1º contato e cotar"}
+
+    return {"nivel": "info", "texto": "Aguardando resposta do cliente"}
+
+
 def analisar_lead(op):
     """Preenche/atualiza a análise do Caçador (por regras). Idempotente."""
     atualizar_score(op)
@@ -658,24 +694,51 @@ def _limpar_prospecto(pessoa):
     Prospecto.objects.filter(pessoa=pessoa).delete()
 
 
+def faixas_oportunidade(op):
+    """Deriva (adultos_preço, crianças 0-5, crianças 6-15) da oportunidade para a motor
+    de preço. Criança 16+ conta como adulto; sem o detalhe de idade, trata as crianças
+    como 6-15 (meia) — conservador."""
+    idades = [a for a in (op.idades_criancas or []) if a is not None]
+    if idades:
+        c05 = sum(1 for a in idades if a <= 5)
+        c615 = sum(1 for a in idades if 6 <= a <= 15)
+        c16 = sum(1 for a in idades if a >= 16)
+        return op.adultos + c16, c05, c615
+    return op.adultos, 0, op.criancas
+
+
 @transaction.atomic
 def registrar_cotacao(*, oportunidade, usuario, tipo_uh, checkin, checkout,
                       valor_diaria=None, validade=None, observacao="",
+                      cobra_iss=True, cobra_taxa_turismo=True,
                       mover_para_cotacao=True):
-    """Grava orçamento real; atualiza valor/datas da oportunidade e (opcional) etapa."""
+    """Grava orçamento real; atualiza valor/datas da oportunidade e (opcional) etapa.
+    Preço pela motor de tarifa (Manual §2 + taxas) a partir da lotação da oportunidade,
+    salvo diária informada à mão pelo vendedor."""
     if not oportunidade.aberta:
         raise ValidationError("Só oportunidades abertas recebem cotação.")
     assumir_lead(oportunidade, usuario)  # cotar = interagir → assume o lead
     if checkout <= checkin:
         raise ValidationError("O check-out deve ser depois do check-in.")
+    noites = (checkout - checkin).days
+    total_por_quarto = None
     if valor_diaria is None and modulo_ativo(Modulo.RESERVAS):
-        from apps.reservas.services import diaria_media
-        valor_diaria = diaria_media(tipo_uh, checkin, checkout)
+        from apps.reservas import precos
+        adultos_p, c05, c615 = faixas_oportunidade(oportunidade)
+        cot = precos.cotacao(
+            tipo=tipo_uh, checkin=checkin, checkout=checkout, adultos=adultos_p,
+            criancas_0_5=c05, criancas_6_15=c615,
+            cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_taxa_turismo)
+        valor_diaria = cot["media_noite"]
+        total_por_quarto = cot["total"]  # hospedagem + ISS + turismo
     elif valor_diaria is None:
         valor_diaria = tipo_uh.tarifa_base
     valor_diaria = Decimal(str(valor_diaria)).quantize(Decimal("0.01"))
-    noites = (checkout - checkin).days
-    valor_total = (valor_diaria * noites * max(1, oportunidade.quartos)).quantize(Decimal("0.01"))
+    quartos = max(1, oportunidade.quartos)
+    if total_por_quarto is not None:
+        valor_total = (total_por_quarto * quartos).quantize(Decimal("0.01"))
+    else:
+        valor_total = (valor_diaria * noites * quartos).quantize(Decimal("0.01"))
     validade = validade or (timezone.localdate() + timedelta(days=VALIDADE_COTACAO_DIAS))
     cotacao = Cotacao.objects.create(
         oportunidade=oportunidade, tipo_uh=tipo_uh, checkin=checkin, checkout=checkout,
@@ -2047,3 +2110,52 @@ def criar_cobranca_sinal(oportunidade, usuario, valor=None, metodo="pix"):
         cobranca_sinal_id=cobranca.id, atualizado_em=timezone.now())
     oportunidade.cobranca_sinal_id = cobranca.id
     return cobranca
+
+
+@transaction.atomic
+def ganhar_por_sinal(oportunidade, cobranca, usuario=None):
+    """Sinal pago numa oportunidade aberta → ganha e cria a reserva automaticamente.
+
+    Chamado pelo receiver de `pagamento_confirmado`. Se faltarem as datas ou o quarto
+    cotado, não dá pra montar a reserva — só registra a atividade p/ conversão manual
+    (o vendedor confirma no detalhe do lead)."""
+    usuario = usuario or cobranca.criado_por
+    cot = oportunidade.ultima_cotacao
+    tipo_uh = cot.tipo_uh if cot else None
+    checkin = oportunidade.checkin_previsto
+    checkout = oportunidade.checkout_previsto
+    if not (tipo_uh and checkin and checkout and modulo_ativo(Modulo.RESERVAS)):
+        registrar_atividade(
+            oportunidade=oportunidade, usuario=usuario,
+            tipo=AtividadeComercial.Tipo.SISTEMA,
+            descricao="Sinal pago — converter em reserva manualmente "
+                      "(faltam datas ou quarto cotado).")
+        return None
+
+    # O quarto cotado pode ter sido reservado por outro canal entre a cotação e o
+    # pagamento: nesse caso NÃO quebra o pagamento — registra p/ conversão manual.
+    try:
+        reserva = converter_em_reserva(
+            oportunidade, tipo_uh=tipo_uh, checkin=checkin, checkout=checkout,
+            usuario=usuario, criar_sinal=False)
+    except ValidationError as e:
+        registrar_atividade(
+            oportunidade=oportunidade, usuario=usuario,
+            tipo=AtividadeComercial.Tipo.SISTEMA,
+            descricao="Sinal pago — não foi possível criar a reserva automaticamente "
+                      f"({'; '.join(e.messages)}). Converter manualmente.")
+        return None
+
+    # Amarra o sinal já pago à reserva recém-criada e confirma a reserva.
+    from apps.pagamentos.models import Cobranca
+    Cobranca.objects.filter(pk=cobranca.pk).update(reserva_id=reserva.pk)
+    from apps.reservas.services import confirmar_reserva
+    confirmada = confirmar_reserva(reserva.pk, usuario)
+    registrar_atividade(
+        oportunidade=oportunidade, usuario=usuario,
+        tipo=AtividadeComercial.Tipo.SISTEMA,
+        descricao=(f"Sinal pago → oportunidade ganha e reserva #{reserva.pk} "
+                   f"criada e confirmada automaticamente." if confirmada else
+                   f"Sinal pago → oportunidade ganha e reserva #{reserva.pk} criada "
+                   f"(confirme a reserva manualmente)."))
+    return reserva

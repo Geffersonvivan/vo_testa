@@ -387,7 +387,7 @@
     htmx.ajax('GET', '{% url "reservas:nova" %}', '#modal-conteudo');
   }
   document.body.addEventListener('htmx:afterSwap', e => {
-    if (e.detail.target.id === 'modal-conteudo') { abrirModal(); atualizarTarifaHint(); }
+    if (e.detail.target.id === 'modal-conteudo') { arranjoTocado = false; abrirModal(); atualizarTarifaHint(); }
   });
 
   // ---------- Toasts ----------
@@ -521,26 +521,63 @@
     if (el) el.scrollIntoView({ block: 'nearest' });
   }
 
-  // ---------- Aviso ao vivo da tarifa no modal de reserva ----------
+  // ---------- Aviso ao vivo da tarifa + arranjo de camas no modal de reserva ----------
+  let arranjoTocado = false;  // o atendente mexeu em casais/solteiros/sofá?
   async function atualizarTarifaHint() {
     const hint = document.getElementById('tarifa-hint');
     if (!hint) return;
     const uh = document.getElementById('id_uh');
     const ci = document.getElementById('id_checkin');
     const co = document.getElementById('id_checkout');
-    if (!uh || !ci || !co || !uh.value || !ci.value || !co.value) { hint.innerHTML = ''; return; }
+    const colch = document.getElementById('colchoes-hint');
+    if (!uh || !ci || !co || !uh.value || !ci.value || !co.value) {
+      hint.innerHTML = ''; if (colch) colch.innerHTML = ''; return;
+    }
+    const ad = document.getElementById('id_adultos');
+    const c05 = document.getElementById('id_criancas_0_5');
+    const c615 = document.getElementById('id_criancas_6_15');
+    const iss = document.getElementById('id_cobra_iss');
+    const tur = document.getElementById('id_cobra_taxa_turismo');
+    const ca = document.getElementById('id_casais');
+    const so = document.getElementById('id_solteiros');
+    const sf = document.getElementById('id_usa_sofa_cama');
     try {
-      const url = hint.dataset.url + '?uh=' + uh.value + '&checkin=' + ci.value + '&checkout=' + co.value;
+      let url = hint.dataset.url + '?uh=' + uh.value + '&checkin=' + ci.value + '&checkout=' + co.value
+        + '&adultos=' + (ad ? ad.value : '')
+        + '&criancas_0_5=' + (c05 ? c05.value : '0') + '&criancas_6_15=' + (c615 ? c615.value : '0')
+        + '&cobra_iss=' + (iss && iss.checked ? '1' : '0')
+        + '&cobra_taxa_turismo=' + (tur && tur.checked ? '1' : '0');
+      // Só manda o arranjo se o atendente o alterou; senão o backend sugere.
+      if (arranjoTocado && ca && so) {
+        url += '&casais=' + ca.value + '&solteiros=' + so.value + '&sofa=' + (sf && sf.checked ? '1' : '0');
+      }
       const d = await (await fetch(url)).json();
-      if (d.erro) { hint.innerHTML = ''; return; }
+      if (d.erro) { hint.innerHTML = ''; if (colch) colch.innerHTML = ''; return; }
       hint.classList.toggle('tarifa-hint-alta', d.feriado_ou_alta);
-      hint.innerHTML = 'Tarifa vigente: <strong>R$ ' + d.diaria + '</strong>/noite · '
-        + d.temporada + ' · ' + d.noites + ' noite' + (d.noites > 1 ? 's' : '')
-        + ' = <strong>R$ ' + d.total + '</strong>';
-    } catch (e) { hint.innerHTML = ''; }
+      let linha = 'Diária <strong>R$ ' + d.diaria + '</strong> · ' + d.noites
+        + ' noite' + (d.noites > 1 ? 's' : '') + ' = hospedagem <strong>R$ ' + d.hospedagem + '</strong>';
+      if (Number(d.iss) > 0) linha += ' · ISS ' + d.iss_aliquota + '% R$ ' + d.iss;
+      if (Number(d.taxa_turismo) > 0) linha += ' · turismo R$ ' + d.taxa_turismo;
+      linha += ' · <strong>Total R$ ' + d.total + '</strong>';
+      hint.innerHTML = linha;
+      // Enquanto o atendente não mexer, refletimos a sugestão nos campos.
+      if (!arranjoTocado && d.arranjo && ca && so) {
+        ca.value = d.arranjo.casais; so.value = d.arranjo.solteiros;
+        if (sf) sf.checked = !!d.arranjo.sofa;
+      }
+      if (colch && d.colchoes_msg) {
+        colch.classList.remove('tarifa-hint-alta', 'tarifa-hint-erro');
+        if (d.colchoes_status === 'bloqueio') colch.classList.add('tarifa-hint-erro');
+        else if (d.colchoes_status === 'aviso') colch.classList.add('tarifa-hint-alta');
+        colch.innerHTML = '🛏️ ' + d.colchoes_msg;
+      } else if (colch) { colch.innerHTML = ''; }
+    } catch (e) { hint.innerHTML = ''; if (colch) colch.innerHTML = ''; }
   }
   document.addEventListener('change', e => {
-    if (['id_uh', 'id_checkin', 'id_checkout'].includes(e.target.id)) atualizarTarifaHint();
+    if (['id_casais', 'id_solteiros', 'id_usa_sofa_cama'].includes(e.target.id)) arranjoTocado = true;
+    if (['id_uh', 'id_checkin', 'id_checkout', 'id_adultos', 'id_criancas_0_5',
+         'id_criancas_6_15', 'id_cobra_iss', 'id_cobra_taxa_turismo',
+         'id_casais', 'id_solteiros', 'id_usa_sofa_cama'].includes(e.target.id)) atualizarTarifaHint();
   });
 
   // ---------- Cadastro rápido de hóspede no modal ----------

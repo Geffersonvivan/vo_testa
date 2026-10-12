@@ -383,6 +383,26 @@ class CotacaoTests(TestCase):
         self.assertEqual(op.etapa.nome, "Cotação enviada")
         self.assertTrue(op.atividades.filter(tipo="cotacao").exists())
 
+    @override_settings(PRECO_ISS_ALIQUOTA="4.0", PRECO_TAXA_TURISMO_DIARIA="4.00",
+                       PRECO_SINGLE_FATOR="0.70")
+    def test_cotacao_pela_motor_com_crianca_e_taxas(self):
+        # Fase 6: cotação do funil pela motor — pessoa adicional + criança 6-15 + taxas.
+        self.tipo.pessoa_adicional = Decimal("100.00")
+        self.tipo.capacidade = 6
+        self.tipo.save(update_fields=["pessoa_adicional", "capacidade"])
+        op = services.criar_oportunidade(usuario=self.user, pessoa=self.pessoa, titulo="Cota2")
+        op.adultos, op.criancas, op.idades_criancas = 3, 1, [10]  # 3 ad + 1 criança 6-15
+        op.save(update_fields=["adultos", "criancas", "idades_criancas"])
+        hoje = timezone.localdate()
+        cot = services.registrar_cotacao(
+            oportunidade=op, usuario=self.user, tipo_uh=self.tipo,
+            checkin=hoje + timedelta(days=5), checkout=hoje + timedelta(days=7),  # 2 noites
+        )
+        # diária = 200 + (3−2)×100 + 1×(100/2) = 350.
+        self.assertEqual(cot.valor_diaria, Decimal("350.00"))
+        # total c/ taxas: hospedagem 700 + ISS 28 + turismo 8 = 736.
+        self.assertEqual(cot.valor_total, Decimal("736.00"))
+
 
 class ConversaoTests(TestCase):
     def setUp(self):
@@ -1662,3 +1682,390 @@ class PropostaSinalTests(TestCase):
     def test_brl_usa_separador_de_milhar(self):
         self.assertEqual(services._brl(Decimal("1500")), "1.500,00")
         self.assertEqual(services._brl(Decimal("450.5")), "450,50")
+
+
+class SinalPagoGanhaTests(TestCase):
+    """#9 — sinal pago numa oportunidade aberta → ganha e cria a reserva sozinho."""
+
+    def setUp(self):
+        from apps.nucleo.models import ModuloContratado
+        from apps.nucleo.modulos import Modulo
+        for mod in (Modulo.PAGAMENTOS, Modulo.RESERVAS, Modulo.COMERCIAL):
+            ModuloContratado.objects.update_or_create(codigo=mod, defaults={"ativo": True})
+        self.u = Usuario.objects.create_superuser(username="s9", password="forte-123-abc")
+        self.pessoa = Pessoa.objects.create(nome="Rui Sinal", telefone="49988887777")
+        self.tipo = TipoUH.objects.create(nome="Std9", tarifa_base=Decimal("200"))
+        self.uh = UH.objects.create(numero="Quarto 09", tipo=self.tipo)
+        self.hoje = timezone.localdate()
+
+    def _cobranca_paga(self, op):
+        from apps.pagamentos.services import confirmar_pagamento
+        cob = services.criar_cobranca_sinal(op, self.u)
+        return confirmar_pagamento(cob, self.u, origem="teste")
+
+    def test_sinal_pago_converte_e_confirma(self):
+        from apps.reservas.models import Reserva
+        op = services.criar_oportunidade(
+            usuario=self.u, pessoa=self.pessoa, titulo="Ganha por sinal",
+            valor_estimado=Decimal("585.00"))
+        services.registrar_cotacao(
+            oportunidade=op, usuario=self.u, tipo_uh=self.tipo,
+            checkin=self.hoje + timedelta(days=5), checkout=self.hoje + timedelta(days=7))
+        op.refresh_from_db()
+        self._cobranca_paga(op)
+        op.refresh_from_db()
+        self.assertEqual(op.status, Oportunidade.Status.GANHA)
+        self.assertIsNotNone(op.reserva_id)
+        reserva = Reserva.objects.get(pk=op.reserva_id)
+        self.assertEqual(reserva.status, Reserva.Status.CONFIRMADA)
+
+    def test_quarto_indisponivel_no_pagamento_nao_quebra_o_pagamento(self):
+        # Entre a cotação e o pagamento, o único quarto do tipo é reservado por outro
+        # canal. Pagar o sinal NÃO pode derrubar a confirmação do pagamento.
+        from apps.pagamentos.models import Cobranca
+        from apps.reservas import services as reservas
+        from apps.reservas.models import Reserva
+        op = services.criar_oportunidade(
+            usuario=self.u, pessoa=self.pessoa, titulo="Quarto some",
+            valor_estimado=Decimal("585.00"))
+        ci, co = self.hoje + timedelta(days=5), self.hoje + timedelta(days=7)
+        services.registrar_cotacao(
+            oportunidade=op, usuario=self.u, tipo_uh=self.tipo, checkin=ci, checkout=co)
+        # ocupa o único quarto do tipo nessas datas (outro hóspede)
+        outro = Pessoa.objects.create(nome="Outro Hóspede")
+        reservas.criar_prereserva(
+            uh=self.uh, checkin=ci, checkout=co, hospede=outro, usuario=self.u)
+        cob = self._cobranca_paga(op)
+        self.assertEqual(cob.status, Cobranca.Status.PAGO)   # pagamento intacto
+        op.refresh_from_db()
+        self.assertEqual(op.status, Oportunidade.Status.ABERTA)  # não converteu
+        self.assertIsNone(op.reserva_id)
+        self.assertTrue(
+            op.atividades.filter(descricao__icontains="não foi possível").exists())
+
+    def test_sem_datas_apenas_registra_para_conversao_manual(self):
+        op = services.criar_oportunidade(
+            usuario=self.u, pessoa=self.pessoa, titulo="Sinal sem datas",
+            valor_estimado=Decimal("300.00"))
+        self._cobranca_paga(op)
+        op.refresh_from_db()
+        self.assertEqual(op.status, Oportunidade.Status.ABERTA)  # não converteu
+        self.assertIsNone(op.reserva_id)
+        self.assertTrue(
+            op.atividades.filter(descricao__icontains="manualmente").exists())
+
+
+class PainelQuartosLeadTests(TestCase):
+    """Descritivo na conversa: comporta(), painel filtrado, texto de oferta, views."""
+
+    def setUp(self):
+        from apps.nucleo.models import ConfiguracaoUH, PosicaoCama
+
+        self.user = Usuario.objects.create_superuser(
+            username="vend", password="senha-forte-123")
+        self.pessoa = Pessoa.objects.create(nome="Família Souza", telefone="49999990000")
+        self.etapa = EtapaFunil.objects.get(nome="Novo lead")
+        # Quarto tipo "Q09": 1 posição (fixa 2) + sofá (1 ad / 2 cr) + 1 colchão extra
+        self.tipo = TipoUH.objects.create(nome="Intermediário", tarifa_base=Decimal("400"))
+        self.uh = UH.objects.create(
+            numero="Quarto 09", tipo=self.tipo, nome_tematico="Estúdio da Cartógrafa")
+        PosicaoCama.objects.create(uh=self.uh, nome="Quarto", montagem_padrao="casal", ordem=0)
+        ConfiguracaoUH.objects.create(
+            uh=self.uh, tem_sofa_cama=True, sofa_adultos=1, sofa_criancas=2,
+            sofa_idade_maxima=15, max_colchoes_extras=1)
+        self.op = Oportunidade.objects.create(
+            pessoa=self.pessoa, titulo="Feriadão", etapa=self.etapa,
+            adultos=3, criancas=2, idades_criancas=[8, 12], hospedes=5,
+            responsavel=self.user, criado_por=self.user,
+        )
+
+    # ---- comporta() ----
+    def test_comporta_composicoes_do_descritivo(self):
+        from apps.comercial import quartos
+        self.assertTrue(quartos.comporta(self.uh, 3, 2, [8, 12]))   # 3ad + 2cr no sofá
+        self.assertTrue(quartos.comporta(self.uh, 4, 0, []))        # 4 adultos = máx
+        self.assertFalse(quartos.comporta(self.uh, 5, 0, []))       # passa da máx
+
+    def test_crianca_acima_do_limite_conta_como_adulto(self):
+        from apps.comercial import quartos
+        # 2 adultos + 1 criança de 16 = 3 adultos → cabe (máx 4)
+        self.assertTrue(quartos.comporta(self.uh, 2, 1, [16]))
+        # 4 adultos + 1 criança de 16 = 5 adultos → não cabe
+        self.assertFalse(quartos.comporta(self.uh, 4, 1, [16]))
+
+    def test_frase_capacidade_formato_descritivo(self):
+        from apps.comercial import quartos
+        self.assertEqual(
+            quartos.frase_capacidade(self.uh),
+            "4 adultos, ou 3 adultos + 2 crianças até 15 anos",
+        )
+
+    # ---- preço pela motor (Fase A — religar funil) ----
+    @override_settings(PRECO_ISS_ALIQUOTA="4.0", PRECO_TAXA_TURISMO_DIARIA="4.00",
+                       PRECO_SINGLE_FATOR="0.70")
+    def test_card_precifica_pela_motor_com_pessoa_adicional_e_taxas(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.comercial import quartos
+        from apps.reservas import precos
+
+        self.tipo.pessoa_adicional = Decimal("90.00")
+        self.tipo.save(update_fields=["pessoa_adicional"])
+        ci = timezone.localdate() + timedelta(days=20)
+        self.op.checkin_previsto, self.op.checkout_previsto = ci, ci + timedelta(days=2)
+        self.op.save(update_fields=["checkin_previsto", "checkout_previsto"])
+
+        painel = quartos.quartos_para_lead(self.op)
+        card = next(i for i in painel["servem"] if i["uh"].pk == self.uh.pk)
+        cot = precos.cotacao(uh=self.uh, checkin=ci, checkout=ci + timedelta(days=2),
+                             adultos=3, criancas_0_5=0, criancas_6_15=2)
+        # diária = base 400 + (3−2)×90 + 2×(90/2) = 580 (igual à recepção/site).
+        self.assertEqual(card["diaria"], Decimal("580.00"))
+        self.assertEqual(card["diaria"], cot["media_noite"])
+        self.assertEqual(card["total"], cot["total"])       # com ISS + turismo
+        self.assertEqual(card["iss"], cot["iss"])
+
+    def test_disponibilidade_respeita_pool_de_colchoes(self):
+        # Fase B: quarto que comporta mas sem colchão extra no pool → não disponível.
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.comercial import quartos
+        from apps.reservas.models import ColchoesExtra
+        ci = timezone.localdate() + timedelta(days=20)
+        self.op.checkin_previsto, self.op.checkout_previsto = ci, ci + timedelta(days=2)
+        self.op.save(update_fields=["checkin_previsto", "checkout_previsto"])
+        pool = ColchoesExtra.atual()
+        pool.quantidade = 5
+        pool.save()
+        # 3 adultos + 2 crianças no Quarto 09 → 1 colchão extra; com pool, serve.
+        painel = quartos.quartos_para_lead(self.op)
+        card = next(i for i in painel["servem"] if i["uh"].pk == self.uh.pk)
+        self.assertTrue(card["disponivel"])
+        self.assertEqual(card["arranjo"]["extra"], 1)
+        # Pool esgotado → cai em "ocupados" por falta de colchão (não por reserva).
+        pool.quantidade = 0
+        pool.save()
+        painel = quartos.quartos_para_lead(self.op)
+        self.assertFalse(any(i["uh"].pk == self.uh.pk for i in painel["servem"]))
+        oc = next(i for i in painel["ocupados"] if i["uh"].pk == self.uh.pk)
+        self.assertEqual(oc["motivo"], "sem_colchao")
+
+    # ---- texto de oferta ----
+    def test_texto_oferta_sem_atencao_nem_nao_confirmado(self):
+        from apps.comercial import quartos
+        from apps.comercial.models import FichaComercial
+        FichaComercial.objects.create(
+            uh=self.uh, resumo="ambiente único e aconchegante",
+            pontos_atencao=["acesso por escada"], confirmados=[])
+        hoje = timezone.localdate()
+        self.op.checkin_previsto = hoje + timedelta(days=10)
+        self.op.checkout_previsto = hoje + timedelta(days=12)
+        self.op.save()
+        texto = quartos.texto_oferta(self.uh, self.op)
+        self.assertIn("Estúdio da Cartógrafa", texto)
+        self.assertIn("ambiente único", texto)
+        self.assertNotIn("escada", texto)          # ponto de atenção não vaza
+        self.assertNotIn("não confirmado", texto)
+        self.assertNotIn("A LEVANTAR", texto)
+
+    # ---- proposta com 2–3 quartos (#3) ----
+    def test_texto_proposta_combina_quartos_numa_mensagem(self):
+        from apps.comercial import quartos
+        tipo2 = TipoUH.objects.create(nome="Standard", tarifa_base=Decimal("300"))
+        uh2 = UH.objects.create(numero="Quarto 10", tipo=tipo2, nome_tematico="Vista Lago")
+        hoje = timezone.localdate()
+        self.op.checkin_previsto = hoje + timedelta(days=10)
+        self.op.checkout_previsto = hoje + timedelta(days=12)
+        self.op.adultos, self.op.criancas, self.op.idades_criancas = 2, 0, []
+        self.op.hospedes = 2
+        self.op.save()
+        texto = quartos.texto_proposta(self.op, [self.uh.pk, uh2.pk])
+        self.assertIn("Família", texto)                 # abertura personalizada
+        self.assertIn("Estúdio da Cartógrafa", texto)   # opção 1
+        self.assertIn("Vista Lago", texto)              # opção 2
+        self.assertIn("*1.", texto)
+        self.assertIn("*2.", texto)
+        self.assertEqual(texto.lower().count("cancel"), 1)  # política só uma vez
+
+    def test_view_proposta_quartos_json(self):
+        self.client.force_login(self.user)
+        hoje = timezone.localdate()
+        self.op.checkin_previsto = hoje + timedelta(days=10)
+        self.op.checkout_previsto = hoje + timedelta(days=12)
+        self.op.save()
+        resp = self.client.get(
+            reverse("comercial:proposta_quartos", args=[self.op.pk]) + f"?uhs={self.uh.pk}")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("Estúdio da Cartógrafa", resp.json()["texto"])
+
+    # ---- histórico do recorrente (#8) ----
+    def test_historico_hospede_conta_estadias_e_futuras(self):
+        from apps.reservas import services as reservas
+        from apps.reservas.models import Reserva
+        hoje = timezone.localdate()
+        # estadia encerrada
+        r1 = reservas.criar_prereserva(
+            uh=self.uh, checkin=hoje - timedelta(days=30),
+            checkout=hoje - timedelta(days=28), hospede=self.pessoa, usuario=self.user)
+        r1.status = Reserva.Status.CHECKOUT
+        r1.save(update_fields=["status"])
+        # reserva futura em aberto
+        reservas.criar_prereserva(
+            uh=self.uh, checkin=hoje + timedelta(days=20),
+            checkout=hoje + timedelta(days=22), hospede=self.pessoa, usuario=self.user)
+        h = reservas.historico_hospede(self.pessoa)
+        self.assertEqual(h["estadias"], 1)
+        self.assertEqual(h["ultima"], hoje - timedelta(days=28))
+        self.assertEqual(h["futuras"], 1)
+
+    def test_oportunidade_mostra_selo_recorrente(self):
+        from apps.reservas import services as reservas
+        from apps.reservas.models import Reserva
+        hoje = timezone.localdate()
+        r = reservas.criar_prereserva(
+            uh=self.uh, checkin=hoje - timedelta(days=30),
+            checkout=hoje - timedelta(days=28), hospede=self.pessoa, usuario=self.user)
+        r.status = Reserva.Status.CHECKOUT
+        r.save(update_fields=["status"])
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse("comercial:oportunidade", args=[self.op.pk]))
+        self.assertContains(resp, "Cliente recorrente")
+
+    # ---- datas vizinhas quando lota (#5) ----
+    def test_datas_vizinhas_quando_lota(self):
+        from apps.comercial import quartos
+        from apps.reservas import services as reservas
+        self.op.adultos, self.op.criancas, self.op.idades_criancas = 2, 0, []
+        self.op.hospedes = 2
+        hoje = timezone.localdate()
+        ci, co = hoje + timedelta(days=10), hoje + timedelta(days=12)
+        # ocupa o único quarto na janela desejada → nada serve
+        reservas.criar_prereserva(
+            uh=self.uh, checkin=ci, checkout=co, hospede=self.pessoa, usuario=self.user)
+        self.op.checkin_previsto, self.op.checkout_previsto = ci, co
+        self.op.save()
+        painel = quartos.quartos_para_lead(self.op)
+        self.assertEqual(painel["servem"], [])
+        self.assertTrue(painel["datas_alternativas"])            # sugere vizinhas
+        self.assertTrue(all(a["qtd"] >= 1 for a in painel["datas_alternativas"]))
+
+    # ---- painel: ocupado não aparece como disponível ----
+    def test_quarto_ocupado_vai_para_ocupados(self):
+        from apps.comercial import quartos
+        from apps.reservas import services as reservas
+        hoje = timezone.localdate()
+        ci, co = hoje + timedelta(days=10), hoje + timedelta(days=12)
+        reservas.criar_prereserva(
+            uh=self.uh, checkin=ci, checkout=co, hospede=self.pessoa, usuario=self.user)
+        self.op.checkin_previsto, self.op.checkout_previsto = ci, co
+        self.op.save()
+        painel = quartos.quartos_para_lead(self.op)
+        nomes_servem = [i["uh"].pk for i in painel["servem"]]
+        nomes_ocup = [i["uh"].pk for i in painel["ocupados"]]
+        self.assertNotIn(self.uh.pk, nomes_servem)
+        self.assertIn(self.uh.pk, nomes_ocup)
+
+    # ---- views ----
+    def test_view_painel_lista_o_quarto(self):
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse("comercial:quartos_lead", args=[self.op.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Estúdio da Cartógrafa")
+
+    def test_view_editar_composicao_salva(self):
+        self.client.force_login(self.user)
+        hoje = timezone.localdate()
+        resp = self.client.post(
+            reverse("comercial:editar_composicao", args=[self.op.pk]),
+            {"adultos": 4, "criancas": 2, "idades_criancas": "8, 12",
+             "checkin": (hoje + timedelta(days=10)).isoformat(),
+             "checkout": (hoje + timedelta(days=12)).isoformat()})
+        self.assertEqual(resp.status_code, 200)
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.adultos, 4)
+        self.assertEqual(self.op.criancas, 2)
+        self.assertEqual(self.op.idades_criancas, [8, 12])
+
+    def test_view_oferecer_registra_e_devolve_texto(self):
+        from apps.comercial.models import AtividadeComercial
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            reverse("comercial:oferecer_quarto", args=[self.op.pk, self.uh.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("texto", resp.json())
+        self.assertIn("Estúdio da Cartógrafa", resp.json()["texto"])
+        self.assertTrue(
+            AtividadeComercial.objects.filter(
+                oportunidade=self.op, tipo=AtividadeComercial.Tipo.SISTEMA,
+                descricao__icontains="Estúdio da Cartógrafa").exists())
+
+    def test_view_oferecer_com_datas_cria_cotacao_e_politica(self):
+        # Fase C: com datas, "Enviar ao cliente" registra a cotação (motor) → valor
+        # estimado preenche; o texto traz a política de cancelamento.
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.comercial.models import Cotacao
+        ci = timezone.localdate() + timedelta(days=15)
+        self.op.checkin_previsto, self.op.checkout_previsto = ci, ci + timedelta(days=2)
+        self.op.save(update_fields=["checkin_previsto", "checkout_previsto"])
+        self.client.force_login(self.user)
+        resp = self.client.post(
+            reverse("comercial:oferecer_quarto", args=[self.op.pk, self.uh.pk]))
+        self.assertTrue(resp.json()["cotou"])
+        self.assertIn("Cancelamento", resp.json()["texto"])    # política no texto
+        self.op.refresh_from_db()
+        self.assertGreater(self.op.valor_estimado, 0)          # valor estimado preenchido
+        self.assertTrue(Cotacao.objects.filter(oportunidade=self.op).exists())
+
+    def test_view_comparar_monta_tabela(self):
+        # segundo quarto pra comparar
+        uh2 = UH.objects.create(
+            numero="Quarto 17", tipo=self.tipo, nome_tematico="Torre do Astrônomo",
+            vista_lago=True)
+        self.client.force_login(self.user)
+        resp = self.client.get(
+            reverse("comercial:comparar_quartos", args=[self.op.pk]),
+            {"uhs": f"{self.uh.pk},{uh2.pk}"})
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Estúdio da Cartógrafa")
+        self.assertContains(resp, "Torre do Astrônomo")
+        self.assertContains(resp, "Capacidade")
+        self.assertContains(resp, "Vista para o lago")
+
+    def test_ficha_comercial_form_pontos_por_linha(self):
+        from apps.comercial.forms import FichaComercialForm
+        from apps.comercial.models import FichaComercial
+        ficha = FichaComercial.objects.create(uh=self.uh, pontos_atencao=["a", "b"])
+        # prefill: lista → linhas
+        self.assertEqual(FichaComercialForm(instance=ficha).fields["pontos_atencao_txt"].initial, "a\nb")
+        # save: linhas → lista (ignora linhas vazias e espaços)
+        form = FichaComercialForm(
+            {"resumo": "x", "indicado_para": "Casal", "historia_e_venda": "",
+             "pontos_atencao_txt": "linha1\n\n  linha2  "}, instance=ficha)
+        self.assertTrue(form.is_valid(), form.errors)
+        obj = form.save()
+        self.assertEqual(obj.pontos_atencao, ["linha1", "linha2"])
+
+    def test_uh_form_edita_ficha_comercial_num_so_lugar(self):
+        """A tela de editar quarto (núcleo) mostra a seção do descritivo comercial."""
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse("uh_editar", args=[self.uh.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Descritivo comercial")
+        self.assertContains(resp, "Pontos de atenção")
+
+    def test_campos_a_levantar_reflete_campo_preenchido(self):
+        from apps.comercial import quartos
+        # vazio → aparece como "a levantar"
+        self.assertIn("Banheiro", quartos._campos_a_levantar(self.uh, None))
+        # preenchido → some (campo tem casa própria na UH)
+        self.uh.banheiro = "1 banheiro com box, chuveiro e secador"
+        self.uh.save()
+        self.uh.refresh_from_db()
+        self.assertNotIn("Banheiro", quartos._campos_a_levantar(self.uh, None))

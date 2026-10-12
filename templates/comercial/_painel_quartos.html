@@ -1,0 +1,225 @@
+{% load static %}
+{# Painel «Quartos para este lead» — parcial recarregável por HTMX. #}
+<div class="pq" id="painel-quartos" x-data="{ editar:false, mostrarTodos:false, sel:[], comparando:false, cmpHtml:'', propostaTexto:'',
+  fVista:false, fPet:false, fVaranda:false,
+  toggle(id){ this.sel.includes(id) ? this.sel=this.sel.filter(x=>x!=id) : (this.sel.length<3 && this.sel.push(id)) },
+  async comparar(){ const r=await fetch('{% url 'comercial:comparar_quartos' op.pk %}?uhs='+this.sel.join(',')); this.cmpHtml=await r.text(); this.comparando=true },
+  async proposta(){ const r=await fetch('{% url 'comercial:proposta_quartos' op.pk %}?uhs='+this.sel.join(',')); const d=await r.json(); this.propostaTexto=d.texto } }">
+
+  <div class="pq-head">
+    <h3>Quartos para este lead</h3>
+    <span class="pq-count">{{ painel_quartos.servem|length }} serve{{ painel_quartos.servem|length|pluralize:"m" }}</span>
+  </div>
+
+  {# ---- composição consultada + editar ---- #}
+  <div class="pq-filtro">
+    <span>
+      Para <b>{{ painel_quartos.composicao.adultos }} adulto{{ painel_quartos.composicao.adultos|pluralize }}{% if painel_quartos.composicao.criancas %} + {{ painel_quartos.composicao.criancas }} criança{{ painel_quartos.composicao.criancas|pluralize:"s" }}{% endif %}</b>{% if painel_quartos.composicao.idades %} ({{ painel_quartos.composicao.idades|join:", " }}){% endif %}
+      {% if painel_quartos.tem_datas %} · <b>{{ painel_quartos.composicao.checkin|date:"d/m" }}–{{ painel_quartos.composicao.checkout|date:"d/m" }}</b>{% else %} · <span class="pq-sem-datas">sem datas — disponibilidade não conferida</span>{% endif %}
+    </span>
+    <button type="button" class="pq-editar" @click="editar=!editar">Editar ✎</button>
+  </div>
+
+  {% if painel_quartos.tem_datas %}
+  <div class="pq-berco {% if painel_quartos.berco_disponivel %}pq-berco-ok{% else %}pq-berco-nao{% endif %}">
+    🍼 Berço (grátis): {% if painel_quartos.berco_disponivel %}<b>disponível</b> nessas datas{% else %}<b>já reservado</b> nessas datas — não prometa{% endif %}
+  </div>
+  {% endif %}
+
+  <form class="pq-form" x-show="editar" x-cloak
+        hx-post="{% url 'comercial:editar_composicao' op.pk %}"
+        hx-target="#painel-quartos" hx-swap="outerHTML">
+    {% csrf_token %}
+    <div class="pq-form-linha">
+      <label>Adultos<input type="number" name="adultos" min="1" value="{{ painel_quartos.composicao.adultos }}"></label>
+      <label>Crianças<input type="number" name="criancas" min="0" value="{{ painel_quartos.composicao.criancas }}"></label>
+      <label class="pq-form-idades">Idades (vírgula)<input type="text" name="idades_criancas" value="{{ painel_quartos.composicao.idades|join:', ' }}" placeholder="ex.: 8, 12"></label>
+    </div>
+    <div class="pq-form-linha">
+      <label>Check-in<input type="date" name="checkin" value="{{ painel_quartos.composicao.checkin|date:'Y-m-d' }}"></label>
+      <label>Check-out<input type="date" name="checkout" value="{{ painel_quartos.composicao.checkout|date:'Y-m-d' }}"></label>
+    </div>
+    <div class="pq-form-acoes">
+      <button type="submit" class="botao-primario botao-mini">Aplicar filtro</button>
+      <button type="button" class="botao-neutro botao-mini" @click="editar=false">Cancelar</button>
+    </div>
+  </form>
+
+  {# ---- B: sem datas → chama pra preencher ---- #}
+  {% if not painel_quartos.tem_datas %}
+  <button type="button" class="pq-datas-cta" @click="editar=true">📅 Informe as datas pra conferir a disponibilidade e o preço →</button>
+  {% endif %}
+
+  {# ---- pontos de atenção no topo ---- #}
+  {% if painel_quartos.atencao_topo %}
+  <div class="pq-atencao">
+    <div class="t">⚠️ Antes de oferecer</div>
+    <ul>
+      {% for nome, numero, ponto in painel_quartos.atencao_topo %}
+      <li><b>{{ nome }}{% if nome != numero %} ({{ numero }}){% endif %}:</b> {{ ponto }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# ---- filtros rápidos (o "mas precisa ter…" do cliente) ---- #}
+  {% if painel_quartos.servem %}
+  <div class="pq-filtros-rapidos">
+    <button type="button" class="pq-chip" :class="fVista && 'on'" @click="fVista=!fVista">🌅 Vista lago</button>
+    <button type="button" class="pq-chip" :class="fVaranda && 'on'" @click="fVaranda=!fVaranda">🪵 Varanda</button>
+    <button type="button" class="pq-chip" :class="fPet && 'on'" @click="fPet=!fPet">🐾 Aceita pet</button>
+  </div>
+  {% endif %}
+
+  {# ---- quartos que servem ---- #}
+  <div class="pq-lista">
+    {% for item in painel_quartos.servem %}
+    <div class="pq-card" x-data="{ ficha:false, texto:'' }" x-cloak
+         data-vista="{{ item.uh.vista_lago|yesno:'1,0' }}" data-pet="{{ item.uh.aceita_pet|yesno:'1,0' }}" data-varanda="{{ item.uh.varanda|yesno:'1,0' }}"
+         x-show="(!fVista || $el.dataset.vista=='1') && (!fPet || $el.dataset.pet=='1') && (!fVaranda || $el.dataset.varanda=='1') && (fVista||fPet||fVaranda || mostrarTodos || {{ forloop.counter0 }} < 6)">
+      <div class="pq-card-topo" @click="ficha=!ficha">
+        <div class="pq-info">
+          <div class="pq-nome">{{ item.nome }}{% if item.nome != item.uh.numero %} <span class="pq-num">· {{ item.uh.numero }}</span>{% endif %}</div>
+          <div class="pq-cat">{{ item.uh.tipo.nome }}</div>
+          <div class="pq-cap"><span class="pq-ok">✓ acomoda</span> — {{ item.capacidade }}</div>
+          {% if item.arranjo %}<div class="pq-montagem">🛏️ {{ item.arranjo.montagem }}</div>{% endif %}
+          {% for ponto in item.pontos_atencao %}<span class="pq-selo-at">⚠️ {{ ponto }}</span>{% endfor %}
+        </div>
+        <div class="pq-preco">
+          {% if item.total %}
+            <div class="v num">R$ {{ item.total|floatformat:0 }}</div>
+            <div class="l">{{ item.noites }} noite{{ item.noites|pluralize }} · R$ {{ item.diaria|floatformat:0 }}/noite</div>
+            <div class="pq-venda">Pix <b>R$ {{ item.total_pix|floatformat:0 }}</b> (−{{ item.desconto_pix|floatformat:0 }}%)<br>ou {{ item.parcelas_max }}× R$ {{ item.parcela_valor|floatformat:0 }}</div>
+          {% else %}
+            <div class="v num">R$ {{ item.diaria|floatformat:0 }}</div>
+            <div class="l">a partir de / noite</div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="pq-acoes">
+        <button type="button" class="botao-neutro botao-mini" @click="ficha=!ficha">Ver ficha <span x-text="ficha?'▴':'▾'"></span></button>
+        <button type="button" class="botao-primario botao-mini"
+                @click="fetch('{% url 'comercial:oferecer_quarto' op.pk item.uh.pk %}',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}'}}).then(r=>r.json()).then(d=>texto=d.texto)">
+          Enviar ao cliente
+        </button>
+        <label class="pq-cmp-check"><input type="checkbox" :checked="sel.includes({{ item.uh.pk }})" @change="toggle({{ item.uh.pk }})"> Comparar</label>
+      </div>
+
+      {# ficha completa #}
+      <div class="pq-ficha" x-show="ficha" x-cloak>
+        {% if item.total %}
+        <div class="pq-linha"><span class="k">Hospedagem ({{ item.noites }} noite{{ item.noites|pluralize }})</span><span class="val num">R$ {{ item.hospedagem|floatformat:2 }}</span></div>
+        {% if item.iss %}<div class="pq-linha"><span class="k">ISS</span><span class="val num">R$ {{ item.iss|floatformat:2 }}</span></div>{% endif %}
+        {% if item.taxa_turismo %}<div class="pq-linha"><span class="k">Taxa de turismo</span><span class="val num">R$ {{ item.taxa_turismo|floatformat:2 }}</span></div>{% endif %}
+        <div class="pq-linha pq-linha-total"><span class="k">Total</span><span class="val num">R$ {{ item.total|floatformat:2 }}</span></div>
+        {% if item.iss or item.taxa_turismo %}<div class="pq-ficha-nota">ISS e taxa de turismo quitados no check-out.</div>{% endif %}
+        {% endif %}
+        <div class="pq-linha"><span class="k">Acomodação</span><span class="val">{{ item.camas }}</span></div>
+        {% if item.uh.tipo %}<div class="pq-linha"><span class="k">Tipo</span><span class="val">{{ item.uh.tipo.nome }}</span></div>{% endif %}
+        {% if item.uh.ar_condicionado %}<div class="pq-linha"><span class="k">Ar-condicionado</span><span class="val">Sim</span></div>{% endif %}
+        {% if item.uh.vista_lago %}<div class="pq-linha"><span class="k">Vista</span><span class="val">Lago</span></div>{% endif %}
+        {% if item.ficha.indicado_para %}<div class="pq-linha"><span class="k">Indicado para</span><span class="val">{{ item.ficha.indicado_para }}</span></div>{% endif %}
+        {% if item.uh.diferenciais %}<div class="pq-linha"><span class="k">Diferenciais</span><span class="val">{{ item.uh.diferenciais }}</span></div>{% endif %}
+        {% if item.uh.banheiro %}<div class="pq-linha"><span class="k">Banheiro</span><span class="val">{{ item.uh.banheiro }}</span></div>{% endif %}
+        {% if item.uh.area_externa %}<div class="pq-linha"><span class="k">Área externa</span><span class="val">{{ item.uh.area_externa }}</span></div>{% endif %}
+        {% if item.uh.acessibilidade %}<div class="pq-linha"><span class="k">Acessibilidade</span><span class="val">{{ item.uh.acessibilidade }}</span></div>{% endif %}
+        {% for rotulo in item.campos_a_levantar %}
+        <div class="pq-linha"><span class="k">{{ rotulo }}</span><span class="val pq-naoconf">não confirmado <span class="tag">A LEVANTAR</span></span></div>
+        {% endfor %}
+      </div>
+
+      {# texto pronto pro WhatsApp #}
+      <div class="pq-wpp" x-show="texto" x-cloak>
+        <div class="t">💬 Texto pronto pro WhatsApp <span class="pq-wpp-nota">— sem pontos de atenção nem «a levantar»</span></div>
+        <div class="msg" x-text="texto"></div>
+        <div class="pq-wpp-acoes">
+          <button type="button" class="botao-primario botao-mini"
+                  @click="navigator.clipboard.writeText(texto); $el.textContent='Copiado ✓'">Copiar</button>
+          <button type="button" class="botao-neutro botao-mini"
+                  @click="fetch('{% url 'comercial:whatsapp_enviar' op.pk %}',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}','X-Requested-With':'XMLHttpRequest','Content-Type':'application/x-www-form-urlencoded'},body:'texto='+encodeURIComponent(texto)}).then(r=>r.json()).then(d=>{$el.textContent=d.ok?'Enviado ✓':'Falhou'; if(!d.ok&&d.erro)alert(d.erro)})">Enviar no WhatsApp</button>
+          <button type="button" class="botao-neutro botao-mini" @click="texto=''">Fechar</button>
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <p class="pq-vazio">Nenhum quarto comporta essa composição{% if painel_quartos.tem_datas %} nas datas escolhidas{% endif %}. Ajuste em «Editar».</p>
+    {% endfor %}
+  </div>
+
+  {# ---- lotou? datas vizinhas com vaga (#5) ---- #}
+  {% if painel_quartos.datas_alternativas %}
+  <div class="pq-vizinhas">
+    <div class="t">📅 Lotou nessas datas — mas tem vaga por perto:</div>
+    <div class="pq-vizinhas-chips">
+      {% for alt in painel_quartos.datas_alternativas %}
+      <button type="button" class="pq-chip"
+              @click="editar=true; $nextTick(()=>{ const f=$root.querySelector('.pq-form'); f.querySelector('[name=checkin]').value='{{ alt.checkin|date:'Y-m-d' }}'; f.querySelector('[name=checkout]').value='{{ alt.checkout|date:'Y-m-d' }}'; })">
+        {{ alt.checkin|date:"d/m" }}–{{ alt.checkout|date:"d/m" }} · {{ alt.qtd }} livre{{ alt.qtd|pluralize }}
+      </button>
+      {% endfor %}
+    </div>
+    <div class="pq-vizinhas-nota">Clique numa data → ajusta o filtro; confira e aplique.</div>
+  </div>
+  {% endif %}
+
+  {# A: mostra só os 6 melhores encaixes por padrão #}
+  {% if painel_quartos.servem|length > 6 %}
+  <button type="button" class="pq-vertodos" @click="mostrarTodos=!mostrarTodos"
+          x-text="mostrarTodos ? '▴ Ver menos' : '▾ Ver todos os {{ painel_quartos.servem|length }} que servem'"></button>
+  {% endif %}
+
+  {# barra de comparação (aparece com 2+ selecionados) #}
+  <div class="pq-cmp-bar" x-show="sel.length>=2" x-cloak>
+    <span x-text="sel.length + ' quartos selecionados'"></span>
+    <button type="button" class="botao-primario botao-mini" @click="comparar()">Comparar ⇄</button>
+    <button type="button" class="botao-neutro botao-mini" @click="proposta()">Proposta (1 msg) 💬</button>
+    <button type="button" class="botao-neutro botao-mini" @click="sel=[]">Limpar</button>
+  </div>
+
+  {# proposta com 2–3 quartos numa mensagem só #}
+  <div class="pq-wpp" x-show="propostaTexto" x-cloak style="margin-top:10px">
+    <div class="t">💬 Proposta pro WhatsApp <span class="pq-wpp-nota">— as opções selecionadas numa mensagem</span></div>
+    <div class="msg" x-text="propostaTexto"></div>
+    <div class="pq-wpp-acoes">
+      <button type="button" class="botao-primario botao-mini"
+              @click="navigator.clipboard.writeText(propostaTexto); $el.textContent='Copiado ✓'">Copiar</button>
+      <button type="button" class="botao-neutro botao-mini"
+              @click="fetch('{% url 'comercial:whatsapp_enviar' op.pk %}',{method:'POST',headers:{'X-CSRFToken':'{{ csrf_token }}','X-Requested-With':'XMLHttpRequest','Content-Type':'application/x-www-form-urlencoded'},body:'texto='+encodeURIComponent(propostaTexto)}).then(r=>r.json()).then(d=>{$el.textContent=d.ok?'Enviado ✓':'Falhou'; if(!d.ok&&d.erro)alert(d.erro)})">Enviar no WhatsApp</button>
+      <button type="button" class="botao-neutro botao-mini" @click="propostaTexto=''">Fechar</button>
+    </div>
+  </div>
+
+  {# ---- ocupados com alternativa ---- #}
+  {% if painel_quartos.ocupados %}
+  <div class="pq-ocupados-titulo">Indisponíveis no período</div>
+  <div class="pq-lista">
+    {% for item in painel_quartos.ocupados %}
+    <div class="pq-card pq-ocupado">
+      <div class="pq-card-topo" style="cursor:default">
+        <div class="pq-info">
+          <div class="pq-nome">{{ item.nome }}{% if item.nome != item.uh.numero %} <span class="pq-num">· {{ item.uh.numero }}</span>{% endif %}</div>
+          <div class="pq-cat">{{ item.uh.tipo.nome }}</div>
+          {% if item.motivo == "sem_colchao" %}
+            <span class="pq-selo-at pq-selo-eq">sem colchão extra p/ essa lotação{% if item.equivalentes %} · veja {{ item.equivalentes|join:", " }}{% endif %}</span>
+          {% elif item.equivalentes %}
+            <span class="pq-selo-at pq-selo-eq">ocupado · veja {{ item.equivalentes|join:", " }}</span>
+          {% else %}
+            <span class="pq-selo-at pq-selo-eq">ocupado no período</span>
+          {% endif %}
+        </div>
+        <div class="pq-preco"><div class="v num pq-mudo">—</div><div class="l">{% if item.motivo == "sem_colchao" %}sem colchão{% else %}ocupado{% endif %}</div></div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# modal de comparação #}
+  <div class="pq-modal" x-show="comparando" x-cloak @click.self="comparando=false">
+    <div class="pq-modal-card">
+      <div class="pq-modal-head"><b>Comparar quartos</b><button type="button" class="pq-modal-x" @click="comparando=false">✕</button></div>
+      <div class="pq-modal-body" x-html="cmpHtml"></div>
+    </div>
+  </div>
+
+</div>

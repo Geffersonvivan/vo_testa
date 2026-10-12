@@ -180,6 +180,32 @@ def dashboard(request):
                 "detalhe": "conta zerada, só finalizar o check-out",
                 "url": reverse("reservas:lista") + "?saida=vencida_quitada",
             })
+        # Colchões extra no limite/esgotados nas próximas noites.
+        from apps.reservas.services import colchoes_alertas_proximos
+
+        alerta_colchoes = colchoes_alertas_proximos()
+        if alerta_colchoes:
+            esg = len(alerta_colchoes["esgotadas"])
+            ap = len(alerta_colchoes["apertadas"])
+            if esg:
+                noites = ", ".join(
+                    f"{l['noite']:%d/%m}" for l in alerta_colchoes["esgotadas"][:4])
+                atencao.append({
+                    "nivel": "alerta",
+                    "rotulo": f"Colchões extra esgotados em {esg} noite{'s' if esg > 1 else ''}",
+                    "detalhe": f"sem extra para novas lotações em {noites}",
+                    "url": reverse("reservas:painel_colchoes"),
+                })
+            if ap:
+                noites = ", ".join(
+                    f"{l['noite']:%d/%m}" for l in alerta_colchoes["apertadas"][:4])
+                atencao.append({
+                    "nivel": "aviso",
+                    "rotulo": f"Colchões extra no limite em {ap} noite{'s' if ap > 1 else ''}",
+                    "detalhe": f"resta pouco em {noites}",
+                    "url": reverse("reservas:painel_colchoes"),
+                })
+
         if tem_graficos:
             graficos.update(dados_graficos())
 
@@ -663,6 +689,20 @@ def _vitrine_do_quarto(request, uh):
     return vitrine, VitrineQuartoForm(dados, arquivos, instance=vitrine)
 
 
+def _ficha_comercial_do_quarto(request, uh):
+    """(ficha, form) da copy comercial do quarto — editada no mesmo lugar. Só para
+    hospedagem e com o quarto salvo. Lazy import para não inverter a dependência
+    (núcleo → comercial)."""
+    if uh is None or uh.tipo.modalidade == uh.tipo.Modalidade.DAY_USE:
+        return None, None
+    from apps.comercial.forms import FichaComercialForm
+    from apps.comercial.models import FichaComercial
+
+    ficha, _ = FichaComercial.objects.get_or_create(uh=uh)
+    dados = request.POST if request.method == "POST" else None
+    return ficha, FichaComercialForm(dados, instance=ficha)
+
+
 @requer_area(Area.QUARTOS)
 def uh_form(request, pk=None):
     from .estrutura import capacidade, descricao_camas
@@ -674,6 +714,7 @@ def uh_form(request, pk=None):
         config, _ = ConfiguracaoUH.objects.get_or_create(uh=uh)
 
     vitrine, vitrine_form = _vitrine_do_quarto(request, uh)
+    ficha_com, ficha_com_form = _ficha_comercial_do_quarto(request, uh)
 
     form = UHForm(request.POST or None, instance=uh)
     config_form = ConfiguracaoUHForm(request.POST or None, instance=config)
@@ -687,14 +728,17 @@ def uh_form(request, pk=None):
             config_form = ConfiguracaoUHForm(request.POST, instance=config)
             formset = PosicaoCamaFormSet(request.POST, instance=uh)
             vitrine, vitrine_form = _vitrine_do_quarto(request, uh)
+            ficha_com, ficha_com_form = _ficha_comercial_do_quarto(request, uh)
             if config_form.is_valid() and formset.is_valid() and (
                 vitrine_form is None or vitrine_form.is_valid()
-            ):
+            ) and (ficha_com_form is None or ficha_com_form.is_valid()):
                 config_form.save()
                 formset.save()
                 _salvar_tarifas_quarto(request, uh)
                 if vitrine_form is not None:
                     vitrine_form.save()
+                if ficha_com_form is not None:
+                    ficha_com_form.save()
                 messages.success(request, f"Quarto {uh.numero} salvo.")
                 return redirect("estrutura")
 
@@ -703,6 +747,7 @@ def uh_form(request, pk=None):
         "config_form": config_form,
         "formset": formset,
         "vitrine_form": vitrine_form,
+        "ficha_comercial_form": ficha_com_form,
         "uh": uh,
         "titulo": "Quarto",
         "voltar": "estrutura",

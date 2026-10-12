@@ -36,7 +36,9 @@ def capacidade(uh) -> dict:
     """
     if _eh_day_use(uh):
         return _vazia()
-    fixa = uh.posicoes_cama.count() * 2
+    # len(all()) em vez de count(): aproveita o prefetch_related quando houver
+    # (evita um COUNT por chamada — a capacidade é consultada várias vezes por UH).
+    fixa = len(uh.posicoes_cama.all()) * 2
     cfg = getattr(uh, "config", None)
     tem_sofa = bool(cfg and cfg.tem_sofa_cama)
     sofa_a = cfg.sofa_adultos if tem_sofa else 0
@@ -89,6 +91,24 @@ def descricao_camas(uh) -> str:
         else:
             partes.append("até 1 colchão de solteiro extra")
     return " · ".join(partes)
+
+
+def casais_max(uh) -> int:
+    """Máximo de camas de casal do quarto = nº de posições de cama (cada uma = 1 casal).
+
+    Base de colchões garantida do quarto = 2 × casais_max (ver estoque de colchões).
+    """
+    return len(uh.posicoes_cama.all())
+
+
+def camas_solteiro(uh) -> int:
+    """Total de camas de solteiro que o quarto comporta = base (2 por casal) + extras.
+
+    Regra do estoque de colchões (docs/Reservas): casal = 2 colchões de solteiro.
+    """
+    cfg = getattr(uh, "config", None)
+    extras = cfg.max_colchoes_extras if cfg else 0
+    return 2 * casais_max(uh) + extras
 
 
 def extras_para(uh, pessoas: int) -> int:

@@ -272,6 +272,16 @@ class TipoUH(models.Model):
         help_text="Hospedagem = pernoite nos 24 quartos. Day use = Dia na Pousada "
                   "(mesma reserva/conta/consumo, sem pernoite).",
     )
+    pessoa_adicional = models.DecimalField(
+        "pessoa adicional (R$)", max_digits=10, decimal_places=2, default=Decimal("0.00"),
+        help_text="Valor por adulto além dos 2 da diária-base (Manual §2). "
+                  "Criança 6-15 paga metade; ≤5 não paga.",
+    )
+    preco_day_use = models.DecimalField(
+        "preço do day use por pessoa (R$)", max_digits=10, decimal_places=2,
+        default=Decimal("0.00"),
+        help_text="Só para a modalidade Day use: valor cobrado por pessoa no dia.",
+    )
     ativo = models.BooleanField("ativo", default=True)
 
     class Meta:
@@ -302,6 +312,11 @@ class UH(models.Model):
         SOLTEIRO_2 = "2solteiros", "Dois solteiros"
         MISTO = "misto", "Casal + solteiro"
 
+    class Layout(models.TextChoices):
+        SEPARADO = "separado", "Quarto e cozinha separados"
+        CONJUGADO = "conjugado", "Quarto e cozinha no mesmo ambiente"
+        MEIA_DIVISAO = "meia_divisao", "Separados por meia parede"
+
     numero = models.CharField("número", max_length=20, unique=True)
     nome_tematico = models.CharField(
         "nome temático", max_length=60, blank=True,
@@ -329,9 +344,26 @@ class UH(models.Model):
     tipo_cama = models.CharField(
         "tipo de cama", max_length=12, choices=Cama.choices, blank=True
     )
+    layout = models.CharField(
+        "layout", max_length=12, choices=Layout.choices, blank=True,
+        help_text="Disposição quarto × cozinha (separado, conjugado ou meia parede).",
+    )
     diferenciais = models.TextField(
         "diferenciais", blank=True,
         help_text="Destaques livres do quarto (ex.: rede na varanda, banheira NÃO).",
+    )
+    # Detalhes do descritivo (texto livre; vazio = "a levantar" no painel do lead).
+    banheiro = models.CharField(
+        "banheiro", max_length=160, blank=True,
+        help_text="Ex.: 1 banheiro com box, chuveiro e secador.",
+    )
+    area_externa = models.CharField(
+        "área externa", max_length=160, blank=True,
+        help_text="Ex.: sacada, deck, varanda ou churrasqueira.",
+    )
+    acessibilidade = models.CharField(
+        "acessibilidade", max_length=200, blank=True,
+        help_text="O que é adaptado (complementa o marcador PCD acima).",
     )
     tarifa_override = models.DecimalField(
         "tarifa própria (R$)", max_digits=10, decimal_places=2,

@@ -108,6 +108,14 @@ class Oportunidade(models.Model):
     checkout_previsto = models.DateField("check-out previsto", null=True, blank=True)
     quartos = models.PositiveSmallIntegerField("quartos", default=1)
     hospedes = models.PositiveSmallIntegerField("hóspedes", default=2)
+    # Composição separada — a regra do sofá-cama (1 adulto ou 2 crianças) exige
+    # adultos e crianças distintos, nunca um "pax" só. `hospedes` fica como total.
+    adultos = models.PositiveSmallIntegerField("adultos", default=2)
+    criancas = models.PositiveSmallIntegerField("crianças", default=0)
+    idades_criancas = models.JSONField(
+        "idades das crianças", default=list, blank=True,
+        help_text="Lista de idades; criança acima do limite do sofá conta como adulto.",
+    )
     responsavel = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="oportunidades", verbose_name="responsável",
@@ -966,3 +974,40 @@ class CampanhaEmail(models.Model):
 
     def __str__(self):
         return self.nome
+
+
+class FichaComercial(models.Model):
+    """Descritivo COMERCIAL de um quarto (o que a vendedora fala/não fala).
+
+    NÃO é a fonte da capacidade nem do nome — isso vem da UH (`nome_tematico`,
+    `ConfiguracaoUH`/`estrutura.py`), da vitrine do site (foto/tour/metragem) e da
+    `TarifaUnidade` (preço). Aqui vive só o que não existe em lugar nenhum: a copy
+    de venda, os pontos de atenção e o rastro do que ainda é "a levantar".
+    """
+
+    uh = models.OneToOneField(
+        "nucleo.UH", on_delete=models.CASCADE,
+        related_name="ficha_comercial", verbose_name="quarto",
+    )
+    resumo = models.CharField(
+        "resumo de venda", max_length=200, blank=True,
+        help_text="Frase curta que abre a oferta (vai pro texto do WhatsApp).",
+    )
+    indicado_para = models.CharField("indicado para", max_length=160, blank=True)
+    pontos_atencao = models.JSONField(
+        "pontos de atenção", default=list, blank=True,
+        help_text="Lista de avisos que a recepção/vendedora dá ANTES (escada, "
+                  "colchão apertado, vista parcial). Nunca vão no texto ao cliente.",
+    )
+    historia_e_venda = models.TextField("história do nome e argumento", blank=True)
+    # Rastro do descritivo: nomes de campos já conferidos. Campo fora daqui =
+    # "não confirmado — não prometa".
+    confirmados = models.JSONField("campos confirmados", default=list, blank=True)
+    atualizado_em = models.DateTimeField("atualizado em", auto_now=True)
+
+    class Meta:
+        verbose_name = "ficha comercial do quarto"
+        verbose_name_plural = "fichas comerciais dos quartos"
+
+    def __str__(self):
+        return f"Ficha comercial — {self.uh}"

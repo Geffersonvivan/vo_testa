@@ -76,7 +76,9 @@ class PessoaAdmin(admin.ModelAdmin):
 
 @admin.register(TipoUH)
 class TipoUHAdmin(admin.ModelAdmin):
-    list_display = ["nome", "modalidade", "capacidade", "tarifa_base", "ativo"]
+    list_display = ["nome", "modalidade", "capacidade", "tarifa_base",
+                    "pessoa_adicional", "preco_day_use", "ativo"]
+    list_editable = ["pessoa_adicional", "preco_day_use"]
     list_filter = ["modalidade", "ativo"]
 
 

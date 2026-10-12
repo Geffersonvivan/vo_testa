@@ -1218,3 +1218,22 @@ class SistemaHelpersTests(TestCase):
         with transaction.atomic():
             travar(p)
         self.assertEqual(p.nome, "Novo")               # a instância foi recarregada
+
+
+class NomesQuartosTests(TestCase):
+    """Sem nomes temáticos: os quartos exibem só o número ('Quarto N')."""
+
+    def test_limpar_nomes_e_exibicao_por_numero(self):
+        from decimal import Decimal
+
+        from django.core.management import call_command
+
+        from apps.nucleo.models import TipoUH, UH
+        tipo = TipoUH.objects.create(nome="Padrão N", tarifa_base=Decimal("100"))
+        uh = UH.objects.create(numero="Quarto 11", tipo=tipo,
+                               nome_tematico="Celeiro do Moleiro")
+        call_command("limpar_nomes_quartos", verbosity=0)
+        uh.refresh_from_db()
+        self.assertEqual(uh.nome_tematico, "")
+        # `numero` já é "Quarto 11" — o fallback é o próprio número, sem duplicar "Quarto".
+        self.assertEqual(uh.nome_tematico or uh.numero, "Quarto 11")

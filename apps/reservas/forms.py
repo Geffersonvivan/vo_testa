@@ -17,7 +17,9 @@ class ReservaForm(forms.ModelForm):
         model = Reserva
         fields = [
             "hospede", "uh", "checkin", "checkout",
-            "adultos", "criancas", "canal",
+            "adultos", "criancas_0_5", "criancas_6_15",
+            "casais", "solteiros", "usa_sofa_cama", "usa_berco",
+            "cobra_iss", "cobra_taxa_turismo", "canal",
             "faturamento", "titular", "valor_diaria", "observacoes",
         ]
         widgets = {
@@ -52,6 +54,12 @@ class ReservaForm(forms.ModelForm):
         self.fields["valor_diaria"].help_text = (
             "Deixe em branco para usar a tarifa vigente do período."
         )
+        # Arranjo de camas: vazio = o sistema sugere a partir de adultos/crianças.
+        for campo in ("casais", "solteiros", "criancas_0_5", "criancas_6_15"):
+            self.fields[campo].required = False
+        self.fields["casais"].help_text = "Em branco: o sistema sugere o arranjo."
+        self.fields["criancas_6_15"].help_text = "Pagam metade da pessoa adicional."
+        self.fields["criancas_0_5"].help_text = "Não pagam (Manual §2)."
 
     def clean(self):
         dados = super().clean()
@@ -63,6 +71,40 @@ class ReservaForm(forms.ModelForm):
             )
         if faturamento == Reserva.Faturamento.PARTICULAR:
             dados["titular"] = None
+
+        # Faixas: vazio = 0 (campos opcionais). Total mantém Reserva.criancas coerente.
+        dados["criancas_0_5"] = dados.get("criancas_0_5") or 0
+        dados["criancas_6_15"] = dados.get("criancas_6_15") or 0
+        dados["criancas"] = dados["criancas_0_5"] + dados["criancas_6_15"]
+
+        # Arranjo de camas: sugere se vier vazio e confere a ESTRUTURA do quarto
+        # (a trava global de colchões extra por noite é checada na view, com lock).
+        from apps.reservas import colchoes as _colchoes
+
+        uh = dados.get("uh")
+        if uh and _colchoes.configurado(uh):
+            adultos = dados.get("adultos") or 0
+            criancas = dados.get("criancas") or 0
+            casais, solteiros = dados.get("casais"), dados.get("solteiros")
+            if casais is None and solteiros is None:
+                arr = _colchoes.sugerir_arranjo(uh, adultos, criancas)
+                dados["casais"], dados["solteiros"] = arr.casais, arr.solteiros
+                if not dados.get("usa_sofa_cama"):
+                    dados["usa_sofa_cama"] = arr.usa_sofa_cama
+            else:
+                dados["casais"] = int(casais or 0)
+                dados["solteiros"] = int(solteiros or 0)
+            for erro in _colchoes.cabe_no_quarto(
+                uh, dados["casais"], dados["solteiros"],
+                bool(dados.get("usa_sofa_cama")), adultos, criancas):
+                self.add_error(None, erro)
+        else:
+            # Quarto fora do modelo de colchões (sem camas configuradas/day use):
+            # mantém defaults sensatos em vez de None (campos opcionais no form).
+            if dados.get("casais") is None:
+                dados["casais"] = 1
+            if dados.get("solteiros") is None:
+                dados["solteiros"] = 0
         return dados
 
 
@@ -111,6 +153,20 @@ class CancelamentoForm(forms.Form):
     motivo = forms.CharField(
         label="Motivo do cancelamento", widget=forms.Textarea(attrs={"rows": 2})
     )
+
+
+class TransferenciaForm(forms.Form):
+    """Reagendar a reserva (1ª opção de cancelamento) — novas datas."""
+
+    checkin = forms.DateField(label="Nova entrada", widget=DataInput())
+    checkout = forms.DateField(label="Nova saída", widget=DataInput())
+
+    def clean(self):
+        dados = super().clean()
+        ci, co = dados.get("checkin"), dados.get("checkout")
+        if ci and co and co <= ci:
+            self.add_error("checkout", "A saída deve ser depois da entrada.")
+        return dados
 
 
 class AcompanhanteForm(forms.ModelForm):

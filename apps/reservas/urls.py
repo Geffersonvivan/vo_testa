@@ -28,6 +28,7 @@ urlpatterns = [
     path("<int:pk>/checkin/", views.fazer_checkin, name="checkin"),
     path("<int:pk>/checkout/", views.fazer_checkout, name="checkout"),
     path("<int:pk>/cancelar/", views.cancelar, name="cancelar"),
+    path("<int:pk>/transferir/", views.transferir, name="transferir"),
     path("<int:pk>/trocar/", views.trocar_quarto, name="trocar_quarto"),
     path("<int:pk>/no-show/", views.no_show, name="no_show"),
     path("<int:pk>/lancamento/", views.lancamento_novo, name="lancamento_novo"),
@@ -37,4 +38,5 @@ urlpatterns = [
     path("<int:pk>/fnrh/", views.fnrh, name="fnrh"),
     path("<int:pk>/fnrh/reenviar/", views.fnrh_reenviar, name="fnrh_reenviar"),
     path("boh/", views.boh, name="boh"),
+    path("colchoes/", views.painel_colchoes, name="painel_colchoes"),
 ]

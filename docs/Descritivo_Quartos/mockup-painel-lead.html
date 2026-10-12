@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mock-up — Descritivo na conversa do lead · Vô Testa</title>
+<style>
+  :root{
+    --canvas:#FAF7F2; --superficie:#FFFFFF; --lampiao:#C69A3E; --lampiao-fraco:#F5ECD8;
+    --noturno:#1E2A2F; --madeira:#8A5A2B; --tinta:#23201B; --tinta-suave:#7A736A;
+    --fio:#ECE5D9; --fio-forte:#DcD2C2;
+    --sucesso:#2E7D5B; --sucesso-bg:#E7F2EC; --alerta:#B7791F; --alerta-bg:#FBF1DD;
+    --perigo:#B4462F; --perigo-bg:#F7E7E2; --info:#3B6EA5; --info-bg:#E7EEF6;
+    --raio-p:10px; --raio:14px; --raio-g:20px;
+    --sombra-1:0 1px 2px rgba(30,20,10,.06);
+    --sombra-cartao:0 1px 2px rgba(30,20,10,.04), 0 10px 26px rgba(30,20,10,.07);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--canvas);color:var(--tinta);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
+    font-size:14px;line-height:1.45}
+  .num{font-variant-numeric:tabular-nums}
+  .topbar{height:52px;background:var(--noturno);display:flex;align-items:center;
+    gap:12px;padding:0 18px;color:#EFE9DE}
+  .topbar .logo{font-weight:700;letter-spacing:.02em}
+  .topbar .crumbs{color:#B9B0A2;font-size:12.5px}
+  .wrap{display:grid;grid-template-columns:1fr 430px;gap:18px;padding:18px;
+    max-width:1280px;margin:0 auto;align-items:start}
+
+  /* ---------- Coluna esquerda: a conversa ---------- */
+  .conversa{background:var(--superficie);border:1px solid var(--fio);
+    border-radius:var(--raio);box-shadow:var(--sombra-cartao);overflow:hidden}
+  .lead-head{padding:14px 16px;border-bottom:1px solid var(--fio)}
+  .lead-nome{font-size:17px;font-weight:700;letter-spacing:-.01em}
+  .lead-sub{color:var(--tinta-suave);font-size:12.5px;margin-top:2px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+  .chip{background:var(--lampiao-fraco);color:var(--madeira);border:1px solid #E9DCBE;
+    padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600}
+  .etapa{margin-left:auto}
+  .thread{padding:16px;display:flex;flex-direction:column;gap:10px;min-height:340px;
+    background:linear-gradient(180deg,#FCFAF6,#FAF7F2)}
+  .bolha{max-width:74%;padding:9px 12px;border-radius:14px;font-size:13px;
+    box-shadow:var(--sombra-1)}
+  .deles{background:#fff;border:1px solid var(--fio);align-self:flex-start;border-bottom-left-radius:4px}
+  .nossa{background:#E4F0E4;align-self:flex-end;border-bottom-right-radius:4px}
+  .hora{display:block;font-size:10px;color:var(--tinta-suave);margin-top:3px;text-align:right}
+  .composer{display:flex;gap:8px;padding:12px 14px;border-top:1px solid var(--fio)}
+  .composer input{flex:1;border:1px solid var(--fio-forte);border-radius:999px;
+    padding:9px 14px;font-size:13px;outline:none}
+  .composer input:focus{border-color:var(--lampiao);box-shadow:0 0 0 3px rgba(198,154,62,.18)}
+
+  /* ---------- Coluna direita: painel de quartos ---------- */
+  .painel{background:var(--superficie);border:1px solid var(--fio);
+    border-radius:var(--raio);box-shadow:var(--sombra-cartao);position:sticky;top:18px}
+  .painel-head{padding:13px 15px;border-bottom:1px solid var(--fio);display:flex;
+    align-items:center;gap:8px}
+  .painel-head h2{font-size:13px;margin:0;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--tinta-suave);font-weight:700}
+  .badge-count{margin-left:auto;background:var(--sucesso-bg);color:var(--sucesso);
+    font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+  .filtro{padding:11px 15px;border-bottom:1px solid var(--fio);display:flex;
+    align-items:center;gap:8px;font-size:12.5px;background:#FCFAF6}
+  .filtro b{font-weight:700}
+  .filtro .editar{margin-left:auto;color:var(--info);font-weight:600;cursor:pointer;font-size:12px}
+
+  .alerta-topo{margin:12px 15px 4px;background:var(--alerta-bg);border:1px solid #EAD6A8;
+    border-radius:var(--raio-p);padding:9px 11px;font-size:12px;color:#7c531a}
+  .alerta-topo .t{font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:4px}
+  .alerta-topo ul{margin:0;padding-left:18px} .alerta-topo li{margin:2px 0}
+
+  .lista{padding:12px 15px;display:flex;flex-direction:column;gap:11px;
+    max-height:none}
+  .cartao-q{border:1px solid var(--fio);border-radius:var(--raio-p);overflow:hidden;
+    transition:border-color .15s,box-shadow .15s}
+  .cartao-q:hover{border-color:var(--fio-forte);box-shadow:var(--sombra-1)}
+  .cq-topo{display:flex;gap:11px;padding:11px 12px;cursor:pointer;align-items:flex-start}
+  .cq-foto{width:58px;height:58px;border-radius:8px;flex:none;
+    background:linear-gradient(135deg,#E9DFCB,#D9C9A6);display:flex;align-items:center;
+    justify-content:center;font-size:22px}
+  .cq-info{flex:1;min-width:0}
+  .cq-nome{font-weight:700;font-size:13.5px;letter-spacing:-.01em}
+  .cq-cat{color:var(--tinta-suave);font-size:11.5px;margin-top:1px}
+  .cq-cap{font-size:12px;margin-top:5px;color:#4a453d}
+  .cq-cap .ok{color:var(--sucesso);font-weight:600}
+  .cq-preco{text-align:right;flex:none}
+  .cq-preco .v{font-weight:700;font-size:14.5px;letter-spacing:-.02em}
+  .cq-preco .l{font-size:10px;color:var(--tinta-suave);text-transform:uppercase;letter-spacing:.04em}
+  .selo-at{display:inline-flex;align-items:center;gap:4px;background:var(--alerta-bg);
+    color:#7c531a;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:999px;margin-top:6px}
+  .selo-eq{background:var(--info-bg);color:var(--info)}
+
+  .cq-acoes{display:flex;gap:6px;padding:0 12px 11px;flex-wrap:wrap}
+  .btn{border:1px solid var(--fio-forte);background:#fff;border-radius:8px;padding:6px 10px;
+    font-size:12px;font-weight:600;cursor:pointer;color:var(--tinta);transition:.12s}
+  .btn:hover{background:#FAF6EE}
+  .btn:active{transform:translateY(1px)}
+  .btn-primario{background:var(--lampiao);border-color:var(--lampiao);color:#3a2c0c}
+  .btn-primario:hover{filter:brightness(1.04)}
+
+  /* ficha expandida */
+  .ficha{border-top:1px dashed var(--fio-forte);padding:12px;background:#FCFAF6;display:none}
+  .ficha.aberta{display:block}
+  .ficha h4{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--tinta-suave)}
+  .linha{display:flex;padding:5px 0;border-bottom:1px solid var(--fio);font-size:12.5px;gap:10px}
+  .linha:last-child{border-bottom:0}
+  .linha .k{width:120px;flex:none;color:var(--tinta-suave)}
+  .linha .val{flex:1}
+  .naoconf{color:#A99F90;font-style:italic}
+  .naoconf .tag{font-style:normal;font-size:10px;background:#EFEAE1;color:#8a8074;
+    padding:1px 6px;border-radius:999px;margin-left:6px;font-weight:600}
+
+  /* ocupado */
+  .cartao-q.ocupado{opacity:.72;background:#FBF9F5}
+  .cartao-q.ocupado .cq-foto{filter:grayscale(.6)}
+
+  /* barra comparar */
+  .comparar{margin:2px 15px 14px;border:1px dashed var(--fio-forte);border-radius:var(--raio-p);
+    padding:9px 11px;font-size:12px;color:var(--tinta-suave);display:flex;align-items:center;gap:8px}
+
+  /* preview whatsapp */
+  .wpp{margin:0 15px 16px;border:1px solid #CDE3C6;background:#EAF4E5;border-radius:var(--raio-p);
+    padding:12px;display:none}
+  .wpp.aberto{display:block}
+  .wpp .t{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#3a7a4f;
+    font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .wpp .msg{background:#fff;border-radius:10px;padding:11px 12px;font-size:12.5px;
+    white-space:pre-wrap;line-height:1.5;border:1px solid #DCEBD5}
+  .wpp .nota{font-size:11px;color:#5f7a62;margin-top:8px}
+  .wpp-acoes{display:flex;gap:6px;margin-top:9px}
+
+  .rodape-nota{max-width:1280px;margin:6px auto 26px;padding:0 18px;color:var(--tinta-suave);
+    font-size:12px}
+  .legenda{display:flex;gap:16px;flex-wrap:wrap;margin-top:6px}
+  .legenda span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:10px;height:10px;border-radius:3px;display:inline-block}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo">🏮 Vô Testa CRM</span>
+  <span class="crumbs">Comercial › Funil › <b style="color:#EFE9DE">Família Souza</b></span>
+</div>
+
+<div class="wrap">
+
+  <!-- ================= CONVERSA ================= -->
+  <section class="conversa">
+    <div class="lead-head">
+      <div style="display:flex;align-items:center">
+        <div>
+          <div class="lead-nome">Família Souza</div>
+          <div class="lead-sub">📱 (49) 99123-4567 · veio da LP «Feriadão» · resp.: gvivan</div>
+        </div>
+        <span class="chip etapa" style="background:#E7EEF6;color:#3B6EA5;border-color:#CADBEE">● Cotação enviada</span>
+      </div>
+      <div class="chips">
+        <span class="chip">👨‍👩‍👧‍👦 4 adultos + 2 crianças</span>
+        <span class="chip">🧒 8 e 12 anos</span>
+        <span class="chip">📅 12–15 set · 3 noites</span>
+      </div>
+    </div>
+
+    <div class="thread">
+      <div class="bolha deles">Oi! Vamos em 4 adultos e 2 crianças (8 e 12). Vocês têm algo pro feriado de setembro?<span class="hora">14:02</span></div>
+      <div class="bolha nossa">Oi, Marina! Temos sim 🙌 Deixa eu ver as melhores opções pra vocês…<span class="hora">14:03</span></div>
+      <div class="bolha deles">A gente queria cozinha e espaço pras crianças 😊<span class="hora">14:04</span></div>
+      <div class="bolha nossa" style="opacity:.6;font-style:italic">✍️ (a vendedora consulta o painel ao lado →)<span class="hora">agora</span></div>
+    </div>
+
+    <div class="composer">
+      <input placeholder="Escreva uma mensagem…">
+      <button class="btn btn-primario">Enviar</button>
+    </div>
+  </section>
+
+  <!-- ================= PAINEL DE QUARTOS ================= -->
+  <aside class="painel">
+    <div class="painel-head">
+      <h2>Quartos para este lead</h2>
+      <span class="badge-count">4 servem</span>
+    </div>
+
+    <div class="filtro">
+      <span>Para <b>4 adultos + 2 crianças</b> (8, 12) · <b>12–15 set</b></span>
+      <span class="editar">Editar ✎</span>
+    </div>
+
+    <!-- pontos de atenção no topo -->
+    <div class="alerta-topo">
+      <div class="t">⚠️ Antes de oferecer</div>
+      <ul>
+        <li><b>Oficina do Relojoeiro (01):</b> colchão extra não cabe — espaço apertado.</li>
+        <li><b>Refúgio do Jardineiro (24):</b> acesso por escada (cabana hobbit).</li>
+      </ul>
+    </div>
+
+    <!-- lista de cartões -->
+    <div class="lista">
+
+      <!-- CARTÃO 1: expandido -->
+      <div class="cartao-q">
+        <div class="cq-topo" onclick="toggleFicha('f1')">
+          <div class="cq-foto">🏡</div>
+          <div class="cq-info">
+            <div class="cq-nome">Torre do Astrônomo <span style="color:var(--tinta-suave);font-weight:500">· 17</span></div>
+            <div class="cq-cat">Cabana Intermediária · 2 quartos de casal + cozinha completa</div>
+            <div class="cq-cap"><span class="ok">✓ acomoda</span> — 7 adultos, ou 6 adultos + 2 crianças até 15 anos</div>
+          </div>
+          <div class="cq-preco">
+            <div class="v num">R$ 2.480</div>
+            <div class="l">3 noites</div>
+          </div>
+        </div>
+        <div class="cq-acoes">
+          <button class="btn" onclick="toggleFicha('f1')">Ver ficha ▾</button>
+          <button class="btn btn-primario" onclick="toggleWpp('w1')">Enviar ao cliente</button>
+          <button class="btn">Comparar</button>
+        </div>
+        <!-- ficha completa -->
+        <div class="ficha aberta" id="f1">
+          <h4>Ficha completa</h4>
+          <div class="linha"><span class="k">Acomodação</span><span class="val">Quarto 1: cama de casal · Quarto 2: cama de casal · sofá-cama (1 adulto ou 2 crianças até 15 anos)</span></div>
+          <div class="linha"><span class="k">Colchão extra</span><span class="val">Sim, 2 (um na cozinha, um em um dos quartos)</span></div>
+          <div class="linha"><span class="k">Equipamentos</span><span class="val">TV 50" smart · micro-ondas · fogão 2 bocas · geladeira dupla</span></div>
+          <div class="linha"><span class="k">Cozinha</span><span class="val">Louças, taças, talheres e utensílios para cozinhar</span></div>
+          <div class="linha"><span class="k">Indicado para</span><span class="val">Famílias, grupos de amigos, dois ou três casais</span></div>
+          <div class="linha"><span class="k">Vista / metragem</span><span class="val naoconf">não confirmado <span class="tag">A LEVANTAR</span></span></div>
+          <div class="linha"><span class="k">Banheiro</span><span class="val naoconf">não confirmado <span class="tag">A LEVANTAR</span></span></div>
+          <div class="linha"><span class="k">Acessibilidade</span><span class="val naoconf">não confirmado <span class="tag">A LEVANTAR</span></span></div>
+        </div>
+        <!-- preview whatsapp -->
+        <div class="wpp" id="w1">
+          <div class="t">💬 Texto pronto pro WhatsApp</div>
+          <div class="msg"><b>Torre do Astrônomo</b> — cabana com dois quartos de casal e cozinha completa.
+Para vocês 4 adultos + 2 crianças: duas camas de casal, e as crianças no sofá-cama.
+Tem fogão, geladeira dupla, louças e utensílios.
+De 12 a 15/09 (3 noites): <b>R$ 2.480,00</b>.</div>
+          <div class="nota">🔒 Sem campos internos, sem pontos de atenção e sem nada «não confirmado». As fotos vão junto quando houver.</div>
+          <div class="wpp-acoes">
+            <button class="btn btn-primario">Copiar &amp; registrar oferta</button>
+            <button class="btn" onclick="toggleWpp('w1')">Fechar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARTÃO 2: com selo de atenção -->
+      <div class="cartao-q">
+        <div class="cq-topo" onclick="toggleFicha('f2')">
+          <div class="cq-foto">🛏️</div>
+          <div class="cq-info">
+            <div class="cq-nome">Oficina do Relojoeiro <span style="color:var(--tinta-suave);font-weight:500">· 01</span></div>
+            <div class="cq-cat">Intermediário · 2 quartos de casal + cozinha</div>
+            <div class="cq-cap"><span class="ok">✓ acomoda</span> — 5 adultos, ou 4 adultos + 2 crianças até 15 anos</div>
+            <span class="selo-at">⚠️ colchão extra não cabe</span>
+          </div>
+          <div class="cq-preco">
+            <div class="v num">R$ 1.740</div>
+            <div class="l">3 noites</div>
+          </div>
+        </div>
+        <div class="cq-acoes">
+          <button class="btn" onclick="toggleFicha('f2')">Ver ficha ▾</button>
+          <button class="btn btn-primario">Enviar ao cliente</button>
+          <button class="btn">Comparar</button>
+        </div>
+        <div class="ficha" id="f2">
+          <h4>Ficha completa</h4>
+          <div class="linha"><span class="k">Acomodação</span><span class="val">Quarto 1: cama de casal · Quarto 2: cama de casal · sofá-cama (1 adulto ou 2 crianças)</span></div>
+          <div class="linha"><span class="k">Colchão extra</span><span class="val">Não — espaço apertado</span></div>
+          <div class="linha"><span class="k">Equipamentos</span><span class="val">TV 50" smart · frigobar · micro-ondas · fogão 2 bocas</span></div>
+          <div class="linha"><span class="k">Indicado para</span><span class="val">Dois casais, ou família com crianças</span></div>
+          <div class="linha"><span class="k">Vista / metragem</span><span class="val naoconf">não confirmado <span class="tag">A LEVANTAR</span></span></div>
+        </div>
+      </div>
+
+      <!-- CARTÃO 3: hobbit -->
+      <div class="cartao-q">
+        <div class="cq-topo" onclick="toggleFicha('f3')">
+          <div class="cq-foto">⛰️</div>
+          <div class="cq-info">
+            <div class="cq-nome">Refúgio do Jardineiro <span style="color:var(--tinta-suave);font-weight:500">· 24</span></div>
+            <div class="cq-cat">Cabana Hobbit · 2 quartos de casal + cozinha completa</div>
+            <div class="cq-cap"><span class="ok">✓ acomoda</span> — 6 adultos, ou 5 adultos + 2 crianças até 15 anos</div>
+            <span class="selo-at">⚠️ acesso por escada</span>
+          </div>
+          <div class="cq-preco">
+            <div class="v num">R$ 2.150</div>
+            <div class="l">3 noites</div>
+          </div>
+        </div>
+        <div class="cq-acoes">
+          <button class="btn" onclick="toggleFicha('f3')">Ver ficha ▾</button>
+          <button class="btn btn-primario">Enviar ao cliente</button>
+          <button class="btn">Comparar</button>
+        </div>
+        <div class="ficha" id="f3">
+          <h4>Ficha completa</h4>
+          <div class="linha"><span class="k">Acomodação</span><span class="val">Quarto 1: casal · Quarto 2: casal · sofá-cama · 1 colchão extra na cozinha</span></div>
+          <div class="linha"><span class="k">Equipamentos</span><span class="val">TV 50" smart · micro-ondas · fogão 2 bocas · geladeira dupla</span></div>
+          <div class="linha"><span class="k">Nome / história</span><span class="val naoconf">não confirmado <span class="tag">A LEVANTAR</span></span></div>
+        </div>
+      </div>
+
+      <!-- CARTÃO 4: OCUPADO com alternativa -->
+      <div class="cartao-q ocupado">
+        <div class="cq-topo" style="cursor:default">
+          <div class="cq-foto">🏡</div>
+          <div class="cq-info">
+            <div class="cq-nome">Estância do Pescador <span style="color:var(--tinta-suave);font-weight:500">· 18</span></div>
+            <div class="cq-cat">Cabana Intermediária</div>
+            <div class="cq-cap"><span class="selo-at selo-eq">ocupado 12–15 · veja o 16 ou o 19 (idênticos)</span></div>
+          </div>
+          <div class="cq-preco">
+            <div class="v num" style="color:var(--tinta-suave)">—</div>
+            <div class="l">ocupado</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- barra comparar -->
+    <div class="comparar">🔀 Selecione 2–3 quartos e toque em <b style="color:var(--tinta)">Comparar</b> para ver lado a lado (capacidade, cozinha, preço).</div>
+
+  </aside>
+</div>
+
+<div class="rodape-nota">
+  <b>Mock-up ilustrativo</b> — dados reais do descritivo (29/09), visual «Lampião». Capacidade e frase de camas viriam da <b>fonte única já existente</b> no CRM (<code>ConfiguracaoUH</code> / <code>estrutura.py</code>), preço da <code>TarifaUnidade</code>, foto/tour da <code>VitrineQuarto</code> e nome temático da <code>UH</code>.
+  <div class="legenda">
+    <span><span class="dot" style="background:var(--sucesso)"></span> ✓ acomoda a composição do lead</span>
+    <span><span class="dot" style="background:var(--alerta)"></span> ponto de atenção (avisar antes)</span>
+    <span><span class="dot" style="background:#A99F90"></span> «a levantar» — não confirmado, não prometa</span>
+    <span><span class="dot" style="background:var(--info)"></span> ocupado → alternativa equivalente</span>
+  </div>
+</div>
+
+<script>
+  function toggleFicha(id){
+    var el=document.getElementById(id);
+    el.classList.toggle('aberta');
+  }
+  function toggleWpp(id){
+    var el=document.getElementById(id);
+    el.classList.toggle('aberto');
+  }
+</script>
+</body>
+</html>

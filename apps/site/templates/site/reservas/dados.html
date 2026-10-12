@@ -15,12 +15,37 @@
             <input type="hidden" name="checkin" value="{{ busca.checkin|date:'Y-m-d' }}">
             <input type="hidden" name="checkout" value="{{ busca.checkout|date:'Y-m-d' }}">
             <input type="hidden" name="hospedes" value="{{ busca.hospedes }}">
+            <input type="hidden" name="criancas_0_5" value="{{ busca.criancas_0_5|default:0 }}">
+            <input type="hidden" name="criancas_6_15" value="{{ busca.criancas_6_15|default:0 }}">
             <input type="hidden" name="modalidade" value="{{ modalidade|default:busca.modalidade }}">
             <input type="hidden" name="metodo_pagamento" value="pix">
 
             <div id="dados-campos">
                 {% include 'site/reservas/partials/dados_campos.html' %}
             </div>
+
+            {% if arranjos %}
+            <div class="bg-pergaminho/40 border border-madeira/10 rounded-xl p-4 mt-6">
+                <p class="text-madeira/50 text-xs uppercase tracking-wider font-semibold mb-1">Montagem das camas</p>
+                <p class="text-madeira/40 text-xs mb-3">Como prefere as camas? (não altera o preço)</p>
+                <div class="space-y-2">
+                    <label class="flex items-center gap-2 text-sm text-madeira cursor-pointer">
+                        <input type="radio" name="arranjo" value="" class="accent-madeira" checked> Sugerido pelo sistema
+                    </label>
+                    {% for a in arranjos %}
+                    <label class="flex items-center gap-2 text-sm text-madeira cursor-pointer">
+                        <input type="radio" name="arranjo" value="{{ a.casais }}-{{ a.solteiros }}" class="accent-madeira">
+                        {{ a.rotulo }}
+                    </label>
+                    {% endfor %}
+                    {% if arranjos.0.tem_sofa %}
+                    <label class="flex items-center gap-2 text-sm text-madeira cursor-pointer mt-1">
+                        <input type="checkbox" name="usa_sofa_cama" value="1" class="accent-madeira"> Abrir o sofá-cama
+                    </label>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
 
             <div class="flex justify-between mt-8">
                 <a href="{% url 'core:reservar' %}?checkin={{ busca.checkin|date:'Y-m-d' }}&checkout={{ busca.checkout|date:'Y-m-d' }}&hospedes={{ busca.hospedes }}{% if modalidade %}&modalidade={{ modalidade }}{% elif busca.modalidade %}&modalidade={{ busca.modalidade }}{% endif %}"

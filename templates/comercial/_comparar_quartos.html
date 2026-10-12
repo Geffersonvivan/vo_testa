@@ -1,0 +1,33 @@
+{# Tabela comparativa de 2–3 quartos — carregada no modal do painel. #}
+{% if cols %}
+<table class="pq-cmp-tab">
+  <thead>
+    <tr>
+      <th class="pq-cmp-attr"></th>
+      {% for c in cols %}<th>{{ c.nome }}<span class="pq-cmp-num">· {{ c.uh.numero }}</span></th>{% endfor %}
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="pq-cmp-attr">Categoria</td>{% for c in cols %}<td>{{ c.categoria }}</td>{% endfor %}</tr>
+    <tr><td class="pq-cmp-attr">Capacidade</td>{% for c in cols %}<td>{{ c.capacidade }}</td>{% endfor %}</tr>
+    <tr><td class="pq-cmp-attr">Camas</td>{% for c in cols %}<td>{{ c.camas }}</td>{% endfor %}</tr>
+    <tr><td class="pq-cmp-attr">Ar-condicionado</td>{% for c in cols %}<td>{% if c.ar_condicionado %}✓{% else %}—{% endif %}</td>{% endfor %}</tr>
+    <tr><td class="pq-cmp-attr">Vista para o lago</td>{% for c in cols %}<td>{% if c.vista_lago %}✓{% else %}—{% endif %}</td>{% endfor %}</tr>
+    <tr><td class="pq-cmp-attr">Varanda</td>{% for c in cols %}<td>{% if c.varanda %}✓{% else %}—{% endif %}</td>{% endfor %}</tr>
+    <tr><td class="pq-cmp-attr">Aceita pet</td>{% for c in cols %}<td>{% if c.aceita_pet %}✓{% else %}—{% endif %}</td>{% endfor %}</tr>
+    <tr><td class="pq-cmp-attr">Indicado para</td>{% for c in cols %}<td>{{ c.indicado_para|default:"—" }}</td>{% endfor %}</tr>
+    <tr><td class="pq-cmp-attr">Diferenciais</td>{% for c in cols %}<td>{{ c.diferenciais|default:"—" }}</td>{% endfor %}</tr>
+    <tr><td class="pq-cmp-attr">Banheiro</td>{% for c in cols %}<td>{{ c.banheiro|default:"—" }}</td>{% endfor %}</tr>
+    <tr><td class="pq-cmp-attr">Área externa</td>{% for c in cols %}<td>{{ c.area_externa|default:"—" }}</td>{% endfor %}</tr>
+    <tr><td class="pq-cmp-attr">Acessibilidade</td>{% for c in cols %}<td>{{ c.acessibilidade|default:"—" }}</td>{% endfor %}</tr>
+    <tr class="pq-cmp-preco">
+      <td class="pq-cmp-attr">Preço</td>
+      {% for c in cols %}
+      <td>{% if c.total %}<b>R$ {{ c.total|floatformat:0 }}</b><span class="pq-cmp-sub">{{ c.noites }} noite{{ c.noites|pluralize }}</span>{% else %}<b>R$ {{ c.diaria|floatformat:0 }}</b><span class="pq-cmp-sub">a partir de / noite</span>{% endif %}</td>
+      {% endfor %}
+    </tr>
+  </tbody>
+</table>
+{% else %}
+<p class="pq-vazio">Selecione 2 ou 3 quartos para comparar.</p>
+{% endif %}

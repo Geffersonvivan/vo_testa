@@ -221,7 +221,7 @@ def _card_de_uh(vitrine, preco=None):
     """Card de vitrine de um quarto físico (UH) — nome temático, qualidades e mídia.
     Exposto no template com a mesma cara de um `Quarto`, mas por unidade."""
     uh = vitrine.uh
-    nome = uh.nome_tematico or f'Quarto {uh.numero}'
+    nome = uh.nome_tematico or uh.numero
     return SimpleNamespace(
         id=uh.pk, uh_id=uh.pk, numero=uh.numero,
         nome=nome,
@@ -257,9 +257,13 @@ def _buscar_unidades(checkin, checkout, hospedes):
     vitrines = _vitrines_publicadas().filter(
         uh__tipo__capacidade__gte=hospedes,
     ).order_by('ordem', 'uh__numero')
+    # Disponibilidade em UMA consulta em lote (reservas ativas + manutenção + pool de
+    # colchões), em vez de varrer por quarto — evita N scans na página pública.
+    disponiveis_ids = set(reservas.uhs_disponiveis(
+        checkin, checkout, adultos=hospedes).values_list('pk', flat=True))
     resultados = []
     for v in vitrines:
-        disponivel = reservas.uh_disponivel(v.uh, checkin, checkout)
+        disponivel = v.uh_id in disponiveis_ids
         base = reservas.tarifa_base_unidade(v.uh)
         preco_noite = reservas.diaria_media_unidade(v.uh, checkin, checkout)
         resultados.append({
@@ -293,7 +297,8 @@ def _buscar_quartos(checkin, checkout, hospedes, modalidade=""):
     quartos = list(qs)
     resultados = []
     for quarto in quartos:
-        disponivel = reservas.tipo_disponivel(quarto.tipo_uh, checkin, checkout)
+        disponivel = reservas.tipo_disponivel(
+            quarto.tipo_uh, checkin, checkout, adultos=hospedes)
         preco_noite = reservas.diaria_media(quarto.tipo_uh, checkin, checkout)
         day = getattr(quarto.tipo_uh, 'modalidade', '') == 'day_use'
         resultados.append({
@@ -312,55 +317,97 @@ def _buscar_quartos(checkin, checkout, hospedes, modalidade=""):
     return resultados
 
 
-def _resumo_preco(quarto, checkin, checkout, metodo='pix'):
-    """Resumo de valores da reserva (com desconto Pix quando aplicável)."""
-    from apps.reservas import services as reservas
+def _adultos_de(hospedes, criancas_0_5, criancas_6_15):
+    """Adultos (16+) = total de hóspedes − crianças informadas (mínimo 1)."""
+    return max(1, int(hospedes) - int(criancas_0_5 or 0) - int(criancas_6_15 or 0))
+
+
+def _criancas(form):
+    """Faixas de criança do form de busca, prontas p/ **kwargs do resumo/criar reserva."""
+    d = getattr(form, 'cleaned_data', {}) or {}
+    return {'criancas_0_5': d.get('criancas_0_5') or 0,
+            'criancas_6_15': d.get('criancas_6_15') or 0}
+
+
+def _arranjo_post(request):
+    """Montagem de cama escolhida no site: (casais, solteiros, usa_sofa_cama) ou None.
+    Formato do radio: 'casais-solteiros'. Vazio = o sistema sugere."""
+    raw = request.POST.get('arranjo') or ''
+    usa_sofa = request.POST.get('usa_sofa_cama') in ('1', 'on', 'true')
+    if '-' in raw:
+        try:
+            c, s = raw.split('-', 1)
+            return {'casais': int(c), 'solteiros': int(s), 'usa_sofa_cama': usa_sofa}
+        except ValueError:
+            pass
+    return {'casais': None, 'solteiros': None, 'usa_sofa_cama': None}
+
+
+def _montar_resumo(cot, checkin, metodo, *, preco_base, eh_day_use):
+    """Dict de resumo p/ o template a partir de uma cotação da motor + desconto Pix.
+    Taxas (ISS + turismo) são **pagas no check-out**; o pagamento online cobra a
+    hospedagem (com desconto Pix). ISS incide sobre a hospedagem líquida (pós-desconto),
+    coerente com o lançamento do check-in."""
+    from apps.reservas import precos
     config = ConfiguracaoSite.load()
-    noites = (checkout - checkin).days
-    temporada = _temporada_de(checkin)
-    preco_noite = reservas.diaria_media(quarto.tipo_uh, checkin, checkout)
-    subtotal = preco_noite * noites
+    hospedagem = cot['hospedagem']
     desconto_pct = Decimal(config.desconto_pix) if metodo == 'pix' else Decimal('0')
-    desconto_valor = subtotal * desconto_pct / 100
+    desconto_valor = (hospedagem * desconto_pct / 100).quantize(Decimal('0.01'))
+    hosp_liquida = hospedagem - desconto_valor
+    # Mesmo helper do motor/check-in — ISS sobre a hospedagem líquida (pós-desconto Pix).
+    t = precos.taxas(hosp_liquida, cobra_iss=cot['cobra_iss'],
+                     cobra_taxa_turismo=cot['cobra_taxa_turismo'], diarias=cot['noites'] or 1)
+    iss = t['iss']
+    turismo = t['taxa_turismo']
+    return {
+        'noites': cot['noites'] or 1,
+        'temporada': _temporada_de(checkin),
+        'preco_base': preco_base,
+        'preco_noite': cot['media_noite'],
+        'subtotal': hospedagem,
+        'metodo': metodo,
+        'desconto_pct': desconto_pct,
+        'desconto_valor': desconto_valor,
+        'hospedagem_liquida': hosp_liquida,
+        'iss': iss,
+        'iss_aliquota': cot['iss_aliquota'],
+        'taxa_turismo': turismo,
+        'taxa_turismo_unitaria': cot['taxa_turismo_unitaria'],
+        'cobra_iss': cot['cobra_iss'],
+        'cobra_taxa_turismo': cot['cobra_taxa_turismo'],
+        'total': hosp_liquida + iss + turismo,
+        'total_online': hosp_liquida,  # o que se paga online (taxas ficam p/ o check-out)
+        'eh_day_use': eh_day_use,
+        'unidade_preco': 'dia' if eh_day_use else 'noite',
+    }
+
+
+def _resumo_preco(quarto, checkin, checkout, metodo='pix', hospedes=2,
+                  criancas_0_5=0, criancas_6_15=0, cobra_iss=True, cobra_taxa_turismo=True):
+    """Resumo de valores da reserva (venda por tipo) pela motor de tarifa (Manual §2)."""
+    from apps.reservas import precos
+    cot = precos.cotacao(
+        tipo=quarto.tipo_uh, checkin=checkin, checkout=checkout,
+        adultos=_adultos_de(hospedes, criancas_0_5, criancas_6_15),
+        criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15,
+        cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_taxa_turismo)
     day = getattr(quarto.tipo_uh, 'modalidade', '') == 'day_use'
-    return {
-        'noites': noites,
-        'temporada': temporada,
-        'preco_base': quarto.preco_base,
-        'preco_noite': preco_noite,
-        'subtotal': subtotal,
-        'metodo': metodo,
-        'desconto_pct': desconto_pct,
-        'desconto_valor': desconto_valor,
-        'total': subtotal - desconto_valor,
-        'eh_day_use': day,
-        'unidade_preco': 'dia' if day else 'noite',
-    }
+    return _montar_resumo(cot, checkin, metodo, preco_base=quarto.preco_base, eh_day_use=day)
 
 
-def _resumo_preco_unidade(uh, checkin, checkout, metodo='pix'):
-    """Resumo de valores de um quarto específico (venda por unidade)."""
-    from apps.reservas import services as reservas
-    config = ConfiguracaoSite.load()
-    noites = (checkout - checkin).days
-    temporada = _temporada_de(checkin)
-    preco_noite = reservas.diaria_media_unidade(uh, checkin, checkout)
-    subtotal = preco_noite * noites
-    desconto_pct = Decimal(config.desconto_pix) if metodo == 'pix' else Decimal('0')
-    desconto_valor = subtotal * desconto_pct / 100
-    return {
-        'noites': noites,
-        'temporada': temporada,
-        'preco_base': reservas.tarifa_base_unidade(uh),
-        'preco_noite': preco_noite,
-        'subtotal': subtotal,
-        'metodo': metodo,
-        'desconto_pct': desconto_pct,
-        'desconto_valor': desconto_valor,
-        'total': subtotal - desconto_valor,
-        'eh_day_use': False,
-        'unidade_preco': 'noite',
-    }
+def _resumo_preco_unidade(uh, checkin, checkout, metodo='pix', hospedes=2,
+                          criancas_0_5=0, criancas_6_15=0, cobra_iss=True,
+                          cobra_taxa_turismo=True):
+    """Resumo de valores de um quarto específico (venda por unidade) pela motor."""
+    from apps.reservas import precos, services as reservas
+    cot = precos.cotacao(
+        uh=uh, checkin=checkin, checkout=checkout,
+        adultos=_adultos_de(hospedes, criancas_0_5, criancas_6_15),
+        criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15,
+        cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_taxa_turismo)
+    day = getattr(uh.tipo, 'modalidade', '') == 'day_use'
+    return _montar_resumo(cot, checkin, metodo, preco_base=reservas.tarifa_base_unidade(uh),
+                          eh_day_use=day)
 
 
 def _url_busca(checkin, checkout, hospedes, modalidade=''):
@@ -398,7 +445,7 @@ def reservar(request):
         from apps.nucleo.models import UH
         _u = UH.objects.filter(pk=uh_id).first()
         if _u:
-            quarto_escolhido = _u.nome_tematico or f'Quarto {_u.numero}'
+            quarto_escolhido = _u.nome_tematico or _u.numero
         else:
             uh_id = ''
     tem_busca = bool(request.GET.get('checkin'))
@@ -422,7 +469,7 @@ def reservar(request):
             from apps.nucleo.models import UH
             from apps.reservas import services as reservas
             uh = UH.objects.filter(pk=uh_id, status=UH.Status.ATIVA).first()
-            if uh and reservas.uh_disponivel(uh, checkin, checkout):
+            if uh and reservas.uh_disponivel(uh, checkin, checkout, adultos=hospedes):
                 destino = reverse('core:selecionar_unidade', args=[uh.pk])
                 return redirect(
                     f"{destino}?checkin={checkin:%Y-%m-%d}"
@@ -444,6 +491,7 @@ def reservar(request):
             'noites': (checkout - checkin).days,
             'modalidade': modalidade,
             'eh_day_use': modalidade == 'day_use',
+            **_criancas(form),
         }
         passo = 2
 
@@ -498,7 +546,7 @@ def selecionar_quarto(request, quarto_id):
     if hospedes > quarto.capacidade:
         messages.error(request, 'Esta opção não comporta o número de pessoas.')
         return redirect_busca(checkin, checkout, hospedes, modalidade)
-    if not reservas.tipo_disponivel(quarto.tipo_uh, checkin, checkout):
+    if not reservas.tipo_disponivel(quarto.tipo_uh, checkin, checkout, adultos=hospedes):
         messages.error(request, 'Esta opção não está mais disponível nessas datas.')
         return redirect_busca(checkin, checkout, hospedes, modalidade)
 
@@ -507,9 +555,9 @@ def selecionar_quarto(request, quarto_id):
         'quarto': quarto,
         'busca': {
             'checkin': checkin, 'checkout': checkout, 'hospedes': hospedes,
-            'modalidade': modalidade,
+            'modalidade': modalidade, **_criancas(form),
         },
-        'resumo': _resumo_preco(quarto, checkin, checkout),
+        'resumo': _resumo_preco(quarto, checkin, checkout, hospedes=hospedes, **_criancas(form)),
         'dados_form': DadosHospedeForm(),
         'config': ConfiguracaoSite.load(),
         'eh_day_use': _modalidade_do_quarto(quarto) == 'day_use',
@@ -547,7 +595,7 @@ def selecionar_unidade(request, uh_id):
     if hospedes > uh.tipo.capacidade:
         messages.error(request, 'Este quarto não comporta o número de pessoas.')
         return redirect_busca(checkin, checkout, hospedes)
-    if not reservas.uh_disponivel(uh, checkin, checkout):
+    if not reservas.uh_disponivel(uh, checkin, checkout, adultos=hospedes):
         messages.error(request, 'Este quarto não está mais disponível nessas datas.')
         return redirect_busca(checkin, checkout, hospedes)
 
@@ -556,8 +604,9 @@ def selecionar_unidade(request, uh_id):
         'quarto': _card_de_uh(vitrine, reservas.tarifa_base_unidade(uh)),
         'uh_id': uh.pk,
         'busca': {'checkin': checkin, 'checkout': checkout, 'hospedes': hospedes,
-                  'modalidade': 'hospedagem'},
-        'resumo': _resumo_preco_unidade(uh, checkin, checkout),
+                  'modalidade': 'hospedagem', **_criancas(form)},
+        'resumo': _resumo_preco_unidade(uh, checkin, checkout, hospedes=hospedes, **_criancas(form)),
+        'arranjos': reservas.arranjos_disponiveis(uh),
         'dados_form': DadosHospedeForm(),
         'config': ConfiguracaoSite.load(),
         'eh_day_use': False,
@@ -578,6 +627,8 @@ def _resumo_reserva_unidade(request):
         'checkin': request.POST.get('checkin'),
         'checkout': request.POST.get('checkout'),
         'hospedes': request.POST.get('hospedes'),
+        'criancas_0_5': request.POST.get('criancas_0_5'),
+        'criancas_6_15': request.POST.get('criancas_6_15'),
         'modalidade': 'hospedagem',
     })
     hospede_existente = encontrar_hospede(
@@ -598,6 +649,7 @@ def _resumo_reserva_unidade(request):
             context['resumo'] = _resumo_preco_unidade(
                 uh, busca_form.cleaned_data['checkin'],
                 busca_form.cleaned_data['checkout'], metodo,
+                hospedes=busca_form.cleaned_data['hospedes'], **_criancas(busca_form),
             )
         return render(request, 'site/reservas/dados.html', context)
 
@@ -605,18 +657,24 @@ def _resumo_reserva_unidade(request):
     checkout = busca_form.cleaned_data['checkout']
     hospedes = busca_form.cleaned_data['hospedes']
 
-    if hospedes > uh.tipo.capacidade or not reservas.uh_disponivel(uh, checkin, checkout):
+    if (hospedes > uh.tipo.capacidade
+            or not reservas.uh_disponivel(uh, checkin, checkout, adultos=hospedes)):
         messages.error(request, 'Este quarto não está mais disponível nessas datas.')
         return redirect_busca(checkin, checkout, hospedes)
 
+    from apps.reservas.cancelamento import descricao_politica
+    cr = _criancas(busca_form)
+    arr = _arranjo_post(request)
     return render(request, 'site/reservas/resumo.html', {
         'passo': 4, 'quarto': card, 'uh_id': uh.pk,
         'busca': {'checkin': checkin, 'checkout': checkout, 'hospedes': hospedes,
-                  'modalidade': 'hospedagem'},
-        'resumo': _resumo_preco_unidade(uh, checkin, checkout, metodo),
+                  'modalidade': 'hospedagem', **cr},
+        'resumo': _resumo_preco_unidade(uh, checkin, checkout, metodo, hospedes=hospedes, **cr),
         'dados': dados_form.cleaned_data, 'metodo': metodo,
         'config': ConfiguracaoSite.load(), 'eh_day_use': False,
-        'modalidade': 'hospedagem',
+        'modalidade': 'hospedagem', 'politica': descricao_politica(),
+        'arranjo_sel': None if arr['casais'] is None else f"{arr['casais']}-{arr['solteiros']}",
+        'arranjo_sofa': arr['usa_sofa_cama'],
     })
 
 
@@ -638,6 +696,8 @@ def resumo_reserva(request):
         'checkin': request.POST.get('checkin'),
         'checkout': request.POST.get('checkout'),
         'hospedes': request.POST.get('hospedes'),
+        'criancas_0_5': request.POST.get('criancas_0_5'),
+        'criancas_6_15': request.POST.get('criancas_6_15'),
         'modalidade': modalidade,
     })
     hospede_existente = encontrar_hospede(
@@ -664,6 +724,7 @@ def resumo_reserva(request):
             context['resumo'] = _resumo_preco(
                 quarto, busca_form.cleaned_data['checkin'],
                 busca_form.cleaned_data['checkout'], metodo,
+                hospedes=busca_form.cleaned_data['hospedes'], **_criancas(busca_form),
             )
         return render(request, 'site/reservas/dados.html', context)
 
@@ -672,23 +733,28 @@ def resumo_reserva(request):
     hospedes = busca_form.cleaned_data['hospedes']
 
     from apps.reservas import services as reservas
-    if hospedes > quarto.capacidade or not reservas.tipo_disponivel(quarto.tipo_uh, checkin, checkout):
+    if (hospedes > quarto.capacidade
+            or not reservas.tipo_disponivel(
+                quarto.tipo_uh, checkin, checkout, adultos=hospedes)):
         messages.error(request, 'Esta opção não está mais disponível nessas datas.')
         return redirect_busca(checkin, checkout, hospedes, modalidade)
 
+    from apps.reservas.cancelamento import descricao_politica
+    cr = _criancas(busca_form)
     context = {
         'passo': 4,
         'quarto': quarto,
         'busca': {
             'checkin': checkin, 'checkout': checkout, 'hospedes': hospedes,
-            'modalidade': modalidade,
+            'modalidade': modalidade, **cr,
         },
-        'resumo': _resumo_preco(quarto, checkin, checkout, metodo),
+        'resumo': _resumo_preco(quarto, checkin, checkout, metodo, hospedes=hospedes, **cr),
         'dados': dados_form.cleaned_data,
         'metodo': metodo,
         'config': ConfiguracaoSite.load(),
         'eh_day_use': _modalidade_do_quarto(quarto) == 'day_use',
         'modalidade': modalidade,
+        'politica': descricao_politica(),
     }
     return render(request, 'site/reservas/resumo.html', context)
 
@@ -716,6 +782,8 @@ def finalizar_reserva(request):
         'checkin': request.POST.get('checkin'),
         'checkout': request.POST.get('checkout'),
         'hospedes': request.POST.get('hospedes'),
+        'criancas_0_5': request.POST.get('criancas_0_5'),
+        'criancas_6_15': request.POST.get('criancas_6_15'),
         'modalidade': modalidade,
     })
     hospede_existente = encontrar_hospede(
@@ -732,6 +800,10 @@ def finalizar_reserva(request):
     checkin = busca_form.cleaned_data['checkin']
     checkout = busca_form.cleaned_data['checkout']
     hospedes = busca_form.cleaned_data['hospedes']
+    c05 = busca_form.cleaned_data.get('criancas_0_5') or 0
+    c615 = busca_form.cleaned_data.get('criancas_6_15') or 0
+    cobra_iss = request.POST.get('cobra_iss', '1') != '0'
+    cobra_turismo = request.POST.get('cobra_taxa_turismo', '1') != '0'
 
     from django.core.exceptions import ValidationError as VErr
 
@@ -754,7 +826,9 @@ def finalizar_reserva(request):
         crm_reserva = reservas.criar_reserva_site(
             tipo_uh=quarto.tipo_uh, checkin=checkin, checkout=checkout,
             hospede=pessoa, usuario=_usuario_sistema(),
-            adultos=hospedes, criancas=0,
+            adultos=_adultos_de(hospedes, c05, c615), criancas=0,
+            criancas_0_5=c05, criancas_6_15=c615,
+            cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_turismo,
             observacoes=f'{rotulo} pelo site — {hospede.nome}',
         )
     except VErr as erro:
@@ -816,6 +890,8 @@ def _finalizar_reserva_unidade(request):
         'checkin': request.POST.get('checkin'),
         'checkout': request.POST.get('checkout'),
         'hospedes': request.POST.get('hospedes'),
+        'criancas_0_5': request.POST.get('criancas_0_5'),
+        'criancas_6_15': request.POST.get('criancas_6_15'),
         'modalidade': 'hospedagem',
     })
     hospede_existente = encontrar_hospede(
@@ -831,6 +907,10 @@ def _finalizar_reserva_unidade(request):
     checkin = busca_form.cleaned_data['checkin']
     checkout = busca_form.cleaned_data['checkout']
     hospedes = busca_form.cleaned_data['hospedes']
+    c05 = busca_form.cleaned_data.get('criancas_0_5') or 0
+    c615 = busca_form.cleaned_data.get('criancas_6_15') or 0
+    cobra_iss = request.POST.get('cobra_iss', '1') != '0'
+    cobra_turismo = request.POST.get('cobra_taxa_turismo', '1') != '0'
 
     if hospedes > uh.tipo.capacidade:
         messages.error(request, 'Este quarto não comporta o número de pessoas.')
@@ -841,13 +921,16 @@ def _finalizar_reserva_unidade(request):
         nome=hospede.nome, email=hospede.email, telefone=hospede.telefone,
         documento=getattr(hospede, 'cpf', '') or '',
     )
-    nome_quarto = uh.nome_tematico or f'Quarto {uh.numero}'
+    nome_quarto = uh.nome_tematico or uh.numero
     try:
         crm_reserva = reservas.criar_reserva_site_unidade(
             uh=uh, checkin=checkin, checkout=checkout,
             hospede=pessoa, usuario=_usuario_sistema(),
-            adultos=hospedes, criancas=0,
+            adultos=_adultos_de(hospedes, c05, c615), criancas=0,
+            criancas_0_5=c05, criancas_6_15=c615,
+            cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_turismo,
             observacoes=f'Reserva pelo site — {nome_quarto} — {hospede.nome}',
+            **_arranjo_post(request),
         )
     except VErr as erro:
         messages.error(request, ' '.join(erro.messages))

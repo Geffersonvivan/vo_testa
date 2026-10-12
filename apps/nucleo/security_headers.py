@@ -53,7 +53,7 @@ class MFAObrigatorioMiddleware:
 
         from .mfa import mfa_obrigatorio
 
-        if getattr(settings, "TESTING", False):
+        if getattr(settings, "TESTING", False) or not getattr(settings, "MFA_OBRIGATORIO", True):
             return self.get_response(request)
         user = getattr(request, "user", None)
         if (user and user.is_authenticated and mfa_obrigatorio(user) and not user.mfa_ativo):

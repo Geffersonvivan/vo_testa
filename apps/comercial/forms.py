@@ -5,6 +5,7 @@ from apps.nucleo.models import Pessoa, TipoUH
 from .models import (
     AtividadeComercial,
     Campanha,
+    FichaComercial,
     GastoDiario,
     MotivoPerda,
     Oportunidade,
@@ -12,6 +13,46 @@ from .models import (
     RespostaRapida,
     TemplateEmail,
 )
+
+
+class FichaComercialForm(forms.ModelForm):
+    """Copy comercial do quarto, editada no MESMO form de «Quartos & tipos».
+
+    Capacidade, nome, preço e fotos NÃO ficam aqui (vêm da UH/ConfiguracaoUH/
+    TarifaUnidade/Vitrine) — só o que a vendedora fala: resumo, indicado para,
+    pontos de atenção (um por linha) e a história do nome.
+    """
+
+    pontos_atencao_txt = forms.CharField(
+        label="Pontos de atenção (um por linha)", required=False,
+        widget=forms.Textarea(attrs={"rows": 3,
+                                     "placeholder": "Ex.: Colchão extra não cabe — espaço apertado"}),
+        help_text="Avisos dados ANTES (nunca vão no texto ao cliente). Um por linha.",
+    )
+
+    class Meta:
+        model = FichaComercial
+        fields = ["resumo", "indicado_para", "historia_e_venda"]
+        widgets = {
+            "resumo": forms.TextInput(attrs={"placeholder": "Frase curta que abre a oferta"}),
+            "historia_e_venda": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["pontos_atencao_txt"].initial = "\n".join(
+                self.instance.pontos_atencao or [])
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        obj.pontos_atencao = [
+            linha.strip() for linha in
+            self.cleaned_data.get("pontos_atencao_txt", "").splitlines() if linha.strip()
+        ]
+        if commit:
+            obj.save()
+        return obj
 
 
 class RespostaRapidaForm(forms.ModelForm):
@@ -164,9 +205,12 @@ class CotacaoForm(forms.Form):
     checkout = forms.DateField(label="Check-out", widget=DataInput())
     valor_diaria = forms.DecimalField(
         label="Diária (R$)", required=False, max_digits=10, decimal_places=2,
-        help_text="Vazio = calcula pela tarifa do período (Reservas).", widget=ReaisInput(),
+        help_text="Vazio = calcula pela motor (lotação do lead + taxas).", widget=ReaisInput(),
     )
     validade = forms.DateField(label="Válida até", required=False, widget=DataInput())
+    cobra_iss = forms.BooleanField(label="Incluir ISS (4%)", required=False, initial=True)
+    cobra_taxa_turismo = forms.BooleanField(
+        label="Incluir taxa de turismo", required=False, initial=True)
     observacao = forms.CharField(
         label="Observação", required=False, widget=forms.Textarea(attrs={"rows": 2}),
     )

@@ -117,6 +117,14 @@ class BuscaDisponibilidadeForm(forms.Form):
         min_value=1,
         initial=2,
     )
+    criancas_0_5 = forms.IntegerField(
+        label='Crianças até 5 anos', min_value=0, initial=0, required=False,
+        help_text='Não pagam.',
+    )
+    criancas_6_15 = forms.IntegerField(
+        label='Crianças de 6 a 15 anos', min_value=0, initial=0, required=False,
+        help_text='Pagam metade da pessoa adicional.',
+    )
     modalidade = forms.ChoiceField(
         choices=[
             ('', 'Todas'),
@@ -145,6 +153,14 @@ class BuscaDisponibilidadeForm(forms.Form):
             self.add_error('checkout', 'O check-out deve ser depois do check-in.')
         elif checkin and not checkout:
             self.add_error('checkout', 'Informe a data de check-out.')
+        # Crianças contam dentro do total de hóspedes: tem de sobrar ao menos 1 adulto,
+        # senão a ocupação (adultos + crianças) estoura o total informado.
+        hospedes = cleaned.get('hospedes') or 0
+        criancas = (cleaned.get('criancas_0_5') or 0) + (cleaned.get('criancas_6_15') or 0)
+        if hospedes and criancas >= hospedes:
+            self.add_error('criancas_6_15',
+                           'As crianças estão contadas no total de hóspedes — '
+                           'informe ao menos 1 adulto.')
         return cleaned
 
 

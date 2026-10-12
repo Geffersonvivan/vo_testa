@@ -141,6 +141,26 @@ class FluxoReservaViewTests(TestCase):
         dados.update(over)
         return self.client.post(reverse('core:finalizar_reserva'), dados)
 
+    def test_finaliza_com_crianca_preco_por_pessoa(self):
+        # Fase 6: site aplica pessoa adicional + criança 6-15 meia na diária do CRM.
+        self.tipo.capacidade = 5
+        self.tipo.pessoa_adicional = Decimal('100.00')
+        self.tipo.save(update_fields=['capacidade', 'pessoa_adicional'])
+        self.quarto.capacidade = 5
+        self.quarto.save(update_fields=['capacidade'])
+        self._post_finalizar(hospedes=3, criancas_6_15=1, metodo_pagamento='cartao')
+        from apps.reservas.models import Reserva
+        r = Reserva.objects.latest('id')
+        # adultos = 3 − 1 criança = 2 (base 400) + 1 criança 6-15 (½×100=50) → 450/noite.
+        self.assertEqual(r.valor_diaria, Decimal('450.00'))
+        self.assertEqual(r.criancas_6_15, 1)
+        self.assertTrue(r.cobra_iss)
+
+    def test_finaliza_desmarcando_iss(self):
+        self._post_finalizar(metodo_pagamento='cartao', cobra_iss='0')
+        from apps.reservas.models import Reserva
+        self.assertFalse(Reserva.objects.latest('id').cobra_iss)
+
     def test_passo1_datas_ok(self):
         self.assertEqual(self.client.get(reverse('core:reservar')).status_code, 200)
 

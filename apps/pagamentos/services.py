@@ -104,6 +104,13 @@ def confirmar_pagamento(cobranca, usuario=None, origem="webhook"):
         elif cobranca.grupo_id:
             from apps.reservas.services import confirmar_grupo
             confirmar_grupo(cobranca.grupo_id, usuario or cobranca.criado_por)
+
+    # Avisa quem escuta (ex.: Comercial ganha a oportunidade do sinal pago).
+    # send_robust: um receiver que falhe NUNCA pode desfazer a confirmação do
+    # pagamento (o dinheiro já foi capturado no gateway).
+    from .signals import pagamento_confirmado
+    pagamento_confirmado.send_robust(
+        sender=Cobranca, cobranca=cobranca, usuario=usuario or cobranca.criado_por)
     return cobranca
 
 

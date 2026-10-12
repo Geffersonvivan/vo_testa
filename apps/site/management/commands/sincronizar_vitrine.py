@@ -30,7 +30,7 @@ class Command(BaseCommand):
             _, novo = VitrineQuarto.objects.get_or_create(
                 uh=uh,
                 defaults={
-                    "descricao_curta": uh.nome_tematico or f"Quarto {uh.numero}",
+                    "descricao_curta": uh.nome_tematico or uh.numero,
                     "descricao": uh.diferenciais or "",
                     "metragem": 25,
                     "destaque": i < DESTAQUES_HOME,

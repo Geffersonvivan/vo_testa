@@ -15,11 +15,22 @@ Usuario = get_user_model()
 @requer_modulo(Modulo.GOVERNANCA)
 def painel(request):
     dados = services.painel_limpeza()
+
+    # Lista de montagem de camas das chegadas do dia (vem de Reservas, se ativo).
+    from apps.nucleo.models import modulo_ativo
+    from django.utils import timezone
+
+    montagem = []
+    if modulo_ativo(Modulo.RESERVAS):
+        from apps.reservas.services import montagem_do_dia
+        montagem = montagem_do_dia(timezone.localdate())
+
     return render(request, "governanca/painel.html", {
         "linhas": dados["linhas"],
         "contagem": dados["contagem"],
         "camareiras": Usuario.objects.filter(is_active=True).order_by("first_name", "username"),
         "tipos": TarefaGovernanca.Tipo.choices,
+        "montagem": montagem,
     })
 
 

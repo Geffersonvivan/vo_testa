@@ -29,6 +29,12 @@
   {% include "nucleo/partials/campos.html" with form=vitrine_form %}
   {% endif %}
 
+  {% if ficha_comercial_form %}
+  <h2>Descritivo comercial (usado na conversa do lead)</h2>
+  <p class="subtitulo">O que a vendedora fala no atendimento — aparece no painel «Quartos para este lead». Capacidade e camas vêm da composição abaixo; aqui é só a copy de venda.</p>
+  {% include "nucleo/partials/campos.html" with form=ficha_comercial_form %}
+  {% endif %}
+
   <h2>Composição de camas</h2>
   <p class="subtitulo">A capacidade e a frase de camas são calculadas daqui — não se digita capacidade.</p>
 

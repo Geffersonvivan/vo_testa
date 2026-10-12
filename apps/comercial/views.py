@@ -21,7 +21,7 @@ from apps.nucleo.periodos import periodo, selecao_periodo
 from apps.nucleo.permissoes import requer_gerencia, requer_modulo
 from apps.nucleo.seletores import pessoas_agrupadas
 
-from . import services
+from . import quartos, services
 from .forms import (
     CampanhaForm,
     ConversaoForm,
@@ -327,8 +327,16 @@ def oportunidade(request, pk):
     )
     from django.conf import settings as _settings
     conversa_wpp = services.abrir_conversa_whatsapp(op)
+    historico_cliente = None
+    if modulo_ativo(Modulo.RESERVAS) and op.pessoa_id:
+        from apps.reservas.services import historico_hospede
+        h = historico_hospede(op.pessoa)
+        if h["estadias"] or h["futuras"]:
+            historico_cliente = h
     return render(request, "comercial/oportunidade.html", {
         "op": op,
+        "proxima_acao": services.proxima_acao(op),
+        "historico_cliente": historico_cliente,
         "atividades": op.atividades.select_related("responsavel"),
         "cotacoes": op.cotacoes.select_related("tipo_uh"),
         "tipos_atividade": AtividadeComercial.Tipo.choices,
@@ -343,7 +351,88 @@ def oportunidade(request, pk):
         "mensagens_wpp": list(conversa_wpp.mensagens.all()),
         "respostas_rapidas": services.respostas_rapidas_para(op),
         "whatsapp_simulado": getattr(_settings, "WHATSAPP_GATEWAY", "simulado") == "simulado",
+        # Painel de quartos só para hospedagem/day use — evento não usa (nem paga o custo).
+        "painel_quartos": (
+            None if op.tipo_interesse == Oportunidade.TipoInteresse.EVENTO
+            else quartos.quartos_para_lead(op)
+        ),
     })
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def quartos_lead(request, pk):
+    """Painel de quartos da conversa (parcial HTMX — recarrega ao mudar composição)."""
+    op = get_object_or_404(Oportunidade.objects.select_related("pessoa"), pk=pk)
+    return render(request, "comercial/_painel_quartos.html", {
+        "op": op, "painel_quartos": quartos.quartos_para_lead(op),
+    })
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def editar_composicao(request, pk):
+    """Salva adultos/crianças/idades/datas do lead e devolve o painel atualizado."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    if request.method == "POST":
+        def _int(chave, padrao=0):
+            try:
+                return max(0, int(request.POST.get(chave) or padrao))
+            except (TypeError, ValueError):
+                return padrao
+        op.adultos = _int("adultos", 1) or 1
+        op.criancas = _int("criancas", 0)
+        idades = [int(x) for x in request.POST.get("idades_criancas", "").replace(";", ",").split(",")
+                  if x.strip().isdigit()]
+        op.idades_criancas = idades[:op.criancas] if op.criancas else []
+        op.hospedes = op.adultos + op.criancas
+        op.checkin_previsto = _data(request.POST.get("checkin")) or op.checkin_previsto
+        op.checkout_previsto = _data(request.POST.get("checkout")) or op.checkout_previsto
+        op.save(update_fields=["adultos", "criancas", "idades_criancas", "hospedes",
+                               "checkin_previsto", "checkout_previsto"])
+    return render(request, "comercial/_painel_quartos.html", {
+        "op": op, "painel_quartos": quartos.quartos_para_lead(op),
+    })
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def oferecer_quarto(request, pk, uh_id):
+    """Gera o texto pronto pro WhatsApp e registra a oferta na linha do tempo."""
+    from apps.nucleo.models import UH
+    op = get_object_or_404(Oportunidade, pk=pk)
+    uh = get_object_or_404(UH, pk=uh_id)
+    texto = quartos.texto_oferta(uh, op)
+    cotou = False
+    if request.method == "POST":
+        quartos.registrar_oferta(op, uh, request.user)
+        # Com datas, "Enviar ao cliente" também registra a COTAÇÃO (motor + taxas) →
+        # preenche o valor estimado e move a etapa. Sem datas ou já fechada, só a oferta.
+        if op.aberta and op.checkin_previsto and op.checkout_previsto:
+            try:
+                services.registrar_cotacao(
+                    oportunidade=op, usuario=request.user, tipo_uh=uh.tipo,
+                    checkin=op.checkin_previsto, checkout=op.checkout_previsto,
+                    observacao=f"Oferta: {uh.nome_tematico or uh.numero}")
+                cotou = True
+            except ValidationError:
+                pass
+    return JsonResponse({"texto": texto, "cotou": cotou})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def comparar_quartos(request, pk):
+    """Tabela comparativa de 2–3 quartos (capacidade, camas, qualidades, preço)."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    ids = [int(x) for x in request.GET.get("uhs", "").split(",") if x.strip().isdigit()][:3]
+    return render(request, "comercial/_comparar_quartos.html", {
+        "op": op, "cols": quartos.comparar(op, ids),
+    })
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def proposta_quartos(request, pk):
+    """Gera UMA mensagem com 2–3 opções de quarto (o cliente escolhe)."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    ids = [int(x) for x in request.GET.get("uhs", "").split(",") if x.strip().isdigit()][:3]
+    return JsonResponse({"texto": quartos.texto_proposta(op, ids)})
 
 
 @requer_modulo(Modulo.COMERCIAL)
@@ -390,6 +479,8 @@ def cotar(request, pk):
                     checkout=form.cleaned_data["checkout"],
                     valor_diaria=form.cleaned_data.get("valor_diaria"),
                     validade=form.cleaned_data.get("validade"),
+                    cobra_iss=form.cleaned_data.get("cobra_iss", True),
+                    cobra_taxa_turismo=form.cleaned_data.get("cobra_taxa_turismo", True),
                     observacao=form.cleaned_data.get("observacao") or "",
                 )
                 messages.success(request, "Cotação registrada.")
@@ -1021,15 +1112,24 @@ def email_campanha_teste(request, pk):
 
 @requer_modulo(Modulo.COMERCIAL)
 def whatsapp_enviar(request, pk):
-    """Envia uma resposta de WhatsApp pelo gateway (MVP simulado)."""
+    """Envia uma resposta de WhatsApp pelo gateway (MVP simulado).
+
+    Chamado por fetch (painel de quartos) → responde JSON {ok, erro} para o botão
+    saber se de fato enviou; via form normal → redireciona com mensagem."""
     op = get_object_or_404(Oportunidade, pk=pk)
+    via_fetch = request.headers.get("X-Requested-With") == "XMLHttpRequest"
+    erro = ""
     if request.method == "POST":
         conv = services.abrir_conversa_whatsapp(op)
         try:
             services.enviar_mensagem_whatsapp(
                 conversa=conv, texto=request.POST.get("texto", ""), usuario=request.user)
         except ValidationError as e:
-            messages.error(request, "; ".join(e.messages))
+            erro = "; ".join(e.messages)
+            if not via_fetch:
+                messages.error(request, erro)
+    if via_fetch:
+        return JsonResponse({"ok": not erro, "erro": erro})
     return redirect("comercial:oportunidade", pk=op.pk)
 
 

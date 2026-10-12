@@ -149,7 +149,8 @@ class UHForm(forms.ModelForm):
         fields = [
             "numero", "nome_tematico", "tipo", "bloco", "andar", "status",
             "pcd", "vista_lago", "varanda", "aceita_pet", "ar_condicionado",
-            "tipo_cama", "diferenciais", "observacoes",
+            "tipo_cama", "diferenciais",
+            "banheiro", "area_externa", "acessibilidade", "observacoes",
         ]
         widgets = {
             "observacoes": forms.Textarea(attrs={"rows": 2}),
