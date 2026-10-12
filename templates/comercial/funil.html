@@ -46,6 +46,14 @@
   .funil-scroll-topo::-webkit-scrollbar{height:9px}
   .funil-scroll-topo::-webkit-scrollbar-thumb{background:var(--fio-forte);border-radius:999px}
   .funil-scroll-topo[hidden]{display:none}
+  /* busca interna do funil */
+  .funil-busca{display:flex;align-items:center;gap:.5rem;margin:.1rem .1rem .5rem;padding:.5rem .8rem;
+    background:var(--superficie);border:1px solid var(--fio);border-radius:999px;max-width:560px}
+  .funil-busca .ico{width:16px;height:16px;color:var(--tinta-suave);flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2}
+  .funil-busca input{flex:1;border:none;background:transparent;outline:none;font-size:14px;color:var(--tinta)}
+  .funil-busca-info{font-size:12px;color:var(--tinta-suave);white-space:nowrap}
+  .funil-card[hidden]{display:none}
+  .funil-coluna.sem-resultado{opacity:.5}
 </style>
 <div x-data="{ nova: false, perda: false, perdaOp: null, perdaEtapa: null }">
   <div class="pagina-cabecalho">
@@ -88,6 +96,13 @@
     <label class="fp-todos"><input type="checkbox" name="fechados" value="todos" {% if todos_fechados %}checked{% endif %} onchange="this.form.submit()"> Todos</label>
   </form>
 
+  {# busca dentro do funil — filtra os cards por nome, proposta ou telefone (instantâneo) #}
+  <div class="funil-busca">
+    <svg viewBox="0 0 24 24" class="ico"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+    <input type="search" id="funilBusca" placeholder="Buscar lead no funil por nome, proposta ou telefone…" autocomplete="off">
+    <span class="funil-busca-info" id="funilBuscaInfo"></span>
+  </div>
+
   {# barra de rolagem horizontal no topo (espelha a de baixo do board) #}
   <div class="funil-scroll-topo" id="funilScrollTop" aria-hidden="true"><div></div></div>
 
@@ -108,6 +123,7 @@
         <div class="funil-cards">
           {% for op in col.itens %}
             <article class="funil-card fat-{{ op.faturamento }} status-{{ op.status }}" data-op="{{ op.id }}"
+                     data-busca="{{ op.pessoa.nome|default:'' }} {{ op.titulo_curto|default:'' }} {{ op.pessoa.telefone|default:'' }}"
                      {% if op.status == 'aberta' %}draggable="true" ondragstart="cardDragStart(event, '{{ op.id }}')" ondragend="cardDragEnd(event)"{% endif %}
                      onclick="location.href='{% url 'comercial:oportunidade' op.pk %}'">
               {% if op.eh_novo %}<span class="card-novo">novo</span>{% endif %}
@@ -346,6 +362,26 @@
     board.addEventListener('scroll', () => espelhar(board, topo));
     window.addEventListener('resize', sincronizarLargura);
     sincronizarLargura();
+  })();
+
+  /* Busca interna do funil: filtra os cards por nome/proposta/telefone (instantâneo). */
+  (function () {
+    const inp = document.getElementById('funilBusca');
+    const info = document.getElementById('funilBuscaInfo');
+    if (!inp) return;
+    const cards = Array.from(document.querySelectorAll('.funil-card'));
+    const norm = s => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    cards.forEach(c => { c._busca = norm(c.dataset.busca); });
+    function filtrar() {
+      const q = norm(inp.value.trim());
+      let vis = 0;
+      cards.forEach(c => { const ok = !q || c._busca.includes(q); c.hidden = !ok; if (ok) vis++; });
+      document.querySelectorAll('.funil-coluna').forEach(col => {
+        col.classList.toggle('sem-resultado', !!q && !col.querySelector('.funil-card:not([hidden])'));
+      });
+      info.textContent = q ? (vis + ' resultado' + (vis === 1 ? '' : 's')) : '';
+    }
+    inp.addEventListener('input', filtrar);
   })();
 </script>
 {% endblock %}
