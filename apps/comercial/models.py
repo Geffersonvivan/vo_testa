@@ -203,6 +203,20 @@ class Oportunidade(models.Model):
         return self.atividades.filter(concluida=False).order_by("quando").first()
 
     @property
+    def ultimo_contato(self):
+        """Última interação REAL com o lead (p/ o card do funil): ligação, WhatsApp,
+        e-mail, reunião, nota ou cotação já concluída. Ignora atividades de sistema
+        (automáticas) e tarefas ainda por fazer."""
+        return self.atividades.filter(
+            concluida=True,
+            tipo__in=[
+                AtividadeComercial.Tipo.LIGACAO, AtividadeComercial.Tipo.WHATSAPP,
+                AtividadeComercial.Tipo.EMAIL, AtividadeComercial.Tipo.REUNIAO,
+                AtividadeComercial.Tipo.NOTA, AtividadeComercial.Tipo.COTACAO,
+            ],
+        ).order_by("-quando").first()
+
+    @property
     def ultima_cotacao(self):
         return self.cotacoes.order_by("-criado_em").first()
 

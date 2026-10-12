@@ -10,7 +10,7 @@ from django.utils import timezone
 from apps.nucleo.models import UH, Pessoa, Prospecto, TipoUH
 
 from . import services
-from .models import AnaliseLead, EtapaFunil, MotivoPerda, Oportunidade
+from .models import AnaliseLead, AtividadeComercial, EtapaFunil, MotivoPerda, Oportunidade
 
 Usuario = get_user_model()
 
@@ -1682,6 +1682,38 @@ class PropostaSinalTests(TestCase):
     def test_brl_usa_separador_de_milhar(self):
         self.assertEqual(services._brl(Decimal("1500")), "1.500,00")
         self.assertEqual(services._brl(Decimal("450.5")), "450,50")
+
+
+class UltimoContatoTests(TestCase):
+    """Card do funil mostra o último CONTATO REAL (não sistema/tarefa)."""
+
+    def setUp(self):
+        self.u = Usuario.objects.create_superuser(username="uc", password="forte-123-abc")
+        self.pessoa = Pessoa.objects.create(nome="Lead Contato")
+        self.op = services.criar_oportunidade(
+            usuario=self.u, pessoa=self.pessoa, titulo="Contato")
+
+    def _atv(self, tipo, descricao, concluida=True):
+        return AtividadeComercial.objects.create(
+            oportunidade=self.op, tipo=tipo, descricao=descricao,
+            quando=timezone.now(), criado_por=self.u, concluida=concluida)
+
+    def test_ignora_sistema_e_tarefa_pega_contato_real(self):
+        self._atv(AtividadeComercial.Tipo.SISTEMA, "Ofereceu Quarto 09")
+        self._atv(AtividadeComercial.Tipo.TAREFA, "Ligar amanhã", concluida=False)
+        alvo = self._atv(AtividadeComercial.Tipo.WHATSAPP, "Enviou proposta no WhatsApp")
+        self.assertEqual(self.op.ultimo_contato, alvo)
+
+    def test_sem_contato_real_retorna_none(self):
+        self._atv(AtividadeComercial.Tipo.SISTEMA, "Converteu em reserva")
+        self.assertIsNone(self.op.ultimo_contato)
+
+    def test_pega_o_mais_recente(self):
+        self._atv(AtividadeComercial.Tipo.LIGACAO, "Primeira ligação",
+                  ).__class__.objects.filter(descricao="Primeira ligação").update(
+            quando=timezone.now() - timedelta(days=2))
+        recente = self._atv(AtividadeComercial.Tipo.NOTA, "Nota de hoje")
+        self.assertEqual(self.op.ultimo_contato, recente)
 
 
 class SinalPagoGanhaTests(TestCase):
