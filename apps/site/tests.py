@@ -569,6 +569,12 @@ class PaginasLegaisTests(TestCase):
         html = self.client.get(reverse("core:termos_servico")).content.decode()
         self.assertIn('id="cancelamento"', html)
 
+    def test_exclusao_tem_whatsapp_e_sem_contato_duplicado(self):
+        html = self.client.get(reverse("core:exclusao_dados")).content.decode()
+        self.assertIn("wa.me/554920550005", html)            # WhatsApp clicável
+        self.assertIn("(49) 2055-0005", html)
+        self.assertNotIn("Dúvidas sobre o processo", html)   # seção Contato redundante removida
+
     def test_home_serve_o_index_por_padrao(self):
         # Sem HOME_MODO=lp_fundador, a raiz é o index do site (não a LP).
         r = self.client.get("/")
