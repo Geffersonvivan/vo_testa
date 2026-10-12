@@ -43,7 +43,10 @@ html.js .fade-section {
     opacity: 0;
     transform: translateY(40px);
 }
-.fade-section.visible {
+/* Precisa casar a especificidade do esconder (html.js …) senão o reveal NUNCA vence:
+   html.js .fade-section = (0,2,1) > .fade-section.visible = (0,2,0). Escopado em html.js
+   fica (0,3,1) e o .visible passa a revelar de fato. */
+html.js .fade-section.visible {
     opacity: 1;
     transform: translateY(0);
 }
