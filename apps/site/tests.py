@@ -575,6 +575,12 @@ class PaginasLegaisTests(TestCase):
         self.assertIn("(49) 2055-0005", html)
         self.assertNotIn("Dúvidas sobre o processo", html)   # seção Contato redundante removida
 
+    def test_whatsapp_nas_tres_paginas_legais(self):
+        for nome in ("core:politica_privacidade", "core:termos_servico", "core:exclusao_dados"):
+            html = self.client.get(reverse(nome)).content.decode()
+            self.assertIn("wa.me/554920550005", html)
+            self.assertIn("(49) 2055-0005", html)
+
     def test_home_serve_o_index_por_padrao(self):
         # Sem HOME_MODO=lp_fundador, a raiz é o index do site (não a LP).
         r = self.client.get("/")
