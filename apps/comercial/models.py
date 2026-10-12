@@ -250,14 +250,16 @@ class Oportunidade(models.Model):
 
     @property
     def whatsapp_url(self) -> str:
-        """Link wa.me a partir do telefone do lead (assume Brasil)."""
+        """Deep link que abre a conversa direto no app WhatsApp (desktop/celular da
+        recepção), sem a página intermediária do api.whatsapp.com. Telefone do lead,
+        assume Brasil."""
         import re
         tel = re.sub(r"\D", "", (self.pessoa.telefone or ""))
         if len(tel) < 10:
             return ""
         if not tel.startswith("55"):
             tel = "55" + tel
-        return f"https://wa.me/{tel}"
+        return f"whatsapp://send?phone={tel}"
 
 
 class Cotacao(models.Model):

@@ -1131,7 +1131,8 @@ class PropriedadeLeadTests(TestCase):
         self.assertEqual(self.op.responsavel, self.v2)
 
     def test_whatsapp_url_do_telefone(self):
-        self.assertTrue(self.op.whatsapp_url.startswith("https://wa.me/55"))
+        # Deep link que abre o app direto (sem a página api.whatsapp.com).
+        self.assertTrue(self.op.whatsapp_url.startswith("whatsapp://send?phone=55"))
 
     def test_view_assumir(self):
         self.client.login(username="vend2", password="forte-123-abc")

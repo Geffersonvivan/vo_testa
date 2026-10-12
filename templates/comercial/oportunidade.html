@@ -146,7 +146,7 @@
       </div>
       <div class="lead-info">
         {% if op.temperatura %}<div class="l"><span>Temperatura</span><b>{% if op.temperatura == 'quente' %}🔥 {% endif %}{{ op.temperatura_display }}</b></div>{% endif %}
-        {% if op.pessoa.telefone %}<div class="l"><span>Telefone</span>{% if op.whatsapp_url %}<b><a href="{{ op.whatsapp_url }}" target="_blank" rel="noopener" class="tel-wpp">{{ op.pessoa.telefone }} ↗</a></b>{% else %}<b>{{ op.pessoa.telefone }}</b>{% endif %}</div>{% endif %}
+        {% if op.pessoa.telefone %}<div class="l"><span>Telefone</span>{% if op.whatsapp_url %}<b><a href="{{ op.whatsapp_url }}" class="tel-wpp">{{ op.pessoa.telefone }} ↗</a></b>{% else %}<b>{{ op.pessoa.telefone }}</b>{% endif %}</div>{% endif %}
         {% if op.campanha %}<div class="l"><span>Campanha</span><b>{{ op.campanha.nome }}</b></div>{% endif %}
         <div class="l"><span>Origem</span><b>{{ op.get_origem_display }}</b></div>
         {% if op.checkin_previsto %}<div class="l"><span>Datas</span><b>{{ op.checkin_previsto|date:"d/m" }} → {{ op.checkout_previsto|date:"d/m/Y" }}</b></div>{% endif %}
