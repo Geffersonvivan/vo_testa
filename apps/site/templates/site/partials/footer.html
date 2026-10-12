@@ -46,10 +46,10 @@
             <div>
                 <h4 class="text-pergaminho font-semibold text-sm mb-4">Informações</h4>
                 <ul class="space-y-2 text-pergaminho/40 text-sm">
-                    <li><a href="#" class="hover:text-lampiao transition">Política de Cancelamento</a></li>
-                    <li><a href="#" class="hover:text-lampiao transition">Termos de Uso</a></li>
-                    <li><a href="#" class="hover:text-lampiao transition">Privacidade</a></li>
-                    <li><a href="#" class="hover:text-lampiao transition">FAQ</a></li>
+                    <li><a href="{% url 'core:termos_servico' %}#cancelamento" class="hover:text-lampiao transition">Política de Cancelamento</a></li>
+                    <li><a href="{% url 'core:termos_servico' %}" class="hover:text-lampiao transition">Termos de Serviço</a></li>
+                    <li><a href="{% url 'core:politica_privacidade' %}" class="hover:text-lampiao transition">Privacidade</a></li>
+                    <li><a href="{% url 'core:exclusao_dados' %}" class="hover:text-lampiao transition">Exclusão de dados</a></li>
                 </ul>
             </div>
         </div>

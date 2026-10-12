@@ -1,0 +1,34 @@
+{% extends 'site/base.html' %}
+{# Base das páginas legais (privacidade, termos, exclusão de dados).
+   Integra o chrome do site (header/footer), com tipografia em <style> escopado —
+   não depende do build do Tailwind (classes utilitárias novas exigiriam rebuild). #}
+
+{% block content %}
+<style>
+  .legal{ --tinta:#2a251c; --suave:#5b5445; --ouro:#c99a3a; }
+  .legal{ max-width:780px; margin:0 auto; padding:3.5rem 1.4rem 4.5rem; color:var(--tinta);
+    line-height:1.7; }
+  .legal .marca{ font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--suave); }
+  .legal h1{ font-size:30px; letter-spacing:-.01em; margin:.4rem 0 .2rem; font-weight:700; }
+  .legal .sub{ color:var(--suave); margin:0 0 .4rem; }
+  .legal .data{ color:var(--suave); font-size:13px; margin:0 0 2.2rem; }
+  .legal h2{ font-size:19px; margin:2.2rem 0 .5rem; font-weight:700; }
+  .legal p, .legal li{ font-size:15.5px; color:#3a352b; }
+  .legal ul{ padding-left:1.2rem; }
+  .legal li{ margin:.25rem 0; }
+  .legal a{ color:var(--ouro); text-decoration:underline; }
+  .legal .rodape{ margin-top:3rem; border-top:1px solid #e5ddcd; padding-top:1rem;
+    font-size:13px; color:var(--suave); }
+</style>
+<main class="legal">
+  <p class="marca">Pousada Vô Testa</p>
+  <h1>{% block legal_titulo %}{% endblock %}</h1>
+  <p class="sub">{% block legal_sub %}{% endblock %}</p>
+  <p class="data">Última atualização: {% block legal_data %}12 de outubro de 2026{% endblock %}</p>
+
+  {% block legal_corpo %}{% endblock %}
+
+  <p class="rodape">Pousada Vô Testa · CNPJ 26.003.246/0001-00 · Itá, Santa Catarina ·
+    <a href="mailto:comercial@pousadavotesta.com.br">comercial@pousadavotesta.com.br</a></p>
+</main>
+{% endblock %}

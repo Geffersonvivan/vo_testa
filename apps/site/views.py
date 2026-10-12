@@ -89,6 +89,21 @@ def home(request):
     return render(request, 'site/home.html', context)
 
 
+def politica_privacidade(request):
+    """Política de Privacidade (LGPD) — URL pública usada pelo app Meta/WhatsApp."""
+    return render(request, 'site/legal/politica_privacidade.html')
+
+
+def termos_servico(request):
+    """Termos de Serviço — URL pública usada pelo app Meta/WhatsApp."""
+    return render(request, 'site/legal/termos_servico.html')
+
+
+def exclusao_dados(request):
+    """Instruções de exclusão de dados do usuário — exigido pelo app Meta."""
+    return render(request, 'site/legal/exclusao_dados.html')
+
+
 def quartos_todos(request):
     """Página com TODOS os quartos (venda por unidade) — a partir do "Ver todos"."""
     from apps.reservas import services as reservas

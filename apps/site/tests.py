@@ -548,3 +548,28 @@ class SeoTests(TestCase):
         with self.settings(GA_MEASUREMENT_ID="G-TESTE123"):
             html = self.client.get("/").content.decode()
             self.assertIn("G-TESTE123", html)
+
+
+class PaginasLegaisTests(TestCase):
+    """Páginas legais públicas (privacidade/termos/exclusão) p/ o app Meta/WhatsApp."""
+
+    def test_paginas_legais_abrem_e_tem_chrome(self):
+        for nome, trecho in [
+            ("core:politica_privacidade", "Política de Privacidade"),
+            ("core:termos_servico", "Termos de Serviço"),
+            ("core:exclusao_dados", "Exclusão de dados"),
+        ]:
+            r = self.client.get(reverse(nome))
+            self.assertEqual(r.status_code, 200)
+            html = r.content.decode()
+            self.assertIn(trecho, html)
+            self.assertIn("comercial@pousadavotesta.com.br", html)  # contato/DPO no rodapé
+
+    def test_termos_tem_ancora_de_cancelamento(self):
+        html = self.client.get(reverse("core:termos_servico")).content.decode()
+        self.assertIn('id="cancelamento"', html)
+
+    def test_home_serve_o_index_por_padrao(self):
+        # Sem HOME_MODO=lp_fundador, a raiz é o index do site (não a LP).
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)

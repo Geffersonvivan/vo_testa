@@ -7,6 +7,9 @@ app_name = 'core'
 urlpatterns = [
     path('', views.home, name='home'),
     path('quartos/', views.quartos_todos, name='quartos_todos'),              # vitrine dos 24
+    path('politica-de-privacidade/', views.politica_privacidade, name='politica_privacidade'),
+    path('termos-de-servico/', views.termos_servico, name='termos_servico'),
+    path('exclusao-de-dados/', views.exclusao_dados, name='exclusao_dados'),
     path('quarto/<int:uh_id>/', views.quarto_detalhe, name='quarto_detalhe'),  # página do quarto
     path('pedir-proposta/', views.pedir_proposta, name='pedir_proposta'),
 

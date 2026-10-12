@@ -1,0 +1,77 @@
+{% extends 'site/legal/_base.html' %}
+{% block title %}Política de Privacidade — Pousada Vô Testa{% endblock %}
+{% block legal_titulo %}Política de Privacidade{% endblock %}
+{% block legal_sub %}Como coletamos, usamos e protegemos os seus dados pessoais.{% endblock %}
+
+{% block legal_corpo %}
+<h2>1. Quem é o controlador</h2>
+<p>A <b>Pousada Vô Testa</b> (CNPJ 26.003.246/0001-00), situada em Itá, Santa Catarina,
+é a controladora dos dados pessoais tratados neste site e nos nossos canais de
+atendimento, nos termos da Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018).</p>
+
+<h2>2. Dados que coletamos</h2>
+<ul>
+  <li><b>Identificação e contato:</b> nome, telefone/WhatsApp, e-mail.</li>
+  <li><b>Reserva e hospedagem:</b> datas, quarto, nº de hóspedes, pedidos e preferências;
+    e, quando a legislação exige (Ficha Nacional de Registro de Hóspedes — FNRH/Embratur),
+    documento, endereço e dados da estadia.</li>
+  <li><b>Pagamento:</b> dados necessários à cobrança, processados pelo nosso provedor de
+    pagamento (não armazenamos o número completo do cartão).</li>
+  <li><b>Navegação:</b> dados de origem da visita (campanha/UTM) e de uso do site, via
+    cookies e tecnologias similares.</li>
+</ul>
+
+<h2>3. Para que usamos (finalidades e bases legais)</h2>
+<ul>
+  <li><b>Atender e reservar</b> — responder solicitações, elaborar cotações e gerir a
+    hospedagem (execução de contrato).</li>
+  <li><b>Comunicação por WhatsApp e e-mail</b> — falar com você sobre a sua reserva ou
+    o seu interesse (execução de contrato / consentimento).</li>
+  <li><b>Obrigações legais</b> — registro de hóspedes (FNRH), obrigações fiscais e
+    contábeis (cumprimento de obrigação legal).</li>
+  <li><b>Marketing</b> — novidades e ofertas, apenas com o seu consentimento, que pode
+    ser retirado a qualquer momento.</li>
+</ul>
+
+<h2>4. WhatsApp e Meta</h2>
+<p>Usamos a <b>Plataforma WhatsApp Business</b>, da Meta Platforms, Inc., para conversar
+com você. Ao nos chamar no WhatsApp, o conteúdo e os metadados da conversa são tratados
+também pela Meta, conforme a política de privacidade dela. Utilizamos essas informações
+somente para atendimento e para dar sequência ao seu interesse/reserva.</p>
+
+<h2>5. Com quem compartilhamos</h2>
+<p>Não vendemos seus dados. Compartilhamos apenas o necessário com operadores que nos
+ajudam a funcionar, sob confidencialidade e instruções nossas:</p>
+<ul>
+  <li><b>Meta/WhatsApp</b> — mensageria de atendimento.</li>
+  <li><b>Provedor de pagamento (Safrapay)</b> — processamento de cobranças.</li>
+  <li><b>Provedor de hospedagem/tecnologia</b> — operação segura do site e do sistema.</li>
+  <li><b>Órgãos públicos</b> — quando exigido por lei (ex.: Embratur/FNRH, fisco).</li>
+</ul>
+
+<h2>6. Por quanto tempo guardamos</h2>
+<p>Mantemos seus dados enquanto durar o relacionamento e pelos prazos exigidos por lei
+(fiscais, contábeis e de registro de hóspedes). Encerrado o relacionamento e vencidos os
+prazos legais, os dados são eliminados ou anonimizados. Comunicações de marketing param
+assim que você se descadastra.</p>
+
+<h2>7. Seus direitos</h2>
+<p>Você pode, a qualquer momento, solicitar: confirmação e acesso aos seus dados,
+correção, anonimização, portabilidade, informação sobre compartilhamentos, revogação do
+consentimento e <b>exclusão</b> dos dados (respeitadas as retenções legais). Veja como em
+<a href="{% url 'core:exclusao_dados' %}">Exclusão de dados</a>.</p>
+
+<h2>8. Segurança</h2>
+<p>Adotamos medidas técnicas e organizacionais para proteger seus dados contra acesso não
+autorizado, perda ou uso indevido (controles de acesso, trilha de auditoria e criptografia
+em trânsito).</p>
+
+<h2>9. Contato / Encarregado (DPO)</h2>
+<p>Dúvidas ou pedidos sobre seus dados:
+<a href="mailto:comercial@pousadavotesta.com.br">comercial@pousadavotesta.com.br</a>.
+Responderemos nos prazos da LGPD.</p>
+
+<h2>10. Alterações</h2>
+<p>Podemos atualizar esta política. A data da última revisão fica indicada no topo desta
+página.</p>
+{% endblock %}
