@@ -14,9 +14,9 @@
         <!-- Logo oficial centralizada (PNG recortado: sem padding transparente) -->
         <img src="{% static 'site/img/logo-hero.png' %}" alt="Pousada Vô Testa" class="h-32 sm:h-40 md:h-48 lg:h-56 xl:h-60 w-auto mx-auto mb-6 sm:mb-8">
 
-        <p class="text-pergaminho/80 text-base sm:text-lg md:text-xl mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed px-2">
-            {{ config.frase_hero }}
-        </p>
+        <h1 class="font-display font-black text-pergaminho text-3xl sm:text-4xl md:text-5xl leading-tight mb-8 sm:mb-10 px-2">
+            Nem resort, nem pousada.<br><span class="text-lampiao">É a casa do vô!</span>
+        </h1>
 
         <!-- Barra de busca de reserva -->
         <form action="{% url 'core:reservar' %}" method="get"
