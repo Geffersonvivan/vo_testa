@@ -126,6 +126,13 @@ def lp_fundador_lead(request):
     whats = (dados.get("whatsapp") or dados.get("whats") or "").strip()
     if not nome or not (email or whats):
         return JsonResponse({"ok": False, "erro": "dados incompletos"}, status=400)
+    if whats:
+        from django.core.exceptions import ValidationError
+        from apps.nucleo.validadores import validar_telefone_br
+        try:
+            whats = validar_telefone_br(whats)  # celular 11 dígitos; normaliza
+        except ValidationError as e:
+            return JsonResponse({"ok": False, "erro": e.messages[0]}, status=400)
 
     from .models import PaginaCaptacao
     pagina = PaginaCaptacao.objects.filter(slug="fundador").first()
@@ -253,6 +260,13 @@ def lp_fundador_2_lead(request):
     whats = (dados.get("whatsapp") or dados.get("whats") or "").strip()
     if not nome or not (email or whats):
         return JsonResponse({"ok": False, "erro": "dados incompletos"}, status=400)
+    if whats:
+        from django.core.exceptions import ValidationError
+        from apps.nucleo.validadores import validar_telefone_br
+        try:
+            whats = validar_telefone_br(whats)  # celular 11 dígitos; normaliza
+        except ValidationError as e:
+            return JsonResponse({"ok": False, "erro": e.messages[0]}, status=400)
 
     from .models import PaginaCaptacao
     pagina = PaginaCaptacao.objects.filter(slug=_LP2_SLUG).first()

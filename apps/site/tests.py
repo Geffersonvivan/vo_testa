@@ -423,7 +423,7 @@ class EventosEHomeTests(TestCase):
         from apps.comercial.models import Oportunidade
         r = self.client.post(reverse('core:pedir_proposta'), {
             'nome': 'Empresa XPTO',
-            'telefone': '4999887766',
+            'telefone': '49999887766',
             'email': 'evento@xpto.com',
             'tipo_interesse': 'evento',
             'hospedes': '30',
@@ -440,7 +440,7 @@ class EventosEHomeTests(TestCase):
         from apps.comercial.models import Oportunidade
         r = self.client.post(reverse('core:pedir_proposta'), {
             'nome': 'Festa Único Dia',
-            'telefone': '4999112233',
+            'telefone': '49999112233',
             'email': 'festa@dia.com',
             'tipo_interesse': 'evento',
             'checkin': '2026-12-20',

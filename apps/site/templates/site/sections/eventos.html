@@ -49,7 +49,7 @@
                     <div class="grid sm:grid-cols-2 gap-4">
                         <div>
                             <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">WhatsApp *</label>
-                            <input type="text" name="telefone" required value="{{ proposta.telefone|default:'' }}" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="(00) 00000-0000" inputmode="tel" maxlength="15" data-mask="telefone" autocomplete="tel">
+                            <input type="text" name="telefone" required value="{{ proposta.telefone|default:'' }}" class="w-full rounded-xl border border-madeira/15 px-3 py-2.5 text-madeira bg-white" placeholder="(00) 00000-0000" inputmode="tel" maxlength="15" data-mask="telefone" autocomplete="tel" pattern="\(\d{2}\) 9\d{4}-\d{4}" title="Informe o WhatsApp com DDD + 9 dígitos, ex.: (49) 99999-9999">
                         </div>
                         <div>
                             <label class="text-madeira/50 text-xs uppercase tracking-wider mb-1.5 block">E-mail</label>

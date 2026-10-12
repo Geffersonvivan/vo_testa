@@ -598,7 +598,7 @@ form.addEventListener('submit', async e=>{
   if(!nome.value.trim()){ nome.setAttribute('aria-invalid','true'); ok=false; foco=foco||nome; }
   if(!reEmail.test(email.value.trim())){ email.setAttribute('aria-invalid','true'); ok=false; foco=foco||email; }
   const digitos = whats.value.replace(/\D/g,'');
-  if(digitos.length < 10){ whats.setAttribute('aria-invalid','true'); ok=false; foco=foco||whats; }
+  if(digitos.length !== 11 || digitos[2] !== '9'){ whats.setAttribute('aria-invalid','true'); ok=false; foco=foco||whats; }
   if(!consent.checked){ consentWrap.classList.add('invalid'); ok=false; foco=foco||consent; }
 
   if(!ok){ if(foco) foco.focus(); return; }

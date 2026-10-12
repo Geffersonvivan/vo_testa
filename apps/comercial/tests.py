@@ -591,7 +591,10 @@ class LPFundadorTests(TestCase):
     """LP Fundador servida do HTML oficial + captura religada ao funil."""
 
     def setUp(self):
+        from django.core.cache import cache
+
         from .models import PaginaCaptacao
+        cache.clear()  # isola o rate-limit por IP (acumula entre testes no full suite)
         self.u = Usuario.objects.create_superuser(username="lp", password="forte-123-abc")
         self.pag = PaginaCaptacao.objects.create(
             nome="Inauguração — Fundador", slug="fundador",
@@ -635,6 +638,16 @@ class LPFundadorTests(TestCase):
                              data=json.dumps({"nome": ""}),
                              content_type="application/json")
         self.assertEqual(r.status_code, 400)
+
+    def test_lead_telefone_incompleto_rejeitado(self):
+        import json
+        r = self.client.post(
+            reverse("lp:fundador_lead"),
+            data=json.dumps({"nome": "Tel Curto", "whatsapp": "4999988"}),  # dígitos a menos
+            content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("incompleto", r.json()["erro"].lower())
+        self.assertFalse(Oportunidade.objects.filter(pessoa__nome="Tel Curto").exists())
 
     def test_privacidade_publica(self):
         r = self.client.get(reverse("privacidade"))
@@ -999,7 +1012,7 @@ class SitePropostaTests(TestCase):
     def test_pedir_proposta_cria_oportunidade(self):
         r = self.client.post(reverse("core:pedir_proposta"), {
             "nome": "Lead Site Form",
-            "telefone": "4999887766",
+            "telefone": "49999887766",
             "email": "lead@site.com",
             "hospedes": "2",
             "mensagem": "Quero orçamento",

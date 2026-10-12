@@ -1237,3 +1237,31 @@ class NomesQuartosTests(TestCase):
         self.assertEqual(uh.nome_tematico, "")
         # `numero` já é "Quarto 11" — o fallback é o próprio número, sem duplicar "Quarto".
         self.assertEqual(uh.nome_tematico or uh.numero, "Quarto 11")
+
+
+class ValidarTelefoneBRTests(TestCase):
+    """Validador compartilhado de telefone (LPs = celular estrito; agência = fixo ok)."""
+
+    def _val(self, v, **k):
+        from apps.nucleo.validadores import validar_telefone_br
+        return validar_telefone_br(v, **k)
+
+    def test_celular_valido_normaliza(self):
+        self.assertEqual(self._val("49999999999"), "(49) 99999-9999")
+        self.assertEqual(self._val("(49) 99999-9999"), "(49) 99999-9999")
+        self.assertEqual(self._val("5549999999999"), "(49) 99999-9999")  # tolera 55
+
+    def test_celular_incompleto_rejeita(self):
+        with self.assertRaises(ValidationError):
+            self._val("4999999999")        # 10 dígitos
+        with self.assertRaises(ValidationError):
+            self._val("(49) 8999-9999")    # sem o 9
+
+    def test_fixo_so_com_aceitar(self):
+        with self.assertRaises(ValidationError):
+            self._val("4933333333")                       # estrito recusa fixo
+        self.assertEqual(self._val("4933333333", aceitar_fixo=True), "(49) 3333-3333")
+
+    def test_ddd_invalido(self):
+        with self.assertRaises(ValidationError):
+            self._val("20999999999")       # DDD 20 não existe

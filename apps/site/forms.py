@@ -279,6 +279,18 @@ class PropostaSiteForm(forms.Form):
         }),
     )
 
+    def clean_telefone(self):
+        from django.core.exceptions import ValidationError
+
+        from apps.nucleo.validadores import validar_telefone_br
+        valor = (self.cleaned_data.get('telefone') or '').strip()
+        if not valor:
+            return valor
+        try:
+            return validar_telefone_br(valor)  # WhatsApp = celular 11 dígitos
+        except ValidationError as e:
+            raise forms.ValidationError(e.messages[0])
+
     def clean(self):
         cleaned = super().clean()
         checkin, checkout = cleaned.get('checkin'), cleaned.get('checkout')

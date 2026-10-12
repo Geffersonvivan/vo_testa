@@ -58,6 +58,19 @@ class PessoaForm(forms.ModelForm):
             ),
         }
 
+    def clean_telefone(self):
+        # Cadastro interno (inclui agência/empresa): aceita fixo (10) OU celular (11).
+        from django.core.exceptions import ValidationError
+
+        from apps.nucleo.validadores import validar_telefone_br
+        valor = (self.cleaned_data.get("telefone") or "").strip()
+        if not valor:
+            return valor
+        try:
+            return validar_telefone_br(valor, aceitar_fixo=True)
+        except ValidationError as e:
+            raise forms.ValidationError(e.messages[0])
+
 
 class HospedeForm(forms.ModelForm):
     class Meta:
