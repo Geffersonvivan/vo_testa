@@ -1698,6 +1698,28 @@ class PropostaSinalTests(TestCase):
         self.assertEqual(services._brl(Decimal("450.5")), "450,50")
 
 
+class TelefoneIncompletoAuditoriaTests(TestCase):
+    """Auditoria acusa leads com telefone incompleto/inválido (passivo)."""
+
+    def _op(self, telefone):
+        pessoa = Pessoa.objects.create(nome="Lead Tel", telefone=telefone)
+        u = Usuario.objects.create_superuser(
+            username=f"ta{telefone or 'x'}", password="forte-123-abc")
+        return services.criar_oportunidade(usuario=u, pessoa=pessoa, titulo="T")
+
+    def test_acusa_incompleto_e_ignora_valido(self):
+        self._op("4999999")          # incompleto → acusa
+        tipos = [a["tipo"] for a in services.pendencias_auditoria()]
+        self.assertIn("telefone_incompleto", tipos)
+
+    def test_celular_e_fixo_validos_nao_acusam(self):
+        self._op("49999887766")      # celular ok
+        self._op("4933887766")       # fixo ok (aceitar_fixo)
+        achados = [a for a in services.pendencias_auditoria()
+                   if a["tipo"] == "telefone_incompleto"]
+        self.assertEqual(achados, [])
+
+
 class UltimoContatoTests(TestCase):
     """Card do funil mostra o último CONTATO REAL (não sistema/tarefa)."""
 

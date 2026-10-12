@@ -1252,7 +1252,31 @@ def pendencias_auditoria():
                 ),
                 "url": _url("comercial:oportunidade", op.pk),
             })
+        # Telefone incompleto/inválido (passivo de antes da validação). Aceita fixo
+        # (agência/empresa) — só acusa número que falha até o critério leniente.
+        tel = (op.pessoa.telefone or "").strip()
+        if tel and not _telefone_ok(tel):
+            achados.append({
+                "area": "Comercial", "gravidade": "media", "tipo": "telefone_incompleto",
+                "descricao": (
+                    f"Telefone incompleto/inválido em '{op.titulo}' "
+                    f"({op.pessoa.nome}): {tel}"
+                ),
+                "url": _url("comercial:oportunidade", op.pk),
+            })
     return achados
+
+
+def _telefone_ok(valor) -> bool:
+    """True se o telefone passa na validação (celular 11 díg OU fixo 10 díg)."""
+    from django.core.exceptions import ValidationError
+
+    from apps.nucleo.validadores import validar_telefone_br
+    try:
+        validar_telefone_br(valor, aceitar_fixo=True)
+        return True
+    except ValidationError:
+        return False
 
 
 def relatorio_funil(inicio, fim):
