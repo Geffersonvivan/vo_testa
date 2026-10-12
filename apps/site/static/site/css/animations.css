@@ -48,6 +48,21 @@ html.js .fade-section {
     transform: translateY(0);
 }
 
+/* FAIL-SAFE: se o reveal por JS (IntersectionObserver em main.js) não rodar — erro,
+   timeout, ordem de carga — nenhuma seção pode ficar permanentemente invisível.
+   Qualquer .fade-section ainda não revelada aparece sozinha após 2s. O caminho normal
+   (.visible pelo observer) continua valendo e tem prioridade: ao ganhar a classe, a
+   seção deixa de casar com :not(.visible) e o fallback é descartado. */
+@keyframes fade-section-failsafe {
+    to { opacity: 1; transform: translateY(0); }
+}
+html.js .fade-section:not(.visible) {
+    animation: fade-section-failsafe 0.8s ease 2s forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+    html.js .fade-section:not(.visible) { animation-duration: 0.01s; }
+}
+
 /* Badge flutuante — prova social */
 @keyframes slide-in {
     0% { transform: translateX(-120%); opacity: 0; }

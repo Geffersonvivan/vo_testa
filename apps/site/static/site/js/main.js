@@ -244,9 +244,9 @@ document.querySelectorAll('[data-mask="cpf"], [data-mask="telefone"]').forEach(a
     grid.querySelectorAll('[data-galeria-item]').forEach((b, i) => {
         if (b.dataset.src) b.addEventListener('click', () => abrir(i));
     });
-    q('[data-gl-prev]').addEventListener('click', () => ir(atual - 1));
-    q('[data-gl-next]').addEventListener('click', () => ir(atual + 1));
-    q('[data-gl-close]').addEventListener('click', fechar);
+    q('[data-gl-prev]')?.addEventListener('click', () => ir(atual - 1));
+    q('[data-gl-next]')?.addEventListener('click', () => ir(atual + 1));
+    q('[data-gl-close]')?.addEventListener('click', fechar);
     lb.addEventListener('click', e => { if (e.target === lb) fechar(); });
     document.addEventListener('keydown', e => {
         if (lb.classList.contains('hidden')) return;
