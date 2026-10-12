@@ -18,11 +18,6 @@
             <a href="{% url 'core:home' %}#dia-pousada" class="hover:text-lampiao transition">Dia na Pousada</a>
             <a href="{% url 'core:home' %}#eventos" class="hover:text-lampiao transition">Eventos</a>
             <a href="{% url 'core:home' %}#contato" class="hover:text-lampiao transition">Contato</a>
-            <!-- TEMPORÁRIO: link para o laboratório de protótipos (remover depois) -->
-            <a href="{% url 'core:lab' %}" class="text-lampiao font-semibold flex items-center gap-1 hover:text-pergaminho transition">
-                Lab
-                <span class="text-[9px] uppercase tracking-wider bg-lampiao/20 text-lampiao px-1.5 py-0.5 rounded">beta</span>
-            </a>
         </nav>
 
         <!-- Acessos + CTA Desktop -->
@@ -57,10 +52,6 @@
         <a href="{% url 'core:home' %}#dia-pousada" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Dia na Pousada</a>
         <a href="{% url 'core:home' %}#eventos" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Eventos</a>
         <a href="{% url 'core:home' %}#contato" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Contato</a>
-        <!-- TEMPORÁRIO: link para o laboratório de protótipos (remover depois) -->
-        <a href="{% url 'core:lab' %}" class="mobile-link text-lampiao font-semibold text-lg py-3 border-b border-pergaminho/10 hover:text-pergaminho transition flex items-center gap-2">
-            Lab <span class="text-[10px] uppercase tracking-wider bg-lampiao/20 px-1.5 py-0.5 rounded">beta</span>
-        </a>
         <a href="{% url 'core:minha_reserva' %}" class="mobile-link text-pergaminho/80 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Minha reserva</a>
         <a href="{% url 'login' %}" class="mobile-link text-pergaminho/50 text-lg py-3 border-b border-pergaminho/10 hover:text-lampiao transition">Acesso da equipe</a>
     </div>
