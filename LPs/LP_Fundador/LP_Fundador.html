@@ -362,7 +362,7 @@ footer .links a:hover{color:var(--lampiao)}
         <div class="field">
           <label for="whats">WhatsApp</label>
           <input type="text" id="whats" name="whats" inputmode="numeric" autocomplete="tel" placeholder="(00) 00000-0000" aria-invalid="false">
-          <span class="err" id="err-whats">Confira o número. Precisa do DDD e do WhatsApp completo.</span>
+          <span class="err" id="err-whats">Número incompleto — informe DDD + 9 dígitos (ex.: (49) 99999-9999).</span>
         </div>
         <div aria-hidden="true" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0">
           <label for="empresa">Empresa</label>
@@ -581,6 +581,12 @@ whats.addEventListener('input', e=>{
   else if(v.length>2)  v=v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
   else if(v.length>0)  v=v.replace(/(\d{0,2})/,'($1');
   e.target.value=v;
+  whats.setAttribute('aria-invalid','false');   // some o erro enquanto corrige
+});
+/* Aviso na hora: ao sair do campo, avisa se o celular não está completo (11 díg + 9) */
+whats.addEventListener('blur', ()=>{
+  const d = whats.value.replace(/\D/g,'');
+  whats.setAttribute('aria-invalid', (d.length && (d.length!==11 || d[2]!=='9')) ? 'true' : 'false');
 });
 
 function clearErr(){

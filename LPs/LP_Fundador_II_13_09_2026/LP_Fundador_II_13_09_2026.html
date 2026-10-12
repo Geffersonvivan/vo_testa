@@ -319,6 +319,9 @@ footer .links a:hover{color:var(--lampiao)}
   border:1px solid color-mix(in srgb,var(--madeira) 24%,transparent);background:#fff;
   font-family:"Crimson Pro",serif;font-size:1.05rem;color:var(--madeira)}
 .form-card input:focus{outline:2px solid var(--lampiao);outline-offset:1px}
+.form-card .campo input[aria-invalid=true]{border-color:#9c3a24}
+.form-card .campo .err{display:none;margin-top:.35rem;font-size:.9rem;color:#9c3a24;font-weight:600}
+.form-card .campo input[aria-invalid=true] + .err{display:block}
 .form-card .fc-consent{display:flex;gap:.5rem;align-items:flex-start;font-size:.86rem;margin:.3rem 0 .7rem;
   color:color-mix(in srgb,var(--madeira) 72%,transparent);line-height:1.35}
 .form-card .fc-consent a{color:var(--musgo);text-decoration:underline}
@@ -602,9 +605,9 @@ html{scrollbar-color:var(--lampiao) var(--noturno-painel)}
       <p class="fc-sub">Só nome e WhatsApp. A gente chama você primeiro, com prioridade para reservar.</p>
       <form class="lista" id="form-lista" novalidate>
         <div class="campo"><label for="h-nome">Seu nome</label>
-          <input type="text" id="h-nome" name="nome" autocomplete="name" placeholder="Como vamos chamar você" aria-invalid="false"></div>
+          <input type="text" id="h-nome" name="nome" autocomplete="name" placeholder="Como vamos chamar você" aria-invalid="false"><span class="err">Falta seu nome — é como vamos chamar você.</span></div>
         <div class="campo"><label for="h-whats">WhatsApp</label>
-          <input type="tel" id="h-whats" name="whats" inputmode="numeric" autocomplete="tel" placeholder="(00) 00000-0000" aria-invalid="false"></div>
+          <input type="tel" id="h-whats" name="whats" inputmode="numeric" autocomplete="tel" placeholder="(00) 00000-0000" aria-invalid="false"><span class="err">Número incompleto — informe DDD + 9 dígitos (ex.: (49) 99999-9999).</span></div>
         <!-- honeypot anti-bot: fora da tela, invisível a leitores de tela; se vier preenchido, é robô -->
         <input type="text" id="empresa" name="empresa" tabindex="-1" autocomplete="off" aria-hidden="true"
                style="position:absolute!important;left:-9999px;width:1px;height:1px;opacity:0">
@@ -847,6 +850,12 @@ if(form && whats){
     else if(v.length>2)  v=v.replace(/(\d{2})(\d{0,5})/,'($1) $2');
     else if(v.length>0)  v=v.replace(/(\d{0,2})/,'($1');
     e.target.value=v;
+    whats.setAttribute('aria-invalid','false');   // some o erro enquanto corrige
+  });
+  /* Aviso na hora: ao sair do campo, avisa se o celular não está completo (11 díg + 9) */
+  whats.addEventListener('blur', ()=>{
+    const d = whats.value.replace(/\D/g,'');
+    whats.setAttribute('aria-invalid', (d.length && (d.length!==11 || d[2]!=='9')) ? 'true' : 'false');
   });
 
   function clearErr(){
