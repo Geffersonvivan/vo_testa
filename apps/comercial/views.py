@@ -308,7 +308,8 @@ def mover(request, pk):
         etapa = get_object_or_404(EtapaFunil, pk=request.POST.get("etapa"))
         motivo = MotivoPerda.objects.filter(pk=request.POST.get("motivo") or None).first()
         try:
-            services.mover_etapa(oportunidade, etapa, request.user, motivo=motivo)
+            services.mover_etapa(oportunidade, etapa, request.user, motivo=motivo,
+                                 detalhe=request.POST.get("detalhe", ""))
             messages.success(request, f"Movida para '{etapa.nome}'.")
         except ValidationError as erro:
             messages.error(request, " ".join(erro.messages))
@@ -525,7 +526,8 @@ def perder(request, pk):
     if request.method == "POST":
         motivo = MotivoPerda.objects.filter(pk=request.POST.get("motivo") or None).first()
         try:
-            services.marcar_perdida(op, motivo, request.user)
+            services.marcar_perdida(op, motivo, request.user,
+                                    detalhe=request.POST.get("detalhe", ""))
             messages.success(request, "Oportunidade marcada como perdida.")
         except ValidationError as erro:
             messages.error(request, " ".join(erro.messages))

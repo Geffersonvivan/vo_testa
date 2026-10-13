@@ -126,6 +126,10 @@ class Oportunidade(models.Model):
         MotivoPerda, on_delete=models.PROTECT, null=True, blank=True,
         related_name="oportunidades", verbose_name="motivo da perda",
     )
+    motivo_perda_detalhe = models.TextField(
+        "relato da perda", blank=True,
+        help_text="Detalhe livre do porquê da perda (opcional).",
+    )
     observacao = models.TextField("observação", blank=True)
     # Vínculos soltos (sem FK cruzada entre módulos).
     reserva_id = models.PositiveIntegerField("reserva vinculada", null=True, blank=True)

@@ -269,6 +269,10 @@
               {% for m in motivos_perda %}<option value="{{ m.id }}">{{ m.nome }}</option>{% endfor %}
             </select>
           </div>
+          <div class="campo">
+            <label>Relato da perda <span style="font-weight:400;color:var(--tinta-suave)">(opcional)</span></label>
+            <textarea name="detalhe" rows="2" placeholder="O que aconteceu? (ex.: telefone deu número errado 3×)"></textarea>
+          </div>
         </div>
         <footer class="modal-acoes">
           <button type="submit" class="botao-primario">Confirmar perda</button>

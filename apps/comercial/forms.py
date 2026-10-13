@@ -195,6 +195,13 @@ class PerdaForm(forms.Form):
     motivo = forms.ModelChoiceField(
         queryset=MotivoPerda.objects.filter(ativo=True), label="Motivo da perda",
     )
+    detalhe = forms.CharField(
+        label="Relato da perda (opcional)", required=False,
+        widget=forms.Textarea(attrs={
+            "rows": 2,
+            "placeholder": "O que aconteceu? (ex.: telefone deu número errado 3×)",
+        }),
+    )
 
 
 class CotacaoForm(forms.Form):

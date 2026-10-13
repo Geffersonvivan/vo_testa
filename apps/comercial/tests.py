@@ -1720,6 +1720,36 @@ class TelefoneIncompletoAuditoriaTests(TestCase):
         self.assertEqual(achados, [])
 
 
+class PerdaComRelatoTests(TestCase):
+    """Motivo 'Dados incompletos' (seed) + relato opcional da perda."""
+
+    def setUp(self):
+        self.u = Usuario.objects.create_superuser(username="pr", password="forte-123-abc")
+        self.pessoa = Pessoa.objects.create(nome="Lead Perda")
+        self.op = services.criar_oportunidade(usuario=self.u, pessoa=self.pessoa, titulo="P")
+
+    def test_motivo_dados_incompletos_semeado_e_ativo(self):
+        m = MotivoPerda.objects.filter(nome="Dados incompletos").first()
+        self.assertIsNotNone(m)
+        self.assertTrue(m.ativo)
+
+    def test_marcar_perdida_grava_relato(self):
+        m = MotivoPerda.objects.get(nome="Dados incompletos")
+        services.marcar_perdida(self.op, m, self.u,
+                                detalhe="telefone deu número errado 3×")
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.status, Oportunidade.Status.PERDIDA)
+        self.assertEqual(self.op.motivo_perda, m)
+        self.assertEqual(self.op.motivo_perda_detalhe, "telefone deu número errado 3×")
+
+    def test_relato_opcional(self):
+        m = MotivoPerda.objects.filter(nome="Outro").first() or \
+            MotivoPerda.objects.create(nome="Outro")
+        services.marcar_perdida(self.op, m, self.u)  # sem detalhe
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.motivo_perda_detalhe, "")
+
+
 class UltimoContatoTests(TestCase):
     """Card do funil mostra o último CONTATO REAL (não sistema/tarefa)."""
 

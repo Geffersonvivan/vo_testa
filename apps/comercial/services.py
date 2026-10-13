@@ -608,7 +608,7 @@ def assumir_lead(oportunidade, usuario) -> bool:
     return True
 
 
-def mover_etapa(oportunidade, etapa, usuario, motivo=None):
+def mover_etapa(oportunidade, etapa, usuario, motivo=None, detalhe=""):
     """Move entre etapas abertas. Ganho exige reserva; Perdido exige motivo."""
     assumir_lead(oportunidade, usuario)
     de = oportunidade.etapa.nome
@@ -630,7 +630,7 @@ def mover_etapa(oportunidade, etapa, usuario, motivo=None):
         return oportunidade
 
     if etapa.tipo == EtapaFunil.Tipo.PERDIDO:
-        return marcar_perdida(oportunidade, motivo, usuario)
+        return marcar_perdida(oportunidade, motivo, usuario, detalhe)
 
     _fechar_permanencia(oportunidade)
     oportunidade.etapa = etapa
@@ -668,24 +668,28 @@ def concluir_tarefa(atividade, usuario):
 
 
 @transaction.atomic
-def marcar_perdida(oportunidade, motivo, usuario):
+def marcar_perdida(oportunidade, motivo, usuario, detalhe=""):
     if motivo is None:
         raise ValidationError("Informe o motivo da perda.")
+    detalhe = (detalhe or "").strip()
     _fechar_permanencia(oportunidade)
     oportunidade.status = Oportunidade.Status.PERDIDA
     oportunidade.motivo_perda = motivo
+    oportunidade.motivo_perda_detalhe = detalhe
     oportunidade.fechado_em = timezone.now()
     etapa_perdido = _etapa_por_tipo(EtapaFunil.Tipo.PERDIDO)
     if etapa_perdido:
         oportunidade.etapa = etapa_perdido
-    oportunidade.save(update_fields=["status", "motivo_perda", "fechado_em",
-                                     "etapa", "atualizado_em"])
+    oportunidade.save(update_fields=["status", "motivo_perda", "motivo_perda_detalhe",
+                                     "fechado_em", "etapa", "atualizado_em"])
     if etapa_perdido:
         _abrir_permanencia(oportunidade, etapa_perdido)
         _fechar_permanencia(oportunidade)
     registrar_auditoria(usuario, "oportunidade_perdida", oportunidade,
-                        {"motivo": motivo.nome})
-    _log_evento(oportunidade, usuario, f"marcou como perdida — {motivo.nome}")
+                        {"motivo": motivo.nome, "detalhe": detalhe})
+    _log_evento(oportunidade, usuario,
+                f"marcou como perdida — {motivo.nome}"
+                + (f": {detalhe}" if detalhe else ""))
     transaction.on_commit(lambda: enviar_evento_crm(oportunidade, "perdido"))
     return oportunidade
 

@@ -160,7 +160,7 @@
       {% if op.observacao %}<p class="op-obs" style="margin-top:.6rem">{{ op.observacao }}</p>{% endif %}
       {% if op.reserva_id %}<p class="aviso-inline op-aviso">Convertida na reserva <a href="{% url 'reservas:detalhe' op.reserva_id %}">#{{ op.reserva_id }}</a>{% if op.cobranca_sinal_id %} · sinal #{{ op.cobranca_sinal_id }}{% endif %}.</p>{% endif %}
       {% if op.nps_convidado_em %}<p class="aviso-inline op-aviso">Hand-off NPS em {{ op.nps_convidado_em|date:"d/m/Y H:i" }}.</p>{% endif %}
-      {% if op.status == 'perdida' and op.motivo_perda %}<p class="aviso-inline op-aviso">Perdida — motivo: {{ op.motivo_perda.nome }}.</p>{% endif %}
+      {% if op.status == 'perdida' and op.motivo_perda %}<p class="aviso-inline op-aviso">Perdida — motivo: {{ op.motivo_perda.nome }}.{% if op.motivo_perda_detalhe %} <span style="font-style:italic">“{{ op.motivo_perda_detalhe }}”</span>{% endif %}</p>{% endif %}
     </div>
 
     {% if op.aberta %}
@@ -228,6 +228,7 @@
         <form method="post" action="{% url 'comercial:perder' op.pk %}">
           {% csrf_token %}
           <div class="campo">{{ perda_form.motivo.label_tag }}{{ perda_form.motivo }}</div>
+          <div class="campo">{{ perda_form.detalhe.label_tag }}{{ perda_form.detalhe }}</div>
           <button type="submit" class="botao-neutro botao-largo">Confirmar perda</button>
         </form>
       </details>
