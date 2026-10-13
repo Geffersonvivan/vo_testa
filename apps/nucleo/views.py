@@ -490,6 +490,18 @@ def busca_global(request):
                     "rotulo": p.nome, "tipo": "Produto",
                     "url": reverse("estoque:produto_editar", args=[p.pk]),
                 })
+        if request.user.pode_acessar(Modulo.COMERCIAL):
+            from apps.comercial.models import Oportunidade
+
+            for op in Oportunidade.objects.select_related("pessoa").filter(
+                Q(pessoa__nome__icontains=q) | Q(titulo__icontains=q)
+                | Q(pessoa__telefone__icontains=q)
+            )[:5]:
+                resultados.append({
+                    "rotulo": f"{op.pessoa.nome} — {op.titulo_curto or op.titulo}",
+                    "tipo": f"Lead · {op.get_status_display()}",
+                    "url": reverse("comercial:oportunidade", args=[op.pk]),
+                })
     return JsonResponse({"resultados": resultados})
 
 
