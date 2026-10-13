@@ -452,7 +452,12 @@
     document.getElementById('paleta').style.display = 'flex';
     const inp = document.getElementById('paleta-input');
     inp.value = ''; inp.focus();
-    renderPaleta(COMANDOS);
+    paletaDica();   // abre vazia — só o campo de busca; comandos/resultados ao digitar
+  }
+  function paletaDica() {
+    paletaItens = []; paletaSel = 0;
+    document.getElementById('paleta-lista').innerHTML =
+      '<div class="paleta-vazio">Digite para buscar hóspedes, reservas, produtos e leads…</div>';
   }
   function fecharPaleta() { document.getElementById('paleta').style.display = 'none'; }
 
@@ -483,8 +488,9 @@
   function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   async function buscarPaleta(q) {
+    if (!q) { paletaDica(); return; }   // campo vazio → só a dica, sem comandos
     const estaticos = COMANDOS.filter(c => c.rotulo.toLowerCase().includes(q.toLowerCase()));
-    if (q.length < 2) { renderPaleta(q ? estaticos : COMANDOS); return; }
+    if (q.length < 2) { renderPaleta(estaticos); return; }
     try {
       const url = document.querySelector('.paleta').dataset.urlBusca + '?q=' + encodeURIComponent(q);
       const d = await (await fetch(url)).json();
