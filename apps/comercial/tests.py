@@ -961,6 +961,87 @@ class WhatsAppCloudTests(TestCase):
         self.assertEqual(conv.mensagens.filter(direcao="entrada").count(), 1)
         self.assertTrue(conv.janela_aberta)
 
+    # ---- número novo (desconhecido) vira lead ----
+    def _payload_novo(self, texto="Olá, quero reservar", wamid="wamid.NOVO",
+                      numero="5549988776655", nome_perfil="João Turista"):
+        agora = str(int(timezone.now().timestamp()))
+        val = {"messaging_product": "whatsapp", "messages": [{
+            "from": numero, "id": wamid, "timestamp": agora,
+            "type": "text", "text": {"body": texto}}]}
+        if nome_perfil is not None:
+            val["contacts"] = [{"wa_id": numero, "profile": {"name": nome_perfil}}]
+        return {"object": "whatsapp_business_account", "entry": [{"id": "WABA",
+                "changes": [{"field": "messages", "value": val}]}]}
+
+    def test_webhook_numero_novo_cria_lead(self):
+        import json
+        antes = Oportunidade.objects.count()
+        r = self.client.post(reverse("whatsapp:webhook"),
+                             data=json.dumps(self._payload_novo()),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(Oportunidade.objects.count(), antes + 1)
+        op = Oportunidade.objects.latest("id")
+        self.assertEqual(op.origem, Oportunidade.Origem.WHATSAPP)
+        self.assertEqual(op.status, Oportunidade.Status.ABERTA)
+        self.assertEqual(op.pessoa.nome, "João Turista")  # nome do perfil do WhatsApp
+        conv = op.conversa_whatsapp
+        self.assertEqual(conv.mensagens.filter(direcao="entrada").count(), 1)
+        self.assertTrue(conv.janela_aberta)
+
+    def test_webhook_numero_novo_sem_perfil_usa_telefone(self):
+        import json
+        self.client.post(reverse("whatsapp:webhook"),
+                         data=json.dumps(self._payload_novo(
+                             nome_perfil=None, wamid="wamid.SEMNOME",
+                             numero="5549911112222")),
+                         content_type="application/json")
+        op = Oportunidade.objects.latest("id")
+        self.assertEqual(op.origem, Oportunidade.Origem.WHATSAPP)
+        # nome = "WhatsApp " + número formatado (prova a formatação, não só o dígito cru)
+        self.assertEqual(op.pessoa.nome, "WhatsApp (49) 91111-2222")
+
+    def test_webhook_numero_novo_idempotente_nao_duplica_lead(self):
+        import json
+        antes = Oportunidade.objects.count()
+        for _ in range(2):   # Meta reentrega o mesmo wamid → não pode criar 2 leads
+            self.client.post(reverse("whatsapp:webhook"),
+                             data=json.dumps(self._payload_novo(
+                                 wamid="wamid.DUP", numero="5549933334444",
+                                 nome_perfil="Lead Repetido")),
+                             content_type="application/json")
+        self.assertEqual(Oportunidade.objects.count(), antes + 1)
+        op = Oportunidade.objects.latest("id")
+        self.assertEqual(op.conversa_whatsapp.mensagens.count(), 1)
+
+    def _payload_reacao(self, numero, wamid="wamid.REACT", nome_perfil=None):
+        agora = str(int(timezone.now().timestamp()))
+        val = {"messaging_product": "whatsapp", "messages": [{
+            "from": numero, "id": wamid, "timestamp": agora, "type": "reaction",
+            "reaction": {"emoji": "👍", "message_id": "wamid.ALVO"}}]}
+        if nome_perfil is not None:
+            val["contacts"] = [{"wa_id": numero, "profile": {"name": nome_perfil}}]
+        return {"object": "whatsapp_business_account", "entry": [{"id": "WABA",
+                "changes": [{"field": "messages", "value": val}]}]}
+
+    def test_webhook_tipo_sem_conteudo_de_numero_novo_nao_cria_lead(self):
+        import json
+        antes = Oportunidade.objects.count()
+        self.client.post(reverse("whatsapp:webhook"),
+                         data=json.dumps(self._payload_reacao(
+                             "5549955556666", nome_perfil="Reagente")),
+                         content_type="application/json")
+        self.assertEqual(Oportunidade.objects.count(), antes)  # reação não vira lead
+
+    def test_webhook_tipo_sem_conteudo_de_conhecido_anexa(self):
+        import json
+        # reação de um número JÁ conhecido (Maria) → anexa à conversa dela (não é lixo)
+        self.client.post(reverse("whatsapp:webhook"),
+                         data=json.dumps(self._payload_reacao("5549999887766")),
+                         content_type="application/json")
+        conv = self.op.conversa_whatsapp
+        self.assertEqual(conv.mensagens.filter(direcao="entrada").count(), 1)
+
     def test_webhook_status_failed_nao_reverte(self):
         import json
 

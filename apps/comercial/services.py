@@ -335,7 +335,9 @@ def dados_kanban(faturamento="", inicio=None, fim=None, todos=False):
 
 
 @transaction.atomic
-def criar_oportunidade(*, usuario, pessoa, titulo, etapa=None, **campos):
+def criar_oportunidade(*, usuario, pessoa, titulo, etapa=None, disparar_crm=True, **campos):
+    """`disparar_crm=False` pula o envio síncrono do evento à Meta CAPI (POST com timeout
+    de 20s) — usado no webhook do WhatsApp, onde não se pode bloquear a resposta à Meta."""
     if etapa is None:
         etapa = etapas().first()
         if etapa is None:
@@ -346,7 +348,8 @@ def criar_oportunidade(*, usuario, pessoa, titulo, etapa=None, **campos):
     )
     _abrir_permanencia(op, etapa)
     analisar_lead(op)  # Caçador analisa o lead na entrada (score + rascunho)
-    transaction.on_commit(lambda: enviar_evento_crm(op, _estagio_key(op.etapa)))
+    if disparar_crm:
+        transaction.on_commit(lambda: enviar_evento_crm(op, _estagio_key(op.etapa)))
     return op
 
 
@@ -407,6 +410,34 @@ def _nomes_compativeis(a, b):
     if na == nb or na in nb or nb in na:
         return True
     return na.split()[0] == nb.split()[0]
+
+
+def _pessoa_por_telefone_qualquer(telefone):
+    """Acha a Pessoa do mesmo telefone pelos últimos 8 dígitos, SEM exigir nome.
+
+    Para o WhatsApp recebido o telefone É a identidade — o nome do perfil pode nem vir,
+    ou vir diferente do cadastro. Tolera máscara/DDD/DDI (ver `_norm_tel`). Inclui
+    inativas de propósito: anexar a resposta ao cadastro existente (mesmo desativado) é
+    melhor do que criar um contato duplicado.
+    """
+    from apps.nucleo.models import Pessoa
+    chave = _norm_tel(telefone)[-8:]
+    if len(chave) < 8:
+        return None
+    for c in Pessoa.objects.filter(telefone__contains=chave[-4:]).iterator():
+        if _norm_tel(c.telefone)[-8:] == chave:
+            return c
+    return None
+
+
+def _formatar_tel_br(telefone):
+    """'5549999648702' → '(49) 99964-8702' (para nomear o lead quando o perfil não vem)."""
+    d = _norm_tel(telefone)
+    if len(d) == 11:
+        return f"({d[:2]}) {d[2:7]}-{d[7:]}"
+    if len(d) == 10:
+        return f"({d[:2]}) {d[2:6]}-{d[6:]}"
+    return d or telefone
 
 
 def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
@@ -1540,40 +1571,78 @@ def abrir_conversa_whatsapp(oportunidade):
     return conv
 
 
+def _criar_lead_whatsapp(*, telefone, nome="", pessoa=None):
+    """Número novo escreveu no WhatsApp → nasce um lead no funil (origem=whatsapp).
+
+    Se já existe a Pessoa (mesmo telefone) mas sem nenhuma oportunidade, cria a
+    oportunidade para ela; senão cria Pessoa + oportunidade. Nome = perfil do WhatsApp,
+    ou '(DDD) número' quando o cliente não compartilha o perfil.
+    """
+    from apps.nucleo.models import Pessoa
+    if pessoa is None:
+        nome_final = ((nome or "").strip() or f"WhatsApp {_formatar_tel_br(telefone)}")[:150]
+        pessoa = Pessoa.objects.create(nome=nome_final, telefone=_norm_tel(telefone))
+    # titulo capado em 120 (max_length do campo) — nome de agência/empresa pode ser longo
+    # e estourar o insert, e o webhook engole o erro (perderia a mensagem).
+    return criar_oportunidade(
+        usuario=_usuario_site(), pessoa=pessoa,
+        titulo=f"WhatsApp — {pessoa.nome}"[:120], origem=Oportunidade.Origem.WHATSAPP,
+        disparar_crm=False,
+    )
+
+
 def receber_mensagem_whatsapp(*, oportunidade=None, telefone=None, texto,
-                              id_externo="", quando=None):
+                              id_externo="", quando=None, nome="", permitir_criar=True):
     """Registra uma mensagem RECEBIDA do cliente (webhook real ou simulação do MVP).
 
-    Idempotente por id_externo. Abre a janela de 24h e incrementa não-lidas.
+    Idempotente por id_externo (atalho + constraint de banco). Abre a janela de 24h e
+    incrementa não-lidas. Se o número não bate com nenhuma Pessoa e `permitir_criar`,
+    CRIA um lead no funil (origem=whatsapp) — "cliente te chama → cai no funil". `nome` é
+    o nome do perfil do WhatsApp (quando a Meta envia). `permitir_criar=False` NÃO cria
+    lead para número novo (tipos que não são conteúdo do cliente — reação/status/… — não
+    devem virar lead-lixo); mensagem de número já conhecido segue sendo registrada.
     """
+    from django.db import IntegrityError
+
     from .models import MensagemWhatsApp, Oportunidade
 
-    if oportunidade is None and telefone:
-        from apps.nucleo.models import Pessoa
-        so_num = "".join(c for c in telefone if c.isdigit())
-        pessoa = Pessoa.objects.filter(telefone__contains=so_num[-8:]).first() if so_num else None
-        if pessoa:
-            # Prefere a oportunidade em aberto; se não houver (lead já ganho/perdido),
-            # anexa à mais recente — a resposta do cliente nunca se perde e a janela
-            # de 24h abre para atender inclusive quem já reservou.
-            base = Oportunidade.objects.filter(pessoa=pessoa)
-            oportunidade = (
-                base.filter(status=Oportunidade.Status.ABERTA).order_by("-criado_em").first()
-                or base.order_by("-criado_em").first())
-    if oportunidade is None:
-        return None
+    # Idempotência (atalho rápido): webhook já processado não refaz nada.
     if id_externo and MensagemWhatsApp.objects.filter(id_externo=id_externo).exists():
-        return None  # idempotência
-    conv = abrir_conversa_whatsapp(oportunidade)
-    quando = quando or timezone.now()
-    msg = MensagemWhatsApp.objects.create(
-        conversa=conv, direcao=MensagemWhatsApp.Direcao.ENTRADA, texto=texto.strip(),
-        status=MensagemWhatsApp.Status.RECEBIDA, id_externo=id_externo, horario=quando,
-    )
-    conv.ultima_msg_cliente_em = quando
-    conv.nao_lidas = (conv.nao_lidas or 0) + 1
-    conv.save(update_fields=["ultima_msg_cliente_em", "nao_lidas", "atualizado_em"])
-    return msg
+        return None
+    try:
+        with transaction.atomic():
+            op = oportunidade
+            if op is None and telefone:
+                pessoa = _pessoa_por_telefone_qualquer(telefone)
+                if pessoa:
+                    # Prefere a oportunidade em aberto; se não houver (lead já ganho/
+                    # perdido), anexa à mais recente — a resposta do cliente nunca se
+                    # perde e a janela de 24h abre inclusive para quem já reservou.
+                    base = Oportunidade.objects.filter(pessoa=pessoa)
+                    op = (base.filter(status=Oportunidade.Status.ABERTA)
+                          .order_by("-criado_em").first()
+                          or base.order_by("-criado_em").first())
+                    if op is None and permitir_criar:  # Pessoa sem nenhuma oportunidade
+                        op = _criar_lead_whatsapp(telefone=telefone, nome=nome, pessoa=pessoa)
+                elif permitir_criar:
+                    op = _criar_lead_whatsapp(telefone=telefone, nome=nome)
+            if op is None:
+                return None
+            conv = abrir_conversa_whatsapp(op)
+            quando_ = quando or timezone.now()
+            msg = MensagemWhatsApp.objects.create(
+                conversa=conv, direcao=MensagemWhatsApp.Direcao.ENTRADA,
+                texto=texto.strip(), status=MensagemWhatsApp.Status.RECEBIDA,
+                id_externo=id_externo, horario=quando_,
+            )
+            conv.ultima_msg_cliente_em = quando_
+            conv.nao_lidas = (conv.nao_lidas or 0) + 1
+            conv.save(update_fields=["ultima_msg_cliente_em", "nao_lidas", "atualizado_em"])
+            return msg
+    except IntegrityError:
+        # Corrida: outra entrega do mesmo wamid venceu e já gravou (viola a unique de
+        # id_externo). A transação inteira — lead inclusive — é desfeita, sem duplicata.
+        return None
 
 
 def enviar_mensagem_whatsapp(*, conversa, texto, usuario):
@@ -1638,6 +1707,10 @@ def enviar_template_whatsapp(*, oportunidade, template, idioma="pt_BR",
 # Palavras que o cliente manda para sair da lista (opt-out LGPD).
 _OPT_OUT = {"sair", "sair da lista", "parar", "cancelar", "descadastrar", "remover"}
 
+# Tipos de mensagem que SÃO conteúdo autoral do cliente (abrem lead novo). Os demais
+# (reaction, location, system, order, sticker…) só anexam a quem já existe.
+_TIPOS_CONTEUDO_WHATSAPP = {"text", "button", "interactive"}
+
 
 def _atualizar_status_mensagem(id_externo, status_meta):
     """Atualiza o status de uma mensagem enviada pelo callback da Meta (delivered/read/failed)."""
@@ -1669,6 +1742,10 @@ def processar_webhook_whatsapp(payload: dict) -> dict:
     for entry in (payload.get("entry") or []):
         for ch in (entry.get("changes") or []):
             val = ch.get("value") or {}
+            # Nome do perfil do WhatsApp por remetente (p/ nomear o lead novo).
+            contatos = {
+                c.get("wa_id"): ((c.get("profile") or {}).get("name") or "")
+                for c in (val.get("contacts") or [])}
             for m in (val.get("messages") or []):
                 telefone = m.get("from", "")
                 wamid = m.get("id", "")
@@ -1688,9 +1765,13 @@ def processar_webhook_whatsapp(payload: dict) -> dict:
                     quando = datetime.fromtimestamp(int(m.get("timestamp")), tz=UTC)
                 except (TypeError, ValueError):
                     pass
+                # Só conteúdo autoral do cliente abre lead novo; reação/status/mídia de
+                # sistema anexa a quem já existe, mas não cria lead-lixo.
                 msg = receber_mensagem_whatsapp(
                     telefone=telefone, texto=texto or "[sem texto]",
-                    id_externo=wamid, quando=quando)
+                    id_externo=wamid, quando=quando,
+                    nome=contatos.get(telefone, ""),
+                    permitir_criar=tipo in _TIPOS_CONTEUDO_WHATSAPP)
                 if msg is not None:
                     resumo["mensagens"] += 1
                     if texto.strip().lower() in _OPT_OUT:

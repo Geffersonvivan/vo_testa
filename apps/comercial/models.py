@@ -866,6 +866,14 @@ class MensagemWhatsApp(models.Model):
         ordering = ["horario", "id"]
         verbose_name = "mensagem de WhatsApp"
         verbose_name_plural = "mensagens de WhatsApp"
+        constraints = [
+            # Idempotência do webhook no nível do banco: a Meta reentrega (e entrega
+            # concorrente) o mesmo wamid — o id_externo não-vazio é único. Sem isto, a
+            # corrida entre duas entregas criaria lead/mensagem duplicados.
+            models.UniqueConstraint(
+                fields=["id_externo"], condition=~models.Q(id_externo=""),
+                name="uniq_msgwhats_id_externo"),
+        ]
 
     def __str__(self):
         return f"{self.get_direcao_display()}: {self.texto[:40]}"
