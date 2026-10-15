@@ -282,17 +282,15 @@
   .tel-wpp{color:var(--sucesso);text-decoration:none;font-weight:700} .tel-wpp:hover{text-decoration:underline}
   .wpp-tag{font-size:12px;font-weight:600;color:var(--sucesso);background:var(--sucesso-bg);padding:2px 9px;border-radius:100px}
   .wpp-sim{font-size:11px;font-weight:700;color:var(--madeira);background:rgba(215,160,72,.15);padding:2px 8px;border-radius:100px}
-  .wpp-thread{display:flex;flex-direction:column;gap:8px;margin:.9rem 0;height:520px;overflow-y:auto;padding:.7rem;border:1px solid var(--fio);border-radius:14px;
-    background-color:#e5ddd3;
-    background-image:url("{% static 'img/wpp-doodles.svg' %}");
-    background-size:210px 210px; background-repeat:repeat}
+  .wpp-thread{display:flex;flex-direction:column;gap:8px;margin:.9rem 0;height:min(520px,58dvh);overflow-y:auto;padding:.7rem;border:1px solid var(--fio);border-radius:14px;
+    background:var(--canvas)}
   .wpp-thread::before{content:"";margin-top:auto}
   .wpp-thread::-webkit-scrollbar{width:8px}
   .wpp-thread::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:8px}
   .wpp-msg{max-width:78%;padding:7px 11px;border-radius:12px;font-size:14px;line-height:1.4;box-shadow:0 1px 1px rgba(0,0,0,.08)}
   .wpp-msg .wpp-h{display:block;font-size:10.5px;color:var(--tinta-suave);text-align:right;margin-top:3px}
-  .wpp-entrada{align-self:flex-start;background:#fff;border-bottom-left-radius:4px}
-  .wpp-saida{align-self:flex-end;background:#dcf3d8;border:1px solid #bfe6b8;border-bottom-right-radius:4px}
+  .wpp-entrada{align-self:flex-start;background:var(--superficie);border-bottom-left-radius:4px}
+  .wpp-saida{align-self:flex-end;background:var(--sucesso-bg);border:1px solid color-mix(in srgb, var(--sucesso) 22%, transparent);border-bottom-right-radius:4px}
   .wpp-vazio{color:var(--tinta-suave);text-align:center;padding:1.4rem;font-size:.9rem}
   .wpp-rapidas{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:.6rem}
   .wpp-chip{font-size:12.5px;color:var(--madeira);background:rgba(215,160,72,.13);border:1px solid rgba(215,160,72,.4);border-radius:100px;padding:4px 11px;cursor:pointer;text-decoration:none}
@@ -301,6 +299,14 @@
   .wpp-form input{flex:1;padding:.6rem .8rem;border:1px solid var(--fio);border-radius:12px;font:inherit;background:var(--superficie)}
   .wpp-sim-form{display:flex;gap:.5rem;margin-top:.6rem;opacity:.75}
   .wpp-sim-form input{flex:1;padding:.45rem .7rem;border:1px dashed var(--fio-forte);border-radius:10px;font:inherit;background:transparent;font-size:.85rem}
+  @media (max-width: 640px){
+    .wpp-thread{height:min(440px,52dvh)}
+    .wpp-form input{font-size:16px}            /* 16px evita o zoom automático do iOS ao focar */
+    .wpp-form .botao-primario{min-height:44px} /* alvo de toque */
+    .wpp-topo{flex-wrap:wrap}                  /* nome + selos quebram em vez de empurrar a largura */
+    .wpp-topo-dir{margin-left:52px;flex-wrap:wrap}
+    .wpp-chip{min-height:38px;display:inline-flex;align-items:center}  /* alvo de toque nas respostas rápidas */
+  }
   .lead-info .l{display:flex;justify-content:space-between;gap:1rem;font-size:.9rem;padding:.42rem 0;border-bottom:1px solid var(--fio)}
   .lead-info .l:last-child{border-bottom:none}
   .lead-info .l span{color:var(--tinta-suave)}

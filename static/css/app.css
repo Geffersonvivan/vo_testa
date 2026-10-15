@@ -673,6 +673,10 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--lampiao); }
   box-shadow: var(--sombra-1);
   font-size: .885rem;
 }
+/* Mobile: tabela densa rola na horizontal em vez de estourar a página (sem perder o cabeçalho). */
+@media (max-width: 640px) {
+  .tabela { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+}
 .tabela th {
   text-align: left;
   padding: .7rem .85rem;
@@ -2606,7 +2610,7 @@ form.filtros:not(.subnav) select:focus {
   padding: .1rem .45rem; border-radius: 999px; white-space: nowrap;
 }
 .fchip-particular { color: var(--info);   background: var(--info-bg); }
-.fchip-agencia    { color: #9A6A1A;        background: var(--alerta-bg); }
+.fchip-agencia    { color: color-mix(in srgb, var(--madeira) 50%, var(--lampiao)); background: var(--alerta-bg); }
 .fchip-empresa    { color: var(--musgo);   background: rgba(46,72,62,.1); }
 
 .funil-vazio {
@@ -2622,7 +2626,10 @@ form.filtros:not(.subnav) select:focus {
   display: grid; grid-template-columns: minmax(0, 1fr) 340px;
   gap: 1.1rem; align-items: start;
 }
-@media (max-width: 900px) { .op-layout { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .op-layout { grid-template-columns: 1fr; }
+  .op-layout > * { min-width: 0; }  /* deixa a coluna encolher abaixo do min-content (sem overflow-x) */
+}
 
 .op-resumo { padding: 1.15rem 1.25rem; }
 .op-resumo-topo {

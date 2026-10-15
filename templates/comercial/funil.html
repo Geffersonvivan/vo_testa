@@ -22,7 +22,7 @@
     font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:100px;box-shadow:var(--sombra-1,0 2px 6px rgba(0,0,0,.15))}
   .card-chips{display:flex;flex-wrap:wrap;gap:5px;margin:.35rem 0}
   .mchip{font-size:12px;background:rgba(0,0,0,.06);color:var(--tinta-suave);padding:2px 7px;border-radius:6px;white-space:nowrap}
-  .mchip-lp{background:rgba(215,160,72,.18);color:#7a5310;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .mchip-lp{background:rgba(215,160,72,.18);color:color-mix(in srgb, var(--madeira) 50%, var(--lampiao));max-width:100%;overflow:hidden;text-overflow:ellipsis}
   .mchip-reativado{background:rgba(42,157,143,.16);color:var(--info,#217a6e);font-weight:600}
   .temp-quente{background:var(--perigo-bg);color:var(--perigo)}
   .temp-morno{background:var(--alerta-bg);color:var(--alerta)}
@@ -55,8 +55,51 @@
   .funil-busca-info{font-size:12px;color:var(--tinta-suave);white-space:nowrap}
   .funil-card[hidden]{display:none}
   .funil-coluna.sem-resultado{opacity:.5}
+
+  /* Botão "Mover" no card — caminho de toque E teclado para mudar de etapa */
+  .card-mover{font-size:12px;font-weight:700;color:var(--info);background:none;border:none;
+    padding:4px 2px;cursor:pointer;white-space:nowrap;min-height:28px}
+  .card-mover:hover{text-decoration:underline}
+  .card-mover:active{opacity:.7}
+
+  /* Bottom sheet — "Mover para etapa" */
+  .sheet-overlay{position:fixed;inset:0;z-index:70;background:rgba(20,24,28,.38);
+    display:flex;align-items:flex-end;justify-content:center}
+  .sheet{width:100%;max-width:520px;background:var(--superficie);
+    border-radius:var(--raio-g) var(--raio-g) 0 0;box-shadow:0 -12px 44px rgba(0,0,0,.24);
+    padding:.5rem .9rem calc(1rem + env(safe-area-inset-bottom));max-height:80vh;overflow-y:auto}
+  .sheet-alca{width:36px;height:4px;border-radius:999px;background:var(--fio-forte);margin:.4rem auto .6rem}
+  .sheet-tit{font-size:12px;font-weight:700;color:var(--tinta-suave);text-transform:uppercase;
+    letter-spacing:.06em;margin:.1rem .2rem .55rem}
+  .sheet-etapa{display:flex;align-items:center;gap:.6rem;width:100%;text-align:left;
+    background:var(--superficie-2);border:1px solid var(--fio);border-radius:var(--raio-p);
+    padding:.75rem .85rem;margin-bottom:.4rem;font-size:14px;font-weight:600;color:var(--tinta);
+    cursor:pointer;min-height:48px}
+  .sheet-etapa:hover{border-color:var(--fio-forte)}
+  .sheet-etapa:active{background:var(--canvas)}
+  .sheet-etapa .ponto{width:10px;height:10px;border-radius:50%;background:var(--cor-etapa,var(--lampiao));flex:0 0 auto}
+  @media (prefers-reduced-motion: no-preference){
+    .sheet{animation:sheet-sobe .22s cubic-bezier(.22,.61,.36,1)}
+    @keyframes sheet-sobe{from{transform:translateY(14px);opacity:.5}to{transform:none;opacity:1}}
+  }
+
+  /* Mobile: uma etapa por tela (largura total + snap horizontal), esconde a barra espelho.
+     O "Mover" vira o caminho principal já que o drag HTML5 não funciona no toque. */
+  @media (max-width: 640px){
+    .funil-board{scroll-snap-type:x mandatory;gap:.6rem;padding-bottom:.6rem}
+    .funil-coluna{flex:0 0 100%;min-height:auto}
+    .funil-cards{overflow-y:visible}
+    .funil-scroll-topo{display:none}
+    .card-mover{font-size:13px;min-height:32px}
+  }
+  /* Toque (qualquer tamanho): o cursor grab não faz sentido; o botão Mover resolve.
+     Ações do card ganham alvo de toque ≥44px. */
+  @media (hover: none){
+    .funil-card{cursor:default}
+    .card-acao .botao-mini, .card-wpp, .card-mover{min-height:44px;display:inline-flex;align-items:center}
+  }
 </style>
-<div x-data="{ nova: false, perda: false, perdaOp: null, perdaEtapa: null }">
+<div x-data="{ nova: false, perda: false, perdaOp: null, perdaEtapa: null, mover: false, moverOp: null }">
   <div class="pagina-cabecalho">
     <div>
       <p class="pagina-eyebrow letreiro">Comercial</p>
@@ -126,7 +169,9 @@
             <article class="funil-card fat-{{ op.faturamento }} status-{{ op.status }}" data-op="{{ op.id }}"
                      data-busca="{{ op.pessoa.nome|default:'' }} {{ op.titulo_curto|default:'' }} {{ op.pessoa.telefone|default:'' }}"
                      {% if op.status == 'aberta' %}draggable="true" ondragstart="cardDragStart(event, '{{ op.id }}')" ondragend="cardDragEnd(event)"{% endif %}
-                     onclick="location.href='{% url 'comercial:oportunidade' op.pk %}'">
+                     role="link" tabindex="0" aria-label="Abrir oportunidade — {{ op.pessoa.nome }}"
+                     onclick="location.href='{% url 'comercial:oportunidade' op.pk %}'"
+                     onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();location.href='{% url 'comercial:oportunidade' op.pk %}'}">
               {% if op.eh_novo %}<span class="card-novo">novo</span>{% endif %}
               <p class="card-nome">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
@@ -189,6 +234,7 @@
                   </form>
                 {% endif %}
                 {% if op.whatsapp_url %}<a href="{{ op.whatsapp_url }}" class="card-wpp" title="Falar no WhatsApp (abre o app)">WhatsApp</a>{% endif %}
+                {% if op.status == 'aberta' %}<button type="button" class="card-mover" onclick="abrirMover(event, '{{ op.pk }}')" aria-label="Mover {{ op.pessoa.nome }} para outra etapa">Mover</button>{% endif %}
               </div>
             </article>
           {% empty %}
@@ -283,6 +329,21 @@
       </form>
     </div>
   </div>
+
+  {# Bottom sheet — Mover card para etapa (toque + teclado; reusa o fluxo do drag) #}
+  <div class="sheet-overlay" x-show="mover" x-cloak @click.self="mover = false" @keydown.escape.window="mover = false">
+    <div class="sheet" role="dialog" aria-modal="true" aria-label="Mover para etapa">
+      <div class="sheet-alca" aria-hidden="true"></div>
+      <p class="sheet-tit">Mover para</p>
+      {% for col in colunas %}
+        <button type="button" class="sheet-etapa"
+                style="--cor-etapa: {% if col.etapa.tipo == 'ganho' %}var(--sucesso){% elif col.etapa.tipo == 'perdido' %}var(--perigo){% else %}var(--lampiao){% endif %}"
+                onclick="moverPara('{{ col.etapa.id }}', '{{ col.etapa.tipo }}')">
+          <span class="ponto" aria-hidden="true"></span>{{ col.etapa.nome }}
+        </button>
+      {% endfor %}
+    </div>
+  </div>
 </div>
 
 <form id="form-mover" method="post" style="display:none">{% csrf_token %}<input type="hidden" name="etapa" id="mover-etapa"></form>
@@ -320,10 +381,8 @@
   function cardDragEnd(ev) { ev.currentTarget.classList.remove('arrastando'); }
   function colDragOver(ev) { ev.preventDefault(); ev.currentTarget.classList.add('dragover'); }
   function colDragLeave(ev) { ev.currentTarget.classList.remove('dragover'); }
-  function soltarCard(ev, etapaId, tipo) {
-    ev.preventDefault();
-    ev.currentTarget.classList.remove('dragover');
-    const opId = ev.dataTransfer.getData('op');
+  /* Núcleo do "mover": compartilhado pelo drag (desktop) e pelo bottom sheet (toque/teclado). */
+  function executarMover(opId, etapaId, tipo) {
     if (!opId) return;
     if (tipo === 'ganho') {
       if (typeof toast === 'function') {
@@ -334,8 +393,7 @@
       return;
     }
     if (tipo === 'perdido') {
-      const root = document.querySelector('[x-data]');
-      const data = Alpine.$data(root);
+      const data = Alpine.$data(document.querySelector('[x-data]'));
       data.perdaOp = opId;
       data.perdaEtapa = etapaId;
       data.perda = true;
@@ -345,6 +403,24 @@
     form.action = '/crm/comercial/' + opId + '/mover/';
     document.getElementById('mover-etapa').value = etapaId;
     form.submit();
+  }
+  function soltarCard(ev, etapaId, tipo) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('dragover');
+    executarMover(ev.dataTransfer.getData('op'), etapaId, tipo);
+  }
+  /* Bottom sheet (toque/teclado) — abre a lista de etapas e reusa executarMover. */
+  function abrirMover(ev, opId) {
+    ev.stopPropagation();
+    const data = Alpine.$data(document.querySelector('[x-data]'));
+    data.moverOp = opId;
+    data.mover = true;
+  }
+  function moverPara(etapaId, tipo) {
+    const data = Alpine.$data(document.querySelector('[x-data]'));
+    const opId = data.moverOp;
+    data.mover = false;
+    executarMover(opId, etapaId, tipo);
   }
 
   /* Barra de rolagem no topo do funil, espelhando a de baixo do board. */
