@@ -72,6 +72,7 @@
     {% if cotacoes %}
     <section class="cartao" style="padding:1.1rem 1.2rem">
       <div class="cartao-cabeca"><h2>Cotações</h2></div>
+      <div class="tabela-rol">
       <table class="tabela">
         <thead><tr><th>Quando</th><th>Tipo</th><th>Período</th><th class="num">Diária</th><th class="num">Total</th><th>Validade</th></tr></thead>
         <tbody>
@@ -87,6 +88,7 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
     </section>
     {% endif %}
 
@@ -104,6 +106,7 @@
           <button type="submit" class="botao-primario">Adicionar</button>
         </form>
       {% endif %}
+      <div class="tabela-rol">
       <table class="tabela">
         <thead><tr><th>Quando</th><th>Quem</th><th>Tipo</th><th>Descrição</th><th></th></tr></thead>
         <tbody>
@@ -124,6 +127,7 @@
           {% endfor %}
         </tbody>
       </table>
+      </div>
     </section>
   </main>
 

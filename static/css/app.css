@@ -677,6 +677,11 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--lampiao); }
 @media (max-width: 640px) {
   .tabela { display: block; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
 }
+/* Container rolante p/ tabela em coluna estreita (ex.: detalhe da oportunidade): a tabela
+   mantém width:100% no desktop e ROLA quando a coluna aperta, em vez de transbordar por cima
+   da coluna vizinha. */
+.tabela-rol { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: .9rem 0 2rem; }
+.tabela-rol > .tabela { margin: 0; }
 .tabela th {
   text-align: left;
   padding: .7rem .85rem;
@@ -688,7 +693,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--lampiao); }
   background: var(--superficie-2);
   border-bottom: 1px solid var(--fio);
 }
-.tabela td { padding: .68rem .85rem; border-bottom: 1px solid var(--fio); vertical-align: middle; }
+.tabela td { padding: .68rem .85rem; border-bottom: 1px solid var(--fio); vertical-align: middle; overflow-wrap: anywhere; }
 .tabela tbody tr:last-child td { border-bottom: none; }
 .tabela tbody tr { transition: background .12s; }
 .tabela tbody tr:hover { background: var(--superficie-2); }
@@ -2626,10 +2631,11 @@ form.filtros:not(.subnav) select:focus {
   display: grid; grid-template-columns: minmax(0, 1fr) 340px;
   gap: 1.1rem; align-items: start;
 }
-@media (max-width: 900px) {
-  .op-layout { grid-template-columns: 1fr; }
-  .op-layout > * { min-width: 0; }  /* deixa a coluna encolher abaixo do min-content (sem overflow-x) */
-}
+/* Incondicional: a coluna encolhe abaixo do min-content (o item de grid é min-width:auto por
+   padrão e, com a sidebar ocupando ~296px, a 2ª coluna fixa aperta a 1ª até ~1140px de viewport
+   — sem isto, a tabela da linha do tempo transborda POR CIMA da coluna direita). */
+.op-layout > * { min-width: 0; }
+@media (max-width: 900px) { .op-layout { grid-template-columns: 1fr; } }
 
 .op-resumo { padding: 1.15rem 1.25rem; }
 .op-resumo-topo {
