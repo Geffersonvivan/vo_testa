@@ -951,13 +951,16 @@ class WhatsAppCloudTests(TestCase):
 
     def test_reply_de_lead_ganho_abre_janela(self):
         import json
-        # lead já convertido (não-ABERTA): a resposta não pode se perder
+        # lead já convertido (GANHA): a resposta não se perde — vira recompra (nova op),
+        # com a janela de 24h aberta na nova oportunidade.
         self.op.status = Oportunidade.Status.GANHA
         self.op.save(update_fields=["status"])
         self.client.post(reverse("whatsapp:webhook"),
                          data=json.dumps(self._payload_msg(wamid="wamid.GANHO")),
                          content_type="application/json")
-        conv = self.op.conversa_whatsapp
+        nova = Oportunidade.objects.filter(pessoa=self.pessoa).latest("id")
+        self.assertNotEqual(nova.id, self.op.id)
+        conv = nova.conversa_whatsapp
         self.assertEqual(conv.mensagens.filter(direcao="entrada").count(), 1)
         self.assertTrue(conv.janela_aberta)
 
@@ -1041,6 +1044,59 @@ class WhatsAppCloudTests(TestCase):
                          content_type="application/json")
         conv = self.op.conversa_whatsapp
         self.assertEqual(conv.mensagens.filter(direcao="entrada").count(), 1)
+
+    # ---- reativação / recompra ----
+    def test_webhook_perdida_reabre_mesmo_card(self):
+        import json
+        # Maria com lead PERDIDO volta a falar → reabre o MESMO card no funil ativo
+        self.op.status = Oportunidade.Status.PERDIDA
+        self.op.save(update_fields=["status"])
+        antes = Oportunidade.objects.count()
+        self.client.post(reverse("whatsapp:webhook"),
+                         data=json.dumps(self._payload_msg(
+                             texto="Oi, voltei!", wamid="wamid.REATIVA")),
+                         content_type="application/json")
+        self.assertEqual(Oportunidade.objects.count(), antes)  # não cria novo card
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.status, Oportunidade.Status.ABERTA)   # reaberto
+        self.assertEqual(self.op.etapa_id, services.etapas().first().id)  # "Novo lead"
+        self.assertIsNotNone(self.op.reativada_em)                     # carimbado
+        conv = self.op.conversa_whatsapp
+        self.assertEqual(conv.mensagens.filter(direcao="entrada").count(), 1)
+        self.assertTrue(self.op.atividades.filter(
+            descricao__icontains="Reativado").exists())               # timeline
+
+    def test_webhook_ganha_abre_nova_oportunidade_recompra(self):
+        import json
+        # Maria com lead GANHO volta a falar → NOVA oportunidade de recompra (carimbada)
+        self.op.status = Oportunidade.Status.GANHA
+        self.op.save(update_fields=["status"])
+        antes = Oportunidade.objects.count()
+        self.client.post(reverse("whatsapp:webhook"),
+                         data=json.dumps(self._payload_msg(
+                             texto="Quero reservar de novo", wamid="wamid.RECOMPRA")),
+                         content_type="application/json")
+        self.assertEqual(Oportunidade.objects.count(), antes + 1)  # nova oportunidade
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.status, Oportunidade.Status.GANHA)  # a ganha fica intacta
+        nova = Oportunidade.objects.filter(pessoa=self.pessoa).latest("id")
+        self.assertNotEqual(nova.id, self.op.id)
+        self.assertEqual(nova.status, Oportunidade.Status.ABERTA)
+        self.assertEqual(nova.origem, Oportunidade.Origem.WHATSAPP)
+        self.assertIsNotNone(nova.reativada_em)
+
+    def test_webhook_reacao_de_perdida_nao_reabre(self):
+        import json
+        # reação (sem conteúdo) de um lead PERDIDO NÃO deve reabrir o card
+        self.op.status = Oportunidade.Status.PERDIDA
+        self.op.save(update_fields=["status"])
+        self.client.post(reverse("whatsapp:webhook"),
+                         data=json.dumps(self._payload_reacao(
+                             "5549999887766", wamid="wamid.REACTP")),
+                         content_type="application/json")
+        self.op.refresh_from_db()
+        self.assertEqual(self.op.status, Oportunidade.Status.PERDIDA)  # segue perdida
+        self.assertIsNone(self.op.reativada_em)
 
     def test_webhook_status_failed_nao_reverte(self):
         import json

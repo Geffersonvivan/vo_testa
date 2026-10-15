@@ -1571,12 +1571,23 @@ def abrir_conversa_whatsapp(oportunidade):
     return conv
 
 
-def _criar_lead_whatsapp(*, telefone, nome="", pessoa=None):
+def _nota_sistema_lead(op, descricao):
+    """Nota de SISTEMA na timeline, autorada pelo usuário de sistema. Diferente de
+    `_log_evento` (que pula usuários de sistema): estes eventos automáticos — reativação,
+    recompra — DEVEM aparecer no histórico do lead."""
+    AtividadeComercial.objects.create(
+        oportunidade=op, tipo=AtividadeComercial.Tipo.SISTEMA,
+        descricao=descricao[:255], quando=timezone.now(), concluida=True,
+        responsavel=op.responsavel, criado_por=_usuario_site())
+
+
+def _criar_lead_whatsapp(*, telefone, nome="", pessoa=None, reativacao=False):
     """Número novo escreveu no WhatsApp → nasce um lead no funil (origem=whatsapp).
 
     Se já existe a Pessoa (mesmo telefone) mas sem nenhuma oportunidade, cria a
     oportunidade para ela; senão cria Pessoa + oportunidade. Nome = perfil do WhatsApp,
-    ou '(DDD) número' quando o cliente não compartilha o perfil.
+    ou '(DDD) número' quando o cliente não compartilha o perfil. `reativacao=True`
+    (recompra de hóspede que já fechou) carimba o selo 'Reativado'.
     """
     from apps.nucleo.models import Pessoa
     if pessoa is None:
@@ -1584,11 +1595,42 @@ def _criar_lead_whatsapp(*, telefone, nome="", pessoa=None):
         pessoa = Pessoa.objects.create(nome=nome_final, telefone=_norm_tel(telefone))
     # titulo capado em 120 (max_length do campo) — nome de agência/empresa pode ser longo
     # e estourar o insert, e o webhook engole o erro (perderia a mensagem).
-    return criar_oportunidade(
+    op = criar_oportunidade(
         usuario=_usuario_site(), pessoa=pessoa,
         titulo=f"WhatsApp — {pessoa.nome}"[:120], origem=Oportunidade.Origem.WHATSAPP,
         disparar_crm=False,
     )
+    if reativacao:
+        op.reativada_em = timezone.now()
+        op.save(update_fields=["reativada_em", "atualizado_em"])
+        _nota_sistema_lead(
+            op, "♻️ Reativado — hóspede anterior voltou a falar no WhatsApp (recompra).")
+    return op
+
+
+def _reativar_oportunidade(op):
+    """Cliente com oportunidade PERDIDA voltou a falar → reabre o MESMO card no funil
+    ativo (etapa inicial 'Novo lead'), carimba `reativada_em` e guarda o motivo da perda
+    anterior na timeline. Preserva a conversa (1:1 com a oportunidade)."""
+    primeira = etapas().first()  # ordering por 'ordem' → "Novo lead"
+    if primeira is None:
+        return op  # sem funil configurado: não reabre (melhor que estourar o webhook)
+    motivo_anterior = op.motivo_perda.nome if op.motivo_perda_id else "não informado"
+    _fechar_permanencia(op)
+    op.status = Oportunidade.Status.ABERTA
+    op.etapa = primeira
+    op.fechado_em = None
+    op.reativada_em = timezone.now()
+    op.motivo_perda = None
+    op.motivo_perda_detalhe = ""
+    op.save(update_fields=["status", "etapa", "fechado_em", "reativada_em",
+                           "motivo_perda", "motivo_perda_detalhe", "atualizado_em"])
+    _abrir_permanencia(op, primeira)
+    atualizar_score(op)
+    _nota_sistema_lead(
+        op, f"♻️ Reativado — cliente voltou a falar no WhatsApp. "
+            f"Perda anterior: {motivo_anterior}.")
+    return op
 
 
 def receber_mensagem_whatsapp(*, oportunidade=None, telefone=None, texto,
@@ -1615,15 +1657,25 @@ def receber_mensagem_whatsapp(*, oportunidade=None, telefone=None, texto,
             if op is None and telefone:
                 pessoa = _pessoa_por_telefone_qualquer(telefone)
                 if pessoa:
-                    # Prefere a oportunidade em aberto; se não houver (lead já ganho/
-                    # perdido), anexa à mais recente — a resposta do cliente nunca se
-                    # perde e a janela de 24h abre inclusive para quem já reservou.
                     base = Oportunidade.objects.filter(pessoa=pessoa)
-                    op = (base.filter(status=Oportunidade.Status.ABERTA)
-                          .order_by("-criado_em").first()
-                          or base.order_by("-criado_em").first())
-                    if op is None and permitir_criar:  # Pessoa sem nenhuma oportunidade
-                        op = _criar_lead_whatsapp(telefone=telefone, nome=nome, pessoa=pessoa)
+                    aberta = (base.filter(status=Oportunidade.Status.ABERTA)
+                              .order_by("-criado_em").first())
+                    if aberta is not None:
+                        op = aberta  # conversa em andamento: anexa (sem carimbo)
+                    else:
+                        recente = base.order_by("-criado_em").first()
+                        if not permitir_criar:
+                            # tipo sem conteúdo (reação/status): só anexa ao card mais
+                            # recente, se existir — não reabre nem cria lead.
+                            op = recente
+                        elif recente is None:  # Pessoa sem nenhuma oportunidade
+                            op = _criar_lead_whatsapp(
+                                telefone=telefone, nome=nome, pessoa=pessoa)
+                        elif recente.status == Oportunidade.Status.PERDIDA:
+                            op = _reativar_oportunidade(recente)  # voltou a falar → reabre
+                        else:  # GANHA → nova oportunidade de recompra
+                            op = _criar_lead_whatsapp(
+                                telefone=telefone, nome=nome, pessoa=pessoa, reativacao=True)
                 elif permitir_criar:
                     op = _criar_lead_whatsapp(telefone=telefone, nome=nome)
             if op is None:

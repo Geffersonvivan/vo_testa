@@ -23,6 +23,7 @@
   .card-chips{display:flex;flex-wrap:wrap;gap:5px;margin:.35rem 0}
   .mchip{font-size:12px;background:rgba(0,0,0,.06);color:var(--tinta-suave);padding:2px 7px;border-radius:6px;white-space:nowrap}
   .mchip-lp{background:rgba(215,160,72,.18);color:#7a5310;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .mchip-reativado{background:rgba(42,157,143,.16);color:var(--info,#217a6e);font-weight:600}
   .temp-quente{background:var(--perigo-bg);color:var(--perigo)}
   .temp-morno{background:var(--alerta-bg);color:var(--alerta)}
   .temp-frio{background:var(--info-bg);color:var(--info)}
@@ -133,9 +134,10 @@
               </p>
               {% if op.titulo_curto %}<p class="card-proposta">{{ op.titulo_curto }}</p>{% endif %}
 
-              {# 1 origem · 2 campanha/LP · 4 temperatura #}
+              {# 1 origem · 2 reativação · 3 campanha/LP · 4 temperatura #}
               <div class="card-chips">
                 <span class="mchip">{{ op.get_origem_display }}</span>
+                {% if op.reativada_em %}<span class="mchip mchip-reativado" title="Cliente voltou a falar em {{ op.reativada_em|date:'d/m/Y H:i' }}">♻️ Reativado</span>{% endif %}
                 {% if op.pagina_captacao %}<span class="mchip mchip-lp" title="Campanha">🎯 {{ op.pagina_captacao.nome }}</span>{% endif %}
                 {% if op.temperatura %}<span class="mchip temp-{{ op.temperatura }}">{{ op.temperatura_display }}</span>{% endif %}
               </div>

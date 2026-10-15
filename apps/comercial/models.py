@@ -163,6 +163,10 @@ class Oportunidade(models.Model):
     criado_em = models.DateTimeField("criada em", auto_now_add=True)
     atualizado_em = models.DateTimeField("atualizada em", auto_now=True)
     fechado_em = models.DateTimeField("fechada em", null=True, blank=True)
+    reativada_em = models.DateTimeField(
+        "reativada em", null=True, blank=True,
+        help_text="Cliente voltou a falar depois de uma perda (ou recompra de hóspede). "
+                  "Marca o selo 'Reativado' no card.")
 
     class Meta:
         ordering = ["-atualizado_em"]
