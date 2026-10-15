@@ -423,6 +423,36 @@
     executarMover(opId, etapaId, tipo);
   }
 
+  /* Arrastar o sheet para baixo para fechar (apple-design: segue o dedo + mola na soltura).
+     Só inicia o arrasto quando o conteúdo está no topo, para não brigar com o scroll interno. */
+  (function () {
+    const sheet = document.querySelector('.sheet');
+    if (!sheet) return;
+    const reduzir = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let y0 = 0, dy = 0, ativo = false;
+    sheet.addEventListener('touchstart', e => {
+      y0 = e.touches[0].clientY; dy = 0; ativo = true; sheet.style.transition = 'none';
+    }, { passive: true });
+    sheet.addEventListener('touchmove', e => {
+      if (!ativo) return;
+      const d = e.touches[0].clientY - y0;
+      if (d > 0 && sheet.scrollTop <= 0) { dy = d; sheet.style.transform = 'translateY(' + d + 'px)'; }
+    }, { passive: true });
+    sheet.addEventListener('touchend', () => {
+      if (!ativo) return;
+      ativo = false;
+      sheet.style.transition = reduzir ? '' : 'transform .24s cubic-bezier(.22,.61,.36,1)';
+      if (dy > 90) {                                  // passou do limiar → fecha
+        const data = Alpine.$data(document.querySelector('[x-data]'));
+        sheet.style.transform = 'translateY(100%)';
+        setTimeout(() => { data.mover = false; sheet.style.transform = ''; sheet.style.transition = ''; },
+                   reduzir ? 0 : 220);
+      } else {                                        // não passou → volta (mola)
+        sheet.style.transform = '';
+      }
+    });
+  })();
+
   /* Barra de rolagem no topo do funil, espelhando a de baixo do board. */
   (function () {
     const board = document.getElementById('funilBoard');
