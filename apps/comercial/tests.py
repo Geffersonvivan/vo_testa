@@ -1098,6 +1098,80 @@ class WhatsAppCloudTests(TestCase):
         self.assertEqual(self.op.status, Oportunidade.Status.PERDIDA)  # segue perdida
         self.assertIsNone(self.op.reativada_em)
 
+    # ---- áudio (recebimento) ----
+    def _payload_audio(self, numero="5549955557777", wamid="wamid.AUDIO",
+                       nome_perfil="Audio Lead", media_id="MEDIA123"):
+        agora = str(int(timezone.now().timestamp()))
+        val = {"messaging_product": "whatsapp", "messages": [{
+            "from": numero, "id": wamid, "timestamp": agora, "type": "audio",
+            "audio": {"id": media_id, "mime_type": "audio/ogg", "voice": True}}]}
+        if nome_perfil is not None:
+            val["contacts"] = [{"wa_id": numero, "profile": {"name": nome_perfil}}]
+        return {"object": "whatsapp_business_account", "entry": [{"id": "WABA",
+                "changes": [{"field": "messages", "value": val}]}]}
+
+    def test_webhook_audio_cria_lead_e_grava_metadados(self):
+        import json
+        from .models import MensagemWhatsApp
+        antes = Oportunidade.objects.count()
+        self.client.post(reverse("whatsapp:webhook"),
+                         data=json.dumps(self._payload_audio()),
+                         content_type="application/json")
+        self.assertEqual(Oportunidade.objects.count(), antes + 1)  # áudio abre lead
+        m = MensagemWhatsApp.objects.get(id_externo="wamid.AUDIO")
+        self.assertEqual(m.tipo, "audio")
+        self.assertEqual(m.midia_id_externo, "MEDIA123")
+        self.assertTrue(m.midia_voz)
+        self.assertFalse(bool(m.midia_arquivo))  # simulado não baixa → sem arquivo
+
+    def test_webhook_audio_baixa_e_salva_arquivo(self):
+        import json
+        import tempfile
+        from unittest.mock import patch
+
+        from django.test import override_settings
+
+        from .models import MensagemWhatsApp
+        from .whatsapp_gateways import GatewaySimulado
+        with tempfile.TemporaryDirectory() as tmp, \
+             override_settings(MEDIA_ROOT=tmp), \
+             patch.object(GatewaySimulado, "baixar_midia",
+                          return_value=(b"OggS-fake-audio", "audio/ogg")):
+            self.client.post(reverse("whatsapp:webhook"),
+                             data=json.dumps(self._payload_audio(wamid="wamid.AUDIO2")),
+                             content_type="application/json")
+            m = MensagemWhatsApp.objects.get(id_externo="wamid.AUDIO2")
+            self.assertTrue(bool(m.midia_arquivo))
+            self.assertEqual(m.midia_arquivo.read(), b"OggS-fake-audio")
+
+    # ---- áudio (envio) ----
+    def test_enviar_audio_cria_saida(self):
+        import tempfile
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from django.test import override_settings
+        self.client.force_login(self.user)
+        conv = services.abrir_conversa_whatsapp(self.op)
+        audio = SimpleUploadedFile("v.ogg", b"OggS-fake", content_type="audio/ogg")
+        with tempfile.TemporaryDirectory() as tmp, override_settings(MEDIA_ROOT=tmp):
+            r = self.client.post(
+                reverse("comercial:whatsapp_enviar_audio", args=[self.op.pk]),
+                {"audio": audio})
+            self.assertEqual(r.status_code, 200)
+            self.assertTrue(r.json()["ok"])
+            m = conv.mensagens.filter(direcao="saida", tipo="audio").first()
+            self.assertIsNotNone(m)
+            self.assertEqual(m.status, "enviada")   # gateway simulado
+            self.assertTrue(bool(m.midia_arquivo))
+
+    @override_settings(WHATSAPP_GATEWAY="cloud")
+    def test_enviar_audio_fora_da_janela_bloqueia(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        conv = services.abrir_conversa_whatsapp(self.op)  # cliente nunca falou → fechada
+        audio = SimpleUploadedFile("v.ogg", b"OggS-fake", content_type="audio/ogg")
+        with self.assertRaises(ValidationError):
+            services.enviar_audio_whatsapp(conversa=conv, arquivo=audio, usuario=self.user)
+
     def test_webhook_status_failed_nao_reverte(self):
         import json
 

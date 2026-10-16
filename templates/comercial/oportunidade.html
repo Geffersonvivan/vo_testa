@@ -39,7 +39,16 @@
 
       <div class="wpp-thread">
         {% for m in mensagens_wpp %}
-          <div class="wpp-msg wpp-{{ m.direcao }}">{{ m.texto|linebreaksbr }}<span class="wpp-h">{{ m.horario|date:"d/m H:i" }}{% if m.direcao == 'saida' %} · {{ m.get_status_display|lower }}{% endif %}</span></div>
+          <div class="wpp-msg wpp-{{ m.direcao }}{% if m.tipo == 'audio' %} wpp-msg-audio{% endif %}">
+            {% if m.tipo == 'audio' %}
+              {% if m.midia_arquivo %}
+                <audio controls preload="none" src="{% url 'comercial:whatsapp_midia' m.pk %}"></audio>
+              {% else %}
+                <span class="wpp-audio-off">🎤 Áudio (não baixado)</span>
+              {% endif %}
+            {% else %}{{ m.texto|linebreaksbr }}{% endif %}
+            <span class="wpp-h">{{ m.horario|date:"d/m H:i" }}{% if m.direcao == 'saida' %} · {{ m.get_status_display|lower }}{% endif %}</span>
+          </div>
         {% empty %}
           <p class="wpp-vazio">Sem mensagens ainda. As conversas do WhatsApp aparecem aqui.</p>
         {% endfor %}
@@ -57,8 +66,15 @@
       <form method="post" action="{% url 'comercial:whatsapp_enviar' op.pk %}" class="wpp-form">
         {% csrf_token %}
         <input type="text" name="texto" id="wpp-texto" placeholder="Escreva uma resposta…" autocomplete="off">
+        <button type="button" class="wpp-mic" id="wpp-mic" title="Gravar áudio" aria-label="Gravar áudio">🎤</button>
         <button type="submit" class="botao-primario">Enviar</button>
       </form>
+      <div class="wpp-gravando" id="wpp-gravando" hidden>
+        <span class="wpp-rec-dot" aria-hidden="true"></span>
+        Gravando <span id="wpp-rec-tempo">0:00</span>
+        <button type="button" class="botao-mini" id="wpp-rec-parar">Parar e enviar</button>
+        <button type="button" class="botao-neutro botao-mini" id="wpp-rec-cancelar">Cancelar</button>
+      </div>
 
       {% if whatsapp_simulado %}
       <form method="post" action="{% url 'comercial:whatsapp_simular' op.pk %}" class="wpp-sim-form">
@@ -293,6 +309,8 @@
   .wpp-thread::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:8px}
   .wpp-msg{max-width:78%;padding:7px 11px;border-radius:12px;font-size:14px;line-height:1.4;box-shadow:0 1px 1px rgba(0,0,0,.08)}
   .wpp-msg .wpp-h{display:block;font-size:10.5px;color:var(--tinta-suave);text-align:right;margin-top:3px}
+  .wpp-msg-audio audio{width:230px;max-width:100%;height:36px;display:block;margin:2px 0}
+  .wpp-audio-off{font-size:13px;color:var(--tinta-suave);font-style:italic}
   .wpp-entrada{align-self:flex-start;background:var(--superficie);border-bottom-left-radius:4px}
   .wpp-saida{align-self:flex-end;background:var(--sucesso-bg);border:1px solid color-mix(in srgb, var(--sucesso) 22%, transparent);border-bottom-right-radius:4px}
   .wpp-vazio{color:var(--tinta-suave);text-align:center;padding:1.4rem;font-size:.9rem}
@@ -301,6 +319,14 @@
   .wpp-chip:hover{background:rgba(215,160,72,.22)}
   .wpp-form{display:flex;gap:.5rem}
   .wpp-form input{flex:1;padding:.6rem .8rem;border:1px solid var(--fio);border-radius:12px;font:inherit;background:var(--superficie)}
+  .wpp-mic{flex:0 0 auto;width:42px;min-height:42px;border:1px solid var(--fio);border-radius:12px;background:var(--superficie);font-size:18px;cursor:pointer;line-height:1}
+  .wpp-mic:hover{border-color:var(--fio-forte)} .wpp-mic:active{transform:scale(.95)}
+  .wpp-gravando{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;font-size:13px;color:var(--tinta-suave)}
+  .wpp-rec-dot{width:10px;height:10px;border-radius:50%;background:var(--perigo);flex:0 0 auto}
+  @media (prefers-reduced-motion: no-preference){
+    .wpp-rec-dot{animation:wpp-pulse 1s ease-in-out infinite}
+    @keyframes wpp-pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  }
   .wpp-sim-form{display:flex;gap:.5rem;margin-top:.6rem;opacity:.75}
   .wpp-sim-form input{flex:1;padding:.45rem .7rem;border:1px dashed var(--fio-forte);border-radius:10px;font:inherit;background:transparent;font-size:.85rem}
   @media (max-width: 640px){
@@ -419,5 +445,44 @@
 <script>
   function wppInserir(btn){ var i=document.getElementById('wpp-texto'); i.value=btn.dataset.texto; i.focus(); }
   (function(){ var t=document.querySelector('.wpp-thread'); if(t){ t.scrollTop=t.scrollHeight; } })();
+
+  /* Gravar e enviar áudio (voz) — MediaRecorder → upload → recarrega a conversa. */
+  (function(){
+    var mic = document.getElementById('wpp-mic');
+    if (!mic) return;
+    if (!(navigator.mediaDevices && window.MediaRecorder)) { mic.style.display = 'none'; return; }
+    var box = document.getElementById('wpp-gravando');
+    var tempoEl = document.getElementById('wpp-rec-tempo');
+    var form = document.querySelector('.wpp-form');
+    var url = "{% url 'comercial:whatsapp_enviar_audio' op.pk %}";
+    var csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+    var rec, chunks, stream, t0, timer, cancelado;
+    function fmt(s){ return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); }
+    function parar(){ clearInterval(timer); if (stream) stream.getTracks().forEach(function(t){ t.stop(); }); mic.hidden=false; box.hidden=true; }
+    async function iniciar(){
+      try { stream = await navigator.mediaDevices.getUserMedia({audio:true}); }
+      catch(e){ if (typeof toast==='function') toast('Permita o microfone para gravar.', 'error'); return; }
+      chunks = []; cancelado = false; rec = new MediaRecorder(stream);
+      rec.ondataavailable = function(e){ if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = function(){ parar(); if (!cancelado) enviar(); };
+      rec.start(); mic.hidden=true; box.hidden=false;
+      t0 = Date.now(); tempoEl.textContent='0:00';
+      timer = setInterval(function(){ tempoEl.textContent = fmt(Math.floor((Date.now()-t0)/1000)); }, 500);
+    }
+    async function enviar(){
+      if (!chunks.length) return;
+      var blob = new Blob(chunks, {type: (rec && rec.mimeType) || 'audio/webm'});
+      var fd = new FormData(); fd.append('audio', blob, 'audio.webm');
+      try {
+        var r = await fetch(url, {method:'POST', headers:{'X-CSRFToken':csrf}, body:fd});
+        var d = await r.json();
+        if (d.ok) { location.reload(); }
+        else if (typeof toast==='function') { toast(d.erro || 'Falha ao enviar o áudio.', 'error'); }
+      } catch(e){ if (typeof toast==='function') toast('Falha de conexão ao enviar o áudio.', 'error'); }
+    }
+    mic.addEventListener('click', iniciar);
+    document.getElementById('wpp-rec-parar').addEventListener('click', function(){ if (rec && rec.state!=='inactive') rec.stop(); });
+    document.getElementById('wpp-rec-cancelar').addEventListener('click', function(){ cancelado=true; if (rec && rec.state!=='inactive') rec.stop(); });
+  })();
 </script>
 {% endblock %}

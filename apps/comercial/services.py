@@ -1633,8 +1633,57 @@ def _reativar_oportunidade(op):
     return op
 
 
+def _ext_audio(mime):
+    """Extensão de arquivo a partir do mime do áudio do WhatsApp."""
+    m = (mime or "").lower()
+    if "ogg" in m:
+        return ".ogg"
+    if "mpeg" in m or "mp3" in m:
+        return ".mp3"
+    if "mp4" in m or "m4a" in m or "aac" in m:
+        return ".m4a"
+    if "amr" in m:
+        return ".amr"
+    return ".bin"
+
+
+def _transcode_para_ogg(conteudo, mime):
+    """Formatos aceitos pela Meta: ogg(opus)/mp3/mp4/aac/amr. O Chrome grava **webm**, que
+    a Meta NÃO aceita → transcodifica p/ ogg/opus com ffmpeg. Best-effort: sem ffmpeg ou se
+    falhar, devolve o original (aí o envio pode dar erro, mas nunca estoura)."""
+    import os
+    import shutil
+    import subprocess
+    import tempfile
+    m = (mime or "").lower()
+    if any(s in m for s in ("ogg", "mpeg", "mp3", "mp4", "aac", "amr", "m4a")):
+        return conteudo, mime
+    if not shutil.which("ffmpeg"):
+        return conteudo, mime
+    inp = out = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".in", delete=False) as fin:
+            fin.write(conteudo)
+            inp = fin.name
+        out = inp + ".ogg"
+        subprocess.run(["ffmpeg", "-y", "-i", inp, "-c:a", "libopus", "-b:a", "32k", out],
+                       check=True, capture_output=True, timeout=30)
+        with open(out, "rb") as f:
+            return f.read(), "audio/ogg"
+    except Exception:  # noqa: BLE001
+        return conteudo, mime
+    finally:
+        for p in (inp, out):
+            if p:
+                try:
+                    os.remove(p)
+                except OSError:
+                    pass
+
+
 def receber_mensagem_whatsapp(*, oportunidade=None, telefone=None, texto,
-                              id_externo="", quando=None, nome="", permitir_criar=True):
+                              id_externo="", quando=None, nome="", permitir_criar=True,
+                              tipo="texto", midia_id="", midia_mime="", midia_voz=False):
     """Registra uma mensagem RECEBIDA do cliente (webhook real ou simulação do MVP).
 
     Idempotente por id_externo (atalho + constraint de banco). Abre a janela de 24h e
@@ -1643,7 +1692,9 @@ def receber_mensagem_whatsapp(*, oportunidade=None, telefone=None, texto,
     o nome do perfil do WhatsApp (quando a Meta envia). `permitir_criar=False` NÃO cria
     lead para número novo (tipos que não são conteúdo do cliente — reação/status/… — não
     devem virar lead-lixo); mensagem de número já conhecido segue sendo registrada.
+    `tipo="audio"` + `midia_id` baixa a mídia e guarda no storage (best-effort).
     """
+    from django.core.files.base import ContentFile
     from django.db import IntegrityError
 
     from .models import MensagemWhatsApp, Oportunidade
@@ -1651,6 +1702,19 @@ def receber_mensagem_whatsapp(*, oportunidade=None, telefone=None, texto,
     # Idempotência (atalho rápido): webhook já processado não refaz nada.
     if id_externo and MensagemWhatsApp.objects.filter(id_externo=id_externo).exists():
         return None
+
+    # Baixa a mídia ANTES da transação (rede não deve segurar o lock do banco).
+    conteudo_midia = None
+    if tipo == "audio" and midia_id:
+        from .whatsapp_gateways import get_whatsapp_gateway
+        try:
+            conteudo_midia, mime_baixado = get_whatsapp_gateway().baixar_midia(midia_id)
+            if mime_baixado and not midia_mime:
+                midia_mime = mime_baixado
+        except Exception:  # noqa: BLE001 — download best-effort; segue sem o binário
+            conteudo_midia = None
+
+    msg = None
     try:
         with transaction.atomic():
             op = oportunidade
@@ -1684,17 +1748,28 @@ def receber_mensagem_whatsapp(*, oportunidade=None, telefone=None, texto,
             quando_ = quando or timezone.now()
             msg = MensagemWhatsApp.objects.create(
                 conversa=conv, direcao=MensagemWhatsApp.Direcao.ENTRADA,
-                texto=texto.strip(), status=MensagemWhatsApp.Status.RECEBIDA,
+                tipo=tipo, texto=texto.strip(), status=MensagemWhatsApp.Status.RECEBIDA,
                 id_externo=id_externo, horario=quando_,
+                midia_id_externo=midia_id, midia_mime=midia_mime, midia_voz=midia_voz,
             )
             conv.ultima_msg_cliente_em = quando_
             conv.nao_lidas = (conv.nao_lidas or 0) + 1
             conv.save(update_fields=["ultima_msg_cliente_em", "nao_lidas", "atualizado_em"])
-            return msg
     except IntegrityError:
         # Corrida: outra entrega do mesmo wamid venceu e já gravou (viola a unique de
         # id_externo). A transação inteira — lead inclusive — é desfeita, sem duplicata.
         return None
+
+    # Salva o binário no storage FORA da transação (best-effort): se falhar, fica o
+    # midia_id_externo gravado pra reprocessar depois.
+    if msg is not None and conteudo_midia is not None:
+        try:
+            msg.midia_arquivo.save(
+                f"wa_{msg.id}{_ext_audio(midia_mime)}",
+                ContentFile(conteudo_midia), save=True)
+        except Exception:  # noqa: BLE001
+            pass
+    return msg
 
 
 def enviar_mensagem_whatsapp(*, conversa, texto, usuario):
@@ -1722,6 +1797,51 @@ def enviar_mensagem_whatsapp(*, conversa, texto, usuario):
                 else MensagemWhatsApp.Status.ERRO),
         id_externo=(res.get("id") or "")[:120], autor=usuario, horario=timezone.now(),
     )
+    conversa.nao_lidas = 0
+    conversa.save(update_fields=["nao_lidas", "atualizado_em"])
+    return msg
+
+
+def enviar_audio_whatsapp(*, conversa, arquivo, usuario):
+    """Envia um áudio (voz) pelo gateway. Só dentro da janela de 24h (áudio não vai por
+    template). Guarda o próprio áudio enviado pra reproduzir no histórico."""
+    from django.core.files.base import ContentFile
+
+    from .models import MensagemWhatsApp
+    from .whatsapp_gateways import get_whatsapp_gateway
+
+    conteudo = arquivo.read()
+    if not conteudo:
+        raise ValidationError("Áudio vazio.")
+    if len(conteudo) > 16 * 1024 * 1024:
+        raise ValidationError("Áudio acima do limite de 16 MB.")
+    if (getattr(settings, "WHATSAPP_GATEWAY", "simulado") != "simulado"
+            and not conversa.janela_aberta):
+        raise ValidationError(
+            "Fora da janela de 24h: o cliente não fala há mais de 24h. Áudio só dentro "
+            "da janela (não existe template de áudio).")
+    mime = getattr(arquivo, "content_type", "") or "audio/ogg"
+    conteudo, mime = _transcode_para_ogg(conteudo, mime)  # webm (Chrome) → ogg/opus
+    gw = get_whatsapp_gateway()
+    assumir_lead(conversa.oportunidade, usuario)  # quem responde primeiro assume
+    try:
+        up = gw.upload_midia(conteudo, mime, "audio" + _ext_audio(mime))
+        res = (gw.enviar_audio(conversa, up["id"]) if up.get("ok")
+               else {"ok": False, "erro": up.get("erro", "upload falhou")})
+    except Exception as e:  # noqa: BLE001
+        res = {"ok": False, "erro": str(e)[:300]}
+    msg = MensagemWhatsApp.objects.create(
+        conversa=conversa, direcao=MensagemWhatsApp.Direcao.SAIDA,
+        tipo=MensagemWhatsApp.Tipo.AUDIO, texto="[áudio]",
+        status=(MensagemWhatsApp.Status.ENVIADA if res.get("ok")
+                else MensagemWhatsApp.Status.ERRO),
+        id_externo=(res.get("id") or "")[:120], autor=usuario,
+        horario=timezone.now(), midia_mime=mime, midia_voz=True)
+    try:
+        msg.midia_arquivo.save(f"wa_out_{msg.id}{_ext_audio(mime)}",
+                               ContentFile(conteudo), save=True)
+    except Exception:  # noqa: BLE001
+        pass
     conversa.nao_lidas = 0
     conversa.save(update_fields=["nao_lidas", "atualizado_em"])
     return msg
@@ -1761,7 +1881,7 @@ _OPT_OUT = {"sair", "sair da lista", "parar", "cancelar", "descadastrar", "remov
 
 # Tipos de mensagem que SÃO conteúdo autoral do cliente (abrem lead novo). Os demais
 # (reaction, location, system, order, sticker…) só anexam a quem já existe.
-_TIPOS_CONTEUDO_WHATSAPP = {"text", "button", "interactive"}
+_TIPOS_CONTEUDO_WHATSAPP = {"text", "button", "interactive", "audio"}
 
 
 def _atualizar_status_mensagem(id_externo, status_meta):
@@ -1802,6 +1922,7 @@ def processar_webhook_whatsapp(payload: dict) -> dict:
                 telefone = m.get("from", "")
                 wamid = m.get("id", "")
                 tipo = m.get("type")
+                tipo_msg, midia_id, midia_mime, midia_voz = "texto", "", "", False
                 if tipo == "text":
                     texto = (m.get("text") or {}).get("body", "")
                 elif tipo == "button":
@@ -1810,6 +1931,11 @@ def processar_webhook_whatsapp(payload: dict) -> dict:
                     inter = m.get("interactive") or {}
                     alvo = inter.get("button_reply") or inter.get("list_reply") or {}
                     texto = alvo.get("title", "")
+                elif tipo == "audio":
+                    au = m.get("audio") or {}
+                    tipo_msg, midia_id = "audio", au.get("id", "")
+                    midia_mime, midia_voz = au.get("mime_type", ""), bool(au.get("voice"))
+                    texto = "[áudio]"
                 else:
                     texto = f"[{tipo}]"
                 quando = None
@@ -1823,7 +1949,9 @@ def processar_webhook_whatsapp(payload: dict) -> dict:
                     telefone=telefone, texto=texto or "[sem texto]",
                     id_externo=wamid, quando=quando,
                     nome=contatos.get(telefone, ""),
-                    permitir_criar=tipo in _TIPOS_CONTEUDO_WHATSAPP)
+                    permitir_criar=tipo in _TIPOS_CONTEUDO_WHATSAPP,
+                    tipo=tipo_msg, midia_id=midia_id, midia_mime=midia_mime,
+                    midia_voz=midia_voz)
                 if msg is not None:
                     resumo["mensagens"] += 1
                     if texto.strip().lower() in _OPT_OUT:

@@ -851,14 +851,26 @@ class MensagemWhatsApp(models.Model):
         ENVIADA = "enviada", "Enviada"
         ERRO = "erro", "Erro"
 
+    class Tipo(models.TextChoices):
+        TEXTO = "texto", "Texto"
+        AUDIO = "audio", "Áudio"
+
     conversa = models.ForeignKey(
         ConversaWhatsApp, on_delete=models.CASCADE, related_name="mensagens",
         verbose_name="conversa",
     )
     direcao = models.CharField("direção", max_length=8, choices=Direcao.choices)
-    texto = models.TextField("texto")
+    tipo = models.CharField("tipo", max_length=12, choices=Tipo.choices, default=Tipo.TEXTO)
+    texto = models.TextField("texto", blank=True)
     status = models.CharField("status", max_length=10, choices=Status.choices)
     id_externo = models.CharField("ID externo", max_length=120, blank=True)
+    # Mídia (áudio/voz) — binário no storage (R2) + metadados do WhatsApp.
+    midia_id_externo = models.CharField("ID da mídia (Meta)", max_length=120, blank=True)
+    midia_arquivo = models.FileField(
+        "arquivo de mídia", upload_to="whatsapp/audio/%Y/%m/", null=True, blank=True)
+    midia_mime = models.CharField("mime da mídia", max_length=80, blank=True)
+    midia_voz = models.BooleanField("é nota de voz", default=False)
+    duracao_seg = models.PositiveIntegerField("duração (s)", null=True, blank=True)
     autor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
         related_name="mensagens_whatsapp", verbose_name="autor (envio)",

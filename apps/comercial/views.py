@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db.models import Count, F, Sum
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.text import slugify
@@ -1133,6 +1133,40 @@ def whatsapp_enviar(request, pk):
     if via_fetch:
         return JsonResponse({"ok": not erro, "erro": erro})
     return redirect("comercial:oportunidade", pk=op.pk)
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def whatsapp_enviar_audio(request, pk):
+    """Recebe um áudio (gravado no navegador ou anexado) e envia pela conversa (fetch)."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    erro = ""
+    if request.method == "POST":
+        arquivo = request.FILES.get("audio")
+        if not arquivo:
+            erro = "Nenhum áudio recebido."
+        else:
+            conv = services.abrir_conversa_whatsapp(op)
+            try:
+                services.enviar_audio_whatsapp(
+                    conversa=conv, arquivo=arquivo, usuario=request.user)
+            except ValidationError as e:
+                erro = "; ".join(e.messages)
+    return JsonResponse({"ok": not erro, "erro": erro})
+
+
+@requer_modulo(Modulo.COMERCIAL)
+def whatsapp_midia(request, pk):
+    """Serve a mídia (áudio) de uma mensagem de WhatsApp — protegido por login + módulo.
+
+    Faz stream pelo Django em vez de expor a URL do storage: conversa é dado privado
+    do hóspede."""
+    from .models import MensagemWhatsApp
+    msg = get_object_or_404(MensagemWhatsApp, pk=pk)
+    if not msg.midia_arquivo:
+        raise Http404("sem mídia")
+    return FileResponse(
+        msg.midia_arquivo.open("rb"),
+        content_type=msg.midia_mime or "application/octet-stream")
 
 
 @requer_modulo(Modulo.COMERCIAL)
