@@ -663,7 +663,7 @@ ESTACOES_BLUEPRINT = [
      "texto": "Cabanas em estilo Hobbit: portas arredondadas e muita madeira.",
      "video": "comercial/blueprint/clip_8.mp4", "poster": "comercial/blueprint/poster_8.jpg"},
     {"n": 9, "rotulo": "a vista", "titulo": "O Mirante",
-     "texto": "Mirante de madeira com vista para o lago de Itá.",
+     "texto": "Experiências e vistas que você só encontra em Itá, Santa Catarina.",
      "video": "comercial/blueprint/clip_9.mp4", "poster": "comercial/blueprint/poster_9.jpg"},
 ]
 
