@@ -694,24 +694,36 @@ def pagina_qr(request, pk):
 
 
 # Estações da "Blueprint da Invenção" (tema BLUEPRINT): a planta da casa do Vô,
-# percorrida em serpentina por 5 vídeos do fundador. Vídeos/pôsteres em
-# static/comercial/blueprint/ (clip_N.mp4 + poster_N.jpg).
+# percorrida em serpentina pelos 9 vídeos do fundador, na sequência. Vídeos/pôsteres
+# em static/comercial/blueprint/ (clip_N.mp4 + poster_N.jpg).
 ESTACOES_BLUEPRINT = [
-    {"n": 1, "rotulo": "A entrada", "titulo": "O Portal",
-     "texto": "A fachada, a torre do relógio e a placa que anuncia: aqui começa a casa do Vô.",
+    {"n": 1, "rotulo": "A chegada", "titulo": "O Começo",
+     "texto": "O primeiro passo no terreno — é aqui que a casa do Vô começa a ganhar forma.",
      "video": "comercial/blueprint/clip_1.mp4", "poster": "comercial/blueprint/poster_1.jpg"},
-    {"n": 2, "rotulo": "O coração", "titulo": "O Mecanismo",
-     "texto": "Corredores com engrenagens de verdade — a alma relojoeira que dá nome e vida ao lugar.",
+    {"n": 2, "rotulo": "A fachada", "titulo": "O Portal",
+     "texto": "A fachada, a torre do relógio e a placa que anuncia: aqui é a casa do Vô.",
      "video": "comercial/blueprint/clip_2.mp4", "poster": "comercial/blueprint/poster_2.jpg"},
-    {"n": 3, "rotulo": "O descanso", "titulo": "O Refúgio",
-     "texto": "Quartos de teto em madeira, ladrilho hidráulico e janela aberta pro horizonte.",
+    {"n": 3, "rotulo": "O hóspede", "titulo": "O Convite",
+     "texto": "Tudo foi pensado para o nosso hóspede — do pátio à vista que se abre pro lago.",
      "video": "comercial/blueprint/clip_3.mp4", "poster": "comercial/blueprint/poster_3.jpg"},
-    {"n": 4, "rotulo": "O detalhe", "titulo": "O Requinte",
-     "texto": "Banheiros em mármore — o conforto que você não espera de uma “pousada”.",
+    {"n": 4, "rotulo": "O acabamento", "titulo": "Os Detalhes",
+     "texto": "Até os postes têm assinatura. Cada peça é feita à mão, com capricho de inventor.",
      "video": "comercial/blueprint/clip_4.mp4", "poster": "comercial/blueprint/poster_4.jpg"},
-    {"n": 5, "rotulo": "O horizonte", "titulo": "A Vista",
-     "texto": "A varanda sobre o lago de Itá, entre as cores da nossa arquitetura fora do tempo.",
+    {"n": 5, "rotulo": "O banho", "titulo": "O Requinte",
+     "texto": "Banheiros em mármore — o conforto que você não espera de uma “pousada”.",
      "video": "comercial/blueprint/clip_5.mp4", "poster": "comercial/blueprint/poster_5.jpg"},
+    {"n": 6, "rotulo": "O coração", "titulo": "O Mecanismo",
+     "texto": "Corredores com engrenagens de verdade — a alma relojoeira que dá nome ao lugar.",
+     "video": "comercial/blueprint/clip_6.mp4", "poster": "comercial/blueprint/poster_6.jpg"},
+    {"n": 7, "rotulo": "O quarto", "titulo": "O Refúgio",
+     "texto": "Quartos de teto em madeira, ladrilho hidráulico e janela aberta pro horizonte.",
+     "video": "comercial/blueprint/clip_7.mp4", "poster": "comercial/blueprint/poster_7.jpg"},
+    {"n": 8, "rotulo": "O azulejo", "titulo": "A Cozinha",
+     "texto": "Azulejos pintados à mão e madeira: o charme artesanal em cada canto.",
+     "video": "comercial/blueprint/clip_8.mp4", "poster": "comercial/blueprint/poster_8.jpg"},
+    {"n": 9, "rotulo": "O horizonte", "titulo": "A Vista",
+     "texto": "A varanda sobre o lago de Itá, entre as cores da nossa arquitetura fora do tempo.",
+     "video": "comercial/blueprint/clip_9.mp4", "poster": "comercial/blueprint/poster_9.jpg"},
 ]
 
 
