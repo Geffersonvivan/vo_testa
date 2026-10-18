@@ -32,7 +32,7 @@
           <span class="wpp-tel-sub">{% if op.pessoa.telefone %}{{ op.pessoa.telefone }}{% else %}sem telefone{% endif %}{% if op.campanha %} · via {{ op.campanha.nome }}{% endif %}</span>
         </div>
         <div class="wpp-topo-dir">
-          <span class="wpp-tag">{% if conversa_wpp.janela_aberta %}🟢 janela 24h aberta{% else %}🔒 fora da janela{% endif %}</span>
+          <span class="wpp-tag{% if not conversa_wpp.janela_aberta %} wpp-tag-fechada{% endif %}">{% if conversa_wpp.janela_aberta %}🟢 janela 24h aberta{% else %}🔒 fora da janela{% endif %}</span>
           {% if whatsapp_simulado %}<span class="wpp-sim">modo simulado</span>{% endif %}
         </div>
       </div>
@@ -61,6 +61,14 @@
           <p class="wpp-vazio">Sem mensagens ainda. As conversas do WhatsApp aparecem aqui.</p>
         {% endfor %}
       </div>
+
+      {% if not conversa_wpp.janela_aberta %}
+      <div class="wpp-reabrir" id="wpp-reabrir">
+        <span class="wpp-reabrir-txt">🔒 Fora da janela de 24h. Só dá para iniciar com um modelo aprovado.</span>
+        <button type="button" class="botao-primario botao-mini" id="wpp-reabrir-btn"
+                data-url="{% url 'comercial:whatsapp_reabrir' op.pk %}">Reabrir conversa</button>
+      </div>
+      {% endif %}
 
       {% if respostas_rapidas %}
       <div class="wpp-rapidas">
@@ -323,7 +331,12 @@
   .wpp-topo-dir{margin-left:auto;display:flex;align-items:center;gap:.4rem;flex:none}
   .tel-wpp{color:var(--sucesso);text-decoration:none;font-weight:700} .tel-wpp:hover{text-decoration:underline}
   .wpp-tag{font-size:12px;font-weight:600;color:var(--sucesso);background:var(--sucesso-bg);padding:2px 9px;border-radius:100px}
+  .wpp-tag-fechada{color:var(--tinta-suave);background:rgba(0,0,0,.05)}
   .wpp-sim{font-size:11px;font-weight:700;color:var(--madeira);background:rgba(215,160,72,.15);padding:2px 8px;border-radius:100px}
+  .wpp-reabrir{display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;margin-bottom:.6rem;padding:.6rem .75rem;
+    border:1px solid rgba(215,160,72,.4);background:rgba(215,160,72,.1);border-radius:12px}
+  .wpp-reabrir-txt{flex:1;min-width:0;font-size:12.5px;color:var(--madeira);line-height:1.35}
+  .wpp-reabrir .botao-mini{flex:none}
   .wpp-thread{display:flex;flex-direction:column;gap:8px;margin:.9rem 0;height:min(520px,58dvh);overflow-y:auto;padding:.7rem;border:1px solid var(--fio);border-radius:14px;
     background:var(--canvas)}
   .wpp-thread::before{content:"";margin-top:auto}
@@ -532,6 +545,24 @@
         if (d.ok){ location.reload(); }
         else { if (typeof toast==='function') toast(d.erro || 'Falha ao enviar a imagem.', 'error'); btn.disabled=false; inp.value=''; }
       } catch(e){ if (typeof toast==='function') toast('Falha de conexão ao enviar a imagem.', 'error'); btn.disabled=false; inp.value=''; }
+    });
+  })();
+
+  /* Reabrir conversa fora da janela 24h — dispara o template de retomada aprovado. */
+  (function(){
+    var btn = document.getElementById('wpp-reabrir-btn');
+    if (!btn) return;
+    var form = document.querySelector('.wpp-form');
+    var csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+    btn.addEventListener('click', async function(){
+      if (!confirm('Enviar o modelo de retomada para reabrir a conversa no WhatsApp?')) return;
+      btn.disabled = true;
+      try {
+        var r = await fetch(btn.dataset.url, {method:'POST', headers:{'X-CSRFToken':csrf}});
+        var d = await r.json();
+        if (d.ok){ location.reload(); }
+        else { if (typeof toast==='function') toast(d.erro || 'Falha ao reabrir a conversa.', 'error'); btn.disabled=false; }
+      } catch(e){ if (typeof toast==='function') toast('Falha de conexão ao reabrir a conversa.', 'error'); btn.disabled=false; }
     });
   })();
 </script>

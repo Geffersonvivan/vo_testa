@@ -328,6 +328,12 @@ WHATSAPP_WABA_ID = os.environ.get("WHATSAPP_WABA_ID", "")  # gestão de template
 # App Secret do app da Meta — se definido, o webhook exige a assinatura
 # X-Hub-Signature-256 (recomendado em produção). Vazio = sem checagem (dev/simulado).
 WHATSAPP_APP_SECRET = os.environ.get("WHATSAPP_APP_SECRET", "")
+# Template aprovado na Meta p/ reabrir conversa fora da janela de 24h (botão "Reabrir
+# conversa" no lead). Variável nomeada {{nome_cliente}}. Trocar aqui ao renomear/versionar
+# o modelo — nunca hard-coded no código.
+WHATSAPP_TEMPLATE_RETOMADA = os.environ.get("WHATSAPP_TEMPLATE_RETOMADA", "retomada_lead")
+WHATSAPP_TEMPLATE_RETOMADA_IDIOMA = os.environ.get(
+    "WHATSAPP_TEMPLATE_RETOMADA_IDIOMA", "pt_BR")
 
 # Gateway de DECISÃO do lead (score/canal) — piloto Jev (TypeSafe AI).
 # "simulado" (default, sem rede — Fase 0 sombra) / "jev" (real, exige URL+KEY).

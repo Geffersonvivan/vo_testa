@@ -2055,21 +2055,23 @@ def enviar_template_whatsapp(*, oportunidade, template, idioma="pt_BR",
     """Dispara um template APROVADO para o lead (inicia conversa / fora da janela 24h).
 
     Best-effort: registra a mensagem de saída (enviada/erro) e nunca estoura. Os
-    templates são pré-aprovados na Meta; aqui só passamos nome + variáveis ({{1}}…).
+    templates são pré-aprovados na Meta; aqui só passamos nome + variáveis. `variaveis`
+    pode ser lista (posicional: {{1}}…) ou dict (nomeada: {{nome_cliente}}).
     """
     from .models import MensagemWhatsApp
     from .whatsapp_gateways import get_whatsapp_gateway
 
     conv = abrir_conversa_whatsapp(oportunidade)
     telefone = conv.telefone or oportunidade.pessoa.telefone or ""
-    variaveis = list(variaveis or [])
     try:
         res = get_whatsapp_gateway().enviar_template(
             telefone, template, idioma=idioma, variaveis=variaveis)
     except Exception as e:  # noqa: BLE001 — best-effort
         res = {"ok": False, "erro": str(e)[:300]}
-    resumo = f"[modelo: {template}]" + (" · " + " · ".join(map(str, variaveis))
-                                        if variaveis else "")
+    valores = (list(variaveis.values()) if isinstance(variaveis, dict)
+               else list(variaveis or []))
+    resumo = f"[modelo: {template}]" + (" · " + " · ".join(map(str, valores))
+                                        if valores else "")
     msg = MensagemWhatsApp.objects.create(
         conversa=conv, direcao=MensagemWhatsApp.Direcao.SAIDA, texto=resumo,
         status=(MensagemWhatsApp.Status.ENVIADA if res.get("ok")
@@ -2077,6 +2079,23 @@ def enviar_template_whatsapp(*, oportunidade, template, idioma="pt_BR",
         id_externo=(res.get("id") or "")[:120], autor=usuario, horario=timezone.now(),
     )
     return msg
+
+
+def reabrir_conversa_whatsapp(*, oportunidade, usuario=None):
+    """Reabre a conversa fora da janela de 24h via o template aprovado de retomada.
+
+    Usa o modelo configurado em `WHATSAPP_TEMPLATE_RETOMADA` (variável nomeada
+    `{{nome_cliente}}` = primeiro nome do lead). Quando o cliente responder, a janela
+    de 24h reabre e volta a valer mensagem livre.
+    """
+    from django.conf import settings
+
+    nome = (oportunidade.pessoa.nome or "").strip().split(" ")[0] or "Olá"
+    template = getattr(settings, "WHATSAPP_TEMPLATE_RETOMADA", "retomada_lead")
+    idioma = getattr(settings, "WHATSAPP_TEMPLATE_RETOMADA_IDIOMA", "pt_BR")
+    return enviar_template_whatsapp(
+        oportunidade=oportunidade, template=template, idioma=idioma,
+        variaveis={"nome_cliente": nome}, usuario=usuario)
 
 
 # Palavras que o cliente manda para sair da lista (opt-out LGPD).

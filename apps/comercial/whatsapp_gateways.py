@@ -21,6 +21,21 @@ from django.core.exceptions import ValidationError
 logger = logging.getLogger(__name__)
 
 
+def _parametros_template(variaveis):
+    """Monta os parâmetros do corpo de um template para a Cloud API.
+
+    - dict  → variáveis NOMEADAS (`{{nome_cliente}}`): cada item leva `parameter_name`.
+    - lista → variáveis POSICIONAIS (`{{1}}`, `{{2}}`…).
+    O template define qual formato espera; aqui só traduzimos o que o chamador passar.
+    """
+    if not variaveis:
+        return []
+    if isinstance(variaveis, dict):
+        return [{"type": "text", "parameter_name": str(k), "text": str(v)}
+                for k, v in variaveis.items()]
+    return [{"type": "text", "text": str(v)} for v in variaveis]
+
+
 def normalizar_telefone(telefone: str) -> str:
     """Número em formato E.164 (só dígitos) para a API. Assume Brasil (55) se faltar.
 
@@ -198,13 +213,14 @@ class GatewayCloud:
 
     def enviar_template(self, telefone: str, template: str, idioma: str = "pt_BR",
                         variaveis=None) -> dict:
-        """Template aprovado (inicia conversa / fora da janela). variaveis → {{1}}, {{2}}…"""
+        """Template aprovado (inicia conversa / fora da janela).
+
+        `variaveis`: dict → nomeadas (`{{nome_cliente}}`); lista → posicionais (`{{1}}`…).
+        """
         componentes = []
-        if variaveis:
-            componentes.append({
-                "type": "body",
-                "parameters": [{"type": "text", "text": str(v)} for v in variaveis],
-            })
+        parametros = _parametros_template(variaveis)
+        if parametros:
+            componentes.append({"type": "body", "parameters": parametros})
         payload = {
             "messaging_product": "whatsapp",
             "to": normalizar_telefone(telefone),

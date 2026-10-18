@@ -1044,6 +1044,19 @@ def whatsapp_enviar_audio(request, pk):
 
 
 @requer_modulo(Modulo.COMERCIAL)
+def whatsapp_reabrir(request, pk):
+    """Reabre a conversa fora da janela de 24h disparando o template de retomada (fetch)."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    erro = ""
+    if request.method == "POST":
+        try:
+            services.reabrir_conversa_whatsapp(oportunidade=op, usuario=request.user)
+        except ValidationError as e:
+            erro = "; ".join(e.messages)
+    return JsonResponse({"ok": not erro, "erro": erro})
+
+
+@requer_modulo(Modulo.COMERCIAL)
 def whatsapp_midia(request, pk):
     """Serve a mídia (áudio) de uma mensagem de WhatsApp — protegido por login + módulo.
 

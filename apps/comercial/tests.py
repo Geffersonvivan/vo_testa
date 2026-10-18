@@ -1016,6 +1016,38 @@ class WhatsAppCloudTests(TestCase):
         self.assertEqual(msg.status, "enviada")  # gateway simulado
         self.assertIn("boas_vindas_fundador", msg.texto)
 
+    def test_reabrir_conversa_dispara_template_de_retomada(self):
+        # Fora da janela (cliente nunca falou): o botão "Reabrir conversa" usa o
+        # template configurado com o primeiro nome do lead.
+        with override_settings(WHATSAPP_TEMPLATE_RETOMADA="retomada_lead"):
+            msg = services.reabrir_conversa_whatsapp(
+                oportunidade=self.op, usuario=self.user)
+        self.assertEqual(msg.direcao, "saida")
+        self.assertEqual(msg.status, "enviada")  # simulado
+        self.assertIn("retomada_lead", msg.texto)
+        self.assertIn("Maria", msg.texto)  # primeiro nome, não "Maria Silva"
+
+    def test_template_aceita_variavel_nomeada_no_payload(self):
+        # Variável nomeada ({{nome_cliente}}) → payload leva parameter_name (Cloud API).
+        from unittest.mock import patch
+        with patch("apps.comercial.whatsapp_gateways._api_post",
+                   return_value={"ok": True, "id": "x"}) as pm, \
+                override_settings(WHATSAPP_GATEWAY="cloud"):
+            services.enviar_template_whatsapp(
+                oportunidade=self.op, template="retomada_lead",
+                variaveis={"nome_cliente": "Maria"}, usuario=self.user)
+        payload = pm.call_args.args[0]
+        param = payload["template"]["components"][0]["parameters"][0]
+        self.assertEqual(param["parameter_name"], "nome_cliente")
+        self.assertEqual(param["text"], "Maria")
+
+    def test_reabrir_conversa_pela_view(self):
+        self.client.force_login(self.user)
+        r = self.client.post(
+            reverse("comercial:whatsapp_reabrir", args=[self.op.pk]))
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["ok"])
+
     @override_settings(WHATSAPP_GATEWAY="cloud")
     def test_texto_livre_fora_da_janela_bloqueia(self):
         conv = services.abrir_conversa_whatsapp(self.op)  # cliente nunca falou → fechada
