@@ -1,0 +1,186 @@
+{% load static %}<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ pagina.hero_titulo|default:"A casa do Vô"|truncatechars:60 }} · Pousada Vô Testa</title>
+<meta name="description" content="{{ pagina.hero_subtitulo|default:'Nem resort, nem pousada. É a casa do Vô — em Itá, Santa Catarina.'|truncatechars:150 }}">
+<style>
+  @font-face{font-family:'Neco';src:url('{% static "site/fonts/Neco-Regular.woff2" %}') format('woff2');font-weight:400;font-display:swap}
+  @font-face{font-family:'Neco';src:url('{% static "site/fonts/Neco-Bold.woff2" %}') format('woff2');font-weight:700;font-display:swap}
+  @font-face{font-family:'Neco';src:url('{% static "site/fonts/Neco-Black.woff2" %}') format('woff2');font-weight:900;font-display:swap}
+  :root{
+    --noturno:#051C2C;--madeira:#4F2C1D;--lampiao:#D7A048;--pergaminho:#EFDBB2;
+    --brass:#D7A048;--brass-soft:rgba(215,160,72,.5);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:'Neco',Georgia,serif;color:var(--pergaminho);line-height:1.6;
+    background-color:var(--noturno);
+    background-image:radial-gradient(ellipse at 50% 0%,rgba(79,44,29,.45),transparent 62%);
+    background-repeat:no-repeat;overflow-x:hidden;
+  }
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+  .num{font-variant-numeric:tabular-nums}
+
+  /* ---- hero ---- */
+  .hero{text-align:center;padding:70px 0 44px}
+  .hero .logo{height:160px;margin:0 auto 22px;display:block;filter:drop-shadow(0 6px 18px rgba(0,0,0,.4))}
+  .hero h1{font-weight:900;font-size:clamp(32px,8.5vw,92px);line-height:1;letter-spacing:-.03em;color:var(--pergaminho)}
+  .hero h1 em{font-style:normal;color:var(--brass)}
+  .rule{height:1px;background:linear-gradient(90deg,transparent,var(--brass-soft),transparent);margin:28px auto;max-width:360px}
+  .sub{color:rgba(239,219,178,.66);font-size:16px;max-width:520px;margin:0 auto}
+  .sub .local{color:var(--brass)}
+  .cue{margin-top:16px;color:var(--brass);font-size:11px;letter-spacing:.28em;text-transform:uppercase;opacity:.8}
+
+  /* ---- estações (serpentina) ---- */
+  .estacoes{padding:16px 0 10px}
+  .estacao{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;padding:26px 0}
+  .estacao .fone-col{order:1}
+  .estacao .txt{order:2;text-align:left}
+  .estacao.flip .fone-col{order:2}
+  .estacao.flip .txt{order:1;text-align:right}
+  .txt .comp{color:var(--brass);font-size:12px;letter-spacing:.22em;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:12px}
+  .estacao.flip .txt .comp{justify-content:flex-end}
+  .dial{width:52px;height:52px;border-radius:50%;border:2px solid var(--brass);display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;color:var(--brass);position:relative;flex:none}
+  .dial::before{content:'';position:absolute;inset:5px;border-radius:50%;border:1px dashed rgba(215,160,72,.4)}
+  .txt h2{font-weight:900;font-size:clamp(26px,3.6vw,40px);line-height:1.05;letter-spacing:-.02em;margin:14px 0 8px;color:var(--pergaminho)}
+  .txt p{color:rgba(239,219,178,.72);font-size:16px;max-width:400px}
+  .estacao.flip .txt p{margin-left:auto}
+
+  /* reveal no scroll (apple-design: transform+opacity, interrompível por natureza) */
+  .txt,.fone-col{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
+  .estacao.vis .txt,.estacao.vis .fone-col{opacity:1;transform:none}
+
+  /* moldura "aparelho": bezel de madeira sólido + hairline latão (sem glow) */
+  .fone-col{display:flex;justify-content:center}
+  .fone{position:relative;width:100%;max-width:272px;aspect-ratio:9/16;border-radius:30px;overflow:hidden;background:#000;border:8px solid var(--madeira);box-shadow:inset 0 0 0 2px var(--brass-soft),0 24px 48px rgba(0,0,0,.45)}
+  .fone video{width:100%;height:100%;object-fit:cover;display:block;background:#000}
+  .fone .toque{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;transition:opacity .3s}
+  .fone.tocando .toque{opacity:0}
+  .play{width:66px;height:66px;border-radius:50%;background:rgba(5,28,44,.5);border:2px solid var(--brass);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+  .play::after{content:'';border-left:18px solid var(--brass);border-top:11px solid transparent;border-bottom:11px solid transparent;margin-left:5px}
+
+  /* conector esquemático: a linha "se desenha" (scaleY no topo) rumo à próxima estação */
+  .conector{display:flex;justify-content:center;height:72px}
+  .conector svg{height:100%;overflow:visible;transform:scaleY(0);transform-origin:top center;transition:transform .6s ease}
+  .conector.vis svg{transform:scaleY(1)}
+  .dash{stroke:var(--brass);stroke-width:2;stroke-dasharray:7 6;fill:none;opacity:.75}
+  .head{fill:var(--brass)}
+
+  /* ---- fecho / frase de impacto ---- */
+  .fecho{text-align:center;padding:72px 0 92px}
+  .fecho .rule{max-width:620px;margin-bottom:30px}
+  .seal{width:56px;height:56px;margin:0 auto 24px;display:block;opacity:.9}
+  .fecho h3{font-weight:900;font-size:clamp(30px,5.2vw,58px);line-height:1.08;letter-spacing:-.02em;color:var(--pergaminho)}
+  .fecho h3 em{font-style:normal;color:var(--brass)}
+
+  @media(max-width:760px){
+    .estacao{grid-template-columns:1fr;gap:20px;text-align:center}
+    .estacao .fone-col,.estacao.flip .fone-col{order:0}
+    .estacao .txt,.estacao.flip .txt{order:1;text-align:center}
+    .txt .comp,.estacao.flip .txt .comp{justify-content:center}
+    .txt p,.estacao.flip .txt p{margin:0 auto}
+    .hero .logo{height:120px}
+  }
+  @media(prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    .txt,.fone-col{opacity:1;transform:none;transition:none}
+    .conector svg{transform:none;transition:none}
+  }
+</style>
+{% if pagina.meta_pixel_id %}
+<script>
+!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init','{{ pagina.meta_pixel_id }}');fbq('track','PageView');
+</script>
+{% endif %}
+{% if pagina.google_tag_id %}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ pagina.google_tag_id }}"></script>
+<script>
+window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+gtag('js',new Date());gtag('config','{{ pagina.google_tag_id }}');
+</script>
+{% endif %}
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="wrap">
+    <img class="logo" src="{% static 'img/logotipo-pergaminho-limpo.png' %}" alt="Pousada Vô Testa">
+    <h1>Nem resort.<br>Nem pousada.<br><em>É a casa do Vô.</em></h1>
+    <div class="rule"></div>
+    <p class="sub"><span class="local">Itá, Santa Catarina</span> — a planta de um lugar fora do tempo.</p>
+    <p class="cue">↓ percorra a planta</p>
+  </div>
+</section>
+
+<!-- ESTAÇÕES (serpentina) -->
+<section class="estacoes wrap">
+  {% for e in estacoes %}
+  <div class="estacao{% if forloop.counter|divisibleby:2 %} flip{% endif %}" id="estacao-{{ e.n }}">
+    <div class="fone-col">
+      <div class="fone" onclick="tocar(this)">
+        <video preload="none" playsinline controls poster="{% static e.poster %}" src="{% static e.video %}"></video>
+        <div class="toque"><div class="play"></div></div>
+      </div>
+    </div>
+    <div class="txt">
+      <div class="comp"><span class="dial num">0{{ e.n }}</span> Componente · {{ e.rotulo }}</div>
+      <h2>{{ e.titulo }}</h2>
+      <p>{{ e.texto }}</p>
+    </div>
+  </div>
+  {% if not forloop.last %}
+    {% if forloop.counter|divisibleby:2 %}
+    <div class="conector"><svg viewBox="0 0 220 72" preserveAspectRatio="none"><path class="dash" d="M55 0 L55 36 L190 36 L190 60"/><polygon class="head" points="190,72 184,58 196,58"/></svg></div>
+    {% else %}
+    <div class="conector"><svg viewBox="0 0 220 72" preserveAspectRatio="none"><path class="dash" d="M165 0 L165 36 L30 36 L30 60"/><polygon class="head" points="30,72 24,58 36,58"/></svg></div>
+    {% endif %}
+  {% endif %}
+  {% endfor %}
+</section>
+
+<!-- FECHO -->
+<section class="fecho">
+  <div class="wrap">
+    <div class="rule"></div>
+    <svg class="seal" viewBox="0 0 64 64" fill="none" stroke="#D7A048" stroke-width="2">
+      <circle cx="32" cy="32" r="20"/><circle cx="32" cy="32" r="8"/>
+      <g>
+        <line x1="32" y1="4" x2="32" y2="12"/><line x1="32" y1="52" x2="32" y2="60"/>
+        <line x1="4" y1="32" x2="12" y2="32"/><line x1="52" y1="32" x2="60" y2="32"/>
+        <line x1="12" y1="12" x2="18" y2="18"/><line x1="46" y1="46" x2="52" y2="52"/>
+        <line x1="52" y1="12" x2="46" y2="18"/><line x1="18" y1="46" x2="12" y2="52"/>
+      </g>
+    </svg>
+    <h3>Nem resort, nem pousada.<br><em>É a casa do Vô.</em></h3>
+  </div>
+</section>
+
+<script>
+  // Toca um vídeo e pausa os outros (um de cada vez); some a dica de play.
+  function tocar(fone){
+    var v=fone.querySelector('video');
+    document.querySelectorAll('.fone video').forEach(function(o){if(o!==v){o.pause();o.closest('.fone').classList.remove('tocando');}});
+    fone.classList.add('tocando');
+  }
+  // Revela estações e "desenha" os conectores conforme entram na viewport.
+  (function(){
+    var alvos=document.querySelectorAll('.estacao,.conector');
+    if('IntersectionObserver' in window){
+      var io=new IntersectionObserver(function(es){
+        es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('vis');io.unobserve(e.target);}});
+      },{threshold:.25});
+      alvos.forEach(function(a){io.observe(a);});
+    } else { alvos.forEach(function(a){a.classList.add('vis');}); }
+  })();
+</script>
+</body>
+</html>

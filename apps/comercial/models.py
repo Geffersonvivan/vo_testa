@@ -467,6 +467,7 @@ class PaginaCaptacao(models.Model):
 
     class Tema(models.TextChoices):
         FUNDADOR = "fundador", "Fundador (inauguração)"
+        BLUEPRINT = "blueprint", "Blueprint — A casa do Vô (tour em vídeo)"
 
     nome = models.CharField("nome (interno)", max_length=80)
     slug = models.SlugField(

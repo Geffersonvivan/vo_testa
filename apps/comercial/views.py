@@ -693,6 +693,28 @@ def pagina_qr(request, pk):
     return HttpResponse(buf.getvalue(), content_type="image/svg+xml")
 
 
+# Estações da "Blueprint da Invenção" (tema BLUEPRINT): a planta da casa do Vô,
+# percorrida em serpentina por 5 vídeos do fundador. Vídeos/pôsteres em
+# static/comercial/blueprint/ (clip_N.mp4 + poster_N.jpg).
+ESTACOES_BLUEPRINT = [
+    {"n": 1, "rotulo": "A entrada", "titulo": "O Portal",
+     "texto": "A fachada, a torre do relógio e a placa que anuncia: aqui começa a casa do Vô.",
+     "video": "comercial/blueprint/clip_1.mp4", "poster": "comercial/blueprint/poster_1.jpg"},
+    {"n": 2, "rotulo": "O coração", "titulo": "O Mecanismo",
+     "texto": "Corredores com engrenagens de verdade — a alma relojoeira que dá nome e vida ao lugar.",
+     "video": "comercial/blueprint/clip_2.mp4", "poster": "comercial/blueprint/poster_2.jpg"},
+    {"n": 3, "rotulo": "O descanso", "titulo": "O Refúgio",
+     "texto": "Quartos de teto em madeira, ladrilho hidráulico e janela aberta pro horizonte.",
+     "video": "comercial/blueprint/clip_3.mp4", "poster": "comercial/blueprint/poster_3.jpg"},
+    {"n": 4, "rotulo": "O detalhe", "titulo": "O Requinte",
+     "texto": "Banheiros em mármore — o conforto que você não espera de uma “pousada”.",
+     "video": "comercial/blueprint/clip_4.mp4", "poster": "comercial/blueprint/poster_4.jpg"},
+    {"n": 5, "rotulo": "O horizonte", "titulo": "A Vista",
+     "texto": "A varanda sobre o lago de Itá, entre as cores da nossa arquitetura fora do tempo.",
+     "video": "comercial/blueprint/clip_5.mp4", "poster": "comercial/blueprint/poster_5.jpg"},
+]
+
+
 @never_cache
 @csrf_protect
 def captacao_publica(request, slug):
@@ -700,6 +722,11 @@ def captacao_publica(request, slug):
     pagina = PaginaCaptacao.objects.filter(slug=slug).first()
     if pagina is None or not pagina.publicada:
         raise Http404("Página não encontrada.")
+
+    # O tema escolhe o visual: 'fundador' (oferta c/ captura) ou 'blueprint' (tour do fundador).
+    eh_blueprint = pagina.tema == PaginaCaptacao.Tema.BLUEPRINT
+    template = "comercial/captacao_blueprint.html" if eh_blueprint else "comercial/captacao_publica.html"
+    extra = {"estacoes": ESTACOES_BLUEPRINT} if eh_blueprint else {}
 
     enviado = request.GET.get("ok") == "1"
     if request.method == "POST":
@@ -729,14 +756,14 @@ def captacao_publica(request, slug):
             except Exception:
                 pass  # best-effort: nunca quebra a página pública do lead
             return redirect(f"{pagina.get_absolute_url()}?ok=1")
-        return render(request, "comercial/captacao_publica.html",
+        return render(request, template,
                       {"pagina": pagina, "erro": "Preencha nome e WhatsApp.",
-                       "rastreio": {k: request.POST.get(k, "") for k in RASTREIO_KEYS}})
+                       "rastreio": {k: request.POST.get(k, "") for k in RASTREIO_KEYS}, **extra})
 
     services.registrar_visita_pagina(pagina)
     rastreio = {k: request.GET.get(k, "") for k in RASTREIO_KEYS}
-    return render(request, "comercial/captacao_publica.html",
-                  {"pagina": pagina, "enviado": enviado, "rastreio": rastreio})
+    return render(request, template,
+                  {"pagina": pagina, "enviado": enviado, "rastreio": rastreio, **extra})
 
 
 # ─────────────────── Gestor de Impulsionamento (anúncios) — Fase A ───────────────────
