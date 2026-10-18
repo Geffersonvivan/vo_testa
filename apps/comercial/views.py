@@ -715,33 +715,41 @@ def pagina_qr(request, pk):
 # percorrida em serpentina pelos 9 vídeos do fundador, na sequência. Vídeos/pôsteres
 # em static/comercial/blueprint/ (clip_N.mp4 + poster_N.jpg).
 ESTACOES_BLUEPRINT = [
-    {"n": 1, "rotulo": "A chegada", "titulo": "O Começo",
-     "texto": "O primeiro passo — é aqui que a casa do Vô começa a ganhar forma.",
+    {"n": 1, "rotulo": "as boas-vindas", "titulo": "A Casa do Avô",
+     "texto": "Antes de tudo, uma apresentação: a Vô Testa nasceu pra ser a casa do nosso "
+              "avô — e agora é a sua.",
      "video": "comercial/blueprint/clip_1.mp4", "poster": "comercial/blueprint/poster_1.jpg"},
-    {"n": 2, "rotulo": "A fachada", "titulo": "O Portal",
-     "texto": "A fachada, a torre do relógio e a placa que anuncia: aqui é a casa do Vô.",
+    {"n": 2, "rotulo": "a marca", "titulo": "O Relógio",
+     "texto": "No alto, a torre do relógio — o símbolo que batiza a casa e marca o tempo "
+              "que corre diferente por aqui.",
      "video": "comercial/blueprint/clip_2.mp4", "poster": "comercial/blueprint/poster_2.jpg"},
-    {"n": 3, "rotulo": "O hóspede", "titulo": "O Convite",
-     "texto": "Tudo foi pensado para o nosso hóspede — do pátio à vista que se abre pro lago.",
+    {"n": 3, "rotulo": "a identidade", "titulo": "A Cara do Vô Testa",
+     "texto": "Cada detalhe é ornamentado no estilo da casa — do portão à última peça, "
+              "é a cara do Vô Testa.",
      "video": "comercial/blueprint/clip_3.mp4", "poster": "comercial/blueprint/poster_3.jpg"},
-    {"n": 4, "rotulo": "O acabamento", "titulo": "Os Detalhes",
-     "texto": "Até os postes têm personalidade. Cada peça é feita à mão, com capricho de inventor.",
+    {"n": 4, "rotulo": "a vista", "titulo": "A Sacada",
+     "texto": "Da sacada, uma vista sensacional se abre sobre o lago — o melhor lugar "
+              "pra respirar fundo.",
      "video": "comercial/blueprint/clip_4.mp4", "poster": "comercial/blueprint/poster_4.jpg"},
-    {"n": 5, "rotulo": "O banho", "titulo": "O Requinte",
-     "texto": "Banheiros com requinte — o conforto que você não espera de uma “pousada”.",
+    {"n": 5, "rotulo": "o descanso", "titulo": "A Suíte",
+     "texto": "Unidades de dois quartos, teto de madeira e varanda. Acordar aqui, com a "
+              "luz da manhã, é outro nível.",
      "video": "comercial/blueprint/clip_5.mp4", "poster": "comercial/blueprint/poster_5.jpg"},
-    {"n": 6, "rotulo": "O coração", "titulo": "O Mecanismo",
-     "texto": "Corredores com engrenagens que movem a pousada — a alma relojoeira que dá nome ao lugar.",
+    {"n": 6, "rotulo": "os detalhes", "titulo": "A Alma Inventora",
+     "texto": "Corredores com o mural do inventor e engrenagens de verdade. Tudo pensado, "
+              "tudo organizado — a alma relojoeira da casa.",
      "video": "comercial/blueprint/clip_6.mp4", "poster": "comercial/blueprint/poster_6.jpg"},
-    {"n": 7, "rotulo": "O quarto", "titulo": "O Refúgio",
-     "texto": "Quartos de teto em madeira, ladrilho hidráulico e janela aberta pro horizonte.",
+    {"n": 7, "rotulo": "o conforto", "titulo": "O Quarto com Vista",
+     "texto": "Teto de madeira, ladrilho hidráulico e um janelão que emoldura o verde e "
+              "o lago. Aconchego com vista.",
      "video": "comercial/blueprint/clip_7.mp4", "poster": "comercial/blueprint/poster_7.jpg"},
     {"n": 8, "rotulo": "O aconchego", "titulo": "As Cabanas Hobbit",
      "texto": "Portas arredondadas, muita madeira e um quê de Condado — dormir aqui é "
               "entrar numa história. O canto mais encantado da Vô Testa.",
      "video": "comercial/blueprint/clip_8.mp4", "poster": "comercial/blueprint/poster_8.jpg"},
-    {"n": 9, "rotulo": "O horizonte", "titulo": "A Vista",
-     "texto": "A varanda sobre o lago de Itá, entre as cores da nossa arquitetura fora do tempo.",
+    {"n": 9, "rotulo": "o mirante", "titulo": "A Paz",
+     "texto": "Do mirante de madeira, o lago se espraia em silêncio. É essa paz que fica "
+              "com você depois que vai embora.",
      "video": "comercial/blueprint/clip_9.mp4", "poster": "comercial/blueprint/poster_9.jpg"},
 ]
 
