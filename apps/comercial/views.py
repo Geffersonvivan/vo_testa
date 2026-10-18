@@ -23,26 +23,21 @@ from apps.nucleo.seletores import pessoas_agrupadas
 
 from . import quartos, services
 from .forms import (
-    CampanhaForm,
     ConversaoForm,
     CotacaoForm,
-    GastoDiarioForm,
     MetaForm,
     PaginaCaptacaoForm,
     PerdaForm,
     RespostaRapidaForm,
 )
 from .models import (
-    AnaliseLead,
     AtividadeComercial,
-    Campanha,
     EtapaFunil,
     MotivoPerda,
     Oportunidade,
     PaginaCaptacao,
     RespostaRapida,
 )
-from .proposta_instagram import PROPOSTA as PROPOSTA_INSTAGRAM
 
 Usuario = get_user_model()
 
@@ -145,78 +140,6 @@ def funil(request):
     ctx.update(selecao_periodo(request))
     ctx.update(_contexto_form())
     return render(request, "comercial/funil.html", ctx)
-
-
-@never_cache
-@requer_modulo(Modulo.COMERCIAL)
-def instagram(request):
-    """Proposta Instagram → Comercial (ainda não implementada)."""
-    return render(
-        request,
-        "comercial/instagram.html",
-        {"proposta": PROPOSTA_INSTAGRAM},
-    )
-
-
-@never_cache
-@requer_modulo(Modulo.COMERCIAL)
-def cacador(request):
-    """Fila do Caçador — leads abertos analisados, do mais quente ao mais frio.
-
-    A análise é por regras (services.analisar_lead); a camada de IA entra depois
-    alimentando os mesmos campos. Leads antigos ainda sem análise são preenchidos
-    de forma preguiçosa aqui."""
-    base = Oportunidade.objects.filter(status=Oportunidade.Status.ABERTA)
-
-    # Filtros por origem (com contagem) — só as origens que têm lead aberto.
-    contagem = {r["origem"]: r["n"] for r in base.values("origem").annotate(n=Count("id"))}
-    origens = [
-        {"cod": cod, "label": label, "n": contagem.get(cod, 0)}
-        for cod, label in Oportunidade.Origem.choices if contagem.get(cod)
-    ]
-    origem_sel = request.GET.get("origem", "")
-
-    leads = base.filter(origem=origem_sel) if origem_sel else base
-    # Ordenação: "a revisar" primeiro (revisado_em nulo), depois score, depois recência.
-    leads = (
-        leads.select_related("pessoa", "etapa", "responsavel", "analise")
-        .order_by(F("analise__revisado_em").asc(nulls_first=True), "-score", "-criado_em")
-    )
-
-    limite_novo = timezone.now() - timedelta(hours=24)
-    fila = []
-    for op in leads:
-        try:
-            analise = op.analise
-        except AnaliseLead.DoesNotExist:
-            analise = services.analisar_lead(op)  # backfill preguiçoso
-        fila.append({"op": op, "analise": analise, "novo": op.criado_em >= limite_novo})
-    kpi = {
-        "total": len(fila),
-        "quentes": sum(1 for f in fila if f["analise"].temperatura == "quente"),
-        "a_revisar": sum(1 for f in fila if f["analise"].revisado_em is None),
-    }
-    return render(request, "comercial/cacador.html", {
-        "fila": fila, "kpi": kpi,
-        "origens": origens, "origem_sel": origem_sel, "total_geral": base.count(),
-    })
-
-
-@requer_modulo(Modulo.COMERCIAL)
-def cacador_feedback(request, pk):
-    """Atendente marca a análise como útil ou não — semente do loop de aprendizado."""
-    op = get_object_or_404(Oportunidade, pk=pk)
-    if request.method != "POST":
-        return redirect("comercial:cacador")
-    analise = services.analisar_lead(op)  # garante que existe
-    util = request.POST.get("util")
-    analise.util = True if util == "1" else (False if util == "0" else None)
-    analise.revisado_por = request.user
-    analise.revisado_em = timezone.now()
-    analise.save(update_fields=["util", "revisado_por", "revisado_em"])
-    services.assumir_lead(op, request.user)  # avaliar no Caçador = interagir
-    messages.success(request, "Feedback registrado — o Caçador aprende com isso.")
-    return redirect("comercial:cacador")
 
 
 @requer_modulo(Modulo.COMERCIAL)
@@ -794,117 +717,6 @@ def captacao_publica(request, slug):
     rastreio = {k: request.GET.get(k, "") for k in RASTREIO_KEYS}
     return render(request, template,
                   {"pagina": pagina, "enviado": enviado, "rastreio": rastreio, **extra})
-
-
-# ─────────────────── Gestor de Impulsionamento (anúncios) — Fase A ───────────────────
-
-@never_cache
-@requer_modulo(Modulo.COMERCIAL)
-def impulsionamento(request):
-    """Painel: campanhas com gasto · leads · reservas · custo por lead · retorno."""
-    campanhas = list(Campanha.objects.all())
-    tot_gasto = sum((c.gasto_total for c in campanhas), Decimal("0.00"))
-    tot_leads = sum(c.leads for c in campanhas)
-    tot_reservas = sum(c.reservas for c in campanhas)
-    tot_receita = sum((c.receita for c in campanhas), Decimal("0.00"))
-    kpi = {
-        "gasto": tot_gasto,
-        "leads": tot_leads,
-        "reservas": tot_reservas,
-        "cpl": (tot_gasto / tot_leads).quantize(Decimal("0.01")) if tot_leads else Decimal("0.00"),
-        "retorno": (tot_receita / tot_gasto).quantize(Decimal("0.01")) if tot_gasto else Decimal("0.00"),
-    }
-    return render(request, "comercial/impulsionamento/painel.html",
-                  {"campanhas": campanhas, "kpi": kpi})
-
-
-@requer_modulo(Modulo.COMERCIAL)
-def campanha_nova(request):
-    if request.method == "POST":
-        form = CampanhaForm(request.POST)
-        if form.is_valid():
-            camp = form.save(commit=False)
-            if not camp.codigo:
-                camp.codigo = slugify(camp.nome)[:80]
-            camp.criado_por = request.user
-            camp.save()
-            messages.success(request, "Campanha criada.")
-            return redirect("comercial:campanha_detalhe", pk=camp.pk)
-    else:
-        form = CampanhaForm()
-    return render(request, "comercial/impulsionamento/form.html",
-                  {"form": form, "novo": True})
-
-
-@requer_modulo(Modulo.COMERCIAL)
-def campanha_editar(request, pk):
-    camp = get_object_or_404(Campanha, pk=pk)
-    if request.method == "POST":
-        form = CampanhaForm(request.POST, instance=camp)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Campanha atualizada.")
-            return redirect("comercial:campanha_detalhe", pk=camp.pk)
-    else:
-        form = CampanhaForm(instance=camp)
-    return render(request, "comercial/impulsionamento/form.html",
-                  {"form": form, "campanha": camp, "novo": False})
-
-
-@never_cache
-@requer_modulo(Modulo.COMERCIAL)
-def campanha_detalhe(request, pk):
-    camp = get_object_or_404(Campanha, pk=pk)
-    gasto_form = GastoDiarioForm()
-    leads = camp.oportunidades.select_related("pessoa", "etapa").order_by("-criado_em")
-    gastos = camp.gastos.select_related("criado_por")
-    url_utm = ""
-    if camp.pagina_captacao:
-        base = request.build_absolute_uri(camp.pagina_captacao.get_absolute_url())
-        url_utm = f"{base}?utm_source={camp.provedor}&utm_medium=cpc&utm_campaign={camp.codigo}"
-    return render(request, "comercial/impulsionamento/detalhe.html", {
-        "campanha": camp, "gasto_form": gasto_form,
-        "leads": leads, "gastos": gastos, "url_utm": url_utm,
-    })
-
-
-@requer_modulo(Modulo.COMERCIAL)
-def campanha_sincronizar(request, pk):
-    """Puxa o gasto da plataforma para a campanha (Fase C). POST."""
-    camp = get_object_or_404(Campanha, pk=pk)
-    if request.method == "POST":
-        try:
-            n = services.sincronizar_gastos(campanha=camp, dias=30)
-            if n:
-                messages.success(request, f"{n} dia(s) de gasto sincronizado(s).")
-            else:
-                messages.info(
-                    request,
-                    "Nada sincronizado. Verifique MIDIA_GATEWAY, o token e o ID da campanha "
-                    "na plataforma (ou lance o gasto manualmente).")
-        except Exception as e:  # best-effort
-            messages.error(request, f"Falha na sincronização: {str(e)[:140]}")
-    return redirect("comercial:campanha_detalhe", pk=camp.pk)
-
-
-@requer_modulo(Modulo.COMERCIAL)
-def campanha_gasto(request, pk):
-    """Lança um gasto na campanha (POST)."""
-    camp = get_object_or_404(Campanha, pk=pk)
-    if request.method == "POST":
-        form = GastoDiarioForm(request.POST)
-        if form.is_valid():
-            try:
-                services.registrar_gasto(
-                    campanha=camp, data=form.cleaned_data["data"],
-                    valor=form.cleaned_data["valor"], usuario=request.user,
-                )
-                messages.success(request, "Gasto lançado.")
-            except ValidationError as e:
-                messages.error(request, "; ".join(e.messages))
-        else:
-            messages.error(request, "Preencha data e valor.")
-    return redirect("comercial:campanha_detalhe", pk=camp.pk)
 
 
 # ─────────────────── WhatsApp no funil (MVP) + Respostas Rápidas ───────────────────

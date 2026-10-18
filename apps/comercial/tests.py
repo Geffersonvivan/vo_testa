@@ -331,26 +331,6 @@ class CacadorTests(TestCase):
         self.assertFalse(analise.sinais["tem_datas"])
         self.assertIn("as datas", analise.sinais["faltando"])
 
-    def test_feedback_marca_revisado(self):
-        op = services.criar_oportunidade(
-            usuario=self.user, pessoa=Pessoa.objects.create(nome="Fb Lead"), titulo="Fb",
-        )
-        self.client.force_login(self.user)
-        r = self.client.post(reverse("comercial:cacador_feedback", args=[op.pk]), {"util": "1"})
-        self.assertEqual(r.status_code, 302)
-        analise = AnaliseLead.objects.get(oportunidade=op)
-        self.assertTrue(analise.util)
-        self.assertIsNotNone(analise.revisado_em)
-
-    def test_fila_renderiza_lead(self):
-        services.criar_oportunidade(
-            usuario=self.user, pessoa=Pessoa.objects.create(nome="Fila Lead"), titulo="Fila",
-        )
-        self.client.force_login(self.user)
-        r = self.client.get(reverse("comercial:cacador"))
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "Fila Lead")
-
     def test_rascunho_por_tipo_de_interesse(self):
         ci = timezone.localdate() + timedelta(days=8)
         co = ci + timedelta(days=1)
@@ -373,15 +353,8 @@ class CacadorTests(TestCase):
         self.assertIn("dia na pousada", du.analise.rascunho.lower())
         self.assertIn("hospedagem", hosp.analise.rascunho.lower())
 
-    def test_badge_novo_no_lead_recente(self):
-        services.criar_oportunidade(
-            usuario=self.user, pessoa=Pessoa.objects.create(nome="Recentíssimo"), titulo="r",
-        )
-        self.client.force_login(self.user)
-        r = self.client.get(reverse("comercial:cacador"))
-        self.assertContains(r, "cac-novo")
-
-    def test_lead_quente_mostra_chama_e_etapa(self):
+    def test_lead_quente_pela_analise(self):
+        # Motor de score: lead de alto valor + indicação + datas → temperatura quente.
         ci = timezone.localdate() + timedelta(days=5)
         op = services.criar_oportunidade(
             usuario=self.user, pessoa=Pessoa.objects.create(nome="Bem Quente"),
@@ -389,42 +362,7 @@ class CacadorTests(TestCase):
             origem=Oportunidade.Origem.INDICACAO,
             checkin_previsto=ci, checkout_previsto=ci + timedelta(days=2),
         )
-        analise = AnaliseLead.objects.get(oportunidade=op)
-        self.assertEqual(analise.temperatura, AnaliseLead.Temperatura.QUENTE)
-        self.client.force_login(self.user)
-        r = self.client.get(reverse("comercial:cacador"))
-        self.assertContains(r, "cac-flama")     # chama no lead quente
-        self.assertContains(r, "no funil ·")    # etapa do funil visível no card
-
-    def test_fila_filtra_por_origem(self):
-        services.criar_oportunidade(
-            usuario=self.user, pessoa=Pessoa.objects.create(nome="Lead Site"),
-            titulo="s", origem=Oportunidade.Origem.SITE,
-        )
-        services.criar_oportunidade(
-            usuario=self.user, pessoa=Pessoa.objects.create(nome="Lead Telefone"),
-            titulo="t", origem=Oportunidade.Origem.TELEFONE,
-        )
-        self.client.force_login(self.user)
-        r = self.client.get(reverse("comercial:cacador") + "?origem=site")
-        self.assertContains(r, "Lead Site")
-        self.assertNotContains(r, "Lead Telefone")
-
-    def test_fila_prioriza_a_revisar(self):
-        # Quente (score alto) mas já revisado deve ficar ABAIXO de um novo a revisar.
-        quente = services.criar_oportunidade(
-            usuario=self.user, pessoa=Pessoa.objects.create(nome="Quente Revisado"),
-            titulo="q", valor_estimado=Decimal("3000"), origem=Oportunidade.Origem.INDICACAO,
-        )
-        an = quente.analise
-        an.revisado_em = timezone.now()
-        an.save(update_fields=["revisado_em"])
-        services.criar_oportunidade(
-            usuario=self.user, pessoa=Pessoa.objects.create(nome="Frio Novo"), titulo="f",
-        )
-        self.client.force_login(self.user)
-        body = self.client.get(reverse("comercial:cacador")).content.decode()
-        self.assertLess(body.index("Frio Novo"), body.index("Quente Revisado"))
+        self.assertEqual(op.analise.temperatura, AnaliseLead.Temperatura.QUENTE)
 
 
 class CotacaoTests(TestCase):
@@ -744,13 +682,6 @@ class ViewTests(TestCase):
         self.assertEqual(self.client.get(reverse("comercial:funil")).status_code, 200)
         self.assertEqual(self.client.get(reverse("comercial:painel")).status_code, 200)
         self.assertEqual(self.client.get(reverse("comercial:tarefas")).status_code, 200)
-
-    def test_instagram_proposta_ok(self):
-        r = self.client.get(reverse("comercial:instagram"))
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "Link na bio")
-        self.assertContains(r, "ManyChat")
-        self.assertContains(r, "API oficial")
 
     def test_nova_via_post(self):
         r = self.client.post(reverse("comercial:nova"), {
@@ -1727,20 +1658,6 @@ class ImpulsionamentoTests(TestCase):
         self.assertEqual(self.camp.reservas, 1)
         self.assertEqual(self.camp.retorno, Decimal("10.00"))
 
-    def test_painel_e_detalhe_renderizam(self):
-        self.client.force_login(self.op)
-        self.assertEqual(self.client.get(reverse("comercial:impulsionamento")).status_code, 200)
-        r = self.client.get(reverse("comercial:campanha_detalhe", args=[self.camp.pk]))
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, "utm_campaign=fundador-meta")
-
-    def test_lancar_gasto_via_view(self):
-        self.client.force_login(self.op)
-        self.client.post(reverse("comercial:campanha_gasto", args=[self.camp.pk]),
-                         {"data": "2026-09-01", "valor": "250.00"})
-        self.camp.refresh_from_db()
-        self.assertEqual(self.camp.gasto_total, Decimal("250.00"))
-
 
 class ConversaoMidiaTests(TestCase):
     """Fase B: devolver conversões (lead/compra) ao provedor (simulado nos testes)."""
@@ -1826,11 +1743,6 @@ class SincronizarGastoTests(TestCase):
 
     def test_sincronizar_simulado_noop(self):
         self.assertEqual(services.sincronizar_gastos(campanha=self.camp), 0)
-
-    def test_view_sincronizar_redireciona(self):
-        self.client.force_login(self.u)
-        r = self.client.post(reverse("comercial:campanha_sincronizar", args=[self.camp.pk]))
-        self.assertEqual(r.status_code, 302)
 
 
 class WhatsAppMVPTests(TestCase):
