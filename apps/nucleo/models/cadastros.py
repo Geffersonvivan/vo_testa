@@ -381,6 +381,15 @@ class UH(models.Model):
     def __str__(self):
         return f"{self.numero} — {self.tipo.nome}"
 
+    @property
+    def ala(self):
+        """Localização oficial (ala) do quarto — regra fixa por número
+        (ver `apps.nucleo.alas`). Vazio para day use / fora das 4 faixas."""
+        if self.tipo_id and self.tipo.modalidade == TipoUH.Modalidade.DAY_USE:
+            return ""
+        from apps.nucleo.alas import ala_do_quarto
+        return ala_do_quarto(self.numero)
+
 
 class PosicaoCama(models.Model):
     """Espaço físico de cama dentro de um quarto (uma posição = 2 pessoas).

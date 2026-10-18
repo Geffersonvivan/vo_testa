@@ -197,9 +197,15 @@
         <summary>Ganhar → criar reserva</summary>
         <form method="post" action="{% url 'comercial:converter' op.pk %}">
           {% csrf_token %}
-          <div class="campo">{{ conversao_form.tipo_uh.label_tag }}{{ conversao_form.tipo_uh }}</div>
           <div class="campo">{{ conversao_form.checkin.label_tag }}{{ conversao_form.checkin }}</div>
           <div class="campo">{{ conversao_form.checkout.label_tag }}{{ conversao_form.checkout }}</div>
+          {% if conversao_form.uh %}
+          <div class="campo"><label>Quarto:</label>
+            {% include "componentes/combo_quarto.html" with dados=quartos_combo dados_id="quartos-conv" campo="uh" valor_id=conversao_form.uh.value %}
+          </div>
+          {% else %}
+          <div class="campo">{{ conversao_form.tipo_uh.label_tag }}{{ conversao_form.tipo_uh }}</div>
+          {% endif %}
           <div class="campo">{{ conversao_form.valor_diaria.label_tag }}{{ conversao_form.valor_diaria }}</div>
           {% if pagamentos_ativo %}
             <label class="check-inline">{{ conversao_form.criar_sinal }} {{ conversao_form.criar_sinal.label }}</label>
@@ -228,9 +234,15 @@
         <summary>Registrar cotação</summary>
         <form method="post" action="{% url 'comercial:cotar' op.pk %}">
           {% csrf_token %}
-          <div class="campo">{{ cotacao_form.tipo_uh.label_tag }}{{ cotacao_form.tipo_uh }}</div>
           <div class="campo">{{ cotacao_form.checkin.label_tag }}{{ cotacao_form.checkin }}</div>
           <div class="campo">{{ cotacao_form.checkout.label_tag }}{{ cotacao_form.checkout }}</div>
+          {% if cotacao_form.uh %}
+          <div class="campo"><label>Quarto:</label>
+            {% include "componentes/combo_quarto.html" with dados=quartos_combo dados_id="quartos-cot" campo="uh" valor_id=cotacao_form.uh.value %}
+          </div>
+          {% else %}
+          <div class="campo">{{ cotacao_form.tipo_uh.label_tag }}{{ cotacao_form.tipo_uh }}</div>
+          {% endif %}
           <div class="campo">{{ cotacao_form.valor_diaria.label_tag }}{{ cotacao_form.valor_diaria }}</div>
           <div class="campo">{{ cotacao_form.validade.label_tag }}{{ cotacao_form.validade }}</div>
           <div class="campo taxas-toggle">

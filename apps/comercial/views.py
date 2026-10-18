@@ -91,6 +91,7 @@ def _conversao_inicial(op):
     cot = op.ultima_cotacao
     if cot:
         initial.update({
+            "uh": cot.uh_id,
             "tipo_uh": cot.tipo_uh_id,
             "checkin": cot.checkin,
             "checkout": cot.checkout,
@@ -108,7 +109,7 @@ def _conversao_inicial(op):
                 initial["valor_diaria"] = (
                     op.valor_estimado / noites / op.quartos
                 ).quantize(Decimal("0.01"))
-    return ConversaoForm(initial=initial)
+    return ConversaoForm(initial=initial, oportunidade=op)
 
 
 def _cotacao_inicial(op):
@@ -117,7 +118,7 @@ def _cotacao_inicial(op):
         initial["checkin"] = op.checkin_previsto
     if op.checkout_previsto:
         initial["checkout"] = op.checkout_previsto
-    return CotacaoForm(initial=initial)
+    return CotacaoForm(initial=initial, oportunidade=op)
 
 
 @never_cache
@@ -344,6 +345,10 @@ def oportunidade(request, pk):
         "etapas": [e for e in services.etapas() if e.tipo == EtapaFunil.Tipo.ABERTA],
         "conversao_form": _conversao_inicial(op),
         "cotacao_form": _cotacao_inicial(op),
+        # Dados iniciais do combo de quarto (quebrado por ala) — já filtrado pelas
+        # datas do lead; o combo refaz via fetch quando as datas mudam.
+        "quartos_combo": services.quartos_combo_dados(
+            services.quartos_para_cotacao(op.checkin_previsto, op.checkout_previsto)),
         "perda_form": PerdaForm(),
         "pagamentos_ativo": modulo_ativo(Modulo.PAGAMENTOS),
         "responsaveis": Usuario.objects.filter(is_active=True).order_by(
@@ -467,15 +472,27 @@ def concluir_tarefa(request, pk):
 
 
 @requer_modulo(Modulo.COMERCIAL)
+def quartos_disponiveis(request):
+    """HTMX: devolve as <option> dos quartos livres nas datas (checkin/checkout do GET).
+    Usado pelos dropdowns de Cotação/Conversão para filtrar por disponibilidade."""
+    checkin = _data(request.GET.get("checkin"))
+    checkout = _data(request.GET.get("checkout"))
+    dados = services.quartos_combo_dados(
+        services.quartos_para_cotacao(checkin, checkout))
+    return JsonResponse(dados, safe=False)
+
+
+@requer_modulo(Modulo.COMERCIAL)
 def cotar(request, pk):
     op = get_object_or_404(Oportunidade, pk=pk)
     if request.method == "POST":
-        form = CotacaoForm(request.POST)
+        form = CotacaoForm(request.POST, oportunidade=op)
         if form.is_valid():
             try:
                 services.registrar_cotacao(
                     oportunidade=op, usuario=request.user,
-                    tipo_uh=form.cleaned_data["tipo_uh"],
+                    uh=form.cleaned_data.get("uh"),
+                    tipo_uh=form.cleaned_data.get("tipo_uh"),
                     checkin=form.cleaned_data["checkin"],
                     checkout=form.cleaned_data["checkout"],
                     valor_diaria=form.cleaned_data.get("valor_diaria"),
@@ -496,12 +513,13 @@ def cotar(request, pk):
 def converter(request, pk):
     op = get_object_or_404(Oportunidade, pk=pk)
     if request.method == "POST":
-        form = ConversaoForm(request.POST)
+        form = ConversaoForm(request.POST, oportunidade=op)
         if form.is_valid():
             try:
                 reserva = services.converter_em_reserva(
                     op, usuario=request.user,
-                    tipo_uh=form.cleaned_data["tipo_uh"],
+                    uh=form.cleaned_data.get("uh"),
+                    tipo_uh=form.cleaned_data.get("tipo_uh"),
                     checkin=form.cleaned_data["checkin"],
                     checkout=form.cleaned_data["checkout"],
                     valor_diaria=form.cleaned_data.get("valor_diaria"),
@@ -718,8 +736,9 @@ ESTACOES_BLUEPRINT = [
     {"n": 7, "rotulo": "O quarto", "titulo": "O Refúgio",
      "texto": "Quartos de teto em madeira, ladrilho hidráulico e janela aberta pro horizonte.",
      "video": "comercial/blueprint/clip_7.mp4", "poster": "comercial/blueprint/poster_7.jpg"},
-    {"n": 8, "rotulo": "O azulejo", "titulo": "A Cozinha",
-     "texto": "Azulejos e madeira: o charme artesanal em cada canto.",
+    {"n": 8, "rotulo": "O aconchego", "titulo": "As Cabanas Hobbit",
+     "texto": "Portas arredondadas, muita madeira e um quê de Condado — dormir aqui é "
+              "entrar numa história. O canto mais encantado da Vô Testa.",
      "video": "comercial/blueprint/clip_8.mp4", "poster": "comercial/blueprint/poster_8.jpg"},
     {"n": 9, "rotulo": "O horizonte", "titulo": "A Vista",
      "texto": "A varanda sobre o lago de Itá, entre as cores da nossa arquitetura fora do tempo.",

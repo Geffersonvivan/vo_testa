@@ -41,6 +41,53 @@
         escolher(it) { this.sel = it.id; this.q = it.nome; this.open = false; },
         adicionar(it) { this.itens.push(it); this.escolher(it); },
       }));
+      Alpine.data("comboQuarto", () => ({
+        // Combo de quarto quebrado por sessões de ala. Refaz a lista de quartos LIVRES
+        // via fetch quando as datas do MESMO form mudam. Busca por número, "PCD" ou ala.
+        q: "", open: false, sel: "", itens: [], url: "",
+        init() {
+          this.url = this.$el.dataset.url;
+          this.itens = JSON.parse(document.getElementById(this.$el.dataset.dados).textContent);
+          const inicial = this.$el.dataset.sel;
+          if (inicial) {
+            this.sel = inicial;
+            const achou = this.itens.find((it) => String(it.id) === String(inicial));
+            if (achou) this.q = achou.nome;
+          }
+          const form = this.$el.closest("form");
+          if (form) {
+            ["[name=checkin]", "[name=checkout]"].forEach((s) => {
+              const el = form.querySelector(s);
+              if (el) el.addEventListener("change", () => this.recarregar());
+            });
+          }
+        },
+        async recarregar() {
+          const form = this.$el.closest("form");
+          const ci = (form.querySelector("[name=checkin]") || {}).value || "";
+          const co = (form.querySelector("[name=checkout]") || {}).value || "";
+          try {
+            const r = await fetch(this.url + "?checkin=" + ci + "&checkout=" + co,
+                                  { headers: { "X-Requested-With": "fetch" } });
+            if (!r.ok) return;
+            this.itens = await r.json();
+            if (this.sel && !this.itens.find((it) => String(it.id) === String(this.sel))) {
+              this.sel = ""; this.q = "";  // quarto escolhido não está mais livre
+            }
+          } catch (e) { /* mantém a lista atual */ }
+        },
+        get grupos() {
+          const f = this.q.trim().toLowerCase();
+          const mapa = new Map();
+          for (const it of this.itens) {
+            if (f && !(it.nome.toLowerCase().includes(f) || it.grupo.toLowerCase().includes(f))) continue;
+            if (!mapa.has(it.grupo)) mapa.set(it.grupo, []);
+            mapa.get(it.grupo).push(it);
+          }
+          return Array.from(mapa.entries());
+        },
+        escolher(it) { this.sel = it.id; this.q = it.nome; this.open = false; },
+      }));
       Alpine.data("blocoQuartos", () => ({
         total: 0, quantidade: 0,
         init() { this.quantidade = this.caixas().length; this.atualizar(); },

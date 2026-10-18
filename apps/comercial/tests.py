@@ -534,6 +534,156 @@ class ConversaoTests(TestCase):
         )
 
 
+class CotacaoConversaoPorQuartoTests(TestCase):
+    """Dropdown por quarto real (24 UHs 'Quarto NN — tipo') + pré-atribuição na
+    conversão (fallback se ocupado); leads de day use mantêm a seleção por tipo."""
+
+    def setUp(self):
+        self.user = Usuario.objects.create_superuser(username="pq", password="senha-forte-123")
+        self.pessoa = Pessoa.objects.create(nome="Lead Quarto", telefone="49999002233")
+        self.tipo = TipoUH.objects.create(nome="Padrão", tarifa_base=Decimal("200"))
+        self.uh1 = UH.objects.create(numero="Quarto 01", tipo=self.tipo)
+        self.uh2 = UH.objects.create(numero="Quarto 02", tipo=self.tipo)
+
+    def _op(self, tipo_interesse=Oportunidade.TipoInteresse.HOSPEDAGEM):
+        return services.criar_oportunidade(
+            usuario=self.user, pessoa=self.pessoa, titulo="Quarto",
+            tipo_interesse=tipo_interesse)
+
+    # ---- form adaptativo ----
+    def test_form_hospedagem_lista_quartos(self):
+        from .forms import CotacaoForm
+        form = CotacaoForm(oportunidade=self._op())
+        self.assertIn("uh", form.fields)
+        self.assertNotIn("tipo_uh", form.fields)
+        self.assertIn(self.uh1, list(form.fields["uh"].queryset))
+        self.assertEqual(
+            form.fields["uh"].label_from_instance(self.uh1),
+            "Quarto 01 — Embaixo da Recepção")
+
+    def test_form_day_use_mantem_tipo(self):
+        from .forms import CotacaoForm
+        dtipo = TipoUH.objects.create(
+            nome="Day", tarifa_base=Decimal("100"), modalidade=TipoUH.Modalidade.DAY_USE)
+        form = CotacaoForm(oportunidade=self._op(Oportunidade.TipoInteresse.DAY_USE))
+        self.assertIn("tipo_uh", form.fields)
+        self.assertNotIn("uh", form.fields)
+        self.assertIn(dtipo, list(form.fields["tipo_uh"].queryset))
+        self.assertNotIn(self.tipo, list(form.fields["tipo_uh"].queryset))
+
+    def test_quartos_excluem_day_use(self):
+        from .forms import CotacaoForm
+        dtipo = TipoUH.objects.create(
+            nome="Day2", tarifa_base=Decimal("100"), modalidade=TipoUH.Modalidade.DAY_USE)
+        duh = UH.objects.create(numero="Day 01", tipo=dtipo)
+        form = CotacaoForm(oportunidade=self._op())
+        self.assertNotIn(duh, list(form.fields["uh"].queryset))
+
+    # ---- cotação ----
+    def test_registrar_cotacao_com_uh_deriva_tipo(self):
+        hoje = timezone.localdate()
+        cot = services.registrar_cotacao(
+            oportunidade=self._op(), usuario=self.user, uh=self.uh1,
+            checkin=hoje + timedelta(days=5), checkout=hoje + timedelta(days=7),
+            valor_diaria=Decimal("200"))
+        self.assertEqual(cot.uh_id, self.uh1.id)
+        self.assertEqual(cot.tipo_uh_id, self.tipo.id)
+
+    # ---- conversão ----
+    def test_converter_com_uh_pre_atribui_o_quarto(self):
+        hoje = timezone.localdate()
+        reserva = services.converter_em_reserva(
+            self._op(), usuario=self.user, uh=self.uh1,
+            checkin=hoje + timedelta(days=5), checkout=hoje + timedelta(days=7),
+            valor_diaria=Decimal("200"))
+        self.assertEqual(reserva.uh_id, self.uh1.id)
+
+    def test_converter_uh_ocupado_cai_para_outro_do_tipo(self):
+        from apps.nucleo.models import Hospede
+        from apps.reservas.services import criar_prereserva
+        hoje = timezone.localdate()
+        ci, co = hoje + timedelta(days=5), hoje + timedelta(days=7)
+        outro = Pessoa.objects.create(nome="Outro Hospede", telefone="49900000000")
+        Hospede.objects.get_or_create(pessoa=outro)
+        criar_prereserva(uh=self.uh1, checkin=ci, checkout=co, hospede=outro,
+                         usuario=self.user, valor_diaria=Decimal("200"))
+        reserva = services.converter_em_reserva(
+            self._op(), usuario=self.user, uh=self.uh1, checkin=ci, checkout=co,
+            valor_diaria=Decimal("200"))
+        self.assertNotEqual(reserva.uh_id, self.uh1.id)    # quarto 01 ocupado → outro
+        self.assertEqual(reserva.uh.tipo_id, self.tipo.id)  # mas do mesmo tipo
+
+    # ---- só os livres pela data ----
+    def _ocupa_uh1(self, ci, co):
+        from apps.nucleo.models import Hospede
+        from apps.reservas.services import criar_prereserva
+        outro = Pessoa.objects.create(nome="Ocupa", telefone="49900001111")
+        Hospede.objects.get_or_create(pessoa=outro)
+        criar_prereserva(uh=self.uh1, checkin=ci, checkout=co, hospede=outro,
+                         usuario=self.user, valor_diaria=Decimal("200"))
+
+    def test_quartos_para_cotacao_filtra_por_data(self):
+        hoje = timezone.localdate()
+        ci, co = hoje + timedelta(days=5), hoje + timedelta(days=7)
+        self._ocupa_uh1(ci, co)
+        livres = list(services.quartos_para_cotacao(ci, co))
+        self.assertNotIn(self.uh1, livres)   # ocupado fica fora
+        self.assertIn(self.uh2, livres)      # livre entra
+        self.assertIn(self.uh1, list(services.quartos_para_cotacao()))  # sem data → todos
+
+    def test_endpoint_json_combo_filtra_por_data(self):
+        hoje = timezone.localdate()
+        ci, co = hoje + timedelta(days=5), hoje + timedelta(days=7)
+        self._ocupa_uh1(ci, co)
+        self.client.force_login(self.user)
+        r = self.client.get(reverse("comercial:quartos_disponiveis"),
+                             {"checkin": ci.isoformat(), "checkout": co.isoformat()})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/json")
+        ids = [d["id"] for d in r.json()]
+        self.assertIn(self.uh2.pk, ids)        # livre aparece
+        self.assertNotIn(self.uh1.pk, ids)     # ocupado não aparece
+
+    def test_quartos_combo_dados_nome_grupo_pcd(self):
+        u4 = UH.objects.create(numero="Quarto 04", tipo=self.tipo, pcd=True)
+        dados = {d["id"]: d for d in services.quartos_combo_dados(
+            services.quartos_para_cotacao())}
+        self.assertEqual(dados[self.uh1.pk],
+                         {"id": self.uh1.pk, "nome": "Quarto 01", "grupo": "Embaixo da Recepção"})
+        self.assertEqual(dados[u4.pk]["nome"], "Quarto 04 · PCD")
+        self.assertEqual(dados[u4.pk]["grupo"], "Corredor Engenhocas")
+
+    def test_form_bound_valida_contra_todos_os_24(self):
+        from .forms import CotacaoForm
+        hoje = timezone.localdate()
+        form = CotacaoForm(
+            {"uh": self.uh1.pk, "checkin": (hoje + timedelta(days=5)).isoformat(),
+             "checkout": (hoje + timedelta(days=7)).isoformat()},
+            oportunidade=self._op())
+        # no POST o queryset não é filtrado por data → o quarto escolhido valida
+        self.assertIn(self.uh1, list(form.fields["uh"].queryset))
+        self.assertTrue(form.is_valid(), form.errors.as_json())
+
+    # ---- ala oficial dos quartos ----
+    def test_uh_ala_pelo_numero(self):
+        self.assertEqual(self.uh1.ala, "Embaixo da Recepção")  # Quarto 01
+        u5 = UH.objects.create(numero="Quarto 05", tipo=self.tipo)
+        u12 = UH.objects.create(numero="Quarto 12", tipo=self.tipo)
+        u20 = UH.objects.create(numero="Quarto 20", tipo=self.tipo)
+        self.assertEqual(u5.ala, "Corredor Engenhocas")
+        self.assertEqual(u12.ala, "Corredor Histórias")
+        self.assertEqual(u20.ala, "Condado dos Hobbits")
+        # day use (ex.: DAY-01 parsearia p/ 1, mas o guard por modalidade devolve vazio)
+        day = UH.objects.filter(tipo__modalidade=TipoUH.Modalidade.DAY_USE).first()
+        self.assertEqual(day.ala, "")
+
+    def test_rotulo_quarto_com_ala_e_pcd(self):
+        from apps.comercial.services import rotulo_quarto
+        self.assertEqual(rotulo_quarto(self.uh1), "Quarto 01 — Embaixo da Recepção")
+        u4 = UH.objects.create(numero="Quarto 04", tipo=self.tipo, pcd=True)
+        self.assertEqual(rotulo_quarto(u4), "Quarto 04 — Corredor Engenhocas PCD")
+
+
 class TemplatesScoreMetaTests(TestCase):
     def setUp(self):
         self.user = Usuario.objects.create_superuser(username="com", password="senha-forte-123")

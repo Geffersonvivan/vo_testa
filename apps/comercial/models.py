@@ -281,6 +281,12 @@ class Cotacao(models.Model):
         "nucleo.TipoUH", on_delete=models.PROTECT,
         related_name="cotacoes_comerciais", verbose_name="tipo de quarto",
     )
+    uh = models.ForeignKey(
+        "nucleo.UH", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="cotacoes_comerciais", verbose_name="quarto",
+        help_text="Quarto físico cotado (venda por unidade). Deriva o tipo. "
+                  "Vazio em cotações antigas ou de day use.",
+    )
     checkin = models.DateField("check-in")
     checkout = models.DateField("check-out")
     valor_diaria = models.DecimalField("diária (R$)", max_digits=10, decimal_places=2)

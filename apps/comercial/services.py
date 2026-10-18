@@ -823,15 +823,56 @@ def faixas_oportunidade(op):
 
 
 @transaction.atomic
-def registrar_cotacao(*, oportunidade, usuario, tipo_uh, checkin, checkout,
+def quartos_para_cotacao(checkin=None, checkout=None):
+    """Os 24 quartos (não day use) para o dropdown do lead, ordenados por número.
+    Com datas válidas e Reservas ativo, retorna só os **livres** no período
+    (disponibilidade central: reservas ativas + bloqueios de manutenção)."""
+    from apps.nucleo.models import UH
+    from apps.nucleo.models.cadastros import TipoUH
+    qs = (UH.objects.exclude(tipo__modalidade=TipoUH.Modalidade.DAY_USE)
+          .select_related("tipo").order_by("numero"))
+    if checkin and checkout and checkout > checkin and modulo_ativo(Modulo.RESERVAS):
+        from apps.reservas.services import uhs_disponiveis
+        livres = list(uhs_disponiveis(checkin, checkout).values_list("pk", flat=True))
+        qs = qs.filter(pk__in=livres)
+    return qs
+
+
+def rotulo_quarto(uh):
+    """Rótulo do quarto 'Quarto NN — Ala' (+ ' PCD'). A ala vem da regra oficial
+    (UH.ala); o tipo não entra no rótulo. Usado em exibições fora do combo."""
+    base = f"{uh.numero} — {uh.ala}" if uh.ala else uh.numero
+    return f"{base} PCD" if uh.pcd else base
+
+
+def quartos_combo_dados(queryset):
+    """Dados do combo de quarto (Alpine), quebrado por sessões de ala:
+    `[{id, nome, grupo}]` por número. `grupo` = ala oficial (vira o cabeçalho da sessão);
+    `nome` = 'Quarto NN' (+ ' · PCD' quando acessível)."""
+    return [
+        {"id": u.pk,
+         "nome": f"{u.numero} · PCD" if u.pcd else u.numero,
+         "grupo": u.ala or "Outros"}
+        for u in queryset
+    ]
+
+
+def registrar_cotacao(*, oportunidade, usuario, tipo_uh=None, uh=None, checkin, checkout,
                       valor_diaria=None, validade=None, observacao="",
                       cobra_iss=True, cobra_taxa_turismo=True,
                       mover_para_cotacao=True):
     """Grava orçamento real; atualiza valor/datas da oportunidade e (opcional) etapa.
     Preço pela motor de tarifa (Manual §2 + taxas) a partir da lotação da oportunidade,
-    salvo diária informada à mão pelo vendedor."""
+    salvo diária informada à mão pelo vendedor.
+
+    `uh` = quarto físico cotado (venda por unidade); deriva o `tipo_uh`. Sem `uh`
+    (ex.: day use), usa o `tipo_uh` direto. O preço segue pelo TIPO do quarto."""
     if not oportunidade.aberta:
         raise ValidationError("Só oportunidades abertas recebem cotação.")
+    if uh is not None:
+        tipo_uh = uh.tipo  # venda por unidade → o tipo vem do quarto
+    if tipo_uh is None:
+        raise ValidationError("Informe o quarto (ou o tipo).")
     assumir_lead(oportunidade, usuario)  # cotar = interagir → assume o lead
     if checkout <= checkin:
         raise ValidationError("O check-out deve ser depois do check-in.")
@@ -856,7 +897,8 @@ def registrar_cotacao(*, oportunidade, usuario, tipo_uh, checkin, checkout,
         valor_total = (valor_diaria * noites * quartos).quantize(Decimal("0.01"))
     validade = validade or (timezone.localdate() + timedelta(days=VALIDADE_COTACAO_DIAS))
     cotacao = Cotacao.objects.create(
-        oportunidade=oportunidade, tipo_uh=tipo_uh, checkin=checkin, checkout=checkout,
+        oportunidade=oportunidade, tipo_uh=tipo_uh, uh=uh,
+        checkin=checkin, checkout=checkout,
         valor_diaria=valor_diaria, valor_total=valor_total, validade=validade,
         observacao=observacao or "", criado_por=usuario,
     )
@@ -866,10 +908,11 @@ def registrar_cotacao(*, oportunidade, usuario, tipo_uh, checkin, checkout,
     oportunidade.save(update_fields=[
         "checkin_previsto", "checkout_previsto", "valor_estimado", "atualizado_em",
     ])
+    rotulo_quarto = f"{uh.numero} ({tipo_uh.nome})" if uh is not None else tipo_uh.nome
     registrar_atividade(
         oportunidade=oportunidade, usuario=usuario, tipo=AtividadeComercial.Tipo.COTACAO,
         descricao=(
-            f"Cotação {tipo_uh.nome}: {checkin:%d/%m}→{checkout:%d/%m} "
+            f"Cotação {rotulo_quarto}: {checkin:%d/%m}→{checkout:%d/%m} "
             f"— R$ {valor_total} (válida até {validade:%d/%m})"
         ),
     )
@@ -882,7 +925,7 @@ def registrar_cotacao(*, oportunidade, usuario, tipo_uh, checkin, checkout,
 
 
 @transaction.atomic
-def converter_em_reserva(oportunidade, *, tipo_uh, checkin, checkout, usuario,
+def converter_em_reserva(oportunidade, *, tipo_uh=None, uh=None, checkin, checkout, usuario,
                          valor_diaria=None, criar_sinal=False, valor_sinal=None):
     if oportunidade.reserva_id:
         raise ValidationError("Esta oportunidade já foi convertida em reserva.")
@@ -890,17 +933,32 @@ def converter_em_reserva(oportunidade, *, tipo_uh, checkin, checkout, usuario,
         raise ValidationError(
             "Módulo Reservas inativo — não é possível converter em reserva."
         )
+    if uh is not None:
+        tipo_uh = uh.tipo  # venda por unidade → o tipo vem do quarto
+    if tipo_uh is None:
+        raise ValidationError("Informe o quarto (ou o tipo).")
     from apps.reservas.services import criar_prereserva
 
     Hospede.objects.get_or_create(pessoa=oportunidade.pessoa)
-    reserva = criar_prereserva(
-        tipo_uh=tipo_uh, checkin=checkin, checkout=checkout,
-        hospede=oportunidade.pessoa, usuario=usuario,
+    base_obs = f"Convertida da oportunidade #{oportunidade.pk} — {oportunidade.titulo}"
+    reserva_kwargs = dict(
+        checkin=checkin, checkout=checkout, hospede=oportunidade.pessoa, usuario=usuario,
         canal="site" if oportunidade.origem == "site" else "balcao",
         faturamento=oportunidade.faturamento, adultos=oportunidade.hospedes,
         valor_diaria=valor_diaria,
-        observacoes=f"Convertida da oportunidade #{oportunidade.pk} — {oportunidade.titulo}",
     )
+    if uh is not None:
+        # Pré-atribui o quarto cotado; se estiver ocupado no período, aloca qualquer
+        # livre do tipo (fallback), registrando a troca na observação.
+        try:
+            reserva = criar_prereserva(uh=uh, observacoes=base_obs, **reserva_kwargs)
+        except ValidationError:
+            reserva = criar_prereserva(
+                tipo_uh=tipo_uh,
+                observacoes=f"{base_obs} (quarto {uh.numero} ocupado — alocado outro do tipo)",
+                **reserva_kwargs)
+    else:
+        reserva = criar_prereserva(tipo_uh=tipo_uh, observacoes=base_obs, **reserva_kwargs)
     _fechar_permanencia(oportunidade)
     oportunidade.reserva_id = reserva.pk
     oportunidade.status = Oportunidade.Status.GANHA
@@ -2491,6 +2549,7 @@ def ganhar_por_sinal(oportunidade, cobranca, usuario=None):
     usuario = usuario or cobranca.criado_por
     cot = oportunidade.ultima_cotacao
     tipo_uh = cot.tipo_uh if cot else None
+    uh = cot.uh if cot else None  # quarto cotado (venda por unidade), se houver
     checkin = oportunidade.checkin_previsto
     checkout = oportunidade.checkout_previsto
     if not (tipo_uh and checkin and checkout and modulo_ativo(Modulo.RESERVAS)):
@@ -2505,7 +2564,7 @@ def ganhar_por_sinal(oportunidade, cobranca, usuario=None):
     # pagamento: nesse caso NÃO quebra o pagamento — registra p/ conversão manual.
     try:
         reserva = converter_em_reserva(
-            oportunidade, tipo_uh=tipo_uh, checkin=checkin, checkout=checkout,
+            oportunidade, tipo_uh=tipo_uh, uh=uh, checkin=checkin, checkout=checkout,
             usuario=usuario, criar_sinal=False)
     except ValidationError as e:
         registrar_atividade(

@@ -6,6 +6,7 @@ app_name = "comercial"
 
 urlpatterns = [
     path("", views.funil, name="funil"),
+    path("quartos-disponiveis/", views.quartos_disponiveis, name="quartos_disponiveis"),
     path("cacador/", views.cacador, name="cacador"),
     path("cacador/<int:pk>/feedback/", views.cacador_feedback, name="cacador_feedback"),
     path("instagram/", views.instagram, name="instagram"),

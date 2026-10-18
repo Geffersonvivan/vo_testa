@@ -1,6 +1,6 @@
 from django import forms
 
-from apps.nucleo.models import Pessoa, TipoUH
+from apps.nucleo.models import UH, Pessoa, TipoUH
 
 from .models import (
     AtividadeComercial,
@@ -164,9 +164,44 @@ class AtividadeForm(forms.ModelForm):
         self.fields["responsavel"].required = False
 
 
-class ConversaoForm(forms.Form):
+class _SelecaoQuartoMixin:
+    """Dropdown de quarto no lead: lista os **24 quartos reais** ('Quarto NN — tipo')
+    para hospedagem; para leads de **day use** mantém a seleção por tipo (não há quarto
+    fixo entre os 24). Chamar `_montar_quarto(oportunidade)` no __init__."""
+
+    def _montar_quarto(self, oportunidade):
+        from . import services
+        day_use = bool(
+            oportunidade
+            and oportunidade.tipo_interesse == Oportunidade.TipoInteresse.DAY_USE)
+        if day_use:
+            self.fields.pop("uh", None)
+            self.fields["tipo_uh"].queryset = TipoUH.objects.filter(
+                modalidade=TipoUH.Modalidade.DAY_USE)
+            self.fields["tipo_uh"].required = True
+            return
+        self.fields.pop("tipo_uh", None)
+        # No POST (form ligado) valida contra TODOS os 24 — o quarto escolhido pode ter
+        # vindo da lista filtrada por datas via HTMX; a disponibilidade real é checada
+        # na criação da reserva. No GET, mostra só os LIVRES nas datas do lead.
+        if self.is_bound:
+            self.fields["uh"].queryset = services.quartos_para_cotacao()
+        else:
+            ci = getattr(oportunidade, "checkin_previsto", None)
+            co = getattr(oportunidade, "checkout_previsto", None)
+            self.fields["uh"].queryset = services.quartos_para_cotacao(ci, co)
+        self.fields["uh"].required = True
+        self.fields["uh"].label_from_instance = services.rotulo_quarto
+        # O quarto é escolhido por um combo custom (combo_quarto.html) que renderiza um
+        # <input hidden name="uh"> e refaz a lista de livres via fetch quando as datas
+        # mudam. A validação do POST segue por este campo (queryset = 24 quartos).
+
+
+class ConversaoForm(_SelecaoQuartoMixin, forms.Form):
+    uh = forms.ModelChoiceField(
+        queryset=UH.objects.none(), required=False, label="Quarto")
     tipo_uh = forms.ModelChoiceField(
-        queryset=TipoUH.objects.all(), label="Tipo de quarto",
+        queryset=TipoUH.objects.all(), required=False, label="Tipo de quarto",
     )
     checkin = forms.DateField(label="Check-in", widget=DataInput())
     checkout = forms.DateField(label="Check-out", widget=DataInput())
@@ -182,6 +217,10 @@ class ConversaoForm(forms.Form):
         label="Valor do sinal (R$)", required=False, max_digits=10, decimal_places=2,
         widget=ReaisInput(),
     )
+
+    def __init__(self, *args, oportunidade=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._montar_quarto(oportunidade)
 
     def clean(self):
         dados = super().clean()
@@ -204,9 +243,11 @@ class PerdaForm(forms.Form):
     )
 
 
-class CotacaoForm(forms.Form):
+class CotacaoForm(_SelecaoQuartoMixin, forms.Form):
+    uh = forms.ModelChoiceField(
+        queryset=UH.objects.none(), required=False, label="Quarto")
     tipo_uh = forms.ModelChoiceField(
-        queryset=TipoUH.objects.all(), label="Tipo de quarto",
+        queryset=TipoUH.objects.all(), required=False, label="Tipo de quarto",
     )
     checkin = forms.DateField(label="Check-in", widget=DataInput())
     checkout = forms.DateField(label="Check-out", widget=DataInput())
@@ -221,6 +262,10 @@ class CotacaoForm(forms.Form):
     observacao = forms.CharField(
         label="Observação", required=False, widget=forms.Textarea(attrs={"rows": 2}),
     )
+
+    def __init__(self, *args, oportunidade=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._montar_quarto(oportunidade)
 
     def clean(self):
         dados = super().clean()
