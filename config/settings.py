@@ -129,6 +129,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "apps.nucleo.context_processors.menu_modulos",
+                "apps.comercial.context_processors.whatsapp_nao_lidas",
                 "apps.site.context_processors.reserva_passos",
                 "apps.site.context_processors.prova_social",
                 "apps.site.context_processors.analytics",

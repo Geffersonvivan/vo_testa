@@ -12,7 +12,9 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Avg, Count, DurationField, ExpressionWrapper, F, Sum
+from django.db.models import (
+    Avg, Count, DurationField, ExpressionWrapper, F, OuterRef, Subquery, Sum,
+)
 from django.template.loader import render_to_string
 from django.utils import timezone
 
@@ -299,8 +301,13 @@ def dados_kanban(faturamento="", inicio=None, fim=None, todos=False):
     fechados do PERÍODO (padrão = mês corrente) — ou o histórico inteiro se `todos=True`.
     Sem isso, o card sumiria do quadro ao marcar ganho/perda (histórico fica em Relatórios).
     """
+    from .models import ConversaWhatsApp
     base = Oportunidade.objects.select_related(
         "pessoa", "etapa", "responsavel", "pagina_captacao", "analise"
+    ).annotate(
+        # Mensagens de WhatsApp recebidas e ainda não respondidas (zera ao responder).
+        wpp_nao_lidas=Subquery(ConversaWhatsApp.objects.filter(
+            oportunidade=OuterRef("pk")).values("nao_lidas")[:1]),
     )
     abertas = base.filter(status=Oportunidade.Status.ABERTA)
     if faturamento:

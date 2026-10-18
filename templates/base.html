@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
-  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=mob2">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}?v=mob3">
   <script src="{% static 'js/fluid.js' %}"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <script>
@@ -96,6 +96,7 @@
               <a href="{{ m.url }}" class="nav-item {% if request.resolver_match.namespace == m.codigo and request.resolver_match.url_name != 'instagram' and request.resolver_match.url_name != 'cacador' %}ativo{% endif %}">
                 {% include "componentes/icone_modulo.html" with codigo=m.codigo %}
                 <span class="rotulo">{{ m.nome }}</span>
+                {% if m.codigo == 'comercial' and wpp_nao_lidas_total %}<span class="nav-badge" title="{{ wpp_nao_lidas_total }} conversa(s) de WhatsApp aguardando resposta">{{ wpp_nao_lidas_total }}</span>{% endif %}
               </a>
               {% if m.codigo == 'comercial' %}
               <a href="{% url 'comercial:cacador' %}" class="nav-item {% if request.resolver_match.namespace == 'comercial' and request.resolver_match.url_name == 'cacador' %}ativo{% endif %}" title="Caçador — Máquina de Vendas com IA">

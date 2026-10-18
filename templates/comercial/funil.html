@@ -20,6 +20,11 @@
   .card-proposta{margin:.15rem 0 0;font-size:12.5px;color:var(--tinta-suave);line-height:1.3}
   .card-novo{position:absolute;top:-7px;right:8px;background:var(--lampiao);color:#241a08;font-size:11px;
     font-weight:800;letter-spacing:.04em;text-transform:uppercase;padding:2px 8px;border-radius:100px;box-shadow:var(--sombra-1,0 2px 6px rgba(0,0,0,.15))}
+  /* Mensagem de WhatsApp nova (não respondida) — selo verde no canto + destaque no card */
+  .card-wpp-nova{position:absolute;top:-7px;left:8px;background:var(--sucesso);color:#fff;font-size:11px;
+    font-weight:800;letter-spacing:.02em;padding:2px 8px;border-radius:100px;box-shadow:var(--sombra-1,0 2px 6px rgba(0,0,0,.15))}
+  .funil-card.tem-wpp-nova{border-left-color:var(--sucesso);
+    box-shadow:0 0 0 1.5px color-mix(in srgb, var(--sucesso) 38%, transparent), var(--sombra-1)}
   .card-chips{display:flex;flex-wrap:wrap;gap:5px;margin:.35rem 0}
   .mchip{font-size:12px;background:rgba(0,0,0,.06);color:var(--tinta-suave);padding:2px 7px;border-radius:6px;white-space:nowrap}
   .mchip-lp{background:rgba(215,160,72,.18);color:color-mix(in srgb, var(--madeira) 50%, var(--lampiao));max-width:100%;overflow:hidden;text-overflow:ellipsis}
@@ -166,13 +171,14 @@
         </div>
         <div class="funil-cards">
           {% for op in col.itens %}
-            <article class="funil-card fat-{{ op.faturamento }} status-{{ op.status }}" data-op="{{ op.id }}"
+            <article class="funil-card fat-{{ op.faturamento }} status-{{ op.status }}{% if op.wpp_nao_lidas %} tem-wpp-nova{% endif %}" data-op="{{ op.id }}"
                      data-busca="{{ op.pessoa.nome|default:'' }} {{ op.titulo_curto|default:'' }} {{ op.pessoa.telefone|default:'' }}"
                      {% if op.status == 'aberta' %}draggable="true" ondragstart="cardDragStart(event, '{{ op.id }}')" ondragend="cardDragEnd(event)"{% endif %}
-                     role="link" tabindex="0" aria-label="Abrir oportunidade — {{ op.pessoa.nome }}"
+                     role="link" tabindex="0" aria-label="Abrir oportunidade — {{ op.pessoa.nome }}{% if op.wpp_nao_lidas %} ({{ op.wpp_nao_lidas }} mensagem nova no WhatsApp){% endif %}"
                      onclick="location.href='{% url 'comercial:oportunidade' op.pk %}'"
                      onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();location.href='{% url 'comercial:oportunidade' op.pk %}'}">
               {% if op.eh_novo %}<span class="card-novo">novo</span>{% endif %}
+              {% if op.wpp_nao_lidas %}<span class="card-wpp-nova" title="{{ op.wpp_nao_lidas }} mensagem(ns) de WhatsApp aguardando resposta">💬 {{ op.wpp_nao_lidas }}</span>{% endif %}
               <p class="card-nome">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
                 {{ op.pessoa.nome }}

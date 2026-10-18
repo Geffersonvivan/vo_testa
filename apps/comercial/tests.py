@@ -1172,6 +1172,38 @@ class WhatsAppCloudTests(TestCase):
         with self.assertRaises(ValidationError):
             services.enviar_audio_whatsapp(conversa=conv, arquivo=audio, usuario=self.user)
 
+    # ---- indicador de mensagem nova no funil (card + sidebar) ----
+    def test_kanban_anota_whatsapp_nao_lidas(self):
+        import json
+        # cliente manda mensagem → conversa da op fica com 1 não lida
+        self.client.post(reverse("whatsapp:webhook"),
+                         data=json.dumps(self._payload_msg(wamid="wamid.NL1")),
+                         content_type="application/json")
+        achado = None
+        for col in services.dados_kanban():
+            for op in col["itens"]:
+                if op.pk == self.op.pk:
+                    achado = op
+        self.assertIsNotNone(achado, "op deveria aparecer no kanban")
+        self.assertEqual(achado.wpp_nao_lidas, 1)
+
+    def test_context_processor_conta_nao_lidas(self):
+        import json
+        from django.test import RequestFactory
+
+        from .context_processors import whatsapp_nao_lidas
+        req = RequestFactory().get("/")
+        req.user = self.user
+        self.assertEqual(whatsapp_nao_lidas(req).get("wpp_nao_lidas_total", 0), 0)
+        self.client.post(reverse("whatsapp:webhook"),
+                         data=json.dumps(self._payload_msg(wamid="wamid.NL2")),
+                         content_type="application/json")
+        self.assertEqual(whatsapp_nao_lidas(req).get("wpp_nao_lidas_total"), 1)
+        # responder zera o contador
+        conv = services.abrir_conversa_whatsapp(self.op)
+        services.enviar_mensagem_whatsapp(conversa=conv, texto="Oi", usuario=self.user)
+        self.assertEqual(whatsapp_nao_lidas(req).get("wpp_nao_lidas_total", 0), 0)
+
     def test_webhook_status_failed_nao_reverte(self):
         import json
 
