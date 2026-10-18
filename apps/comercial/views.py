@@ -716,40 +716,31 @@ def pagina_qr(request, pk):
 # em static/comercial/blueprint/ (clip_N.mp4 + poster_N.jpg).
 ESTACOES_BLUEPRINT = [
     {"n": 1, "rotulo": "as boas-vindas", "titulo": "A Casa do Avô",
-     "texto": "Antes de tudo, uma apresentação: a Vô Testa nasceu pra ser a casa do nosso "
-              "avô — e agora é a sua.",
+     "texto": "Boas-vindas à Pousada Vô Testa, em Itá, Santa Catarina.",
      "video": "comercial/blueprint/clip_1.mp4", "poster": "comercial/blueprint/poster_1.jpg"},
     {"n": 2, "rotulo": "a marca", "titulo": "O Relógio",
-     "texto": "No alto, a torre do relógio — o símbolo que batiza a casa e marca o tempo "
-              "que corre diferente por aqui.",
+     "texto": "A torre do relógio, símbolo da pousada.",
      "video": "comercial/blueprint/clip_2.mp4", "poster": "comercial/blueprint/poster_2.jpg"},
     {"n": 3, "rotulo": "a identidade", "titulo": "A Cara do Vô Testa",
-     "texto": "Cada detalhe é ornamentado no estilo da casa — do portão à última peça, "
-              "é a cara do Vô Testa.",
+     "texto": "Fachada decorada no estilo da pousada.",
      "video": "comercial/blueprint/clip_3.mp4", "poster": "comercial/blueprint/poster_3.jpg"},
     {"n": 4, "rotulo": "a vista", "titulo": "A Sacada",
-     "texto": "Da sacada, uma vista sensacional se abre sobre o lago — o melhor lugar "
-              "pra respirar fundo.",
+     "texto": "Sacada com vista para o lago.",
      "video": "comercial/blueprint/clip_4.mp4", "poster": "comercial/blueprint/poster_4.jpg"},
     {"n": 5, "rotulo": "o descanso", "titulo": "A Suíte",
-     "texto": "Unidades de dois quartos, teto de madeira e varanda. Acordar aqui, com a "
-              "luz da manhã, é outro nível.",
+     "texto": "Unidades de dois quartos, com teto de madeira e varanda para o lago.",
      "video": "comercial/blueprint/clip_5.mp4", "poster": "comercial/blueprint/poster_5.jpg"},
     {"n": 6, "rotulo": "os detalhes", "titulo": "A Alma Inventora",
-     "texto": "Corredores com o mural do inventor e engrenagens de verdade. Tudo pensado, "
-              "tudo organizado — a alma relojoeira da casa.",
+     "texto": "Corredores com o mural do inventor e detalhes temáticos.",
      "video": "comercial/blueprint/clip_6.mp4", "poster": "comercial/blueprint/poster_6.jpg"},
     {"n": 7, "rotulo": "o conforto", "titulo": "O Quarto com Vista",
-     "texto": "Teto de madeira, ladrilho hidráulico e um janelão que emoldura o verde e "
-              "o lago. Aconchego com vista.",
+     "texto": "Quarto com teto de madeira, ladrilho hidráulico e janela ampla para o lago.",
      "video": "comercial/blueprint/clip_7.mp4", "poster": "comercial/blueprint/poster_7.jpg"},
-    {"n": 8, "rotulo": "O aconchego", "titulo": "As Cabanas Hobbit",
-     "texto": "Portas arredondadas, muita madeira e um quê de Condado — dormir aqui é "
-              "entrar numa história. O canto mais encantado da Vô Testa.",
+    {"n": 8, "rotulo": "o aconchego", "titulo": "As Cabanas Hobbit",
+     "texto": "Cabanas em estilo Hobbit: portas arredondadas e muita madeira.",
      "video": "comercial/blueprint/clip_8.mp4", "poster": "comercial/blueprint/poster_8.jpg"},
-    {"n": 9, "rotulo": "o mirante", "titulo": "A Paz",
-     "texto": "Do mirante de madeira, o lago se espraia em silêncio. É essa paz que fica "
-              "com você depois que vai embora.",
+    {"n": 9, "rotulo": "a vista", "titulo": "O Mirante",
+     "texto": "Mirante de madeira com vista para o lago de Itá.",
      "video": "comercial/blueprint/clip_9.mp4", "poster": "comercial/blueprint/poster_9.jpg"},
 ]
 
