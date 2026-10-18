@@ -10,7 +10,9 @@ from django.utils import timezone
 from apps.nucleo.models import UH, Pessoa, Prospecto, TipoUH
 
 from . import services
-from .models import AnaliseLead, AtividadeComercial, EtapaFunil, MotivoPerda, Oportunidade
+from .models import (
+    AnaliseLead, AtividadeComercial, EtapaFunil, MotivoPerda, Oportunidade, PaginaCaptacao,
+)
 
 Usuario = get_user_model()
 
@@ -156,6 +158,68 @@ class CapturaSiteTests(TestCase):
         a = services.capturar_lead_site(nome="Maria", telefone="49988887777")
         b = services.capturar_lead_site(nome="Carlos Souza", telefone="49988887777")
         self.assertNotEqual(a.pessoa_id, b.pessoa_id)
+
+
+class LeadRepetidoCampanhaTests(TestCase):
+    """Dedup por campanha (LP): mesma campanha aberta → anota (não duplica);
+    histórico anterior → reabre o card em 'Novo lead' p/ a campanha (mantém conversa)."""
+
+    def setUp(self):
+        self.user = Usuario.objects.create_superuser(username="lr", password="senha-forte-123")
+        self.campA = PaginaCaptacao.objects.create(
+            nome="Camp A", slug="camp-a", status=PaginaCaptacao.Status.PUBLICADA,
+            criado_por=self.user)
+        self.campB = PaginaCaptacao.objects.create(
+            nome="Camp B", slug="camp-b", status=PaginaCaptacao.Status.PUBLICADA,
+            criado_por=self.user)
+
+    def _cap(self, pagina, msg=""):
+        return services.capturar_lead_site(
+            nome="Carlos Lead", telefone="49999001122", pagina=pagina, mensagem=msg)
+
+    def test_mesma_campanha_aberta_nao_duplica_so_anota(self):
+        a = self._cap(self.campA, "Primeira")
+        b = self._cap(self.campA, "De novo")
+        self.assertEqual(a.pk, b.pk)
+        self.assertEqual(Oportunidade.objects.filter(pessoa=a.pessoa).count(), 1)
+        b.refresh_from_db()
+        self.assertIn("Lead repetido", b.observacao)
+        self.assertEqual(b.status, Oportunidade.Status.ABERTA)
+
+    def test_mesma_campanha_fechada_reabre_novo_lead(self):
+        a = self._cap(self.campA)
+        motivo = MotivoPerda.objects.create(nome="Teste perda")
+        services.marcar_perdida(a, motivo, self.user)
+        a.refresh_from_db()
+        self.assertEqual(a.status, Oportunidade.Status.PERDIDA)
+        b = self._cap(self.campA, "Voltei")
+        self.assertEqual(a.pk, b.pk)  # mesmo card reaberto
+        b.refresh_from_db()
+        self.assertEqual(b.status, Oportunidade.Status.ABERTA)
+        self.assertIsNotNone(b.reativada_em)
+        self.assertEqual(b.etapa, services.etapas().first())  # Novo lead
+
+    def test_campanha_diferente_reaproveita_e_retag(self):
+        a = self._cap(self.campA)
+        b = services.capturar_lead_site(
+            nome="Carlos Lead", telefone="49999001122", pagina=self.campB, mensagem="Outra LP")
+        self.assertEqual(a.pk, b.pk)  # reaproveita o card (mantém a conversa)
+        self.assertEqual(Oportunidade.objects.filter(pessoa=a.pessoa).count(), 1)
+        b.refresh_from_db()
+        self.assertEqual(b.pagina_captacao_id, self.campB.id)  # retag p/ nova campanha
+        self.assertIsNotNone(b.reativada_em)
+        self.assertEqual(b.etapa, services.etapas().first())  # Novo lead
+
+    def test_pessoa_nova_cria_card(self):
+        op = services.capturar_lead_site(
+            nome="Novato Silva", telefone="49988112233", pagina=self.campA)
+        self.assertIsNotNone(op)
+        self.assertEqual(op.pagina_captacao_id, self.campA.id)
+        self.assertEqual(op.status, Oportunidade.Status.ABERTA)
+
+    def test_motivo_lead_repetido_no_catalogo(self):
+        self.assertTrue(MotivoPerda.objects.filter(
+            nome="Lead repetido (mesma campanha)", ativo=True).exists())
 
 
 class JevSombraTests(TestCase):

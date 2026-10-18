@@ -447,6 +447,68 @@ def _formatar_tel_br(telefone):
     return d or telefone
 
 
+def _anota_lead_repetido(op, mensagem, usuario):
+    """Lead repetido na MESMA campanha com card ABERTO: NÃO duplica — registra no card
+    existente que um novo cadastro chegou (nota + reanálise). Nunca muda a etapa."""
+    hoje = timezone.localdate()
+    cab = f"🔁 Lead repetido (mesma campanha) em {hoje:%d/%m/%Y}."
+    texto = cab + (f" {mensagem}" if mensagem else "")
+    op.observacao = ((op.observacao + "\n") if op.observacao else "") + texto
+    op.save(update_fields=["observacao", "atualizado_em"])
+    registrar_atividade(oportunidade=op, usuario=usuario,
+                        tipo=AtividadeComercial.Tipo.NOTA, descricao=texto[:200])
+    analisar_lead(op)
+    return op
+
+
+def _reabrir_lead_para_campanha(op, pagina, mensagem, usuario):
+    """Pessoa com histórico voltou por uma campanha (nova LP, ou a mesma já fechada):
+    reaproveita o MESMO card — reabre em "Novo lead", marca a campanha e preserva a
+    conversa (1:1). Espelha _reativar_oportunidade, adaptado ao contexto de LP."""
+    primeira = etapas().first()
+    if primeira is None:
+        return None  # sem funil configurado → cai no fluxo normal (cria novo)
+    motivo_anterior = op.motivo_perda.nome if op.motivo_perda_id else None
+    _fechar_permanencia(op)
+    op.status = Oportunidade.Status.ABERTA
+    op.etapa = primeira
+    op.fechado_em = None
+    op.reativada_em = timezone.now()
+    op.motivo_perda = None
+    op.motivo_perda_detalhe = ""
+    op.pagina_captacao = pagina
+    if mensagem:
+        op.observacao = ((op.observacao + "\n") if op.observacao else "") + mensagem
+    op.save(update_fields=["status", "etapa", "fechado_em", "reativada_em",
+                           "motivo_perda", "motivo_perda_detalhe", "pagina_captacao",
+                           "observacao", "atualizado_em"])
+    _abrir_permanencia(op, primeira)
+    atualizar_score(op)
+    nota = f"♻️ Reativado — novo interesse pela campanha “{pagina.nome}”."
+    if motivo_anterior:
+        nota += f" Perda anterior: {motivo_anterior}."
+    _nota_sistema_lead(op, nota)
+    return op
+
+
+def _dedupe_lead_por_campanha(*, pessoa, pagina, mensagem, usuario):
+    """Dedup de lead por campanha (LP). Retorna a Oportunidade tratada, ou None para
+    seguir o fluxo normal (pessoa sem nenhum card)."""
+    cards = Oportunidade.objects.filter(pessoa=pessoa)
+    # 1) card ABERTO na MESMA campanha → repetido: só anota
+    aberto_mesma = cards.filter(
+        pagina_captacao=pagina, status=Oportunidade.Status.ABERTA,
+    ).order_by("-criado_em").first()
+    if aberto_mesma is not None:
+        return _anota_lead_repetido(aberto_mesma, mensagem, usuario)
+    # 2) tem histórico (card fechado, ou aberto em outra campanha) → reabre p/ Novo lead
+    anterior = cards.order_by("-criado_em").first()
+    if anterior is not None:
+        return _reabrir_lead_para_campanha(anterior, pagina, mensagem, usuario)
+    # 3) sem card → fluxo normal
+    return None
+
+
 def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
                        checkin=None, checkout=None, hospedes=2, documento="",
                        tipo_interesse="hospedagem", faturamento=None, pagina=None,
@@ -537,6 +599,17 @@ def capturar_lead_site(*, nome, email="", telefone="", mensagem="",
             pessoa.save(update_fields=campos)
 
     Prospecto.objects.get_or_create(pessoa=pessoa)
+
+    # Deduplicação por campanha (LP): decide pelo histórico da pessoa —
+    #  • card ABERTO na MESMA campanha → lead repetido: só anota, não duplica;
+    #  • qualquer outro histórico → reabre o card da pessoa em "Novo lead" para esta
+    #    campanha, preservando a conversa (1:1 com o card).
+    # Pessoa sem card algum → segue o fluxo normal (cria novo).
+    if pagina is not None:
+        tratado = _dedupe_lead_por_campanha(
+            pessoa=pessoa, pagina=pagina, mensagem=mensagem, usuario=usuario)
+        if tratado is not None:
+            return tratado
 
     limite = timezone.now() - timedelta(hours=24)
     qs = Oportunidade.objects.filter(
