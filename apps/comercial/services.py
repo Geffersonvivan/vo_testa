@@ -1785,6 +1785,23 @@ def _ext_audio(mime):
     return ".bin"
 
 
+def _ext_imagem(mime):
+    """Extensão de arquivo a partir do mime da imagem do WhatsApp."""
+    m = (mime or "").lower()
+    if "png" in m:
+        return ".png"
+    if "webp" in m:
+        return ".webp"
+    if "gif" in m:
+        return ".gif"
+    return ".jpg"
+
+
+def _ext_midia(tipo, mime):
+    """Extensão do arquivo conforme o tipo da mídia (imagem/áudio)."""
+    return _ext_imagem(mime) if tipo == "imagem" else _ext_audio(mime)
+
+
 def _transcode_para_ogg(conteudo, mime):
     """Formatos aceitos pela Meta: ogg(opus)/mp3/mp4/aac/amr. O Chrome grava **webm**, que
     a Meta NÃO aceita → transcodifica p/ ogg/opus com ffmpeg. Best-effort: sem ffmpeg ou se
@@ -1843,7 +1860,7 @@ def receber_mensagem_whatsapp(*, oportunidade=None, telefone=None, texto,
 
     # Baixa a mídia ANTES da transação (rede não deve segurar o lock do banco).
     conteudo_midia = None
-    if tipo == "audio" and midia_id:
+    if tipo in ("audio", "imagem") and midia_id:
         from .whatsapp_gateways import get_whatsapp_gateway
         try:
             conteudo_midia, mime_baixado = get_whatsapp_gateway().baixar_midia(midia_id)
@@ -1903,7 +1920,7 @@ def receber_mensagem_whatsapp(*, oportunidade=None, telefone=None, texto,
     if msg is not None and conteudo_midia is not None:
         try:
             msg.midia_arquivo.save(
-                f"wa_{msg.id}{_ext_audio(midia_mime)}",
+                f"wa_{msg.id}{_ext_midia(tipo, midia_mime)}",
                 ContentFile(conteudo_midia), save=True)
         except Exception:  # noqa: BLE001
             pass
@@ -1985,6 +2002,54 @@ def enviar_audio_whatsapp(*, conversa, arquivo, usuario):
     return msg
 
 
+def enviar_imagem_whatsapp(*, conversa, arquivo, usuario, legenda=""):
+    """Envia uma imagem pelo gateway. Só dentro da janela de 24h (imagem não vai por
+    template). Guarda a imagem no histórico. Limite 5 MB (WhatsApp)."""
+    from django.core.files.base import ContentFile
+
+    from .models import MensagemWhatsApp
+    from .whatsapp_gateways import get_whatsapp_gateway
+
+    conteudo = arquivo.read()
+    if not conteudo:
+        raise ValidationError("Imagem vazia.")
+    if len(conteudo) > 5 * 1024 * 1024:
+        raise ValidationError("Imagem acima do limite de 5 MB (WhatsApp).")
+    mime = (getattr(arquivo, "content_type", "") or "").lower()
+    if not mime.startswith("image/") or "svg" in mime:
+        raise ValidationError("Formato não aceito — envie JPG, PNG ou WEBP.")
+    if (getattr(settings, "WHATSAPP_GATEWAY", "simulado") != "simulado"
+            and not conversa.janela_aberta):
+        raise ValidationError(
+            "Fora da janela de 24h: o cliente não fala há mais de 24h. Imagem só dentro "
+            "da janela (não existe template de imagem).")
+    legenda = (legenda or "").strip()
+    nome = (getattr(arquivo, "name", "") or ("imagem" + _ext_imagem(mime)))[:160]
+    gw = get_whatsapp_gateway()
+    assumir_lead(conversa.oportunidade, usuario)  # quem responde primeiro assume
+    try:
+        up = gw.upload_midia(conteudo, mime, nome)
+        res = (gw.enviar_imagem(conversa, up["id"], legenda) if up.get("ok")
+               else {"ok": False, "erro": up.get("erro", "upload falhou")})
+    except Exception as e:  # noqa: BLE001
+        res = {"ok": False, "erro": str(e)[:300]}
+    msg = MensagemWhatsApp.objects.create(
+        conversa=conversa, direcao=MensagemWhatsApp.Direcao.SAIDA,
+        tipo=MensagemWhatsApp.Tipo.IMAGEM, texto=legenda,
+        status=(MensagemWhatsApp.Status.ENVIADA if res.get("ok")
+                else MensagemWhatsApp.Status.ERRO),
+        id_externo=(res.get("id") or "")[:120], autor=usuario,
+        horario=timezone.now(), midia_mime=mime, midia_nome=nome)
+    try:
+        msg.midia_arquivo.save(f"wa_out_{msg.id}{_ext_imagem(mime)}",
+                               ContentFile(conteudo), save=True)
+    except Exception:  # noqa: BLE001
+        pass
+    conversa.nao_lidas = 0
+    conversa.save(update_fields=["nao_lidas", "atualizado_em"])
+    return msg
+
+
 def enviar_template_whatsapp(*, oportunidade, template, idioma="pt_BR",
                              variaveis=None, usuario=None):
     """Dispara um template APROVADO para o lead (inicia conversa / fora da janela 24h).
@@ -2019,7 +2084,7 @@ _OPT_OUT = {"sair", "sair da lista", "parar", "cancelar", "descadastrar", "remov
 
 # Tipos de mensagem que SÃO conteúdo autoral do cliente (abrem lead novo). Os demais
 # (reaction, location, system, order, sticker…) só anexam a quem já existe.
-_TIPOS_CONTEUDO_WHATSAPP = {"text", "button", "interactive", "audio"}
+_TIPOS_CONTEUDO_WHATSAPP = {"text", "button", "interactive", "audio", "image"}
 
 
 def _atualizar_status_mensagem(id_externo, status_meta):
@@ -2074,6 +2139,11 @@ def processar_webhook_whatsapp(payload: dict) -> dict:
                     tipo_msg, midia_id = "audio", au.get("id", "")
                     midia_mime, midia_voz = au.get("mime_type", ""), bool(au.get("voice"))
                     texto = "[áudio]"
+                elif tipo == "image":
+                    im = m.get("image") or {}
+                    tipo_msg, midia_id = "imagem", im.get("id", "")
+                    midia_mime = im.get("mime_type", "")
+                    texto = im.get("caption", "")  # legenda (pode ser vazia)
                 else:
                     texto = f"[{tipo}]"
                 quando = None
@@ -2084,7 +2154,8 @@ def processar_webhook_whatsapp(payload: dict) -> dict:
                 # Só conteúdo autoral do cliente abre lead novo; reação/status/mídia de
                 # sistema anexa a quem já existe, mas não cria lead-lixo.
                 msg = receber_mensagem_whatsapp(
-                    telefone=telefone, texto=texto or "[sem texto]",
+                    telefone=telefone,
+                    texto=texto if tipo_msg in ("audio", "imagem") else (texto or "[sem texto]"),
                     id_externo=wamid, quando=quando,
                     nome=contatos.get(telefone, ""),
                     permitir_criar=tipo in _TIPOS_CONTEUDO_WHATSAPP,

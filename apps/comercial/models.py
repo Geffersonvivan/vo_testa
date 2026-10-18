@@ -861,6 +861,7 @@ class MensagemWhatsApp(models.Model):
     class Tipo(models.TextChoices):
         TEXTO = "texto", "Texto"
         AUDIO = "audio", "Áudio"
+        IMAGEM = "imagem", "Imagem"
 
     conversa = models.ForeignKey(
         ConversaWhatsApp, on_delete=models.CASCADE, related_name="mensagens",
@@ -871,11 +872,12 @@ class MensagemWhatsApp(models.Model):
     texto = models.TextField("texto", blank=True)
     status = models.CharField("status", max_length=10, choices=Status.choices)
     id_externo = models.CharField("ID externo", max_length=120, blank=True)
-    # Mídia (áudio/voz) — binário no storage (R2) + metadados do WhatsApp.
+    # Mídia (áudio/voz, imagem…) — binário no storage (R2) + metadados do WhatsApp.
     midia_id_externo = models.CharField("ID da mídia (Meta)", max_length=120, blank=True)
     midia_arquivo = models.FileField(
-        "arquivo de mídia", upload_to="whatsapp/audio/%Y/%m/", null=True, blank=True)
+        "arquivo de mídia", upload_to="whatsapp/midia/%Y/%m/", null=True, blank=True)
     midia_mime = models.CharField("mime da mídia", max_length=80, blank=True)
+    midia_nome = models.CharField("nome do arquivo", max_length=160, blank=True)
     midia_voz = models.BooleanField("é nota de voz", default=False)
     duracao_seg = models.PositiveIntegerField("duração (s)", null=True, blank=True)
     autor = models.ForeignKey(

@@ -49,6 +49,7 @@ urlpatterns = [
     path("email/campanhas/<int:pk>/teste/", views.email_campanha_teste, name="email_campanha_teste"),
     path("<int:pk>/whatsapp/enviar/", views.whatsapp_enviar, name="whatsapp_enviar"),
     path("<int:pk>/whatsapp/audio/", views.whatsapp_enviar_audio, name="whatsapp_enviar_audio"),
+    path("<int:pk>/whatsapp/imagem/", views.whatsapp_enviar_imagem, name="whatsapp_enviar_imagem"),
     path("whatsapp/midia/<int:pk>/", views.whatsapp_midia, name="whatsapp_midia"),
     path("<int:pk>/whatsapp/simular/", views.whatsapp_simular, name="whatsapp_simular"),
     path("respostas/", views.respostas, name="respostas"),

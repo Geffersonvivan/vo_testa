@@ -39,12 +39,20 @@
 
       <div class="wpp-thread">
         {% for m in mensagens_wpp %}
-          <div class="wpp-msg wpp-{{ m.direcao }}{% if m.tipo == 'audio' %} wpp-msg-audio{% endif %}">
+          <div class="wpp-msg wpp-{{ m.direcao }}{% if m.tipo == 'audio' %} wpp-msg-audio{% elif m.tipo == 'imagem' %} wpp-msg-img{% endif %}">
             {% if m.tipo == 'audio' %}
               {% if m.midia_arquivo %}
                 <audio controls preload="none" src="{% url 'comercial:whatsapp_midia' m.pk %}"></audio>
               {% else %}
                 <span class="wpp-audio-off">🎤 Áudio (não baixado)</span>
+              {% endif %}
+            {% elif m.tipo == 'imagem' %}
+              {% if m.midia_arquivo %}
+                <a href="{% url 'comercial:whatsapp_midia' m.pk %}" target="_blank" rel="noopener">
+                  <img class="wpp-img" src="{% url 'comercial:whatsapp_midia' m.pk %}" alt="imagem" loading="lazy"></a>
+                {% if m.texto %}<div class="wpp-cap">{{ m.texto|linebreaksbr }}</div>{% endif %}
+              {% else %}
+                <span class="wpp-audio-off">🖼️ Imagem (não baixada)</span>
               {% endif %}
             {% else %}{{ m.texto|linebreaksbr }}{% endif %}
             <span class="wpp-h">{{ m.horario|date:"d/m H:i" }}{% if m.direcao == 'saida' %} · {{ m.get_status_display|lower }}{% endif %}</span>
@@ -66,6 +74,8 @@
       <form method="post" action="{% url 'comercial:whatsapp_enviar' op.pk %}" class="wpp-form">
         {% csrf_token %}
         <input type="text" name="texto" id="wpp-texto" placeholder="Escreva uma resposta…" autocomplete="off">
+        <button type="button" class="wpp-mic" id="wpp-anexo" title="Enviar imagem" aria-label="Enviar imagem">📎</button>
+        <input type="file" id="wpp-arquivo" accept="image/*" hidden>
         <button type="button" class="wpp-mic" id="wpp-mic" title="Gravar áudio" aria-label="Gravar áudio">🎤</button>
         <button type="submit" class="botao-primario">Enviar</button>
       </form>
@@ -323,6 +333,8 @@
   .wpp-msg .wpp-h{display:block;font-size:10.5px;color:var(--tinta-suave);text-align:right;margin-top:3px}
   .wpp-msg-audio audio{width:230px;max-width:100%;height:36px;display:block;margin:2px 0}
   .wpp-audio-off{font-size:13px;color:var(--tinta-suave);font-style:italic}
+  .wpp-img{max-width:230px;max-height:280px;width:auto;border-radius:10px;display:block;cursor:zoom-in}
+  .wpp-cap{margin-top:4px;font-size:13.5px;line-height:1.35}
   .wpp-entrada{align-self:flex-start;background:var(--superficie);border-bottom-left-radius:4px}
   .wpp-saida{align-self:flex-end;background:var(--sucesso-bg);border:1px solid color-mix(in srgb, var(--sucesso) 22%, transparent);border-bottom-right-radius:4px}
   .wpp-vazio{color:var(--tinta-suave);text-align:center;padding:1.4rem;font-size:.9rem}
@@ -495,6 +507,32 @@
     mic.addEventListener('click', iniciar);
     document.getElementById('wpp-rec-parar').addEventListener('click', function(){ if (rec && rec.state!=='inactive') rec.stop(); });
     document.getElementById('wpp-rec-cancelar').addEventListener('click', function(){ cancelado=true; if (rec && rec.state!=='inactive') rec.stop(); });
+  })();
+
+  /* Anexar e enviar imagem — input file → upload → recarrega a conversa.
+     A legenda é o que estiver escrito na caixa de resposta no momento. */
+  (function(){
+    var btn = document.getElementById('wpp-anexo');
+    var inp = document.getElementById('wpp-arquivo');
+    if (!btn || !inp) return;
+    var form = document.querySelector('.wpp-form');
+    var url = "{% url 'comercial:whatsapp_enviar_imagem' op.pk %}";
+    var csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
+    btn.addEventListener('click', function(){ inp.click(); });
+    inp.addEventListener('change', async function(){
+      var f = inp.files && inp.files[0];
+      if (!f) return;
+      if (f.size > 5*1024*1024){ if (typeof toast==='function') toast('Imagem acima de 5 MB.', 'error'); inp.value=''; return; }
+      var legenda = (document.getElementById('wpp-texto') || {}).value || '';
+      var fd = new FormData(); fd.append('imagem', f, f.name); fd.append('legenda', legenda);
+      btn.disabled = true;
+      try {
+        var r = await fetch(url, {method:'POST', headers:{'X-CSRFToken':csrf}, body:fd});
+        var d = await r.json();
+        if (d.ok){ location.reload(); }
+        else { if (typeof toast==='function') toast(d.erro || 'Falha ao enviar a imagem.', 'error'); btn.disabled=false; inp.value=''; }
+      } catch(e){ if (typeof toast==='function') toast('Falha de conexão ao enviar a imagem.', 'error'); btn.disabled=false; inp.value=''; }
+    });
   })();
 </script>
 {% endblock %}

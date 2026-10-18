@@ -150,6 +150,10 @@ class GatewaySimulado:
         logger.info("WHATSAPP[simulado] áudio → %s (media %s)", conversa.telefone, media_id)
         return {"ok": True, "id": ""}
 
+    def enviar_imagem(self, conversa, media_id: str, legenda: str = "") -> dict:
+        logger.info("WHATSAPP[simulado] imagem → %s (media %s)", conversa.telefone, media_id)
+        return {"ok": True, "id": ""}
+
 
 class GatewayCloud:
     nome = "cloud"
@@ -178,6 +182,18 @@ class GatewayCloud:
             "to": normalizar_telefone(conversa.telefone),
             "type": "audio",
             "audio": {"id": media_id},
+        })
+
+    def enviar_imagem(self, conversa, media_id: str, legenda: str = "") -> dict:
+        """Mensagem de imagem (só dentro da janela de 24h). Legenda opcional."""
+        imagem = {"id": media_id}
+        if legenda:
+            imagem["caption"] = legenda
+        return _api_post({
+            "messaging_product": "whatsapp",
+            "to": normalizar_telefone(conversa.telefone),
+            "type": "image",
+            "image": imagem,
         })
 
     def enviar_template(self, telefone: str, template: str, idioma: str = "pt_BR",
@@ -220,6 +236,9 @@ class GatewayBsp:
 
     def enviar_audio(self, conversa, media_id: str) -> dict:
         raise ValidationError("WhatsApp BSP: áudio ainda não implementado (stub).")
+
+    def enviar_imagem(self, conversa, media_id: str, legenda: str = "") -> dict:
+        raise ValidationError("WhatsApp BSP: imagem ainda não implementado (stub).")
 
 
 _GATEWAYS = {"simulado": GatewaySimulado, "cloud": GatewayCloud, "bsp": GatewayBsp}

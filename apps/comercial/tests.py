@@ -1386,6 +1386,59 @@ class WhatsAppCloudTests(TestCase):
         with self.assertRaises(ValidationError):
             services.enviar_audio_whatsapp(conversa=conv, arquivo=audio, usuario=self.user)
 
+    # ---- imagem ----
+    def _img(self, nome="foto.jpg", mime="image/jpeg", dados=b"\xff\xd8\xff-fake"):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        return SimpleUploadedFile(nome, dados, content_type=mime)
+
+    def test_enviar_imagem_registra_saida(self):
+        from .models import MensagemWhatsApp
+        conv = services.abrir_conversa_whatsapp(self.op)
+        msg = services.enviar_imagem_whatsapp(
+            conversa=conv, arquivo=self._img(), usuario=self.user, legenda="Nossa suíte")
+        self.assertEqual(msg.direcao, "saida")
+        self.assertEqual(msg.tipo, MensagemWhatsApp.Tipo.IMAGEM)
+        self.assertEqual(msg.status, "enviada")   # gateway simulado
+        self.assertEqual(msg.texto, "Nossa suíte")  # legenda
+        self.assertTrue(msg.midia_arquivo)
+
+    def test_enviar_imagem_recusa_nao_imagem(self):
+        conv = services.abrir_conversa_whatsapp(self.op)
+        pdf = self._img(nome="doc.pdf", mime="application/pdf", dados=b"%PDF-fake")
+        with self.assertRaises(ValidationError):
+            services.enviar_imagem_whatsapp(conversa=conv, arquivo=pdf, usuario=self.user)
+
+    def test_enviar_imagem_recusa_acima_5mb(self):
+        conv = services.abrir_conversa_whatsapp(self.op)
+        grande = self._img(dados=b"x" * (5 * 1024 * 1024 + 1))
+        with self.assertRaises(ValidationError):
+            services.enviar_imagem_whatsapp(conversa=conv, arquivo=grande, usuario=self.user)
+
+    @override_settings(WHATSAPP_GATEWAY="cloud")
+    def test_enviar_imagem_fora_da_janela_bloqueia(self):
+        conv = services.abrir_conversa_whatsapp(self.op)  # janela fechada
+        with self.assertRaises(ValidationError):
+            services.enviar_imagem_whatsapp(conversa=conv, arquivo=self._img(), usuario=self.user)
+
+    def test_webhook_recebe_imagem(self):
+        import json
+
+        from .models import MensagemWhatsApp
+        agora = str(int(timezone.now().timestamp()))
+        payload = {"object": "whatsapp_business_account", "entry": [{"id": "WABA", "changes": [{
+            "field": "messages", "value": {"messaging_product": "whatsapp", "messages": [{
+                "from": "5549999887766", "id": "wamid.IMG1", "timestamp": agora,
+                "type": "image", "image": {"id": "media-123", "mime_type": "image/jpeg",
+                                            "caption": "olha isso"}}]}}]}]}
+        self.client.post(reverse("whatsapp:webhook"), data=json.dumps(payload),
+                         content_type="application/json")
+        m = MensagemWhatsApp.objects.filter(id_externo="wamid.IMG1").first()
+        self.assertIsNotNone(m)
+        self.assertEqual(m.tipo, MensagemWhatsApp.Tipo.IMAGEM)
+        self.assertEqual(m.direcao, "entrada")
+        self.assertEqual(m.texto, "olha isso")           # legenda
+        self.assertEqual(m.midia_id_externo, "media-123")
+
     # ---- indicador de mensagem nova no funil (card + sidebar) ----
     def test_kanban_anota_whatsapp_nao_lidas(self):
         import json

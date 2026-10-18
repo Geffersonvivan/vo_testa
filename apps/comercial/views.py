@@ -1194,6 +1194,26 @@ def whatsapp_enviar(request, pk):
 
 
 @requer_modulo(Modulo.COMERCIAL)
+def whatsapp_enviar_imagem(request, pk):
+    """Recebe uma imagem anexada e envia pela conversa (fetch). Legenda opcional."""
+    op = get_object_or_404(Oportunidade, pk=pk)
+    erro = ""
+    if request.method == "POST":
+        arquivo = request.FILES.get("imagem")
+        if not arquivo:
+            erro = "Nenhuma imagem recebida."
+        else:
+            conv = services.abrir_conversa_whatsapp(op)
+            try:
+                services.enviar_imagem_whatsapp(
+                    conversa=conv, arquivo=arquivo, usuario=request.user,
+                    legenda=request.POST.get("legenda", ""))
+            except ValidationError as e:
+                erro = "; ".join(e.messages)
+    return JsonResponse({"ok": not erro, "erro": erro})
+
+
+@requer_modulo(Modulo.COMERCIAL)
 def whatsapp_enviar_audio(request, pk):
     """Recebe um áudio (gravado no navegador ou anexado) e envia pela conversa (fetch)."""
     op = get_object_or_404(Oportunidade, pk=pk)
