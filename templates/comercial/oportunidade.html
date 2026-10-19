@@ -55,7 +55,7 @@
                 <span class="wpp-audio-off">🖼️ Imagem (não baixada)</span>
               {% endif %}
             {% else %}{{ m.texto|linebreaksbr }}{% endif %}
-            <span class="wpp-h">{{ m.horario|date:"d/m H:i" }}{% if m.direcao == 'saida' %} · {{ m.get_status_display|lower }}{% endif %}</span>
+            <span class="wpp-h">{{ m.horario|date:"d/m H:i" }}{% if m.direcao == 'saida' %} · {% if m.status == 'erro' and m.erro_detalhe %}<span class="wpp-erro" title="{{ m.erro_detalhe }}">{{ m.get_status_display|lower }} ⚠</span>{% else %}{{ m.get_status_display|lower }}{% endif %}{% endif %}</span>
           </div>
         {% empty %}
           <p class="wpp-vazio">Sem mensagens ainda. As conversas do WhatsApp aparecem aqui.</p>
@@ -344,6 +344,7 @@
   .wpp-thread::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:8px}
   .wpp-msg{max-width:78%;padding:7px 11px;border-radius:12px;font-size:14px;line-height:1.4;box-shadow:0 1px 1px rgba(0,0,0,.08)}
   .wpp-msg .wpp-h{display:block;font-size:10.5px;color:var(--tinta-suave);text-align:right;margin-top:3px}
+  .wpp-erro{color:var(--perigo);cursor:help;border-bottom:1px dotted var(--perigo)}
   .wpp-msg-audio audio{width:230px;max-width:100%;height:36px;display:block;margin:2px 0}
   .wpp-audio-off{font-size:13px;color:var(--tinta-suave);font-style:italic}
   .wpp-img{max-width:230px;max-height:280px;width:auto;border-radius:10px;display:block;cursor:zoom-in}

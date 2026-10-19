@@ -871,6 +871,9 @@ class MensagemWhatsApp(models.Model):
     tipo = models.CharField("tipo", max_length=12, choices=Tipo.choices, default=Tipo.TEXTO)
     texto = models.TextField("texto", blank=True)
     status = models.CharField("status", max_length=10, choices=Status.choices)
+    # Motivo do erro devolvido pelo gateway/Meta quando status=erro (ex.: template
+    # não aprovado, número inválido). Só p/ diagnóstico — aparece no hover da mensagem.
+    erro_detalhe = models.CharField("motivo do erro", max_length=300, blank=True)
     id_externo = models.CharField("ID externo", max_length=120, blank=True)
     # Mídia (áudio/voz, imagem…) — binário no storage (R2) + metadados do WhatsApp.
     midia_id_externo = models.CharField("ID da mídia (Meta)", max_length=120, blank=True)

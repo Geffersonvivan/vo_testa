@@ -1041,6 +1041,18 @@ class WhatsAppCloudTests(TestCase):
         self.assertEqual(param["parameter_name"], "nome_cliente")
         self.assertEqual(param["text"], "Maria")
 
+    def test_erro_do_gateway_fica_gravado_na_mensagem(self):
+        # Meta recusa (ex.: template não aprovado) → o motivo é guardado p/ diagnóstico.
+        from unittest.mock import patch
+        recusa = {"ok": False, "erro": "HTTP 400: template não aprovado"}
+        with patch("apps.comercial.whatsapp_gateways._api_post", return_value=recusa), \
+                override_settings(WHATSAPP_GATEWAY="cloud"):
+            msg = services.enviar_template_whatsapp(
+                oportunidade=self.op, template="retomada_lead",
+                variaveis={"nome_cliente": "Maria"}, usuario=self.user)
+        self.assertEqual(msg.status, "erro")
+        self.assertIn("template não aprovado", msg.erro_detalhe)
+
     def test_reabrir_conversa_pela_view(self):
         self.client.force_login(self.user)
         r = self.client.post(

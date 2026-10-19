@@ -4,6 +4,7 @@ Regras do módulo Comercial. Interface pública para views, Site, Auditoria e Re
 Só conversa com outros módulos por services. Ganho exige conversão em reserva;
 perda exige motivo. Cotação, SLA, score e metas cobrem o Plano Comercial P0–P3.
 """
+import logging
 import unicodedata
 from datetime import UTC, timedelta
 from decimal import Decimal
@@ -32,6 +33,22 @@ from .models import (
 )
 
 Usuario = get_user_model()
+logger = logging.getLogger(__name__)
+
+
+def _resultado_envio_whatsapp(res):
+    """Traduz o retorno do gateway em (status, erro_detalhe) para a mensagem.
+
+    Em falha, loga o motivo (que a Meta/gateway devolve em `res["erro"]`) e o devolve
+    para ser gravado na mensagem — hoje esse motivo era descartado.
+    """
+    from .models import MensagemWhatsApp
+    if res.get("ok"):
+        return MensagemWhatsApp.Status.ENVIADA, ""
+    erro = (res.get("erro") or "")[:300]
+    logger.warning("WhatsApp: envio recusado/falhou — %s", erro or "sem detalhe")
+    return MensagemWhatsApp.Status.ERRO, erro
+
 
 DIAS_PARADA = 7
 SLA_PRIMEIRO_CONTATO_HORAS = 24
@@ -1946,10 +1963,10 @@ def enviar_mensagem_whatsapp(*, conversa, texto, usuario):
         res = get_whatsapp_gateway().enviar(conversa, texto)
     except Exception as e:
         res = {"ok": False, "erro": str(e)[:300]}
+    _status, _erro = _resultado_envio_whatsapp(res)
     msg = MensagemWhatsApp.objects.create(
         conversa=conversa, direcao=MensagemWhatsApp.Direcao.SAIDA, texto=texto,
-        status=(MensagemWhatsApp.Status.ENVIADA if res.get("ok")
-                else MensagemWhatsApp.Status.ERRO),
+        status=_status, erro_detalhe=_erro,
         id_externo=(res.get("id") or "")[:120], autor=usuario, horario=timezone.now(),
     )
     conversa.nao_lidas = 0
@@ -1985,11 +2002,11 @@ def enviar_audio_whatsapp(*, conversa, arquivo, usuario):
                else {"ok": False, "erro": up.get("erro", "upload falhou")})
     except Exception as e:  # noqa: BLE001
         res = {"ok": False, "erro": str(e)[:300]}
+    _status, _erro = _resultado_envio_whatsapp(res)
     msg = MensagemWhatsApp.objects.create(
         conversa=conversa, direcao=MensagemWhatsApp.Direcao.SAIDA,
         tipo=MensagemWhatsApp.Tipo.AUDIO, texto="[áudio]",
-        status=(MensagemWhatsApp.Status.ENVIADA if res.get("ok")
-                else MensagemWhatsApp.Status.ERRO),
+        status=_status, erro_detalhe=_erro,
         id_externo=(res.get("id") or "")[:120], autor=usuario,
         horario=timezone.now(), midia_mime=mime, midia_voz=True)
     try:
@@ -2033,11 +2050,11 @@ def enviar_imagem_whatsapp(*, conversa, arquivo, usuario, legenda=""):
                else {"ok": False, "erro": up.get("erro", "upload falhou")})
     except Exception as e:  # noqa: BLE001
         res = {"ok": False, "erro": str(e)[:300]}
+    _status, _erro = _resultado_envio_whatsapp(res)
     msg = MensagemWhatsApp.objects.create(
         conversa=conversa, direcao=MensagemWhatsApp.Direcao.SAIDA,
         tipo=MensagemWhatsApp.Tipo.IMAGEM, texto=legenda,
-        status=(MensagemWhatsApp.Status.ENVIADA if res.get("ok")
-                else MensagemWhatsApp.Status.ERRO),
+        status=_status, erro_detalhe=_erro,
         id_externo=(res.get("id") or "")[:120], autor=usuario,
         horario=timezone.now(), midia_mime=mime, midia_nome=nome)
     try:
@@ -2072,10 +2089,10 @@ def enviar_template_whatsapp(*, oportunidade, template, idioma="pt_BR",
                else list(variaveis or []))
     resumo = f"[modelo: {template}]" + (" · " + " · ".join(map(str, valores))
                                         if valores else "")
+    _status, _erro = _resultado_envio_whatsapp(res)
     msg = MensagemWhatsApp.objects.create(
         conversa=conv, direcao=MensagemWhatsApp.Direcao.SAIDA, texto=resumo,
-        status=(MensagemWhatsApp.Status.ENVIADA if res.get("ok")
-                else MensagemWhatsApp.Status.ERRO),
+        status=_status, erro_detalhe=_erro,
         id_externo=(res.get("id") or "")[:120], autor=usuario, horario=timezone.now(),
     )
     return msg
