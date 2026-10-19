@@ -46,12 +46,16 @@ PRECEDENCIA_TEMPORADA = [
 
 
 def classificacao_do_dia(dia: date) -> str | None:
-    """Classificação de temporada vigente na data (ou None = fora de temporada)."""
-    vigentes = set(
-        Temporada.objects.filter(inicio__lte=dia, fim__gte=dia).values_list(
-            "classificacao", flat=True
-        )
-    )
+    """Classificação de temporada vigente na data (ou None = fora de temporada).
+
+    Cada temporada vale só nos seus dias da semana (Seg–Qui = baixa, Sex–Dom =
+    alta); temporada sem dias marcados vale todos os dias (feriado). Quando mais
+    de uma cobre a data, vence a de maior precedência (feriado em primeiro)."""
+    vigentes = {
+        t.classificacao
+        for t in Temporada.objects.filter(inicio__lte=dia, fim__gte=dia)
+        if t.vale_no_dia(dia)
+    }
     for classificacao in PRECEDENCIA_TEMPORADA:
         if classificacao in vigentes:
             return classificacao

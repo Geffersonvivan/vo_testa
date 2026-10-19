@@ -467,9 +467,20 @@ class Temporada(models.Model):
         SUPER_ALTA = "super_alta", "Super alta"
         FERIADO = "feriado", "Feriado"
 
+    # Python weekday(): segunda = 0 … domingo = 6.
+    DIAS_SEMANA = [
+        (0, "Segunda"), (1, "Terça"), (2, "Quarta"), (3, "Quinta"),
+        (4, "Sexta"), (5, "Sábado"), (6, "Domingo"),
+    ]
+
     nome = models.CharField("nome", max_length=80)
     classificacao = models.CharField(
         "classificação", max_length=12, choices=Classificacao.choices
+    )
+    dias_semana = models.JSONField(
+        "dias da semana", default=list, blank=True,
+        help_text="Noites da semana em que esta temporada vale. Vazio = todos os "
+                  "dias (use nos feriados). Ex.: Baixa = Seg–Qui, Alta = Sex–Dom.",
     )
     inicio = models.DateField("início")
     fim = models.DateField("fim")
@@ -481,6 +492,11 @@ class Temporada(models.Model):
 
     def __str__(self):
         return f"{self.nome} ({self.get_classificacao_display()})"
+
+    def vale_no_dia(self, dia) -> bool:
+        """A temporada se aplica à noite nesta data? Lista vazia = todos os dias
+        (feriado); senão, só nos dias da semana marcados."""
+        return not self.dias_semana or dia.weekday() in self.dias_semana
 
     def clean(self):
         if self.inicio and self.fim and self.fim < self.inicio:

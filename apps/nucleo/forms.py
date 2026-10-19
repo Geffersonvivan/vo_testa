@@ -193,10 +193,22 @@ PosicaoCamaFormSet = forms.inlineformset_factory(
 
 
 class TemporadaForm(forms.ModelForm):
+    dias_semana = forms.MultipleChoiceField(
+        label="Dias da semana",
+        choices=Temporada.DIAS_SEMANA,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        help_text="Marque as noites em que vale. Vazio = todos os dias (use nos "
+                  "feriados). Baixa = Seg–Qui, Alta = Sex–Dom.",
+    )
+
     class Meta:
         model = Temporada
-        fields = ["nome", "classificacao", "inicio", "fim"]
+        fields = ["nome", "classificacao", "dias_semana", "inicio", "fim"]
         widgets = {"inicio": DataInput(), "fim": DataInput()}
+
+    def clean_dias_semana(self):
+        return [int(d) for d in self.cleaned_data.get("dias_semana", [])]
 
 
 # ---------- Caixa ----------

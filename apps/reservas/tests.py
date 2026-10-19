@@ -233,6 +233,34 @@ class TarifaTests(ReservasTestsBase):
         media = services.diaria_media(self.tipo, HOJE, HOJE + timedelta(days=2))
         self.assertEqual(media, Decimal("400.00"))
 
+    def test_classificacao_por_dia_da_semana_e_feriado(self):
+        import datetime
+        seg = datetime.date(2026, 11, 2)   # segunda-feira
+        sab = datetime.date(2026, 10, 31)  # sábado
+        self.assertEqual((seg.weekday(), sab.weekday()), (0, 5))
+        # Baixa nas noites de seg–qui; Alta nas de sex–dom (mesmo período).
+        Temporada.objects.create(
+            nome="Baixa", classificacao="baixa", dias_semana=[0, 1, 2, 3],
+            inicio=datetime.date(2026, 1, 1), fim=datetime.date(2026, 12, 31),
+        )
+        Temporada.objects.create(
+            nome="Alta", classificacao="alta", dias_semana=[4, 5, 6],
+            inicio=datetime.date(2026, 1, 1), fim=datetime.date(2026, 12, 31),
+        )
+        # Feriado em data específica: sem dias marcados = vale o dia todo.
+        Temporada.objects.create(
+            nome="Feriados", classificacao="feriado", dias_semana=[],
+            inicio=sab, fim=sab,
+        )
+        # Segunda/quinta comuns → baixa; sexta comum → alta.
+        self.assertEqual(services.classificacao_do_dia(seg), "baixa")
+        self.assertEqual(
+            services.classificacao_do_dia(datetime.date(2026, 10, 29)), "baixa")
+        self.assertEqual(
+            services.classificacao_do_dia(datetime.date(2026, 10, 30)), "alta")
+        # Sábado seria alta, mas é feriado → precedência do feriado.
+        self.assertEqual(services.classificacao_do_dia(sab), "feriado")
+
 
 class TarifaUnidadeTests(ReservasTestsBase):
     """Tarifa por unidade (Passo 3): duplo cobra mais, override vence, mínimo real."""
