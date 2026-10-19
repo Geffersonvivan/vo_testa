@@ -940,6 +940,63 @@ class LPFundador2Tests(TestCase):
         self.assertEqual(r.status_code, 400)
 
 
+class LPInauguracaoTests(TestCase):
+    """LP Inauguração 31/10 (/lp/inauguracao_31_10_2026/) — HTML bespoke + RSVP no funil."""
+
+    def setUp(self):
+        from .models import PaginaCaptacao
+        self.u = Usuario.objects.create_superuser(
+            username="lpinaug", password="forte-123-abc")
+        # O seed (migração 0030) no-opa no banco de teste (sem usuário na migração);
+        # cria aqui a página que o endpoint de lead usa p/ etiquetar.
+        self.pag = PaginaCaptacao.objects.create(
+            nome="Inauguração 31/10 (LP)", slug="inauguracao_31_10_2026",
+            status=PaginaCaptacao.Status.PUBLICADA, hero_titulo="Oi", criado_por=self.u)
+
+    def test_serve_html_com_form_e_endpoint_proprio(self):
+        r = self.client.get(reverse("lp:inauguracao"))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b'id="formInaug"', r.content)
+        self.assertIn(b"/lp/inauguracao_31_10_2026/lead/", r.content)  # rota própria
+        self.assertNotIn(b"/lp/fundador-2/lead/", r.content)           # não reusa a outra
+
+    def test_link_do_crm_redireciona_para_a_lp(self):
+        r = self.client.get("/captacao/inauguracao_31_10_2026/")
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r.headers["Location"], "/lp/inauguracao_31_10_2026/")
+
+    def test_rsvp_cai_no_funil_ligado_a_pagina(self):
+        import json
+        r = self.client.post(
+            reverse("lp:inauguracao_lead"),
+            data=json.dumps({"nome": "Convidado Inaug", "whatsapp": "49999887766",
+                             "pessoas": 2, "origem": "lp-inauguracao-31-10",
+                             "consent": True, "ms": 5000,
+                             "rastreio": {"utm_campaign": "inauguracao_31_10_2026"}}),
+            content_type="application/json")
+        self.assertEqual(r.status_code, 200)
+        op = Oportunidade.objects.get(pagina_captacao=self.pag)
+        self.assertTrue(op.pessoa.aceita_whatsapp)
+        self.assertEqual(op.origem_rastreio.get("utm_campaign"), "inauguracao_31_10_2026")
+
+    def test_honeypot_descarta_sem_criar_lead(self):
+        import json
+        r = self.client.post(
+            reverse("lp:inauguracao_lead"),
+            data=json.dumps({"nome": "Bot", "whatsapp": "49999880000",
+                             "empresa": "x", "ms": 5000}),
+            content_type="application/json")
+        self.assertEqual(r.status_code, 200)          # finge sucesso
+        self.assertFalse(Oportunidade.objects.exists())
+
+    def test_rsvp_incompleto_400(self):
+        import json
+        r = self.client.post(reverse("lp:inauguracao_lead"),
+                             data=json.dumps({"nome": "Só nome"}),
+                             content_type="application/json")
+        self.assertEqual(r.status_code, 400)
+
+
 class EnriquecimentoLeadTests(TestCase):
     """Sinais estimados do lead (sexo/UF/dispositivo/navegador) — offline."""
 

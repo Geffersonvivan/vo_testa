@@ -292,3 +292,106 @@ def lp_fundador_2_lead(request):
     except Exception:  # noqa: BLE001
         pass
     return JsonResponse({"ok": True})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LP Inauguração (sábado 31/10/2026) — HTML autocontido em
+# /lp/inauguracao_31_10_2026/. Mesmo padrão da Fundador II: serve o HTML do disco e
+# captura o RSVP no funil, etiquetado na campanha "inauguracao_31_10_2026".
+# ─────────────────────────────────────────────────────────────────────────────
+_LPINAUG_PATH = (Path(settings.BASE_DIR) / "LPs" / "LP_Inauguração_31_10_2026"
+                 / "LP-Inauguracao-VoTesta.html")
+_LPINAUG_CACHE = {"html": None}
+_LPINAUG_SLUG = "inauguracao_31_10_2026"       # casa com a PaginaCaptacao / utm_campaign
+_VISITA_INAUG_COOKIE = "lpv_inauguracao_31_10_2026"
+
+
+def _lpinaug_html() -> str:
+    if _LPINAUG_CACHE["html"] is None or settings.DEBUG:
+        html = _LPINAUG_PATH.read_text(encoding="utf-8")
+        # O HTML vem reusando o endpoint da Fundador II; aponta para a rota própria.
+        html = html.replace("/lp/fundador-2/lead/", f"/lp/{_LPINAUG_SLUG}/lead/")
+        _LPINAUG_CACHE["html"] = html
+    return _LPINAUG_CACHE["html"]
+
+
+@never_cache
+def servir_lp_inauguracao(request):
+    """LP Inauguração 31/10 (HTML autocontido) em /lp/inauguracao_31_10_2026/."""
+    resp = HttpResponse(_lpinaug_html())
+    if not request.COOKIES.get(_VISITA_INAUG_COOKIE):
+        try:
+            _contar_visita_pagina(request, _LPINAUG_SLUG)
+        except Exception:  # noqa: BLE001 — métrica nunca quebra a LP
+            pass
+        resp.set_cookie(_VISITA_INAUG_COOKIE, "1", max_age=_VISITA_TTL,
+                        httponly=True, samesite="Lax", secure=not settings.DEBUG)
+    return resp
+
+
+@csrf_exempt
+@never_cache
+@require_POST
+def lp_inauguracao_lead(request):
+    """Lead (RSVP) da LP Inauguração (JSON) → funil, etiquetado 'inauguracao_31_10_2026'."""
+    try:
+        dados = json.loads(request.body or b"{}")
+    except (ValueError, TypeError):
+        return JsonResponse({"ok": False, "erro": "json inválido"}, status=400)
+
+    # Anti-bot silencioso: honeypot preenchido ou envio instantâneo → finge sucesso.
+    if (dados.get("empresa") or "").strip():
+        return JsonResponse({"ok": True})
+    try:
+        ms = float(dados.get("ms") or 0)
+    except (TypeError, ValueError):
+        ms = 0
+    if 0 < ms < _MIN_MS:
+        return JsonResponse({"ok": True})
+
+    ip = _ip(request)
+    try:
+        chave = f"lp_lead_rate:{ip}"
+        cache.add(chave, 0, _RATE_JANELA)
+        if cache.incr(chave) > _RATE_MAX:
+            return JsonResponse({"ok": True})  # silencioso
+    except Exception:  # noqa: BLE001 — sem cache, segue sem rate limit
+        pass
+
+    nome = (dados.get("nome") or "").strip()
+    email = (dados.get("email") or "").strip()
+    whats = (dados.get("whatsapp") or dados.get("whats") or "").strip()
+    if not nome or not (email or whats):
+        return JsonResponse({"ok": False, "erro": "dados incompletos"}, status=400)
+    if whats:
+        from django.core.exceptions import ValidationError
+        from apps.nucleo.validadores import validar_telefone_br
+        try:
+            whats = validar_telefone_br(whats)  # celular 11 dígitos; normaliza
+        except ValidationError as e:
+            return JsonResponse({"ok": False, "erro": e.messages[0]}, status=400)
+
+    from .models import PaginaCaptacao
+    pagina = PaginaCaptacao.objects.filter(slug=_LPINAUG_SLUG).first()
+    origem = dict(dados.get("rastreio") or {})
+    origem.setdefault("origem_form", dados.get("origem") or "lp-inauguracao-31-10")
+    try:
+        services.capturar_lead_site(
+            nome=nome, email=email, telefone=whats,
+            tipo_interesse=(pagina.tipo_interesse if pagina else "hospedagem"),
+            pagina=pagina, mensagem="Inauguração 31/10 — confirmação de presença",
+            origem=origem, aceita_email=bool(dados.get("consent", True)),
+            ip=ip, user_agent=request.META.get("HTTP_USER_AGENT", ""))
+    except Exception:  # noqa: BLE001 — captação pública nunca estoura
+        pass
+
+    try:
+        services.enviar_capi_lead(
+            email=email, telefone=whats,
+            event_id=(dados.get("event_id") or ""),
+            fbp=(dados.get("fbp") or ""), fbc=(dados.get("fbc") or ""),
+            event_source_url=request.META.get("HTTP_REFERER", ""),
+            client_ip=ip, user_agent=request.META.get("HTTP_USER_AGENT", ""))
+    except Exception:  # noqa: BLE001
+        pass
+    return JsonResponse({"ok": True})

@@ -39,6 +39,9 @@ urlpatterns = [
     path("captacao/fundador/", RedirectView.as_view(url="/lp/fundador/", permanent=False)),
     # Campanha Fundador II (LP bespoke em /lp/fundador-2/) — link do CRM redireciona.
     path("captacao/fundador-2/", RedirectView.as_view(url="/lp/fundador-2/", permanent=False)),
+    # Inauguração 31/10 (LP bespoke em /lp/inauguracao_31_10_2026/) — link do CRM redireciona.
+    path("captacao/inauguracao_31_10_2026/",
+         RedirectView.as_view(url="/lp/inauguracao_31_10_2026/", permanent=False)),
 
     # Páginas de Captação (Landing Pages) — públicas, fora do /crm.
     path("captacao/", include("apps.comercial.urls_publicas")),
