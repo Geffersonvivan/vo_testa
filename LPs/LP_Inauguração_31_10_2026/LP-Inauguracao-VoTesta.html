@@ -307,6 +307,14 @@ section{position:relative}
 .dia.destaque .dia-corpo{display:grid;grid-template-columns:auto 1fr;column-gap:1.6rem;align-items:end}
 .dia.destaque .dia-semana,.dia.destaque .dia-num{grid-column:1}
 .dia.destaque .dia-info{grid-column:2;grid-row:1 / span 2;align-self:center}
+.dia-hora{display:inline-flex;align-items:center;gap:.45rem;margin-top:.75rem;font-size:.92rem;font-weight:700}
+.dia-hora i{font-size:1.05rem;color:var(--lampiao);flex:none}
+.dia-hora b{font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.dia:not(.destaque) .dia-hora{color:var(--perg-80)}
+.dia.destaque .dia-hora{color:var(--madeira)}
+.dia.destaque .dia-hora i{color:var(--madeira)}
+.hosp-teaser{display:flex;align-items:center;gap:.65rem;margin:clamp(2.2rem,4vw,3rem) 0 0;padding:.95rem 1.25rem;border-radius:14px;background:var(--madeira);color:var(--pergaminho);font-size:1.02rem;font-weight:700;line-height:1.35;box-shadow:inset 0 0 0 1px rgba(239,219,178,.12)}
+.hosp-teaser i{color:var(--lampiao);font-size:1.35rem;flex:none}
 .hosp-cta{display:flex;flex-wrap:wrap;align-items:center;gap:1rem 1.5rem;margin-top:2.2rem}
 .hosp-cta p{display:flex;align-items:center;gap:.5rem;color:var(--perg-60);font-size:.98rem}
 .hosp-cta p i{color:var(--lampiao);font-size:1.2rem}
@@ -732,6 +740,8 @@ section{position:relative}
       </div>
     </div>
 
+    <p class="hosp-teaser" data-reveal style="--d:1"><i aria-hidden="true"><svg class="ico-svg"><use href="#i-gift-f"/></svg></i>Estamos preparando algo incrível para os nossos hóspedes.</p>
+
     <ol class="dias">
       <li class="dia destaque" data-reveal style="--d:0">
         <div class="dia-mes">Outubro</div>
@@ -742,6 +752,7 @@ section{position:relative}
             <span class="dia-tag"><i aria-hidden="true"><svg class="ico-svg"><use href="#i-champagne-f"/></svg></i>Inauguração com coquetel</span>
             <h3>Check-in na casa do Vô</h3>
             <p>O momento especial da inauguração, com coquetel para celebrar a abertura.</p>
+            <p class="dia-hora"><i aria-hidden="true"><svg class="ico-svg"><use href="#i-key-f"/></svg></i>Check-in a partir das <b>16h07</b></p>
           </div>
         </div>
       </li>
@@ -761,6 +772,7 @@ section{position:relative}
           <span class="dia-num">02</span>
           <h3>Feriadão sem pressa</h3>
           <p>Dia de curtir Itá: as torres da antiga igreja no lago e o passeio pela cidade.</p>
+          <p class="dia-hora"><i aria-hidden="true"><svg class="ico-svg"><use href="#i-hourglass-medium"/></svg></i>Check-out até <b>18h07</b></p>
         </div>
       </li>
     </ol>
