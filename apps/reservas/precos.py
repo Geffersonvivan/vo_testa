@@ -71,7 +71,7 @@ def cotacao(*, uh=None, tipo=None, checkin: date, checkout: date,
             cobra_iss: bool = True, cobra_taxa_turismo: bool = True) -> dict:
     """Cotação itemizada: diárias (por pessoa) + ISS + taxa de turismo. Passe `uh`
     (venda por unidade) OU `tipo` (venda por tipo). Pura — não grava."""
-    from apps.reservas.services import tarifa_da_unidade, tarifa_do_dia
+    from apps.reservas.services import preco_unidade_noite, tarifa_do_dia
 
     o_tipo = tipo or (uh.tipo if uh else None)
     if o_tipo is None:
@@ -94,9 +94,15 @@ def cotacao(*, uh=None, tipo=None, checkin: date, checkout: date,
         diarias = []
         for n in range(noites):
             dia = checkin + timedelta(days=n)
-            base_noite = tarifa_da_unidade(uh, dia) if uh else tarifa_do_dia(o_tipo, dia)
+            # Venda por unidade: base e pessoa-adicional por noite (variam por
+            # temporada e por feriado específico). Venda por tipo: base do tipo
+            # + pessoa_adicional do tipo.
+            if uh:
+                base_noite, pa_noite = preco_unidade_noite(uh, dia)
+            else:
+                base_noite, pa_noite = tarifa_do_dia(o_tipo, dia), pa
             diarias.append({"dia": dia, "valor": diaria_por_pessoas(
-                base_noite, pa, adultos=adultos, criancas_6_15=criancas_6_15)})
+                base_noite, pa_noite, adultos=adultos, criancas_6_15=criancas_6_15)})
         hospedagem = sum((d["valor"] for d in diarias), Decimal("0.00"))
         diarias_qtd = noites
 

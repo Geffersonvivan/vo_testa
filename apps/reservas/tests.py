@@ -298,6 +298,68 @@ class TarifaTests(ReservasTestsBase):
         self.assertTrue(ConfiguracaoReservas.carregar().feriados_automaticos)
         self.assertEqual(ConfiguracaoReservas.objects.count(), 1)  # singleton
 
+    def test_preco_unidade_noite_base_adicional_e_feriado_especifico(self):
+        import datetime
+        from apps.reservas.models import TarifaTemporada, TarifaUnidade
+        seg = datetime.date(2026, 11, 9)  # segunda comum
+        Temporada.objects.create(
+            nome="Baixa", classificacao="baixa", dias_semana=[0, 1, 2, 3],
+            inicio=datetime.date(2026, 1, 1), fim=datetime.date(2026, 12, 31),
+        )
+        TarifaUnidade.objects.create(
+            uh=self.uh, classificacao="baixa",
+            valor=Decimal("900.00"), pessoa_adicional=Decimal("400.00"),
+        )
+        self.assertEqual(
+            services.preco_unidade_noite(self.uh, seg),
+            (Decimal("900.00"), Decimal("400.00")),
+        )
+        # Feriado específico (Natal) tem preço próprio e vence tudo na data dele.
+        natal = Temporada.objects.create(
+            nome="Natal", classificacao="feriado", dias_semana=[],
+            inicio=datetime.date(2026, 12, 25), fim=datetime.date(2026, 12, 25),
+        )
+        TarifaTemporada.objects.create(
+            temporada=natal, uh=self.uh,
+            valor=Decimal("2200.00"), pessoa_adicional=Decimal("800.00"),
+        )
+        self.assertEqual(
+            services.preco_unidade_noite(self.uh, datetime.date(2026, 12, 25)),
+            (Decimal("2200.00"), Decimal("800.00")),
+        )
+        # adicional vazio na tarifa → cai no do tipo.
+        self.tipo.pessoa_adicional = Decimal("150.00")
+        self.tipo.save()
+        TarifaUnidade.objects.filter(uh=self.uh, classificacao="baixa").update(
+            pessoa_adicional=None)
+        self.assertEqual(
+            services.preco_unidade_noite(self.uh, seg),
+            (Decimal("900.00"), Decimal("150.00")),
+        )
+
+    def test_cotacao_linear_por_numero_de_adultos(self):
+        import datetime
+        from apps.reservas import precos
+        from apps.reservas.models import TarifaUnidade
+        Temporada.objects.create(
+            nome="Baixa", classificacao="baixa", dias_semana=[0, 1, 2, 3],
+            inicio=datetime.date(2026, 1, 1), fim=datetime.date(2026, 12, 31),
+        )
+        TarifaUnidade.objects.create(
+            uh=self.uh, classificacao="baixa",
+            valor=Decimal("900.00"), pessoa_adicional=Decimal("400.00"),
+        )
+        ci, co = datetime.date(2026, 11, 9), datetime.date(2026, 11, 11)  # 2 noites seg/ter
+        # 4 adultos: 900 + 2×400 = 1700/noite (igual à tabela de vendas).
+        cot = precos.cotacao(uh=self.uh, checkin=ci, checkout=co, adultos=4,
+                             cobra_iss=False, cobra_taxa_turismo=False)
+        self.assertEqual(cot["media_noite"], Decimal("1700.00"))
+        self.assertEqual(cot["hospedagem"], Decimal("3400.00"))
+        # Hóspede sozinho = 70% da base de 2 pax (PRECO_SINGLE_FATOR).
+        cot1 = precos.cotacao(uh=self.uh, checkin=ci, checkout=co, adultos=1,
+                              cobra_iss=False, cobra_taxa_turismo=False)
+        self.assertEqual(cot1["media_noite"], Decimal("630.00"))  # 900 × 0.70
+
 
 class TarifaUnidadeTests(ReservasTestsBase):
     """Tarifa por unidade (Passo 3): duplo cobra mais, override vence, mínimo real."""

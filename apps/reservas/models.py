@@ -70,8 +70,14 @@ class TarifaUnidade(models.Model):
         choices=Temporada.Classificacao.choices,
     )
     valor = models.DecimalField(
-        "diária (R$)", max_digits=10, decimal_places=2,
+        "diária base — 2 adultos (R$)", max_digits=10, decimal_places=2,
         validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    pessoa_adicional = models.DecimalField(
+        "pessoa adicional (R$)", max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        help_text="Valor por adulto além dos 2 da base, nesta temporada. "
+                  "Vazio = usa o do tipo. Criança 6-15 paga metade; ≤5 não paga.",
     )
 
     class Meta:
@@ -87,6 +93,46 @@ class TarifaUnidade(models.Model):
 
     def __str__(self):
         return f"{self.uh.numero} / {self.get_classificacao_display()}: R$ {self.valor}"
+
+
+class TarifaTemporada(models.Model):
+    """Preço por QUARTO num feriado/temporada ESPECÍFICO (ex.: Natal, Ano Novo).
+
+    Vence o preço da classificação: quando a data cai numa temporada que tem linha
+    aqui para o quarto, usa-se este valor. Permite Natal ≠ Ano Novo ≠ feriado comum.
+    Sem linha → cai na tarifa da classificação (TarifaUnidade) → tipo."""
+
+    temporada = models.ForeignKey(
+        "nucleo.Temporada", on_delete=models.CASCADE,
+        related_name="tarifas_quarto", verbose_name="temporada",
+    )
+    uh = models.ForeignKey(
+        "nucleo.UH", on_delete=models.CASCADE,
+        related_name="tarifas_temporada", verbose_name="quarto",
+    )
+    valor = models.DecimalField(
+        "diária base — 2 adultos (R$)", max_digits=10, decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    pessoa_adicional = models.DecimalField(
+        "pessoa adicional (R$)", max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        help_text="Valor por adulto além dos 2. Vazio = usa o do tipo.",
+    )
+
+    class Meta:
+        verbose_name = "tarifa de feriado por quarto"
+        verbose_name_plural = "tarifas de feriado por quarto"
+        ordering = ["temporada__inicio", "uh__numero"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["temporada", "uh"],
+                name="tarifa_unica_por_temporada_e_quarto",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.temporada.nome} / {self.uh.numero}: R$ {self.valor}"
 
 
 class Reserva(models.Model):

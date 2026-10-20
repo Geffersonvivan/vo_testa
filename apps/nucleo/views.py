@@ -652,38 +652,63 @@ def tipo_uh_form(request, pk=None):
     )
 
 
+# Só as classificações em uso (Baixa/Alta/Feriado); feriado especial = TarifaTemporada.
+_CLASSIF_EM_USO = ("baixa", "alta", "feriado")
+
+
+def _dec_post(request, campo):
+    """Decimal do POST em formato BRL ('1.234,56') ou None se vazio/ inválido."""
+    bruto = (request.POST.get(campo) or "").strip().replace(".", "").replace(",", ".")
+    if not bruto:
+        return None
+    try:
+        return Decimal(bruto)
+    except (ValueError, ArithmeticError):
+        return None
+
+
 def _salvar_tarifas_quarto(request, uh):
-    """Preço por quarto × temporada: cria/atualiza/remove TarifaUnidade a partir
-    dos inputs `tarifa_<classificacao>` (vazio = remove/usa o tipo)."""
+    """Preço por quarto × temporada: cria/atualiza/remove TarifaUnidade a partir dos
+    inputs `tarifa_<classif>` (base 2 pax) + `adicional_<classif>` (pessoa adicional).
+    Base vazia = remove a linha (usa o tipo)."""
     from apps.reservas.models import TarifaUnidade
     from apps.reservas.models import Temporada as _Temp
 
-    for cod, _rot in _Temp.Classificacao.choices:
-        bruto = (request.POST.get(f"tarifa_{cod}") or "").strip().replace(".", "").replace(",", ".")
-        if not bruto:
+    rotulos = dict(_Temp.Classificacao.choices)
+    for cod in _CLASSIF_EM_USO:
+        if cod not in rotulos:
+            continue
+        valor = _dec_post(request, f"tarifa_{cod}")
+        if valor is None:
             TarifaUnidade.objects.filter(uh=uh, classificacao=cod).delete()
             continue
-        try:
-            valor = Decimal(bruto)
-        except (ValueError, ArithmeticError):
-            continue
         TarifaUnidade.objects.update_or_create(
-            uh=uh, classificacao=cod, defaults={"valor": valor}
+            uh=uh, classificacao=cod,
+            defaults={"valor": valor,
+                      "pessoa_adicional": _dec_post(request, f"adicional_{cod}")},
         )
 
 
 def _tarifas_quarto(uh):
-    """Editor de preço por quarto: [(código, rótulo, valor formatado BRL)]."""
+    """Editor de preço por quarto: [{cod, rotulo, valor_fmt, adicional_fmt}]."""
     from apps.reservas.models import TarifaUnidade
     from apps.reservas.models import Temporada as _Temp
 
     from .forms import _brl
 
-    atuais = {t.classificacao: t.valor for t in TarifaUnidade.objects.filter(uh=uh)} if uh else {}
-    return [
-        {"cod": c, "rotulo": rot, "valor_fmt": _brl(atuais[c]) if c in atuais else ""}
-        for c, rot in _Temp.Classificacao.choices
-    ]
+    rotulos = dict(_Temp.Classificacao.choices)
+    atuais = {t.classificacao: t for t in TarifaUnidade.objects.filter(uh=uh)} if uh else {}
+    linhas = []
+    for cod in _CLASSIF_EM_USO:
+        if cod not in rotulos:
+            continue
+        t = atuais.get(cod)
+        linhas.append({
+            "cod": cod, "rotulo": rotulos[cod],
+            "valor_fmt": _brl(t.valor) if t else "",
+            "adicional_fmt": _brl(t.pessoa_adicional) if t and t.pessoa_adicional is not None else "",
+        })
+    return linhas
 
 
 def _vitrine_do_quarto(request, uh):
@@ -796,18 +821,63 @@ def temporadas(request):
     )
 
 
+def _uhs_hospedagem():
+    from apps.nucleo.models.cadastros import TipoUH
+    return (UH.objects.exclude(tipo__modalidade=TipoUH.Modalidade.DAY_USE)
+            .select_related("tipo").order_by("numero"))
+
+
+def _salvar_tarifas_temporada(request, temporada):
+    """Preço especial por quarto numa temporada (Natal/Ano Novo). Base vazia =
+    remove (usa o preço da classificação)."""
+    from apps.reservas.models import TarifaTemporada
+
+    for uh in _uhs_hospedagem():
+        base = _dec_post(request, f"tbase_{uh.id}")
+        if base is None:
+            TarifaTemporada.objects.filter(temporada=temporada, uh=uh).delete()
+            continue
+        TarifaTemporada.objects.update_or_create(
+            temporada=temporada, uh=uh,
+            defaults={"valor": base,
+                      "pessoa_adicional": _dec_post(request, f"tadd_{uh.id}")},
+        )
+
+
+def _tarifas_temporada(temporada):
+    """[{uh_id, numero, tematico, base_fmt, adicional_fmt}] para o editor."""
+    from apps.reservas.models import TarifaTemporada
+
+    from .forms import _brl
+
+    atuais = ({t.uh_id: t for t in TarifaTemporada.objects.filter(temporada=temporada)}
+              if temporada else {})
+    linhas = []
+    for uh in _uhs_hospedagem():
+        t = atuais.get(uh.id)
+        linhas.append({
+            "uh_id": uh.id, "numero": uh.numero,
+            "tematico": getattr(uh, "nome_tematico", "") or "",
+            "base_fmt": _brl(t.valor) if t else "",
+            "adicional_fmt": _brl(t.pessoa_adicional) if t and t.pessoa_adicional is not None else "",
+        })
+    return linhas
+
+
 @requer_area(Area.TEMPORADAS)
 def temporada_form(request, pk=None):
     temporada = get_object_or_404(Temporada, pk=pk) if pk else None
     form = TemporadaForm(request.POST or None, instance=temporada)
     if request.method == "POST" and form.is_valid():
         temporada = form.save()
+        _salvar_tarifas_temporada(request, temporada)
         messages.success(request, f"Temporada “{temporada.nome}” salva.")
         return redirect("temporadas")
     return render(
         request,
-        "nucleo/form_simples.html",
-        {"form": form, "titulo": "Temporada", "voltar": "temporadas"},
+        "nucleo/temporada_form.html",
+        {"form": form, "titulo": "Temporada", "voltar": "temporadas",
+         "temporada": temporada, "tarifas_temporada": _tarifas_temporada(temporada)},
     )
 
 

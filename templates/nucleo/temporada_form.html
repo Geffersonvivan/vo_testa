@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block titulo %}{{ titulo }} — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Núcleo</p>
+<h1>{{ titulo }}</h1>
+
+<form method="post" class="form-cartao">
+  {% csrf_token %}
+  {% include "nucleo/partials/campos.html" %}
+
+  {% if temporada %}
+  <h2>Preço especial por quarto (opcional)</h2>
+  <p class="subtitulo">Use em feriados como <strong>Natal</strong> e <strong>Ano Novo</strong>: cada quarto com seu preço nesta temporada — vence o preço da classificação. Em branco = usa o preço da classificação (baixa/alta/feriado).</p>
+  <table class="tabela">
+    <thead>
+      <tr><th>Quarto</th><th class="num">Base (2 adultos)</th><th class="num">Pessoa adicional</th></tr>
+    </thead>
+    <tbody>
+      {% for t in tarifas_temporada %}
+      <tr>
+        <td>{{ t.numero }}{% if t.tematico %} · {{ t.tematico }}{% endif %}</td>
+        <td class="num"><div class="tarifa-input"><span class="tarifa-rs">R$</span><input type="text" name="tbase_{{ t.uh_id }}" class="money-mask" value="{{ t.base_fmt }}" placeholder="—" inputmode="decimal"></div></td>
+        <td class="num"><div class="tarifa-input"><span class="tarifa-rs">+R$</span><input type="text" name="tadd_{{ t.uh_id }}" class="money-mask" value="{{ t.adicional_fmt }}" placeholder="—" inputmode="decimal"></div></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="subtitulo">Salve a temporada para habilitar o preço especial por quarto (Natal/Ano Novo).</p>
+  {% endif %}
+
+  <div class="acoes">
+    <button type="submit" class="botao-primario">Salvar</button>
+    <a href="{% url voltar %}" class="botao-neutro">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

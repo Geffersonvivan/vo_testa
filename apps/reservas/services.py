@@ -148,6 +148,41 @@ def tarifa_base_unidade(uh: UH) -> Decimal:
     return _tarifa_unidade_sobre(uh, uh.tipo.tarifa_base)
 
 
+def preco_unidade_noite(uh: UH, dia: date):
+    """`(diária base de 2 pax, pessoa_adicional)` da unidade na data — a fonte do
+    preço por ocupação (Passo 3). Precedência:
+
+    1. **Feriado específico do quarto** (`TarifaTemporada`, ex.: Natal/Ano Novo) —
+       vence tudo nas datas da temporada dele.
+    2. **Classificação** (feriado automático / alta / baixa) com preço do quarto
+       (`TarifaUnidade`).
+    3. **Fallback**: base atual do quarto + `pessoa_adicional` do tipo.
+
+    O `pessoa_adicional` segue a mesma fonte do valor; se a fonte não o definir,
+    cai no do tipo — assim nada muda até o preço novo ser preenchido."""
+    from .models import TarifaTemporada, TarifaUnidade
+
+    pa_tipo = uh.tipo.pessoa_adicional or Decimal("0.00")
+
+    especiais = [
+        t for t in TarifaTemporada.objects.filter(
+            uh=uh, temporada__inicio__lte=dia, temporada__fim__gte=dia,
+        ).select_related("temporada")
+        if t.temporada.vale_no_dia(dia)
+    ]
+    if especiais:  # período mais curto = mais específico
+        t = min(especiais, key=lambda x: (x.temporada.fim - x.temporada.inicio).days)
+        return t.valor, (t.pessoa_adicional if t.pessoa_adicional is not None else pa_tipo)
+
+    classif = classificacao_do_dia(dia)
+    if classif:
+        t = TarifaUnidade.objects.filter(uh=uh, classificacao=classif).first()
+        if t:
+            return t.valor, (t.pessoa_adicional if t.pessoa_adicional is not None else pa_tipo)
+
+    return tarifa_da_unidade(uh, dia), pa_tipo
+
+
 def tarifa_minima_do_tipo(tipo_uh: TipoUH) -> Decimal | None:
     """Menor diária efetiva entre as unidades do tipo — o "a partir de" honesto.
 
