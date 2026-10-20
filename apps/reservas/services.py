@@ -149,20 +149,24 @@ def tarifa_base_unidade(uh: UH) -> Decimal:
 
 
 def preco_unidade_noite(uh: UH, dia: date):
-    """`(diária base de 2 pax, pessoa_adicional)` da unidade na data — a fonte do
+    """`(base 2 pax, pessoa_adicional, meia 6-15)` da unidade na data — a fonte do
     preço por ocupação (Passo 3). Precedência:
 
-    1. **Feriado específico do quarto** (`TarifaTemporada`, ex.: Natal/Ano Novo) —
-       vence tudo nas datas da temporada dele.
+    1. **Feriado específico do quarto** (`TarifaTemporada`, ex.: Natal/Ano Novo).
     2. **Classificação** (feriado automático / alta / baixa) com preço do quarto
        (`TarifaUnidade`).
     3. **Fallback**: base atual do quarto + `pessoa_adicional` do tipo.
 
-    O `pessoa_adicional` segue a mesma fonte do valor; se a fonte não o definir,
-    cai no do tipo — assim nada muda até o preço novo ser preenchido."""
+    `pessoa_adicional` e `meia` seguem a mesma fonte do valor; se a fonte não os
+    definir, caem no do tipo / metade do adicional — nada muda até preencher."""
     from .models import TarifaTemporada, TarifaUnidade
 
     pa_tipo = uh.tipo.pessoa_adicional or Decimal("0.00")
+
+    def _resolve(t):
+        adic = t.pessoa_adicional if t.pessoa_adicional is not None else pa_tipo
+        meia = t.meia if t.meia is not None else (adic / 2)
+        return t.valor, adic, meia
 
     especiais = [
         t for t in TarifaTemporada.objects.filter(
@@ -171,16 +175,29 @@ def preco_unidade_noite(uh: UH, dia: date):
         if t.temporada.vale_no_dia(dia)
     ]
     if especiais:  # período mais curto = mais específico
-        t = min(especiais, key=lambda x: (x.temporada.fim - x.temporada.inicio).days)
-        return t.valor, (t.pessoa_adicional if t.pessoa_adicional is not None else pa_tipo)
+        return _resolve(min(especiais, key=lambda x: (x.temporada.fim - x.temporada.inicio).days))
 
     classif = classificacao_do_dia(dia)
     if classif:
         t = TarifaUnidade.objects.filter(uh=uh, classificacao=classif).first()
         if t:
-            return t.valor, (t.pessoa_adicional if t.pessoa_adicional is not None else pa_tipo)
+            return _resolve(t)
 
-    return tarifa_da_unidade(uh, dia), pa_tipo
+    return tarifa_da_unidade(uh, dia), pa_tipo, (pa_tipo / 2)
+
+
+def tarifa_day_use(dia: date):
+    """`(valor_adulto, valor_meia)` do day use na data pela classificação da
+    temporada, ou None se não houver preço cadastrado (cai no tipo)."""
+    from .models import TarifaDayUse
+
+    classif = classificacao_do_dia(dia)
+    if classif:
+        t = TarifaDayUse.objects.filter(classificacao=classif).first()
+        if t:
+            meia = t.valor_meia if t.valor_meia is not None else (t.valor_adulto / 2)
+            return t.valor_adulto, meia
+    return None
 
 
 def tarifa_minima_do_tipo(tipo_uh: TipoUH) -> Decimal | None:
@@ -583,7 +600,8 @@ def criar_prereserva(*, tipo_uh=None, uh=None, checkin, checkout, hospede, usuar
                      adultos=2, criancas=0, valor_diaria=None, observacoes="",
                      reter=False, casais=None, solteiros=None, usa_sofa_cama=None,
                      criancas_0_5=None, criancas_6_15=None,
-                     cobra_iss=True, cobra_taxa_turismo=True, usa_berco=False):
+                     cobra_iss=True, cobra_taxa_turismo=True, usa_berco=False,
+                     nao_reembolsavel=False):
     """Cria uma PRÉ-RESERVA num quarto físico. Passe `uh` para reservar uma unidade
     ESPECÍFICA (venda por quarto) ou `tipo_uh` para alocar qualquer livre do tipo. O
     antioverbooking (constraint) protege da corrida. Interface pública usada pelo Site
@@ -621,7 +639,8 @@ def criar_prereserva(*, tipo_uh=None, uh=None, checkin, checkout, hospede, usuar
         cot = precos.cotacao(
             uh=uh if por_unidade else None, tipo=None if por_unidade else tipo_uh,
             checkin=checkin, checkout=checkout, adultos=adultos,
-            criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15)
+            criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15,
+            nao_reembolsavel=nao_reembolsavel)
         valor_diaria = cot["media_noite"]
 
     # Arranjo + trava global de colchões extra por noite (lock serializa a corrida).
@@ -646,7 +665,7 @@ def criar_prereserva(*, tipo_uh=None, uh=None, checkin, checkout, hospede, usuar
             adultos=adultos, criancas=criancas,
             criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15,
             cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_taxa_turismo,
-            usa_berco=usa_berco,
+            usa_berco=usa_berco, nao_reembolsavel=nao_reembolsavel,
             status=Reserva.Status.PRE_RESERVA, canal=canal,
             valor_diaria=valor_diaria, criado_por=usuario, observacoes=observacoes,
             expira_em=expira, **arranjo, **extra,

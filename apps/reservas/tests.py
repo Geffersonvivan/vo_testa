@@ -310,31 +310,33 @@ class TarifaTests(ReservasTestsBase):
             uh=self.uh, classificacao="baixa",
             valor=Decimal("900.00"), pessoa_adicional=Decimal("400.00"),
         )
+        # (base, adicional, meia) — meia vazia = metade do adicional.
         self.assertEqual(
             services.preco_unidade_noite(self.uh, seg),
-            (Decimal("900.00"), Decimal("400.00")),
+            (Decimal("900.00"), Decimal("400.00"), Decimal("200.00")),
         )
-        # Feriado específico (Natal) tem preço próprio e vence tudo na data dele.
+        # Feriado específico (Natal) tem preço próprio e vence tudo na data dele;
+        # meia explícita.
         natal = Temporada.objects.create(
             nome="Natal", classificacao="feriado", dias_semana=[],
             inicio=datetime.date(2026, 12, 25), fim=datetime.date(2026, 12, 25),
         )
         TarifaTemporada.objects.create(
-            temporada=natal, uh=self.uh,
-            valor=Decimal("2200.00"), pessoa_adicional=Decimal("800.00"),
+            temporada=natal, uh=self.uh, valor=Decimal("2200.00"),
+            pessoa_adicional=Decimal("800.00"), meia=Decimal("500.00"),
         )
         self.assertEqual(
             services.preco_unidade_noite(self.uh, datetime.date(2026, 12, 25)),
-            (Decimal("2200.00"), Decimal("800.00")),
+            (Decimal("2200.00"), Decimal("800.00"), Decimal("500.00")),
         )
-        # adicional vazio na tarifa → cai no do tipo.
+        # adicional vazio na tarifa → cai no do tipo; meia = metade dele.
         self.tipo.pessoa_adicional = Decimal("150.00")
         self.tipo.save()
         TarifaUnidade.objects.filter(uh=self.uh, classificacao="baixa").update(
             pessoa_adicional=None)
         self.assertEqual(
             services.preco_unidade_noite(self.uh, seg),
-            (Decimal("900.00"), Decimal("150.00")),
+            (Decimal("900.00"), Decimal("150.00"), Decimal("75.00")),
         )
 
     def test_cotacao_linear_por_numero_de_adultos(self):
@@ -359,6 +361,41 @@ class TarifaTests(ReservasTestsBase):
         cot1 = precos.cotacao(uh=self.uh, checkin=ci, checkout=co, adultos=1,
                               cobra_iss=False, cobra_taxa_turismo=False)
         self.assertEqual(cot1["media_noite"], Decimal("630.00"))  # 900 × 0.70
+
+    def test_meia_dayuse_e_nao_reembolsavel(self):
+        import datetime
+        from apps.nucleo.models import ConfiguracaoReservas
+        from apps.nucleo.models.cadastros import TipoUH
+        from apps.reservas import precos
+        from apps.reservas.models import TarifaDayUse, TarifaUnidade
+        Temporada.objects.create(
+            nome="Baixa", classificacao="baixa", dias_semana=[0, 1, 2, 3],
+            inicio=datetime.date(2026, 1, 1), fim=datetime.date(2026, 12, 31),
+        )
+        TarifaUnidade.objects.create(
+            uh=self.uh, classificacao="baixa", valor=Decimal("900.00"),
+            pessoa_adicional=Decimal("400.00"), meia=Decimal("150.00"),
+        )
+        ci, co = datetime.date(2026, 11, 9), datetime.date(2026, 11, 10)  # 1 noite baixa
+        # 2 adultos + 1 criança 6-15 com meia explícita: 900 + 150 = 1050.
+        cot = precos.cotacao(uh=self.uh, checkin=ci, checkout=co, adultos=2,
+                             criancas_6_15=1, cobra_iss=False, cobra_taxa_turismo=False)
+        self.assertEqual(cot["hospedagem"], Decimal("1050.00"))
+        # Não-reembolsável −12%: 900 → 792; desconto 108.
+        cotnr = precos.cotacao(uh=self.uh, checkin=ci, checkout=co, adultos=2,
+                               cobra_iss=False, cobra_taxa_turismo=False,
+                               nao_reembolsavel=True)
+        self.assertEqual(cotnr["hospedagem"], Decimal("792.00"))
+        self.assertEqual(cotnr["desconto_nao_reembolsavel"], Decimal("108.00"))
+        # Day use por pessoa × temporada; criança ≤5 não paga, 6-15 = meia.
+        dt = TipoUH.objects.create(
+            nome="Dia", modalidade=TipoUH.Modalidade.DAY_USE, tarifa_base=Decimal("0.00"))
+        TarifaDayUse.objects.create(
+            classificacao="baixa", valor_adulto=Decimal("120.00"), valor_meia=Decimal("60.00"))
+        cotd = precos.cotacao(tipo=dt, checkin=ci, checkout=ci, adultos=3,
+                              criancas_6_15=2, criancas_0_5=1,
+                              cobra_iss=False, cobra_taxa_turismo=False)
+        self.assertEqual(cotd["hospedagem"], Decimal("480.00"))  # 3×120 + 2×60
 
 
 class TarifaUnidadeTests(ReservasTestsBase):

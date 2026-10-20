@@ -881,56 +881,91 @@ def temporada_form(request, pk=None):
     )
 
 
+_CLASSIF_PRECO = [("baixa", "Baixa"), ("alta", "Alta"), ("feriado", "Feriados")]
+
+
 @requer_area(Area.QUARTOS)
 def tabela_precos(request):
-    """Tabela central de preços: quartos (por ala) × Baixa/Alta/Feriados + colunas
-    de feriados especiais (Natal/Ano Novo). Cada célula = base (2 adultos) + adulto
-    adicional. Grava em TarifaUnidade (classificações) e TarifaTemporada (especiais)."""
+    """Tabela central de preços: quartos (por ala) × Baixa/Alta/Feriados (+ feriados
+    especiais Natal/Ano Novo), cada célula = base (2 adultos) + adulto + meia (6-15).
+    Mais a seção Day use (por pessoa) e os Parâmetros (single / não-reembolsável /
+    taxas). Grava em TarifaUnidade, TarifaTemporada, TarifaDayUse e ConfiguracaoReservas."""
     from apps.nucleo.alas import ORDEM_ALAS
-    from apps.reservas.models import TarifaTemporada, TarifaUnidade
+    from apps.reservas.models import (
+        TarifaDayUse,
+        TarifaTemporada,
+        TarifaUnidade,
+    )
 
     from .forms import _brl
+    from .models import ConfiguracaoReservas
 
     especiais = list(Temporada.objects.filter(classificacao="feriado").order_by("inicio"))
-    colunas = [
-        {"key": "baixa", "label": "Baixa"},
-        {"key": "alta", "label": "Alta"},
-        {"key": "feriado", "label": "Feriados"},
-    ] + [{"key": f"temp{t.pk}", "label": t.nome, "temporada": t} for t in especiais]
+    colunas = [{"key": k, "label": r} for k, r in _CLASSIF_PRECO] \
+        + [{"key": f"temp{t.pk}", "label": t.nome, "temporada": t} for t in especiais]
 
     uhs = list(_uhs_hospedagem())
+    cfg = ConfiguracaoReservas.carregar()
 
     if request.method == "POST":
+        # 1) preço por quarto
         for uh in uhs:
             for col in colunas:
                 base = _dec_post(request, f"base_{uh.id}_{col['key']}")
-                add = _dec_post(request, f"add_{uh.id}_{col['key']}")
+                defaults = {"valor": base,
+                            "pessoa_adicional": _dec_post(request, f"add_{uh.id}_{col['key']}"),
+                            "meia": _dec_post(request, f"meia_{uh.id}_{col['key']}")}
                 if "temporada" in col:
                     if base is None:
                         TarifaTemporada.objects.filter(temporada=col["temporada"], uh=uh).delete()
                     else:
                         TarifaTemporada.objects.update_or_create(
-                            temporada=col["temporada"], uh=uh,
-                            defaults={"valor": base, "pessoa_adicional": add})
+                            temporada=col["temporada"], uh=uh, defaults=defaults)
                 elif base is None:
                     TarifaUnidade.objects.filter(uh=uh, classificacao=col["key"]).delete()
                 else:
                     TarifaUnidade.objects.update_or_create(
-                        uh=uh, classificacao=col["key"],
-                        defaults={"valor": base, "pessoa_adicional": add})
+                        uh=uh, classificacao=col["key"], defaults=defaults)
+        # 2) day use (por pessoa) × classificação
+        for k, _r in _CLASSIF_PRECO:
+            ad = _dec_post(request, f"du_ad_{k}")
+            if ad is None:
+                TarifaDayUse.objects.filter(classificacao=k).delete()
+            else:
+                TarifaDayUse.objects.update_or_create(
+                    classificacao=k,
+                    defaults={"valor_adulto": ad, "valor_meia": _dec_post(request, f"du_meia_{k}")})
+        # 3) parâmetros globais (single/não-reembolsável em %; ISS %; taxa R$)
+        single = _dec_post(request, "single_pct")
+        naoreemb = _dec_post(request, "nao_reemb_pct")
+        iss = _dec_post(request, "iss")
+        taxa = _dec_post(request, "taxa_turismo")
+        if single is not None:
+            cfg.single_fator = single / 100
+        if naoreemb is not None:
+            cfg.nao_reembolsavel_desconto = naoreemb / 100
+        if iss is not None:
+            cfg.iss_aliquota = iss
+        if taxa is not None:
+            cfg.taxa_turismo_diaria = taxa
+        cfg.save()
         messages.success(request, "Tabela de preços salva.")
         return redirect("tabela_precos")
 
     tus = {(t.uh_id, t.classificacao): t for t in TarifaUnidade.objects.all()}
     tts = {(t.uh_id, t.temporada_id): t for t in TarifaTemporada.objects.all()}
 
+    def _fmt(v):
+        return _brl(v) if v is not None else ""
+
     def _cel(uh, col):
         t = (tts.get((uh.id, col["temporada"].pk)) if "temporada" in col
              else tus.get((uh.id, col["key"])))
         return {
             "key": col["key"],
-            "base_fmt": _brl(t.valor) if t else "",
-            "add_fmt": _brl(t.pessoa_adicional) if t and t.pessoa_adicional is not None else "",
+            "base_fmt": _fmt(t.valor if t else None),
+            "add_fmt": _fmt(t.pessoa_adicional if t else None),
+            "meia_fmt": _fmt(t.meia if t else None),
         }
 
     por_ala: dict[str, list] = {}
@@ -944,8 +979,22 @@ def tabela_precos(request):
     grupos = [{"titulo": k, "quartos": v}
               for k, v in sorted(por_ala.items(), key=lambda kv: ordem.get(kv[0], 99))]
 
+    dus = {d.classificacao: d for d in TarifaDayUse.objects.all()}
+    day_use = [{"key": k, "label": r,
+                "ad_fmt": _fmt(dus[k].valor_adulto if k in dus else None),
+                "meia_fmt": _fmt(dus[k].valor_meia if k in dus and dus[k].valor_meia is not None else None)}
+               for k, r in _CLASSIF_PRECO]
+
+    parametros = {
+        "single_pct": _brl(cfg.single_fator * 100),
+        "nao_reemb_pct": _brl(cfg.nao_reembolsavel_desconto * 100),
+        "iss": _brl(cfg.iss_aliquota),
+        "taxa_turismo": _brl(cfg.taxa_turismo_diaria),
+    }
+
     return render(request, "nucleo/tabela_precos.html",
-                  {"colunas": colunas, "grupos": grupos})
+                  {"colunas": colunas, "grupos": grupos,
+                   "day_use": day_use, "parametros": parametros})
 
 
 # ---------- Caixa ----------

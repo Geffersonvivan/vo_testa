@@ -263,6 +263,7 @@ def nova(request):
             uh=reserva.uh, checkin=reserva.checkin, checkout=reserva.checkout,
             adultos=reserva.adultos, criancas_0_5=reserva.criancas_0_5,
             criancas_6_15=reserva.criancas_6_15,
+            nao_reembolsavel=reserva.nao_reembolsavel,
         )["media_noite"]
         if not form.cleaned_data.get("valor_diaria"):
             reserva.valor_diaria = sugerida
@@ -376,12 +377,14 @@ def tarifa_preview(request):
     criancas = criancas_0_5 + criancas_6_15
     cobra_iss = _bool("cobra_iss", True)
     cobra_taxa_turismo = _bool("cobra_taxa_turismo", True)
+    nao_reembolsavel = _bool("nao_reembolsavel", False)
 
     # Preço itemizado pela motor de tarifa (Manual §2 + taxas).
     cot = precos.cotacao(
         uh=uh, checkin=checkin, checkout=checkout, adultos=adultos,
         criancas_0_5=criancas_0_5, criancas_6_15=criancas_6_15,
-        cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_taxa_turismo)
+        cobra_iss=cobra_iss, cobra_taxa_turismo=cobra_taxa_turismo,
+        nao_reembolsavel=nao_reembolsavel)
     diaria = cot["media_noite"]
 
     casais_in, solteiros_in = _int("casais"), _int("solteiros")

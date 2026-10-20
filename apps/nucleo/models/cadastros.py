@@ -512,6 +512,24 @@ class ConfiguracaoReservas(models.Model):
                   "temporada Feriado automaticamente, sem cadastrar cada data. "
                   "Feriados locais específicos ainda podem ser cadastrados à mão.",
     )
+    # Parâmetros de preço (antes fixos no código; agora editáveis na Tabela de Preços).
+    single_fator = models.DecimalField(
+        "hóspede sozinho (fração da base)", max_digits=4, decimal_places=2,
+        default=Decimal("0.70"),
+        help_text="1 adulto paga esta fração do valor de 2 (0.70 = 70%).",
+    )
+    nao_reembolsavel_desconto = models.DecimalField(
+        "desconto não-reembolsável (fração)", max_digits=4, decimal_places=2,
+        default=Decimal("0.12"),
+        help_text="Desconto da tarifa não-reembolsável (0.12 = −12%).",
+    )
+    iss_aliquota = models.DecimalField(
+        "ISS (%)", max_digits=5, decimal_places=2, default=Decimal("4.00"),
+    )
+    taxa_turismo_diaria = models.DecimalField(
+        "taxa de turismo (R$/noite)", max_digits=8, decimal_places=2,
+        default=Decimal("4.00"),
+    )
 
     class Meta:
         verbose_name = "configuração de reservas"

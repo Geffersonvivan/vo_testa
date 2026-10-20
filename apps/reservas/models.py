@@ -79,6 +79,12 @@ class TarifaUnidade(models.Model):
         help_text="Valor por adulto além dos 2 da base, nesta temporada. "
                   "Vazio = usa o do tipo. Criança 6-15 paga metade; ≤5 não paga.",
     )
+    meia = models.DecimalField(
+        "meia — criança 6-15 (R$)", max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        help_text="Valor por criança de 6 a 15 anos. Vazio = metade da pessoa "
+                  "adicional. ≤5 não paga.",
+    )
 
     class Meta:
         verbose_name = "tarifa por quarto"
@@ -119,6 +125,11 @@ class TarifaTemporada(models.Model):
         null=True, blank=True,
         help_text="Valor por adulto além dos 2. Vazio = usa o do tipo.",
     )
+    meia = models.DecimalField(
+        "meia — criança 6-15 (R$)", max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        help_text="Valor por criança de 6 a 15 anos. Vazio = metade da pessoa adicional.",
+    )
 
     class Meta:
         verbose_name = "tarifa de feriado por quarto"
@@ -133,6 +144,33 @@ class TarifaTemporada(models.Model):
 
     def __str__(self):
         return f"{self.temporada.nome} / {self.uh.numero}: R$ {self.valor}"
+
+
+class TarifaDayUse(models.Model):
+    """Preço do Dia na Pousada (day use) por PESSOA, por classificação de temporada.
+    Day use não é por quarto — é por pessoa. Sem linha → cai no `preco_day_use` do tipo."""
+
+    classificacao = models.CharField(
+        "classificação da temporada", max_length=12,
+        choices=Temporada.Classificacao.choices, unique=True,
+    )
+    valor_adulto = models.DecimalField(
+        "valor por adulto (R$)", max_digits=10, decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    valor_meia = models.DecimalField(
+        "meia — criança 6-15 (R$)", max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        help_text="Vazio = metade do adulto. ≤5 não paga.",
+    )
+
+    class Meta:
+        verbose_name = "tarifa de day use"
+        verbose_name_plural = "tarifas de day use"
+        ordering = ["classificacao"]
+
+    def __str__(self):
+        return f"Day use / {self.get_classificacao_display()}: R$ {self.valor_adulto}"
 
 
 class Reserva(models.Model):
@@ -203,6 +241,9 @@ class Reserva(models.Model):
     criancas_6_15 = models.PositiveSmallIntegerField("crianças de 6 a 15 anos", default=0)
     cobra_iss = models.BooleanField("cobrar ISS", default=True)
     cobra_taxa_turismo = models.BooleanField("cobrar taxa de turismo", default=True)
+    # Tarifa não-reembolsável: desconto pré-pago (ConfiguracaoReservas), sem direito a
+    # cancelamento. O desconto já entra na diária acordada ao criar a reserva.
+    nao_reembolsavel = models.BooleanField("tarifa não-reembolsável", default=False)
     # Berço (grátis, recurso global limitado — não conta como pessoa/cama/colchão).
     usa_berco = models.BooleanField("usa berço", default=False)
     # Arranjo de camas (estoque de colchões — docs/Reservas/PLANO_ESTOQUE_COLCHOES.md).

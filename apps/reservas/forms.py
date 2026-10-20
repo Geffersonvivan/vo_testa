@@ -19,7 +19,7 @@ class ReservaForm(forms.ModelForm):
             "hospede", "uh", "checkin", "checkout",
             "adultos", "criancas_0_5", "criancas_6_15",
             "casais", "solteiros", "usa_sofa_cama", "usa_berco",
-            "cobra_iss", "cobra_taxa_turismo", "canal",
+            "cobra_iss", "cobra_taxa_turismo", "nao_reembolsavel", "canal",
             "faturamento", "titular", "valor_diaria", "observacoes",
         ]
         widgets = {

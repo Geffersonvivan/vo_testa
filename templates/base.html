@@ -584,6 +584,7 @@
     const c615 = document.getElementById('id_criancas_6_15');
     const iss = document.getElementById('id_cobra_iss');
     const tur = document.getElementById('id_cobra_taxa_turismo');
+    const nr = document.getElementById('id_nao_reembolsavel');
     const ca = document.getElementById('id_casais');
     const so = document.getElementById('id_solteiros');
     const sf = document.getElementById('id_usa_sofa_cama');
@@ -592,7 +593,8 @@
         + '&adultos=' + (ad ? ad.value : '')
         + '&criancas_0_5=' + (c05 ? c05.value : '0') + '&criancas_6_15=' + (c615 ? c615.value : '0')
         + '&cobra_iss=' + (iss && iss.checked ? '1' : '0')
-        + '&cobra_taxa_turismo=' + (tur && tur.checked ? '1' : '0');
+        + '&cobra_taxa_turismo=' + (tur && tur.checked ? '1' : '0')
+        + '&nao_reembolsavel=' + (nr && nr.checked ? '1' : '0');
       // Só manda o arranjo se o atendente o alterou; senão o backend sugere.
       if (arranjoTocado && ca && so) {
         url += '&casais=' + ca.value + '&solteiros=' + so.value + '&sofa=' + (sf && sf.checked ? '1' : '0');
@@ -622,7 +624,7 @@
   document.addEventListener('change', e => {
     if (['id_casais', 'id_solteiros', 'id_usa_sofa_cama'].includes(e.target.id)) arranjoTocado = true;
     if (['id_uh', 'id_checkin', 'id_checkout', 'id_adultos', 'id_criancas_0_5',
-         'id_criancas_6_15', 'id_cobra_iss', 'id_cobra_taxa_turismo',
+         'id_criancas_6_15', 'id_cobra_iss', 'id_cobra_taxa_turismo', 'id_nao_reembolsavel',
          'id_casais', 'id_solteiros', 'id_usa_sofa_cama'].includes(e.target.id)) atualizarTarifaHint();
   });
 

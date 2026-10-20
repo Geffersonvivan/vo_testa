@@ -121,6 +121,20 @@ class TravaGlobalPorNoiteTests(TestCase):
         self.assertEqual(conf["extra"], 0)
         self.assertEqual(conf["erros"], [])
 
+    def test_reserva_nao_reembolsavel_desconta_a_diaria(self):
+        from apps.reservas import precos
+        r = services.criar_prereserva(
+            uh=self.qa, checkin=self.hoje, checkout=self.amanha,
+            hospede=self.hospede, usuario=self.user,
+            casais=1, solteiros=0, adultos=2, nao_reembolsavel=True)
+        self.assertTrue(r.nao_reembolsavel)
+        cot_nr = precos.cotacao(uh=self.qa, checkin=self.hoje, checkout=self.amanha,
+                                adultos=2, nao_reembolsavel=True)
+        cot_full = precos.cotacao(uh=self.qa, checkin=self.hoje, checkout=self.amanha,
+                                  adultos=2)
+        self.assertEqual(r.valor_diaria, cot_nr["media_noite"])
+        self.assertLess(cot_nr["media_noite"], cot_full["media_noite"])
+
     def test_estrutura_excede_casais(self):
         conf = self._conf(self.qa, casais=2, solteiros=0)
         self.assertTrue(any("casais" in e for e in conf["erros"]))

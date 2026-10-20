@@ -64,13 +64,21 @@ class MotorPrecoTests(TestCase):
         c = self.cot(adultos=3)
         self.assertEqual(c["media_noite"], Decimal("810.00"))
 
+    def test_nao_reembolsavel_desconta_12(self):
+        c = self.cot(nao_reembolsavel=True, cobra_iss=False, cobra_taxa_turismo=False)
+        # 1120 − 12% = 985,60; desconto 134,40.
+        self.assertEqual(c["desconto_nao_reembolsavel"], Decimal("134.40"))
+        self.assertEqual(c["hospedagem"], Decimal("985.60"))
+        self.assertEqual(c["total"], Decimal("985.60"))
+
     def test_day_use_por_pessoa(self):
         day = TipoUH.objects.create(
             nome="Day Teste", capacidade=10, tarifa_base=Decimal("0.00"),
             modalidade=TipoUH.Modalidade.DAY_USE, preco_day_use=Decimal("180.00"))
         c = precos.cotacao(tipo=day, checkin=CI, checkout=CI,
                            adultos=2, criancas_6_15=1, criancas_0_5=1)
-        self.assertEqual(c["hospedagem"], Decimal("540.00"))    # 180 × 3 pagantes (≤5 grátis)
+        # 2 adultos × 180 + 1 criança 6-15 × meia (90) = 450; ≤5 grátis.
+        self.assertEqual(c["hospedagem"], Decimal("450.00"))
         self.assertEqual(c["taxa_turismo"], Decimal("4.00"))    # 1 diária
-        self.assertEqual(c["iss"], Decimal("21.60"))
-        self.assertEqual(c["total"], Decimal("565.60"))
+        self.assertEqual(c["iss"], Decimal("18.00"))            # 4% de 450
+        self.assertEqual(c["total"], Decimal("472.00"))

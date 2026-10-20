@@ -8,7 +8,7 @@
   <h1>Tabela de preços</h1>
   <a href="{% url 'temporada_nova' %}" class="botao-neutro">+ Feriado especial</a>
 </div>
-<p class="subtitulo">Preço por quarto (agrupado por ala) em cada temporada. Cada célula: <strong>base</strong> (2 adultos) e <strong>+adulto</strong> (pessoa adicional). Em branco = usa o tipo. Natal/Ano Novo viram colunas próprias quando você cadastra o feriado.</p>
+<p class="subtitulo">Preço por quarto (agrupado por ala) em cada temporada. Cada célula: <strong>base</strong> (2 adultos), <strong>+adulto</strong> (pessoa adicional) e <strong>meia</strong> (criança 6-15). Meia em branco = metade do +adulto; ≤5 não paga. Natal/Ano Novo viram colunas próprias quando você cadastra o feriado.</p>
 
 <form method="post" class="form-cartao" style="overflow-x:auto">
   {% csrf_token %}
@@ -16,7 +16,7 @@
     <thead>
       <tr>
         <th>Quarto</th>
-        {% for c in colunas %}<th class="num">{{ c.label }}<br><small>base · +adulto</small></th>{% endfor %}
+        {% for c in colunas %}<th class="num">{{ c.label }}<br><small>base · +adulto · meia</small></th>{% endfor %}
       </tr>
     </thead>
     <tbody>
@@ -30,6 +30,7 @@
             <div class="precos-cel">
               <input type="text" name="base_{{ q.uh_id }}_{{ cel.key }}" value="{{ cel.base_fmt }}" class="money-mask" placeholder="base" inputmode="decimal">
               <input type="text" name="add_{{ q.uh_id }}_{{ cel.key }}" value="{{ cel.add_fmt }}" class="money-mask" placeholder="+ad" inputmode="decimal">
+              <input type="text" name="meia_{{ q.uh_id }}_{{ cel.key }}" value="{{ cel.meia_fmt }}" class="money-mask" placeholder="meia" inputmode="decimal">
             </div>
           </td>
           {% endfor %}
@@ -38,6 +39,37 @@
       {% endfor %}
     </tbody>
   </table>
+
+  <h2>Dia na Pousada (day use)</h2>
+  <p class="subtitulo">Cobrado <strong>por pessoa</strong> (não por quarto). Meia em branco = metade do adulto; ≤5 não paga.</p>
+  <table class="tabela precos-tabela">
+    <thead><tr><th>Temporada</th><th class="num">Adulto</th><th class="num">Meia (6-15)</th></tr></thead>
+    <tbody>
+      {% for d in day_use %}
+      <tr>
+        <td>{{ d.label }}</td>
+        <td class="num"><div class="precos-cel"><input type="text" name="du_ad_{{ d.key }}" value="{{ d.ad_fmt }}" class="money-mask" placeholder="adulto" inputmode="decimal"></div></td>
+        <td class="num"><div class="precos-cel"><input type="text" name="du_meia_{{ d.key }}" value="{{ d.meia_fmt }}" class="money-mask" placeholder="meia" inputmode="decimal"></div></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Parâmetros de preço</h2>
+  <p class="subtitulo">Valem para todas as cotações.</p>
+  <div class="precos-param">
+    <label>Hóspede sozinho (%)
+      <input type="text" name="single_pct" value="{{ parametros.single_pct }}" class="money-mask" inputmode="decimal">
+      <small>paga essa % do valor de 2 adultos</small></label>
+    <label>Não-reembolsável (% desconto)
+      <input type="text" name="nao_reemb_pct" value="{{ parametros.nao_reemb_pct }}" class="money-mask" inputmode="decimal">
+      <small>desconto pré-pago sem cancelamento</small></label>
+    <label>ISS (%)
+      <input type="text" name="iss" value="{{ parametros.iss }}" class="money-mask" inputmode="decimal"></label>
+    <label>Taxa de turismo (R$/noite)
+      <input type="text" name="taxa_turismo" value="{{ parametros.taxa_turismo }}" class="money-mask" inputmode="decimal"></label>
+  </div>
+
   <div class="acoes">
     <button type="submit" class="botao-primario">Salvar tabela</button>
     <a href="{% url 'temporadas' %}" class="botao-neutro">Voltar</a>
@@ -47,6 +79,10 @@
 <style>
   .precos-tabela td, .precos-tabela th { white-space: nowrap; }
   .precos-cel { display: flex; gap: .35rem; justify-content: flex-end; }
-  .precos-cel input { width: 5rem; text-align: right; }
+  .precos-cel input { width: 4.5rem; text-align: right; }
+  .precos-param { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; margin: .5rem 0 1.5rem; }
+  .precos-param label { display: flex; flex-direction: column; gap: .3rem; font-weight: 600; }
+  .precos-param input { max-width: 8rem; }
+  .precos-param small { font-weight: 400; color: var(--tinta-suave); }
 </style>
 {% endblock %}
