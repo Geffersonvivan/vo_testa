@@ -14,7 +14,7 @@
             hx-get="{% url 'reservas:nova' %}" hx-target="#modal-conteudo">Nova reserva</button>
   </div>
 </div>
-<p class="subtitulo">Arraste sobre as noites de um quarto para reservar; ao soltar, os dados abrem em uma janela. Cada linha de tipo mostra quantos quartos livres há por dia.</p>
+<p class="subtitulo">Arraste sobre as noites de um quarto para reservar; ao soltar, os dados abrem em uma janela. Cada ala mostra quantos quartos livres há por dia.</p>
 
 <div class="mapa-navegacao">
   <a href="?inicio={{ anterior|date:'Y-m-d' }}" class="botao-neutro">← Anterior</a>
@@ -47,7 +47,7 @@
     {% for grupo in grupos %}
       <tr class="mapa-grupo">
         <td class="mapa-uh">
-          <strong>{{ grupo.tipo.nome }}</strong> <small>({{ grupo.uhs|length }})</small>
+          <strong>{{ grupo.titulo }}</strong> <small>({{ grupo.uhs|length }})</small>
         </td>
         {% for d in grupo.disponibilidade %}
           <td class="{% if d.fim_de_semana %}mapa-fds{% endif %} {% if d.hoje %}mapa-hoje{% endif %}">

@@ -229,6 +229,10 @@
           <svg viewBox="0 0 24 24" class="ico"><path d="M3 21V9l9-6 9 6v12"/><path d="M9 21v-6h6v6"/></svg>
           <span class="rotulo">Quartos &amp; tipos</span>
         </a>
+        <a href="{% url 'tabela_precos' %}" class="nav-item {% if atual == 'tabela_precos' %}ativo{% endif %}">
+          <svg viewBox="0 0 24 24" class="ico"><path d="M3 6h18M3 12h18M3 18h18M8 3v18M16 3v18"/></svg>
+          <span class="rotulo">Tabela de preços</span>
+        </a>
         {% endif %}
         {% if user|pode_area:'temporadas' %}
         <a href="{% url 'temporadas' %}" class="nav-item {% if 'temporada' in atual %}ativo{% endif %}">

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block titulo %}Tabela de preços — CRM Vô Testa{% endblock %}
+
+{% block conteudo %}
+<p class="pagina-eyebrow letreiro">Núcleo</p>
+<div class="pagina-cabecalho">
+  <h1>Tabela de preços</h1>
+  <a href="{% url 'temporada_nova' %}" class="botao-neutro">+ Feriado especial</a>
+</div>
+<p class="subtitulo">Preço por quarto (agrupado por ala) em cada temporada. Cada célula: <strong>base</strong> (2 adultos) e <strong>+adulto</strong> (pessoa adicional). Em branco = usa o tipo. Natal/Ano Novo viram colunas próprias quando você cadastra o feriado.</p>
+
+<form method="post" class="form-cartao" style="overflow-x:auto">
+  {% csrf_token %}
+  <table class="tabela precos-tabela">
+    <thead>
+      <tr>
+        <th>Quarto</th>
+        {% for c in colunas %}<th class="num">{{ c.label }}<br><small>base · +adulto</small></th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in grupos %}
+        <tr class="mapa-grupo"><td colspan="{{ colunas|length|add:1 }}"><strong>{{ g.titulo }}</strong></td></tr>
+        {% for q in g.quartos %}
+        <tr>
+          <td>{{ q.numero }}{% if q.tematico %} · <small>{{ q.tematico }}</small>{% endif %}</td>
+          {% for cel in q.celulas %}
+          <td class="num">
+            <div class="precos-cel">
+              <input type="text" name="base_{{ q.uh_id }}_{{ cel.key }}" value="{{ cel.base_fmt }}" class="money-mask" placeholder="base" inputmode="decimal">
+              <input type="text" name="add_{{ q.uh_id }}_{{ cel.key }}" value="{{ cel.add_fmt }}" class="money-mask" placeholder="+ad" inputmode="decimal">
+            </div>
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="acoes">
+    <button type="submit" class="botao-primario">Salvar tabela</button>
+    <a href="{% url 'temporadas' %}" class="botao-neutro">Voltar</a>
+  </div>
+</form>
+
+<style>
+  .precos-tabela td, .precos-tabela th { white-space: nowrap; }
+  .precos-cel { display: flex; gap: .35rem; justify-content: flex-end; }
+  .precos-cel input { width: 5rem; text-align: right; }
+</style>
+{% endblock %}

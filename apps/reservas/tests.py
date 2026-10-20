@@ -570,6 +570,21 @@ class PermissaoModuloTests(ReservasTestsBase):
         self.assertEqual(self.client.get(reverse("reservas:mapa")).status_code, 200)
         self.assertEqual(self.client.get(reverse("reservas:lista")).status_code, 200)
 
+    def test_mapa_agrupa_por_ala(self):
+        from apps.nucleo.models import UH
+        from apps.nucleo.models.cadastros import TipoUH
+        tp = TipoUH.objects.create(nome="Cabana", tarifa_base=Decimal("300.00"))
+        UH.objects.create(numero="Quarto 01", tipo=tp)   # Embaixo da Recepção
+        UH.objects.create(numero="Quarto 16", tipo=tp)   # Condado dos Hobbits
+        self.client.login(username="recepcao", password="senha-forte-123")
+        r = self.client.get(reverse("reservas:mapa"))
+        titulos = [g["titulo"] for g in r.context["grupos"]]
+        self.assertIn("Embaixo da Recepção", titulos)
+        self.assertIn("Condado dos Hobbits", titulos)
+        # Ordem oficial: Recepção antes do Condado.
+        self.assertLess(titulos.index("Embaixo da Recepção"),
+                        titulos.index("Condado dos Hobbits"))
+
     def test_diaria_manual_exige_gerencia(self):
         operadora = Usuario.objects.create_user(
             username="operadora", password="senha-forte-123"

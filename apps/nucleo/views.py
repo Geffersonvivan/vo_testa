@@ -881,6 +881,73 @@ def temporada_form(request, pk=None):
     )
 
 
+@requer_area(Area.QUARTOS)
+def tabela_precos(request):
+    """Tabela central de preços: quartos (por ala) × Baixa/Alta/Feriados + colunas
+    de feriados especiais (Natal/Ano Novo). Cada célula = base (2 adultos) + adulto
+    adicional. Grava em TarifaUnidade (classificações) e TarifaTemporada (especiais)."""
+    from apps.nucleo.alas import ORDEM_ALAS
+    from apps.reservas.models import TarifaTemporada, TarifaUnidade
+
+    from .forms import _brl
+
+    especiais = list(Temporada.objects.filter(classificacao="feriado").order_by("inicio"))
+    colunas = [
+        {"key": "baixa", "label": "Baixa"},
+        {"key": "alta", "label": "Alta"},
+        {"key": "feriado", "label": "Feriados"},
+    ] + [{"key": f"temp{t.pk}", "label": t.nome, "temporada": t} for t in especiais]
+
+    uhs = list(_uhs_hospedagem())
+
+    if request.method == "POST":
+        for uh in uhs:
+            for col in colunas:
+                base = _dec_post(request, f"base_{uh.id}_{col['key']}")
+                add = _dec_post(request, f"add_{uh.id}_{col['key']}")
+                if "temporada" in col:
+                    if base is None:
+                        TarifaTemporada.objects.filter(temporada=col["temporada"], uh=uh).delete()
+                    else:
+                        TarifaTemporada.objects.update_or_create(
+                            temporada=col["temporada"], uh=uh,
+                            defaults={"valor": base, "pessoa_adicional": add})
+                elif base is None:
+                    TarifaUnidade.objects.filter(uh=uh, classificacao=col["key"]).delete()
+                else:
+                    TarifaUnidade.objects.update_or_create(
+                        uh=uh, classificacao=col["key"],
+                        defaults={"valor": base, "pessoa_adicional": add})
+        messages.success(request, "Tabela de preços salva.")
+        return redirect("tabela_precos")
+
+    tus = {(t.uh_id, t.classificacao): t for t in TarifaUnidade.objects.all()}
+    tts = {(t.uh_id, t.temporada_id): t for t in TarifaTemporada.objects.all()}
+
+    def _cel(uh, col):
+        t = (tts.get((uh.id, col["temporada"].pk)) if "temporada" in col
+             else tus.get((uh.id, col["key"])))
+        return {
+            "key": col["key"],
+            "base_fmt": _brl(t.valor) if t else "",
+            "add_fmt": _brl(t.pessoa_adicional) if t and t.pessoa_adicional is not None else "",
+        }
+
+    por_ala: dict[str, list] = {}
+    for uh in uhs:
+        por_ala.setdefault(uh.ala or "Outros", []).append({
+            "uh_id": uh.id, "numero": uh.numero,
+            "tematico": getattr(uh, "nome_tematico", "") or "",
+            "celulas": [_cel(uh, c) for c in colunas],
+        })
+    ordem = {nome: i for i, nome in enumerate(ORDEM_ALAS)}
+    grupos = [{"titulo": k, "quartos": v}
+              for k, v in sorted(por_ala.items(), key=lambda kv: ordem.get(kv[0], 99))]
+
+    return render(request, "nucleo/tabela_precos.html",
+                  {"colunas": colunas, "grupos": grupos})
+
+
 # ---------- Caixa ----------
 
 

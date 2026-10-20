@@ -137,18 +137,18 @@ def mapa(request):
             "bloqueada": uh.status == UH.Status.BLOQUEADA,
         }
 
-    # Agrupado por tipo de UH, com disponibilidade por dia no cabeçalho do
-    # grupo (modelo Desbravador: LX (9) + contagem de livres por data).
+    # Agrupado por ALA (localização oficial), com disponibilidade por dia no
+    # cabeçalho do grupo (modelo Desbravador: contagem de livres por data).
+    from apps.nucleo.alas import ORDEM_ALAS
+
     uhs = list(UH.objects.select_related("tipo").exclude(status=UH.Status.INATIVA))
-    por_tipo: dict[int, dict] = {}
+    por_ala: dict[str, dict] = {}
     for uh in uhs:  # a lista vem ordenada por número; agrupa mantendo a ordem
-        por_tipo.setdefault(
-            uh.tipo.pk, {"tipo": uh.tipo, "uhs": []}
-        )["uhs"].append(uh)
-    grupos = list(por_tipo.values())
-    # "Dia na Pousada" (day use) vai para o FINAL do mapa, depois dos tipos de
-    # hospedagem (sort estável preserva a ordem entre os demais tipos).
-    grupos.sort(key=lambda g: g["tipo"].modalidade == TipoUH.Modalidade.DAY_USE)
+        chave = uh.ala or "Dia na Pousada"          # day use não tem ala
+        por_ala.setdefault(chave, {"titulo": chave, "uhs": []})["uhs"].append(uh)
+    # Ordem oficial das alas; "Dia na Pousada" (day use) por último.
+    ordem = {nome: i for i, nome in enumerate(ORDEM_ALAS)}
+    grupos = sorted(por_ala.values(), key=lambda g: ordem.get(g["titulo"], 99))
 
     manual_ids = {u.pk for u in uhs if u.status == UH.Status.BLOQUEADA}
     for grupo in grupos:

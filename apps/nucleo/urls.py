@@ -25,6 +25,7 @@ urlpatterns = [
     path("estrutura/tipos/<int:pk>/", views.tipo_uh_form, name="tipo_uh_editar"),
     path("estrutura/uhs/nova/", views.uh_form, name="uh_nova"),
     path("estrutura/uhs/<int:pk>/", views.uh_form, name="uh_editar"),
+    path("precos/", views.tabela_precos, name="tabela_precos"),
     path("temporadas/", views.temporadas, name="temporadas"),
     path("temporadas/nova/", views.temporada_form, name="temporada_nova"),
     path("temporadas/<int:pk>/", views.temporada_form, name="temporada_editar"),
