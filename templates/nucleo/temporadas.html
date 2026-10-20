@@ -8,7 +8,19 @@
   <h1>Temporadas</h1>
   <a href="{% url 'temporada_nova' %}" class="botao-primario">Nova temporada</a>
 </div>
-<p class="subtitulo">Calendário tarifário: períodos de baixa, média, alta, super alta e feriados.</p>
+<p class="subtitulo">Calendário tarifário: períodos de baixa, alta e feriados.</p>
+
+<form method="post" class="cartao" style="display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;margin-bottom:1.25rem">
+  {% csrf_token %}
+  <label style="display:flex;align-items:center;gap:.6rem;margin:0;cursor:pointer">
+    <input type="checkbox" name="feriados_automaticos"
+           {% if config.feriados_automaticos %}checked{% endif %}
+           onchange="this.form.submit()">
+    <span><strong>Feriados automáticos</strong> — classifica os feriados nacionais e o
+    aniversário de Itá (13/12) como <em>Feriado</em>, sem cadastrar cada data.
+    Feriados locais específicos você ainda cadastra abaixo.</span>
+  </label>
+</form>
 
 <table class="tabela">
   <thead>

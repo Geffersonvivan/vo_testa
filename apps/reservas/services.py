@@ -48,9 +48,17 @@ PRECEDENCIA_TEMPORADA = [
 def classificacao_do_dia(dia: date) -> str | None:
     """Classificação de temporada vigente na data (ou None = fora de temporada).
 
-    Cada temporada vale só nos seus dias da semana (Seg–Qui = baixa, Sex–Dom =
-    alta); temporada sem dias marcados vale todos os dias (feriado). Quando mais
-    de uma cobre a data, vence a de maior precedência (feriado em primeiro)."""
+    Precedência: feriado automático (calendário nacional + Itá, se ligado) →
+    temporadas cadastradas (cada uma só nos seus dias da semana: Seg–Qui = baixa,
+    Sex–Dom = alta; sem dias marcados = todos os dias). Feriado sempre vence."""
+    from apps.nucleo.feriados import eh_feriado
+    from apps.nucleo.models.cadastros import ConfiguracaoReservas
+
+    # Feriado automático só consulta a config nas datas que são realmente feriado,
+    # para não bater no banco em todo dia comum.
+    if eh_feriado(dia) and ConfiguracaoReservas.carregar().feriados_automaticos:
+        return Temporada.Classificacao.FERIADO
+
     vigentes = {
         t.classificacao
         for t in Temporada.objects.filter(inicio__lte=dia, fim__gte=dia)

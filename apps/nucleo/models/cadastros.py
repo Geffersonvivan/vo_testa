@@ -467,7 +467,7 @@ class Temporada(models.Model):
         SUPER_ALTA = "super_alta", "Super alta"
         FERIADO = "feriado", "Feriado"
 
-    # Python weekday(): segunda = 0 … domingo = 6.
+    # Python weekday(): segunda = 0 … domingo = 6.  (ver ConfiguracaoReservas)
     DIAS_SEMANA = [
         (0, "Segunda"), (1, "Terça"), (2, "Quarta"), (3, "Quinta"),
         (4, "Sexta"), (5, "Sábado"), (6, "Domingo"),
@@ -501,3 +501,30 @@ class Temporada(models.Model):
     def clean(self):
         if self.inicio and self.fim and self.fim < self.inicio:
             raise ValidationError("A data de fim deve ser igual ou depois do início.")
+
+
+class ConfiguracaoReservas(models.Model):
+    """Ajustes gerais de tarifação — registro único (singleton, pk=1)."""
+
+    feriados_automaticos = models.BooleanField(
+        "feriados automáticos", default=True,
+        help_text="Classifica os feriados nacionais e o aniversário de Itá como "
+                  "temporada Feriado automaticamente, sem cadastrar cada data. "
+                  "Feriados locais específicos ainda podem ser cadastrados à mão.",
+    )
+
+    class Meta:
+        verbose_name = "configuração de reservas"
+        verbose_name_plural = "configuração de reservas"
+
+    def __str__(self):
+        return "Configuração de reservas"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1  # singleton
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def carregar(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

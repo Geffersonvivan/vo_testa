@@ -40,6 +40,13 @@ class ReservasTestsBase(TestCase):
         self.uh = UH.objects.create(numero="T1", tipo=self.tipo)
         self.hospede = Pessoa.objects.create(nome="Maria Teste")
         self.dinheiro = FormaPagamento.objects.get(tipo="dinheiro")
+        # Feriado automático desligado por padrão nos testes, para que as datas
+        # relativas a HOJE não caiam em feriado nacional e flutuem. Os testes que
+        # exercitam o automático ligam explicitamente.
+        from apps.nucleo.models import ConfiguracaoReservas
+        ConfiguracaoReservas.objects.update_or_create(
+            pk=1, defaults={"feriados_automaticos": False}
+        )
 
     def reserva(self, status=Reserva.Status.CONFIRMADA, dias=2, uh=None, offset=0):
         checkin = HOJE + timedelta(days=offset)
@@ -235,7 +242,7 @@ class TarifaTests(ReservasTestsBase):
 
     def test_classificacao_por_dia_da_semana_e_feriado(self):
         import datetime
-        seg = datetime.date(2026, 11, 2)   # segunda-feira
+        seg = datetime.date(2026, 11, 9)   # segunda-feira comum (não feriado)
         sab = datetime.date(2026, 10, 31)  # sábado
         self.assertEqual((seg.weekday(), sab.weekday()), (0, 5))
         # Baixa nas noites de seg–qui; Alta nas de sex–dom (mesmo período).
@@ -260,6 +267,36 @@ class TarifaTests(ReservasTestsBase):
             services.classificacao_do_dia(datetime.date(2026, 10, 30)), "alta")
         # Sábado seria alta, mas é feriado → precedência do feriado.
         self.assertEqual(services.classificacao_do_dia(sab), "feriado")
+
+    def test_feriado_automatico(self):
+        import datetime
+        from apps.nucleo.feriados import eh_feriado
+        from apps.nucleo.models import ConfiguracaoReservas
+        # Cálculo do calendário (nacional + Itá, móveis pela Páscoa).
+        self.assertEqual(eh_feriado(datetime.date(2026, 12, 25)), "Natal")
+        self.assertEqual(eh_feriado(datetime.date(2026, 12, 13)), "Aniversário de Itá")
+        self.assertEqual(eh_feriado(datetime.date(2027, 2, 9)), "Carnaval")
+        self.assertIsNone(eh_feriado(datetime.date(2026, 11, 9)))  # segunda comum
+        # Ligado (sem NENHUMA temporada cadastrada): o feriado já classifica.
+        cfg = ConfiguracaoReservas.carregar()
+        cfg.feriados_automaticos = True
+        cfg.save()
+        self.assertEqual(
+            services.classificacao_do_dia(datetime.date(2026, 12, 25)), "feriado")
+        self.assertEqual(
+            services.classificacao_do_dia(datetime.date(2026, 12, 13)), "feriado")
+        # Desligado: deixa de classificar automaticamente.
+        cfg.feriados_automaticos = False
+        cfg.save()
+        self.assertIsNone(
+            services.classificacao_do_dia(datetime.date(2026, 12, 25)))
+
+    def test_feriado_automatico_singleton_default_ligado(self):
+        from apps.nucleo.models import ConfiguracaoReservas
+        # setUp zera para False; aqui garantimos que o default do model é True.
+        ConfiguracaoReservas.objects.all().delete()
+        self.assertTrue(ConfiguracaoReservas.carregar().feriados_automaticos)
+        self.assertEqual(ConfiguracaoReservas.objects.count(), 1)  # singleton
 
 
 class TarifaUnidadeTests(ReservasTestsBase):

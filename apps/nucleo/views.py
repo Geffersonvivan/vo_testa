@@ -776,8 +776,23 @@ def uh_form(request, pk=None):
 
 @requer_area(Area.TEMPORADAS)
 def temporadas(request):
+    from .models import ConfiguracaoReservas
+
+    config = ConfiguracaoReservas.carregar()
+    if request.method == "POST":
+        config.feriados_automaticos = request.POST.get("feriados_automaticos") == "on"
+        config.save()
+        messages.success(
+            request,
+            "Feriados automáticos ativados."
+            if config.feriados_automaticos
+            else "Feriados automáticos desativados.",
+        )
+        return redirect("temporadas")
     return render(
-        request, "nucleo/temporadas.html", {"temporadas": Temporada.objects.all()}
+        request,
+        "nucleo/temporadas.html",
+        {"temporadas": Temporada.objects.all(), "config": config},
     )
 
 

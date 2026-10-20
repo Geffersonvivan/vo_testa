@@ -10,6 +10,7 @@ Models do núcleo, organizados por domínio:
 from .cadastros import (
     UH,
     Agencia,
+    ConfiguracaoReservas,
     ConfiguracaoUH,
     Fornecedor,
     Funcionario,
@@ -55,6 +56,7 @@ from .usuarios import ModuloContratado, Usuario, modulo_ativo, modulos_ativos
 __all__ = [
     "UH",
     "Agencia",
+    "ConfiguracaoReservas",
     "ConfiguracaoUH",
     "PosicaoCama",
     "CategoriaFinanceira",
