@@ -99,6 +99,33 @@ class FunilServiceTests(TestCase):
                        if c["etapa"].tipo == "perdido")
         self.assertIn(op.id, [o.id for o in perdido["itens"]])
 
+    def test_reabrir_lead_perdido_volta_para_novo_e_registra_timeline(self):
+        op = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="X")
+        motivo = MotivoPerda.objects.first()
+        services.marcar_perdida(op, motivo, self.op, detalhe="foi em outro lugar")
+        op.refresh_from_db()
+        self.assertEqual(op.status, Oportunidade.Status.PERDIDA)
+
+        services.reabrir_oportunidade(op, self.op)
+        op.refresh_from_db()
+        # Voltou para aberto, na etapa inicial, sem motivo e com selo de reativação.
+        self.assertEqual(op.status, Oportunidade.Status.ABERTA)
+        self.assertEqual(op.etapa, self.etapa_novo)
+        self.assertIsNone(op.motivo_perda)
+        self.assertEqual(op.motivo_perda_detalhe, "")
+        self.assertIsNone(op.fechado_em)
+        self.assertIsNotNone(op.reativada_em)
+        # Linha do tempo guarda o motivo da perda anterior.
+        nota = op.atividades.filter(tipo=AtividadeComercial.Tipo.SISTEMA,
+                                    descricao__icontains="Reaberto").first()
+        self.assertIsNotNone(nota)
+        self.assertIn(motivo.nome, nota.descricao)
+
+    def test_reabrir_so_vale_para_lead_perdido(self):
+        op = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="X")
+        with self.assertRaises(ValidationError):
+            services.reabrir_oportunidade(op, self.op)
+
 
 class CapturaSiteTests(TestCase):
     def test_capturar_lead_cria_oportunidade_e_tarefa(self):

@@ -822,6 +822,47 @@ def marcar_perdida(oportunidade, motivo, usuario, detalhe=""):
     return oportunidade
 
 
+@transaction.atomic
+def reabrir_oportunidade(oportunidade, usuario):
+    """Reabre MANUALMENTE um lead perdido: volta à etapa inicial do funil ('Novo
+    lead'), limpa o motivo da perda e carimba `reativada_em` (card ganha o selo
+    ♻️ Reativado). Guarda na linha do tempo o motivo e a DATA da perda anterior e,
+    pelo próprio carimbo da nota, a data da reabertura e quem reabriu. Auditado.
+
+    Espelha a reativação automática (`_reativar_oportunidade`), mas acionada por um
+    vendedor no detalhe do lead — e não dispara evento de mídia (como a automática)."""
+    if oportunidade.status != Oportunidade.Status.PERDIDA:
+        raise ValidationError("Só é possível reabrir um lead que está perdido.")
+    primeira = etapas().first()  # ordering por 'ordem' → "Novo lead"
+    if primeira is None:
+        raise ValidationError("Não há etapa de funil configurada para reabrir o lead.")
+    motivo_anterior = oportunidade.motivo_perda.nome if oportunidade.motivo_perda_id \
+        else "não informado"
+    detalhe_anterior = (oportunidade.motivo_perda_detalhe or "").strip()
+    perdido_em = oportunidade.fechado_em
+    quando_perda = perdido_em.strftime("%d/%m/%Y") if perdido_em else "data não registrada"
+    agora = timezone.now()
+    _fechar_permanencia(oportunidade)
+    oportunidade.status = Oportunidade.Status.ABERTA
+    oportunidade.etapa = primeira
+    oportunidade.fechado_em = None
+    oportunidade.reativada_em = agora
+    oportunidade.motivo_perda = None
+    oportunidade.motivo_perda_detalhe = ""
+    oportunidade.save(update_fields=["status", "etapa", "fechado_em", "reativada_em",
+                                     "motivo_perda", "motivo_perda_detalhe", "atualizado_em"])
+    _abrir_permanencia(oportunidade, primeira)
+    atualizar_score(oportunidade)
+    _log_evento(
+        oportunidade, usuario,
+        f"♻️ Reaberto manualmente (perdido em {quando_perda} — {motivo_anterior}"
+        + (f": {detalhe_anterior}" if detalhe_anterior else "") + ")")
+    registrar_auditoria(usuario, "oportunidade_reaberta", oportunidade,
+                        {"motivo_perda_anterior": motivo_anterior,
+                         "detalhe": detalhe_anterior, "perdido_em": quando_perda})
+    return oportunidade
+
+
 def _limpar_prospecto(pessoa):
     Prospecto.objects.filter(pessoa=pessoa).delete()
 

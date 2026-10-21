@@ -285,6 +285,20 @@
     </div>
     {% endif %}
 
+    {% if op.perdida %}
+    <div class="cartao op-acoes">
+      <p class="rot-secao">Lead perdido</p>
+      <p style="font-size:.74em;color:var(--tinta-suave);margin:-.15rem 0 .6rem">
+        {% if op.motivo_perda %}Motivo: {{ op.motivo_perda.nome }}{% if op.motivo_perda_detalhe %} — “{{ op.motivo_perda_detalhe }}”{% endif %}{% else %}Sem motivo registrado.{% endif %}
+        {% if op.fechado_em %}<br>Perdido em {{ op.fechado_em|date:"d/m/Y" }}.{% endif %}
+      </p>
+      <form method="post" action="{% url 'comercial:reabrir' op.pk %}" onsubmit="return confirm('Reabrir este lead em «Novo lead»? A perda fica registrada na linha do tempo.')" style="margin:0">
+        {% csrf_token %}
+        <button type="submit" class="botao-primario botao-largo">♻️ Reabrir lead</button>
+      </form>
+    </div>
+    {% endif %}
+
     {% with r=op.origem_rastreio %}
     {% if r.sexo_estimado or r.uf_estimada or r.cidade_estimada or r.dispositivo or r.navegador %}
     <div class="cartao" style="padding:1rem 1.2rem">

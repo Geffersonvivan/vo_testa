@@ -186,6 +186,10 @@ class Oportunidade(models.Model):
         return self.status == self.Status.ABERTA
 
     @property
+    def perdida(self) -> bool:
+        return self.status == self.Status.PERDIDA
+
+    @property
     def titulo_curto(self) -> str:
         """Título sem o nome do lead ao final (o nome já é exibido à parte).
 

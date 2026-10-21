@@ -475,6 +475,18 @@ def perder(request, pk):
     return redirect("comercial:oportunidade", pk=pk)
 
 
+@requer_modulo(Modulo.COMERCIAL)
+def reabrir(request, pk):
+    op = get_object_or_404(Oportunidade, pk=pk)
+    if request.method == "POST":
+        try:
+            services.reabrir_oportunidade(op, request.user)
+            messages.success(request, "Lead reaberto em 'Novo lead'.")
+        except ValidationError as erro:
+            messages.error(request, " ".join(erro.messages))
+    return redirect("comercial:oportunidade", pk=pk)
+
+
 @never_cache
 @requer_modulo(Modulo.COMERCIAL)
 def tarefas(request):
