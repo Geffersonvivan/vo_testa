@@ -554,6 +554,9 @@ a.cartao-link:hover, .cartao-link:hover {
   border-radius: var(--raio);
   box-shadow: var(--sombra-1);
 }
+/* Modificador p/ formulários largos (tabelas que precisam da tela toda, ex.: Tabela
+   de preços) — tira o teto de 620px e usa a largura inteira da área de conteúdo. */
+.form-cartao.form-largo { max-width: none; }
 
 .campo { margin-bottom: .9rem; }
 

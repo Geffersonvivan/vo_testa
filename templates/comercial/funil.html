@@ -46,12 +46,14 @@
   .card-assumir{background:var(--lampiao);color:#241a08;border:none;font-weight:700}
   .card-wpp{font-size:12px;font-weight:700;color:var(--sucesso);text-decoration:none;white-space:nowrap}
   .card-wpp:hover{text-decoration:underline}
-  /* barra de rolagem horizontal no topo do funil — espelha a de baixo do board */
-  .funil-scroll-topo{overflow-x:auto;overflow-y:hidden;margin:.1rem .1rem .2rem}
-  .funil-scroll-topo>div{height:1px}
-  .funil-scroll-topo::-webkit-scrollbar{height:9px}
-  .funil-scroll-topo::-webkit-scrollbar-thumb{background:var(--fio-forte);border-radius:999px}
-  .funil-scroll-topo[hidden]{display:none}
+  /* Barra do topo = trilho + polegar. O board é o ÚNICO contêiner que rola; o polegar
+     só reflete/dirige via transform — sem segundo scroll container, logo não treme. */
+  .funil-trilho{position:relative;height:10px;margin:.1rem .1rem .45rem;border-radius:999px;
+    background:var(--fio);cursor:pointer;touch-action:none}
+  .funil-trilho[hidden]{display:none}
+  .funil-polegar{position:absolute;top:0;left:0;height:100%;width:44px;min-width:44px;
+    border-radius:999px;background:var(--fio-forte);cursor:grab;will-change:transform}
+  .funil-polegar:active{cursor:grabbing}
   /* busca interna do funil */
   .funil-busca{display:flex;align-items:center;gap:.5rem;margin:.1rem .1rem .5rem;padding:.5rem .8rem;
     background:var(--superficie);border:1px solid var(--fio);border-radius:999px;max-width:560px}
@@ -94,7 +96,7 @@
     .funil-board{scroll-snap-type:x mandatory;gap:.6rem;padding-bottom:.6rem}
     .funil-coluna{flex:0 0 100%;min-height:auto}
     .funil-cards{overflow-y:visible}
-    .funil-scroll-topo{display:none}
+    .funil-trilho{display:none}
     .card-mover{font-size:13px;min-height:32px}
   }
   /* Toque (qualquer tamanho): o cursor grab não faz sentido; o botão Mover resolve.
@@ -152,8 +154,8 @@
     <span class="funil-busca-info" id="funilBuscaInfo"></span>
   </div>
 
-  {# barra de rolagem horizontal no topo (espelha a de baixo do board) #}
-  <div class="funil-scroll-topo" id="funilScrollTop" aria-hidden="true"><div></div></div>
+  {# barra de rolagem no topo: trilho + polegar (one-way; o board é o único scroller) #}
+  <div class="funil-trilho" id="funilTrilho" aria-hidden="true"><div class="funil-polegar" id="funilPolegar"></div></div>
 
   <div class="funil-board" id="funilBoard">
     {% for col in colunas %}
@@ -459,32 +461,62 @@
     });
   })();
 
-  /* Barra de rolagem no topo do funil, espelhando a de baixo do board. */
+  /* Barra do topo = trilho + polegar. O board é o ÚNICO contêiner que rola:
+     - board rola      → move o polegar (transform; NUNCA escreve no board)
+     - arrasta polegar → seta board.scrollLeft
+     Como só o board rola, não há loop de scroll → não treme. */
   (function () {
     const board = document.getElementById('funilBoard');
-    const topo = document.getElementById('funilScrollTop');
-    if (!board || !topo) return;
-    const inner = topo.firstElementChild;
-    let travado = false;
-    function sincronizarLargura() {
-      inner.style.width = board.scrollWidth + 'px';
-      topo.hidden = board.scrollWidth <= board.clientWidth + 1; // some se não há overflow
+    const trilho = document.getElementById('funilTrilho');
+    const polegar = document.getElementById('funilPolegar');
+    if (!board || !trilho || !polegar) return;
+    const overflow = () => board.scrollWidth - board.clientWidth;   // quanto dá p/ rolar
+    const trilhoLarg = () => trilho.clientWidth;
+
+    function atualizar() {
+      const ov = overflow();
+      trilho.hidden = ov <= 1;
+      if (trilho.hidden) return;
+      const lp = Math.max(44, Math.round(trilhoLarg() * board.clientWidth / board.scrollWidth));
+      polegar.style.width = lp + 'px';
+      const livre = trilhoLarg() - lp;                              // curso do polegar
+      const x = ov > 0 ? (board.scrollLeft / ov) * livre : 0;
+      polegar.style.transform = 'translateX(' + Math.round(x) + 'px)';
     }
-    function espelhar(origem, destino) {
-      // O evento 'scroll' disparado por setar scrollLeft só roda no PRÓXIMO frame;
-      // por isso o guard precisa durar até lá (senão as duas barras se empurram e a
-      // tela fica "indo e voltando"). Libera no requestAnimationFrame.
-      if (travado) return;
-      travado = true;
-      if (Math.round(destino.scrollLeft) !== Math.round(origem.scrollLeft)) {
-        destino.scrollLeft = origem.scrollLeft;
-      }
-      requestAnimationFrame(() => { travado = false; });
-    }
-    topo.addEventListener('scroll', () => espelhar(topo, board), { passive: true });
-    board.addEventListener('scroll', () => espelhar(board, topo), { passive: true });
-    window.addEventListener('resize', sincronizarLargura);
-    sincronizarLargura();
+    board.addEventListener('scroll', atualizar, { passive: true });
+    window.addEventListener('resize', atualizar);
+
+    // Arrastar o polegar dirige o board (que, ao rolar, reposiciona o polegar).
+    let arrastando = false, x0 = 0, scroll0 = 0;
+    const razao = () => {
+      const livre = trilhoLarg() - polegar.offsetWidth;
+      return livre > 0 ? overflow() / livre : 0;
+    };
+    polegar.addEventListener('pointerdown', (e) => {
+      arrastando = true; x0 = e.clientX; scroll0 = board.scrollLeft;
+      polegar.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    polegar.addEventListener('pointermove', (e) => {
+      if (arrastando) board.scrollLeft = scroll0 + (e.clientX - x0) * razao();
+    });
+    const soltar = (e) => {
+      if (!arrastando) return;
+      arrastando = false;
+      try { polegar.releasePointerCapture(e.pointerId); } catch (_) { /* ok */ }
+    };
+    polegar.addEventListener('pointerup', soltar);
+    polegar.addEventListener('pointercancel', soltar);
+
+    // Clicar no trilho (fora do polegar) pula para a posição.
+    trilho.addEventListener('pointerdown', (e) => {
+      if (e.target === polegar) return;
+      const r = trilho.getBoundingClientRect();
+      const lp = polegar.offsetWidth;
+      const frac = (e.clientX - r.left - lp / 2) / Math.max(1, trilhoLarg() - lp);
+      board.scrollLeft = Math.max(0, Math.min(1, frac)) * overflow();
+    });
+
+    atualizar();
   })();
 
   /* Busca interna do funil: filtra os cards por nome/proposta/telefone (instantâneo). */
