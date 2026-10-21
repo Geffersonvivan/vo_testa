@@ -1204,3 +1204,32 @@ class EnvioFNRHTests(ReservasTestsBase):
         self.assertEqual(p["fnrh"]["motivo_viagem_id"], "LAZER_FERIAS")
         self.assertEqual(p["fnrh"]["meio_transporte_id"], "AUTOMOVEL")
         self.assertEqual(fnrh_gateway.payload_reserva(r)["origem_reserva_id"], "MEIOHOSPEDAGEM")
+
+
+class PainelFinanceiroReservaTests(ReservasTestsBase):
+    """Painel financeiro no detalhe da reserva: total previsto + cobranças (Pagamentos)."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.login(username="recepcao", password="senha-forte-123")
+
+    def test_detalhe_mostra_financeiro_e_cobranca_com_link(self):
+        from apps.pagamentos.services import criar_cobranca
+        r = self.reserva(status=Reserva.Status.PRE_RESERVA)  # diária 300 × 2 noites
+        criar_cobranca(self.usuario, valor=Decimal("180.00"), metodo="pix",
+                       descricao="Sinal teste", finalidade="sinal_reserva",
+                       reserva_id=r.pk)
+        resp = self.client.get(reverse("reservas:detalhe", args=[r.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Financeiro")
+        self.assertContains(resp, "Total previsto")
+        self.assertContains(resp, "Saldo a receber")
+        self.assertContains(resp, "Sinal de reserva")       # finalidade da cobrança
+        self.assertContains(resp, "Link de pagamento")       # cobrança pendente → link público
+
+    def test_detalhe_sem_cobranca_mostra_vazio(self):
+        r = self.reserva(status=Reserva.Status.PRE_RESERVA)
+        resp = self.client.get(reverse("reservas:detalhe", args=[r.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Financeiro")
+        self.assertContains(resp, "Nenhuma cobrança")

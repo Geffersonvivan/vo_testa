@@ -29,6 +29,42 @@
   <div class="mensagem error"><strong>Cancelada:</strong> {{ reserva.motivo_cancelamento }}</div>
 {% endif %}
 
+{# ---------- Painel financeiro ---------- #}
+{% if reserva.status != "cancelada" %}
+<div class="cartao" style="margin:1.2rem 0 1.6rem">
+  <p class="rot-secao">Financeiro</p>
+  <div class="kpi-grade" style="margin:.6rem 0 0">
+    <div class="kpi"><span class="kpi-rotulo letreiro">Total previsto</span><strong class="kpi-valor num">R$ {{ fin_total }}</strong></div>
+    <div class="kpi"><span class="kpi-rotulo letreiro">Recebido</span><strong class="kpi-valor num">R$ {{ fin_recebido }}</strong></div>
+    {% if fin_cobr_pendente %}<div class="kpi"><span class="kpi-rotulo letreiro">Sinal/Pix pendente</span><strong class="kpi-valor num">R$ {{ fin_cobr_pendente }}</strong></div>{% endif %}
+    <div class="kpi kpi-destaque"><span class="kpi-rotulo letreiro">Saldo a receber</span><strong class="kpi-valor num">R$ {{ fin_saldo }}</strong></div>
+  </div>
+  {% if cobrancas_reserva %}
+  <div class="tabela-rol">
+  <table class="tabela" style="margin-top:1rem">
+    <thead><tr><th>Cobrança</th><th>Finalidade</th><th class="num">Valor</th><th>Status</th><th>Ação</th></tr></thead>
+    <tbody>
+      {% for c in cobrancas_reserva %}
+      <tr>
+        <td style="white-space:nowrap">#{{ c.pk }} · {{ c.get_metodo_display }}</td>
+        <td>{{ c.get_finalidade_display }}</td>
+        <td class="num">R$ {{ c.valor }}</td>
+        <td><span class="selo selo-pg-{{ c.status }}">{{ c.get_status_display }}</span></td>
+        <td style="white-space:nowrap">
+          <a href="{% url 'pagamentos:detalhe' c.pk %}" class="botao-mini">Abrir</a>
+          {% if c.pendente %}<a href="{% url 'pagamentos:pagar' c.token %}" target="_blank" class="botao-mini">Link de pagamento</a>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% elif 'pagamentos'|modulo_ativo %}
+  <p class="subtitulo" style="margin:.7rem 0 0">Nenhuma cobrança (Pix/cartão) gerada para esta reserva.</p>
+  {% endif %}
+</div>
+{% endif %}
+
 {# ---------- Ações por estado ---------- #}
 <div class="acoes acoes-reserva">
   {% if reserva.status == "orcamento" or reserva.status == "pre_reserva" %}

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load comercial_extras %}
 
 {% block titulo %}{{ op.titulo }} — Comercial{% endblock %}
 
@@ -142,14 +143,14 @@
       {% endif %}
       <div class="tabela-rol">
       <table class="tabela">
-        <thead><tr><th>Quando</th><th>Quem</th><th>Tipo</th><th>Descrição</th><th></th></tr></thead>
+        <thead><tr><th>Quando</th><th>Quem</th><th style="white-space:nowrap;overflow-wrap:normal">Tipo</th><th>Descrição</th><th></th></tr></thead>
         <tbody>
           {% for at in atividades %}
             <tr class="{% if not at.concluida %}linha-pendente{% endif %}">
               <td>{{ at.quando|date:"d/m/Y H:i" }}</td>
               <td>{% with quem=at.criado_por|default:at.responsavel %}{% if quem %}{{ quem.get_full_name|default:quem.username }}{% else %}—{% endif %}{% endwith %}</td>
-              <td>{{ at.get_tipo_display }}</td>
-              <td>{{ at.descricao }}{% if not at.concluida %} <span class="selo selo-em_andamento">tarefa</span>{% endif %}</td>
+              <td style="white-space:nowrap;overflow-wrap:normal">{{ at.get_tipo_display }}</td>
+              <td>{{ at.descricao|linkar_reservas }}{% if not at.concluida %} <span class="selo selo-em_andamento">tarefa</span>{% endif %}</td>
               <td class="num">
                 {% if not at.concluida %}
                   <form method="post" action="{% url 'comercial:concluir_tarefa' at.pk %}">{% csrf_token %}<button class="botao-mini">Concluir</button></form>
@@ -387,7 +388,9 @@
         {% if op.perdida and op.motivo_perda %} Motivo: {{ op.motivo_perda.nome }}{% if op.motivo_perda_detalhe %} — “{{ op.motivo_perda_detalhe }}”{% endif %}.{% endif %}
       </p>
       {% if reserva_vinculada %}
-      <p class="aviso-inline op-aviso">
+      {# display:block: este aviso tem link/negrito/<br> — no flex do .aviso-inline cada
+         pedaço vira um item e empilha tudo (bagunça). Em bloco, flui como texto normal. #}
+      <p class="aviso-inline op-aviso" style="display:block">
         ⚠️ Há a reserva <a href="{% url 'reservas:detalhe' reserva_vinculada.pk %}">#{{ reserva_vinculada.pk }}</a> ({{ reserva_vinculada.status }}).
         {% if op.status == 'ganha' %} Tirar do Ganho vai <b>cancelar</b> esta reserva.{% endif %}
         {% if reserva_vinculada.adiantamento %}<br>Há <b>adiantamento de R$ {{ reserva_vinculada.adiantamento }}</b> — será <b>estornado</b> ao mover (exige o caixa de Reservas aberto).{% endif %}

@@ -462,12 +462,37 @@ def detalhe(request, pk):
         from apps.reservas import cancelamento
         politica_cancel = cancelamento.resumo_cancelamento(reserva)
 
+    # Painel financeiro: total previsto (diária acordada × noites), adiantamentos já
+    # recebidos e as cobranças do módulo Pagamentos (sinal/Pix) vinculadas à reserva.
+    from decimal import Decimal
+    from django.db.models import Sum
+    fin_total = (reserva.valor_diaria or Decimal("0.00")) * (reserva.noites or 0)
+    fin_adiantado = reserva.adiantamentos.aggregate(t=Sum("valor"))["t"] or Decimal("0.00")
+    cobrancas_reserva, fin_cobr_pago, fin_cobr_pendente = [], Decimal("0.00"), Decimal("0.00")
+    if modulo_ativo(Modulo.PAGAMENTOS):
+        from apps.pagamentos.models import Cobranca
+        cobrancas_reserva = list(
+            Cobranca.objects.filter(reserva_id=reserva.pk).order_by("-criado_em"))
+        for c in cobrancas_reserva:
+            if c.status == Cobranca.Status.PAGO:
+                fin_cobr_pago += c.valor
+            elif c.status == Cobranca.Status.PENDENTE:
+                fin_cobr_pendente += c.valor
+    fin_recebido = fin_adiantado + fin_cobr_pago
+    fin_saldo = fin_total - fin_recebido
+
     return render(
         request,
         "reservas/reserva_detalhe.html",
         {
             "reserva": reserva,
             "conta": conta,
+            "fin_total": fin_total,
+            "fin_adiantado": fin_adiantado,
+            "fin_recebido": fin_recebido,
+            "fin_saldo": fin_saldo,
+            "fin_cobr_pendente": fin_cobr_pendente,
+            "cobrancas_reserva": cobrancas_reserva,
             "form_cancelamento": CancelamentoForm(),
             "form_transferencia": TransferenciaForm(),
             "form_recebimento": RecebimentoForm(),

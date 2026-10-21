@@ -556,6 +556,16 @@ class ConversaoTests(TestCase):
         self.assertEqual(Cobranca.objects.get(pk=oport.cobranca_sinal_id).valor,
                          Decimal("100.00"))
 
+    def test_linkar_reservas_filtro(self):
+        from apps.comercial.templatetags.comercial_extras import linkar_reservas
+        out = linkar_reservas("converteu em reserva #25")
+        self.assertIn('#25</a>', out)                     # virou link
+        out2 = linkar_reservas("Cobrança de sinal #6 — R$ 426,00")
+        self.assertNotIn("<a ", out2)                     # cobrança não vira link
+        out3 = linkar_reservas("x <b>y</b> reserva #9")
+        self.assertIn("&lt;b&gt;", out3)                  # texto escapado
+        self.assertIn("#9</a>", out3)
+
     def test_form_sinal_marcado_sem_valor_invalido(self):
         from apps.comercial.forms import ConversaoForm
         oport = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="F")
