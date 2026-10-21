@@ -361,7 +361,11 @@
         </div>
         <div class="campo" x-show="tipo === 'perdido'" x-cloak>
           <label>Motivo da perda:</label>
-          {{ perda_form.motivo }}
+          {# :disabled quando escondido — campo required oculto bloqueia o submit (não é focável) #}
+          <select name="motivo" required :disabled="tipo !== 'perdido'">
+            <option value="">—</option>
+            {% for m in motivos_perda %}<option value="{{ m.pk }}">{{ m.nome }}</option>{% endfor %}
+          </select>
         </div>
         <div class="campo">
           <label>Motivo do movimento (obrigatório):</label>

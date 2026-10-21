@@ -292,6 +292,7 @@ def oportunidade(request, pk):
         "quartos_combo": services.quartos_combo_dados(
             services.quartos_para_cotacao(op.checkin_previsto, op.checkout_previsto)),
         "perda_form": PerdaForm(),
+        "motivos_perda": MotivoPerda.objects.filter(ativo=True),
         "pagamentos_ativo": modulo_ativo(Modulo.PAGAMENTOS),
         "responsaveis": Usuario.objects.filter(is_active=True).order_by(
             "first_name", "username"),
