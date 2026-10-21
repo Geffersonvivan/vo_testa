@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.test import TestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -1233,3 +1233,51 @@ class PainelFinanceiroReservaTests(ReservasTestsBase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Financeiro")
         self.assertContains(resp, "Nenhuma cobrança")
+
+
+class ZerarReservasCommandTests(TransactionTestCase):
+    """O comando zerar_reservas apaga tudo de reservas, desvincula (não apaga) os leads
+    e reinicia o contador para #1."""
+
+    def test_zera_tudo_e_desvincula_leads(self):
+        from django.core.management import call_command
+        from apps.nucleo.models import TipoUH, UH, Pessoa
+        from apps.comercial import services as csvc
+        from apps.comercial.models import Oportunidade
+        from apps.pagamentos.services import criar_cobranca
+
+        tipo = TipoUH.objects.create(nome="Z", tarifa_base=Decimal("300.00"))
+        uh = UH.objects.create(numero="Z1", tipo=tipo)
+        pessoa = Pessoa.objects.create(nome="Teste Zerar")
+        r = Reserva.objects.create(
+            uh=uh, hospede=pessoa, checkin=HOJE + timedelta(days=5),
+            checkout=HOJE + timedelta(days=7), status=Reserva.Status.PRE_RESERVA,
+            valor_diaria=Decimal("300.00"), criado_por=self.usuario_ou_cria())
+        criar_cobranca(self.usuario_ou_cria(), valor=Decimal("180.00"), metodo="pix",
+                       descricao="sinal", finalidade="sinal_reserva", reserva_id=r.pk)
+        op = csvc.criar_oportunidade(usuario=self.usuario_ou_cria(), pessoa=pessoa, titulo="L")
+        Oportunidade.objects.filter(pk=op.pk).update(
+            reserva_id=r.pk, status=Oportunidade.Status.GANHA)
+
+        call_command("zerar_reservas", "--sim")
+
+        from apps.pagamentos.models import Cobranca
+        self.assertEqual(Reserva.objects.count(), 0)
+        self.assertEqual(Cobranca.objects.filter(reserva_id__isnull=False).count(), 0)
+        # Lead: continua existindo, status intacto, só desvinculado.
+        op.refresh_from_db()
+        self.assertIsNone(op.reserva_id)
+        self.assertEqual(op.status, Oportunidade.Status.GANHA)
+        # Contador reiniciado: a próxima reserva é a #1.
+        nova = Reserva.objects.create(
+            uh=uh, hospede=pessoa, checkin=HOJE + timedelta(days=5),
+            checkout=HOJE + timedelta(days=7), status=Reserva.Status.PRE_RESERVA,
+            valor_diaria=Decimal("300.00"), criado_por=self.usuario_ou_cria())
+        self.assertEqual(nova.pk, 1)
+
+    def usuario_ou_cria(self):
+        from apps.nucleo.models import Usuario
+        u = Usuario.objects.filter(username="zcmd").first()
+        if not u:
+            u = Usuario.objects.create_superuser(username="zcmd", password="senha-forte-123")
+        return u
