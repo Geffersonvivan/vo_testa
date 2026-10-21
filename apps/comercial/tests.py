@@ -498,6 +498,41 @@ class ConversaoTests(TestCase):
             oport.atividades.filter(concluida=False, descricao__icontains="Reabordar").exists()
         )
 
+    def test_endpoint_diaria_praticada_devolve_tabela(self):
+        from apps.reservas.services import diaria_media_unidade
+        hoje = timezone.localdate()
+        ci, co = hoje + timedelta(days=5), hoje + timedelta(days=7)
+        esperado = diaria_media_unidade(self.uh, ci, co)
+        self.client.login(username="com", password="senha-forte-123")
+        r = self.client.get(reverse("comercial:diaria_praticada"), {
+            "uh": self.uh.pk, "checkin": ci.isoformat(), "checkout": co.isoformat()})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()["diaria"], str(esperado))
+
+    def test_converter_com_diaria_vendida_divergente_loga_delta(self):
+        from apps.nucleo.models import TrilhaAuditoria
+        from apps.reservas.services import diaria_media_unidade
+        oport = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="D")
+        hoje = timezone.localdate()
+        ci, co = hoje + timedelta(days=5), hoje + timedelta(days=7)
+        praticada = diaria_media_unidade(self.uh, ci, co)
+        vendida = praticada - Decimal("50.00")  # desconto
+        services.converter_em_reserva(oport, usuario=self.op, uh=self.uh,
+                                      checkin=ci, checkout=co, valor_diaria=vendida)
+        self.assertTrue(oport.atividades.filter(
+            descricao__icontains="diária vendida").exists())
+        self.assertTrue(TrilhaAuditoria.objects.filter(
+            acao="diaria_vendida_divergente").exists())
+
+    def test_converter_sem_informar_diaria_nao_loga_delta(self):
+        oport = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="S")
+        hoje = timezone.localdate()
+        services.converter_em_reserva(
+            oport, usuario=self.op, uh=self.uh,
+            checkin=hoje + timedelta(days=5), checkout=hoje + timedelta(days=7))
+        self.assertFalse(oport.atividades.filter(
+            descricao__icontains="diária vendida").exists())
+
 
 class GestaoLeadFechadoTests(TestCase):
     """Reabrir/mover leads já fechados (área `comercial_fechados`): cancela a reserva

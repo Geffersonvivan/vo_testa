@@ -425,6 +425,30 @@ def quartos_disponiveis(request):
 
 
 @requer_modulo(Modulo.COMERCIAL)
+def diaria_praticada(request):
+    """Diária da Tabela de Preços (quarto×temporada) para o período — p/ autofill no
+    form 'Ganhar'. Retorna {"diaria": "420.00"} ou {"diaria": null}."""
+    checkin = _data(request.GET.get("checkin"))
+    checkout = _data(request.GET.get("checkout"))
+    if not (checkin and checkout and checkout > checkin and modulo_ativo(Modulo.RESERVAS)):
+        return JsonResponse({"diaria": None})
+    from apps.nucleo.models import UH, TipoUH
+    from apps.reservas.services import diaria_media, diaria_media_unidade
+    try:
+        if request.GET.get("uh"):
+            uh = UH.objects.select_related("tipo").get(pk=request.GET["uh"])
+            diaria = diaria_media_unidade(uh, checkin, checkout)
+        elif request.GET.get("tipo_uh"):
+            diaria = diaria_media(TipoUH.objects.get(pk=request.GET["tipo_uh"]),
+                                  checkin, checkout)
+        else:
+            return JsonResponse({"diaria": None})
+    except (UH.DoesNotExist, TipoUH.DoesNotExist, ValueError):
+        return JsonResponse({"diaria": None})
+    return JsonResponse({"diaria": str(diaria)})
+
+
+@requer_modulo(Modulo.COMERCIAL)
 def cotar(request, pk):
     op = get_object_or_404(Oportunidade, pk=pk)
     if request.method == "POST":

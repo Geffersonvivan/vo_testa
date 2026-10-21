@@ -471,13 +471,18 @@
       topo.hidden = board.scrollWidth <= board.clientWidth + 1; // some se não há overflow
     }
     function espelhar(origem, destino) {
+      // O evento 'scroll' disparado por setar scrollLeft só roda no PRÓXIMO frame;
+      // por isso o guard precisa durar até lá (senão as duas barras se empurram e a
+      // tela fica "indo e voltando"). Libera no requestAnimationFrame.
       if (travado) return;
       travado = true;
-      destino.scrollLeft = origem.scrollLeft;
-      travado = false;
+      if (Math.round(destino.scrollLeft) !== Math.round(origem.scrollLeft)) {
+        destino.scrollLeft = origem.scrollLeft;
+      }
+      requestAnimationFrame(() => { travado = false; });
     }
-    topo.addEventListener('scroll', () => espelhar(topo, board));
-    board.addEventListener('scroll', () => espelhar(board, topo));
+    topo.addEventListener('scroll', () => espelhar(topo, board), { passive: true });
+    board.addEventListener('scroll', () => espelhar(board, topo), { passive: true });
     window.addEventListener('resize', sincronizarLargura);
     sincronizarLargura();
   })();

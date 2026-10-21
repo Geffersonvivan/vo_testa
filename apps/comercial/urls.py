@@ -7,6 +7,7 @@ app_name = "comercial"
 urlpatterns = [
     path("", views.funil, name="funil"),
     path("quartos-disponiveis/", views.quartos_disponiveis, name="quartos_disponiveis"),
+    path("diaria-praticada/", views.diaria_praticada, name="diaria_praticada"),
     path("painel/", views.painel, name="painel"),
     path("painel/meta/", views.meta, name="meta"),
     path("tarefas/", views.tarefas, name="tarefas"),

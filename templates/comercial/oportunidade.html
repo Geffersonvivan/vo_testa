@@ -213,7 +213,7 @@
       <a href="{% url 'comercial:enviar_email_lead' op.pk %}" class="botao-neutro botao-largo" style="display:block; text-align:center; margin-top:.5rem">Enviar por e-mail</a>
       <details class="op-det op-det-ganhar">
         <summary>Ganhar → criar reserva</summary>
-        <form method="post" action="{% url 'comercial:converter' op.pk %}">
+        <form method="post" action="{% url 'comercial:converter' op.pk %}" id="formGanhar">
           {% csrf_token %}
           <div class="campo">{{ conversao_form.checkin.label_tag }}{{ conversao_form.checkin }}</div>
           <div class="campo">{{ conversao_form.checkout.label_tag }}{{ conversao_form.checkout }}</div>
@@ -224,6 +224,13 @@
           {% else %}
           <div class="campo">{{ conversao_form.tipo_uh.label_tag }}{{ conversao_form.tipo_uh }}</div>
           {% endif %}
+          <div class="campo">
+            <label>Diária praticada (tabela):</label>
+            <input type="text" id="praticadaGanhar" readonly tabindex="-1"
+                   data-url="{% url 'comercial:diaria_praticada' %}"
+                   placeholder="escolha quarto + datas"
+                   style="background:var(--canvas);color:var(--tinta-suave)">
+          </div>
           <div class="campo">{{ conversao_form.valor_diaria.label_tag }}{{ conversao_form.valor_diaria }}</div>
           {% if pagamentos_ativo %}
             <label class="check-inline">{{ conversao_form.criar_sinal }} {{ conversao_form.criar_sinal.label }}</label>
@@ -232,6 +239,47 @@
           <button type="submit" class="botao-primario botao-largo">Criar reserva</button>
         </form>
       </details>
+      <script>
+      (function () {
+        const form = document.getElementById('formGanhar');
+        if (!form) return;
+        const prat = document.getElementById('praticadaGanhar');
+        const vend = form.querySelector('[name=valor_diaria]');
+        const ci = form.querySelector('[name=checkin]');
+        const co = form.querySelector('[name=checkout]');
+        // "420.00" → "420,00" (pt-BR, com milhar) para a máscara/submit entenderem.
+        const brMoeda = (s) => { const n = parseFloat(s); return isNaN(n) ? '' :
+          n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+        // Cotação pré-preenchida já conta como "vendida mexida" (não sobrescreve).
+        let vendidaTocada = !!(vend && vend.value);
+        if (vend) vend.addEventListener('input', () => { vendidaTocada = true; });
+        async function atualizar(ev) {
+          if (!prat || !ci || !co) return;
+          const uh = form.querySelector('[name=uh]');
+          const tipo = form.querySelector('[name=tipo_uh]');
+          // No evento 'quarto-mudou' o Alpine ainda não propagou o value do input;
+          // usa o id do detail (fresco). Nos demais eventos, lê o input já estável.
+          const uhVal = (ev && ev.detail && ev.detail.id !== undefined)
+                      ? ev.detail.id : (uh ? uh.value : '');
+          const sel = uhVal ? ('uh=' + uhVal)
+                    : (tipo && tipo.value ? ('tipo_uh=' + tipo.value) : '');
+          if (!sel || !ci.value || !co.value) { prat.value = ''; return; }
+          try {
+            const url = prat.dataset.url + '?' + sel + '&checkin=' + ci.value + '&checkout=' + co.value;
+            const d = await (await fetch(url, { headers: { 'X-Requested-With': 'fetch' } })).json();
+            if (d.diaria == null) { prat.value = ''; return; }
+            prat.value = brMoeda(d.diaria);
+            if (vend && !vendidaTocada) vend.value = brMoeda(d.diaria);  // sugere a vendida
+          } catch (e) { /* mantém o que está */ }
+        }
+        form.addEventListener('quarto-mudou', atualizar);
+        if (ci) ci.addEventListener('change', atualizar);
+        if (co) co.addEventListener('change', atualizar);
+        const tipo = form.querySelector('[name=tipo_uh]');
+        if (tipo) tipo.addEventListener('change', atualizar);
+        atualizar();  // caso já venha pré-preenchido (cotação)
+      })();
+      </script>
     </div>
     {% endif %}
 

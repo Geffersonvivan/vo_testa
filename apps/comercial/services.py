@@ -1089,6 +1089,34 @@ def registrar_cotacao(*, oportunidade, usuario, tipo_uh=None, uh=None, checkin, 
     return cotacao
 
 
+def _registrar_diaria_vendida(oportunidade, *, vendida, tipo_uh, uh, checkin, checkout,
+                              usuario):
+    """Se a diária fechada (vendida) diverge da Tabela de Preços (praticada), registra
+    o delta na linha do tempo e na auditoria. Só roda quando o vendedor informou um
+    valor (blank = usa a tabela, sem divergência)."""
+    from apps.reservas.services import diaria_media, diaria_media_unidade
+    try:
+        praticada = (diaria_media_unidade(uh, checkin, checkout) if uh is not None
+                     else diaria_media(tipo_uh, checkin, checkout))
+    except Exception:
+        return
+    if praticada is None:
+        return
+    praticada = Decimal(praticada).quantize(Decimal("0.01"))
+    vendida = Decimal(str(vendida)).quantize(Decimal("0.01"))
+    if vendida == praticada:
+        return
+    delta = vendida - praticada
+    tipo_delta = "desconto" if delta < 0 else "acréscimo"
+    _log_evento(
+        oportunidade, usuario,
+        f"diária vendida R$ {vendida} · tabela R$ {praticada} "
+        f"({tipo_delta} R$ {abs(delta)})")
+    registrar_auditoria(usuario, "diaria_vendida_divergente", oportunidade,
+                        {"vendida": str(vendida), "praticada": str(praticada),
+                         "delta": str(delta)})
+
+
 @transaction.atomic
 def converter_em_reserva(oportunidade, *, tipo_uh=None, uh=None, checkin, checkout, usuario,
                          valor_diaria=None, criar_sinal=False, valor_sinal=None):
@@ -1172,6 +1200,9 @@ def converter_em_reserva(oportunidade, *, tipo_uh=None, uh=None, checkin, checko
                 descricao=f"Cobrança de sinal #{cobranca.pk} — R$ {valor}",
             )
     _log_evento(oportunidade, usuario, f"converteu em reserva #{reserva.pk}")
+    if valor_diaria is not None:
+        _registrar_diaria_vendida(oportunidade, vendida=valor_diaria, tipo_uh=tipo_uh,
+                                  uh=uh, checkin=checkin, checkout=checkout, usuario=usuario)
     atualizar_score(oportunidade)
     return reserva
 

@@ -206,8 +206,9 @@ class ConversaoForm(_SelecaoQuartoMixin, forms.Form):
     checkin = forms.DateField(label="Check-in", widget=DataInput())
     checkout = forms.DateField(label="Check-out", widget=DataInput())
     valor_diaria = forms.DecimalField(
-        label="Diária (R$)", required=False, max_digits=10, decimal_places=2,
-        help_text="Vazio = usa a tarifa do período.", widget=ReaisInput(),
+        label="Diária vendida (R$)", required=False, max_digits=10, decimal_places=2,
+        help_text="O que foi fechado de fato. Vazio = usa a praticada (tabela).",
+        widget=ReaisInput(),
     )
     criar_sinal = forms.BooleanField(
         label="Gerar cobrança de sinal (Pix)", required=False, initial=False,
