@@ -212,7 +212,7 @@ class ConversaoForm(_SelecaoQuartoMixin, forms.Form):
     )
     criar_sinal = forms.BooleanField(
         label="Gerar cobrança de sinal (Pix)", required=False, initial=False,
-        help_text="Se Pagamentos estiver ativo — 30% do valor estimado (ou informe abaixo).",
+        help_text="Se Pagamentos estiver ativo — informe o valor do sinal abaixo (R$ ou %).",
     )
     valor_sinal = forms.DecimalField(
         label="Valor do sinal (R$)", required=False, max_digits=10, decimal_places=2,
@@ -228,6 +228,9 @@ class ConversaoForm(_SelecaoQuartoMixin, forms.Form):
         ci, co = dados.get("checkin"), dados.get("checkout")
         if ci and co and co <= ci:
             raise forms.ValidationError("O check-out deve ser depois do check-in.")
+        # Sinal sem padrão de 30%: marcou a cobrança → tem de informar o valor.
+        if dados.get("criar_sinal") and not dados.get("valor_sinal"):
+            self.add_error("valor_sinal", "Informe o valor do sinal (ou desmarque a cobrança).")
         return dados
 
 

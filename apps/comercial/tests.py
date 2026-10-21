@@ -533,6 +533,42 @@ class ConversaoTests(TestCase):
         self.assertFalse(oport.atividades.filter(
             descricao__icontains="diária vendida").exists())
 
+    def test_sinal_marcado_sem_valor_nao_cobra_30pct(self):
+        oport = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="SN")
+        hoje = timezone.localdate()
+        services.converter_em_reserva(
+            oport, usuario=self.op, uh=self.uh,
+            checkin=hoje + timedelta(days=5), checkout=hoje + timedelta(days=7),
+            criar_sinal=True, valor_sinal=None)
+        oport.refresh_from_db()
+        self.assertIsNone(oport.cobranca_sinal_id)  # sem padrão de 30%
+
+    def test_sinal_usa_valor_informado(self):
+        from apps.pagamentos.models import Cobranca
+        oport = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="SV")
+        hoje = timezone.localdate()
+        services.converter_em_reserva(
+            oport, usuario=self.op, uh=self.uh,
+            checkin=hoje + timedelta(days=5), checkout=hoje + timedelta(days=7),
+            criar_sinal=True, valor_sinal=Decimal("100.00"))
+        oport.refresh_from_db()
+        self.assertIsNotNone(oport.cobranca_sinal_id)
+        self.assertEqual(Cobranca.objects.get(pk=oport.cobranca_sinal_id).valor,
+                         Decimal("100.00"))
+
+    def test_form_sinal_marcado_sem_valor_invalido(self):
+        from apps.comercial.forms import ConversaoForm
+        oport = services.criar_oportunidade(usuario=self.op, pessoa=self.pessoa, titulo="F")
+        hoje = timezone.localdate()
+        form = ConversaoForm(data={
+            "tipo_uh": self.tipo.pk,
+            "checkin": (hoje + timedelta(days=5)).isoformat(),
+            "checkout": (hoje + timedelta(days=7)).isoformat(),
+            "criar_sinal": "on", "valor_sinal": "",
+        }, oportunidade=oport)
+        self.assertFalse(form.is_valid())
+        self.assertIn("valor_sinal", form.errors)
+
 
 class GestaoLeadFechadoTests(TestCase):
     """Reabrir/mover leads já fechados (área `comercial_fechados`): cancela a reserva
