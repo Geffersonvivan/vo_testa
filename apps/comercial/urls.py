@@ -52,6 +52,6 @@ urlpatterns = [
     path("<int:pk>/cotar/", views.cotar, name="cotar"),
     path("<int:pk>/converter/", views.converter, name="converter"),
     path("<int:pk>/perder/", views.perder, name="perder"),
-    path("<int:pk>/reabrir/", views.reabrir, name="reabrir"),
+    path("<int:pk>/mover-fechado/", views.mover_fechado, name="mover_fechado"),
     path("tarefa/<int:pk>/concluir/", views.concluir_tarefa, name="concluir_tarefa"),
 ]

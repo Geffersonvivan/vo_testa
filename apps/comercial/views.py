@@ -18,7 +18,8 @@ from django.views.decorators.csrf import csrf_protect
 from apps.nucleo.models import Pessoa, Prospecto, modulo_ativo
 from apps.nucleo.modulos import Modulo
 from apps.nucleo.periodos import periodo, selecao_periodo
-from apps.nucleo.permissoes import requer_gerencia, requer_modulo
+from apps.nucleo.areas import Area
+from apps.nucleo.permissoes import requer_area, requer_gerencia, requer_modulo
 from apps.nucleo.seletores import pessoas_agrupadas
 
 from . import quartos, services
@@ -258,6 +259,21 @@ def oportunidade(request, pk):
         h = historico_hospede(op.pessoa)
         if h["estadias"] or h["futuras"]:
             historico_cliente = h
+    # Gestão de lead fechado (reabrir/mover) — só para quem tem a área e p/ avisar
+    # sobre a reserva/adiantamento que seriam cancelados.
+    pode_gerir_fechados = request.user.is_superuser or request.user.pode_area(
+        Area.COMERCIAL_FECHADOS)
+    reserva_vinculada = None
+    if op.reserva_id and modulo_ativo(Modulo.RESERVAS):
+        from django.db.models import Sum
+        from apps.reservas.models import Reserva
+        r = Reserva.objects.filter(pk=op.reserva_id).first()
+        if r:
+            reserva_vinculada = {
+                "pk": r.pk, "status": r.get_status_display(),
+                "cancelavel": r.status in ("orcamento", "pre_reserva", "confirmada"),
+                "adiantamento": r.adiantamentos.aggregate(t=Sum("valor"))["t"] or 0,
+            }
     return render(request, "comercial/oportunidade.html", {
         "op": op,
         "proxima_acao": services.proxima_acao(op),
@@ -266,6 +282,9 @@ def oportunidade(request, pk):
         "cotacoes": op.cotacoes.select_related("tipo_uh"),
         "tipos_atividade": AtividadeComercial.Tipo.choices,
         "etapas": [e for e in services.etapas() if e.tipo == EtapaFunil.Tipo.ABERTA],
+        "etapas_todas": services.etapas(),  # inclui Ganho/Perdido (mover fechados)
+        "pode_gerir_fechados": pode_gerir_fechados,
+        "reserva_vinculada": reserva_vinculada,
         "conversao_form": _conversao_inicial(op),
         "cotacao_form": _cotacao_inicial(op),
         # Dados iniciais do combo de quarto (quebrado por ala) — já filtrado pelas
@@ -476,12 +495,19 @@ def perder(request, pk):
 
 
 @requer_modulo(Modulo.COMERCIAL)
-def reabrir(request, pk):
+@requer_area(Area.COMERCIAL_FECHADOS)
+def mover_fechado(request, pk):
+    """Reabrir/mover um lead já fechado (ganho/perdido) — só gestão comercial."""
     op = get_object_or_404(Oportunidade, pk=pk)
     if request.method == "POST":
+        etapa = get_object_or_404(EtapaFunil, pk=request.POST.get("etapa"))
+        motivo = MotivoPerda.objects.filter(pk=request.POST.get("motivo") or None).first()
         try:
-            services.reabrir_oportunidade(op, request.user)
-            messages.success(request, "Lead reaberto em 'Novo lead'.")
+            services.mover_lead_fechado(
+                op, etapa, request.user,
+                justificativa=request.POST.get("justificativa", ""),
+                motivo_perda=motivo)
+            messages.success(request, f"Lead movido para '{etapa.nome}'.")
         except ValidationError as erro:
             messages.error(request, " ".join(erro.messages))
     return redirect("comercial:oportunidade", pk=pk)

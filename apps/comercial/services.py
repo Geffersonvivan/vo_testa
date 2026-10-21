@@ -822,45 +822,152 @@ def marcar_perdida(oportunidade, motivo, usuario, detalhe=""):
     return oportunidade
 
 
-@transaction.atomic
-def reabrir_oportunidade(oportunidade, usuario):
-    """Reabre MANUALMENTE um lead perdido: volta à etapa inicial do funil ('Novo
-    lead'), limpa o motivo da perda e carimba `reativada_em` (card ganha o selo
-    ♻️ Reativado). Guarda na linha do tempo o motivo e a DATA da perda anterior e,
-    pelo próprio carimbo da nota, a data da reabertura e quem reabriu. Auditado.
+def _contexto_fechamento(op):
+    """Frase que resume como o lead foi fechado (para o log do movimento)."""
+    quando = op.fechado_em.strftime("%d/%m/%Y") if op.fechado_em else "data não registrada"
+    if op.status == Oportunidade.Status.PERDIDA:
+        motivo = op.motivo_perda.nome if op.motivo_perda_id else "não informado"
+        detalhe = (op.motivo_perda_detalhe or "").strip()
+        return f"perdido em {quando} — {motivo}" + (f": {detalhe}" if detalhe else "")
+    return f"ganho em {quando}" + (f", reserva #{op.reserva_id}" if op.reserva_id else "")
 
-    Espelha a reativação automática (`_reativar_oportunidade`), mas acionada por um
-    vendedor no detalhe do lead — e não dispara evento de mídia (como a automática)."""
+
+# Status de reserva em que ainda dá para cancelar (antes da entrada do hóspede).
+_RESERVA_CANCELAVEL = ("orcamento", "pre_reserva", "confirmada")
+
+
+@transaction.atomic
+def mover_lead_fechado(oportunidade, etapa_destino, usuario, justificativa="",
+                       motivo_perda=None):
+    """Reabre/move MANUALMENTE um lead já fechado (ganho ou perdido) para a etapa
+    escolhida — ação privilegiada (área `comercial_fechados`, ver permissoes).
+
+    Destino aberto = reabre (status Aberta, selo ♻️ Reativado); Perdido = exige
+    `motivo_perda`; Ganho = exige reserva vinculada (ganho sem conversão não existe).
+    Ao TIRAR um lead do ganho, cancela a reserva vinculada pelo service oficial
+    (`reserva.cancelar`, auditado) — se a reserva não for mais cancelável (hóspede já
+    em casa/check-out), bloqueia o movimento. Adiantamento NÃO é estornado
+    automaticamente: só avisa e registra o valor pendente (dinheiro no caixa só se
+    estorna por ação explícita no Financeiro). Tudo vai para a linha do tempo + trilha
+    de auditoria, com a data/motivo do fechamento anterior e a justificativa do
+    movimento."""
+    if oportunidade.status not in (Oportunidade.Status.GANHA, Oportunidade.Status.PERDIDA):
+        raise ValidationError("Esta ação é só para leads fechados (ganho ou perdido).")
+    if etapa_destino is None:
+        raise ValidationError("Escolha a etapa de destino.")
+    justificativa = (justificativa or "").strip()
+    if not justificativa:
+        raise ValidationError("Informe o motivo do movimento.")
+    if etapa_destino.tipo == EtapaFunil.Tipo.GANHO and not oportunidade.reserva_id:
+        raise ValidationError("Para marcar como ganho, use «Converter em reserva» — "
+                              "ganho exige reserva.")
+    if etapa_destino.tipo == EtapaFunil.Tipo.PERDIDO and motivo_perda is None:
+        raise ValidationError("Informe o motivo da perda.")
+
+    era_ganha = oportunidade.status == Oportunidade.Status.GANHA
+    vai_sair_do_ganho = era_ganha and etapa_destino.tipo != EtapaFunil.Tipo.GANHO
+    contexto = _contexto_fechamento(oportunidade)
+
+    # Se vai tirar do ganho, valida a reserva ANTES de mexer no lead (evita estado
+    # inconsistente): precisa ser cancelável e, se tem adiantamento, exige o caixa de
+    # Reservas aberto (o estorno volta o dinheiro por um movimento inverso nessa sessão).
+    reserva = None
+    adiantamento = Decimal("0.00")
+    sessao_estorno = None
+    if vai_sair_do_ganho and oportunidade.reserva_id:
+        from apps.reservas.models import Reserva
+        reserva = Reserva.objects.filter(pk=oportunidade.reserva_id).first()
+        if reserva:
+            if reserva.status not in _RESERVA_CANCELAVEL:
+                raise ValidationError(
+                    f"Não é possível mover: a reserva #{reserva.pk} está "
+                    f"'{reserva.get_status_display()}'. Resolva em Reservas primeiro.")
+            adiantamento = reserva.adiantamentos.aggregate(t=Sum("valor"))["t"] \
+                or Decimal("0.00")
+            if adiantamento > 0:
+                from apps.nucleo.models import SessaoCaixa
+                from apps.nucleo.modulos import Modulo
+                sessao_estorno = SessaoCaixa.objects.filter(
+                    operador=usuario, modulo=Modulo.RESERVAS,
+                    status=SessaoCaixa.Status.ABERTA).first()
+                if sessao_estorno is None:
+                    raise ValidationError(
+                        f"A reserva #{reserva.pk} tem adiantamento de R$ {adiantamento} "
+                        "a estornar — abra o caixa de Reservas (Operação → Caixa) antes "
+                        "de mover o lead.")
+
+    agora = timezone.now()
+    _fechar_permanencia(oportunidade)
+    oportunidade.etapa = etapa_destino
+    if etapa_destino.tipo == EtapaFunil.Tipo.PERDIDO:
+        oportunidade.status = Oportunidade.Status.PERDIDA
+        oportunidade.motivo_perda = motivo_perda
+        oportunidade.motivo_perda_detalhe = justificativa
+        oportunidade.fechado_em = agora
+        verbo = "Movido para perdido"
+    elif etapa_destino.tipo == EtapaFunil.Tipo.GANHO:
+        oportunidade.status = Oportunidade.Status.GANHA
+        oportunidade.fechado_em = oportunidade.fechado_em or agora
+        verbo = "Movido para ganho"
+    else:  # etapa aberta → reabre
+        oportunidade.status = Oportunidade.Status.ABERTA
+        oportunidade.fechado_em = None
+        oportunidade.reativada_em = agora
+        oportunidade.motivo_perda = None
+        oportunidade.motivo_perda_detalhe = ""
+        verbo = "Reaberto"
+    oportunidade.save(update_fields=["etapa", "status", "fechado_em", "reativada_em",
+                                     "motivo_perda", "motivo_perda_detalhe", "atualizado_em"])
+    _abrir_permanencia(oportunidade, etapa_destino)
+    if etapa_destino.tipo in (EtapaFunil.Tipo.GANHO, EtapaFunil.Tipo.PERDIDO):
+        _fechar_permanencia(oportunidade)  # terminais não acumulam permanência
+    atualizar_score(oportunidade)
+
+    # Estorna o adiantamento (movimento inverso no caixa) e cancela a reserva DEPOIS de
+    # mudar o status — assim o receiver de `reserva_encerrada` não cria a tarefa de
+    # "reabordar", só anota o cancelamento na timeline.
+    reserva_cancelada = None
+    total_estornado = Decimal("0.00")
+    if vai_sair_do_ganho and reserva:
+        if adiantamento > 0:
+            from apps.nucleo.models import estornar_movimento
+            for adianto in reserva.adiantamentos.select_related("movimento_caixa"):
+                mov = adianto.movimento_caixa
+                ja = mov.estornos.aggregate(t=Sum("valor"))["t"] or Decimal("0.00")
+                restante = mov.valor - ja
+                if restante > 0:
+                    estornar_movimento(
+                        mov, sessao_estorno, usuario,
+                        f"Reserva #{reserva.pk} cancelada — lead movido no funil "
+                        f"({justificativa})", valor=restante)
+                    total_estornado += restante
+        reserva.cancelar(usuario, f"Lead movido no funil ({justificativa})")
+        reserva_cancelada = reserva.pk
+
+    nota = f"♻️ {verbo} → {etapa_destino.nome} · fechamento anterior: {contexto} · " \
+           f"motivo: {justificativa}"
+    if reserva_cancelada:
+        nota += f" · reserva #{reserva_cancelada} cancelada"
+    if total_estornado > 0:
+        nota += f" · adiantamento R$ {total_estornado} estornado no Caixa"
+    _log_evento(oportunidade, usuario, nota[:255])
+    registrar_auditoria(usuario, "lead_fechado_movido", oportunidade, {
+        "destino": etapa_destino.nome, "fechamento_anterior": contexto,
+        "justificativa": justificativa,
+        "reserva_cancelada": reserva_cancelada,
+        "adiantamento_estornado": str(total_estornado) if total_estornado > 0 else None})
+    return oportunidade
+
+
+def reabrir_oportunidade(oportunidade, usuario, justificativa="Reaberto manualmente"):
+    """Atalho: reabre um lead perdido na etapa inicial do funil ('Novo lead').
+    Delega para `mover_lead_fechado` (mesma trilha/auditoria)."""
     if oportunidade.status != Oportunidade.Status.PERDIDA:
         raise ValidationError("Só é possível reabrir um lead que está perdido.")
     primeira = etapas().first()  # ordering por 'ordem' → "Novo lead"
     if primeira is None:
         raise ValidationError("Não há etapa de funil configurada para reabrir o lead.")
-    motivo_anterior = oportunidade.motivo_perda.nome if oportunidade.motivo_perda_id \
-        else "não informado"
-    detalhe_anterior = (oportunidade.motivo_perda_detalhe or "").strip()
-    perdido_em = oportunidade.fechado_em
-    quando_perda = perdido_em.strftime("%d/%m/%Y") if perdido_em else "data não registrada"
-    agora = timezone.now()
-    _fechar_permanencia(oportunidade)
-    oportunidade.status = Oportunidade.Status.ABERTA
-    oportunidade.etapa = primeira
-    oportunidade.fechado_em = None
-    oportunidade.reativada_em = agora
-    oportunidade.motivo_perda = None
-    oportunidade.motivo_perda_detalhe = ""
-    oportunidade.save(update_fields=["status", "etapa", "fechado_em", "reativada_em",
-                                     "motivo_perda", "motivo_perda_detalhe", "atualizado_em"])
-    _abrir_permanencia(oportunidade, primeira)
-    atualizar_score(oportunidade)
-    _log_evento(
-        oportunidade, usuario,
-        f"♻️ Reaberto manualmente (perdido em {quando_perda} — {motivo_anterior}"
-        + (f": {detalhe_anterior}" if detalhe_anterior else "") + ")")
-    registrar_auditoria(usuario, "oportunidade_reaberta", oportunidade,
-                        {"motivo_perda_anterior": motivo_anterior,
-                         "detalhe": detalhe_anterior, "perdido_em": quando_perda})
-    return oportunidade
+    return mover_lead_fechado(oportunidade, primeira, usuario, justificativa=justificativa)
 
 
 def _limpar_prospecto(pessoa):

@@ -25,6 +25,9 @@ class Area(models.TextChoices):
     # Analista de Marketing: mover campanha até Aprovação, lançar gasto, marcar peça.
     # (Gestor = gerência; ver a tela = módulo Marketing.)
     MARKETING = "marketing", "Marketing (analista)"
+    # Gestão comercial: reabrir leads perdidos e mover leads já fechados (ganho/perdido)
+    # para outra etapa — ação sensível (cancela a reserva do ganho). Gestor comercial.
+    COMERCIAL_FECHADOS = "comercial_fechados", "Comercial — reabrir/mover leads fechados"
     EQUIPE = "equipe", "Equipe & Acessos"
 
 

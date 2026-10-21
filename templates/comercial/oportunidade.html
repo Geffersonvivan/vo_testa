@@ -285,16 +285,42 @@
     </div>
     {% endif %}
 
-    {% if op.perdida %}
-    <div class="cartao op-acoes">
-      <p class="rot-secao">Lead perdido</p>
+    {% if pode_gerir_fechados and not op.aberta %}
+    <div class="cartao op-acoes" x-data="{ tipo: '' }">
+      <p class="rot-secao">Gestão — reabrir / mover lead fechado</p>
       <p style="font-size:.74em;color:var(--tinta-suave);margin:-.15rem 0 .6rem">
-        {% if op.motivo_perda %}Motivo: {{ op.motivo_perda.nome }}{% if op.motivo_perda_detalhe %} — “{{ op.motivo_perda_detalhe }}”{% endif %}{% else %}Sem motivo registrado.{% endif %}
-        {% if op.fechado_em %}<br>Perdido em {{ op.fechado_em|date:"d/m/Y" }}.{% endif %}
+        Estado atual: <b>{% if op.perdida %}Perdido{% else %}Ganho{% endif %}</b>{% if op.fechado_em %} em {{ op.fechado_em|date:"d/m/Y" }}{% endif %}.
+        {% if op.perdida and op.motivo_perda %} Motivo: {{ op.motivo_perda.nome }}{% if op.motivo_perda_detalhe %} — “{{ op.motivo_perda_detalhe }}”{% endif %}.{% endif %}
       </p>
-      <form method="post" action="{% url 'comercial:reabrir' op.pk %}" onsubmit="return confirm('Reabrir este lead em «Novo lead»? A perda fica registrada na linha do tempo.')" style="margin:0">
+      {% if reserva_vinculada %}
+      <p class="aviso-inline op-aviso">
+        ⚠️ Há a reserva <a href="{% url 'reservas:detalhe' reserva_vinculada.pk %}">#{{ reserva_vinculada.pk }}</a> ({{ reserva_vinculada.status }}).
+        {% if op.status == 'ganha' %} Tirar do Ganho vai <b>cancelar</b> esta reserva.{% endif %}
+        {% if reserva_vinculada.adiantamento %}<br>Há <b>adiantamento de R$ {{ reserva_vinculada.adiantamento }}</b> — será <b>estornado</b> ao mover (exige o caixa de Reservas aberto).{% endif %}
+        {% if op.status == 'ganha' and not reserva_vinculada.cancelavel %}<br>A reserva não é mais cancelável ({{ reserva_vinculada.status }}) — resolva em Reservas primeiro.{% endif %}
+      </p>
+      {% endif %}
+      <form method="post" action="{% url 'comercial:mover_fechado' op.pk %}"
+            onsubmit="return confirm('{% if op.status == 'ganha' and reserva_vinculada %}Isto vai CANCELAR a reserva #{{ reserva_vinculada.pk }}{% if reserva_vinculada.adiantamento %} e ESTORNAR o adiantamento de R$ {{ reserva_vinculada.adiantamento }}{% endif %}. {% endif %}Mover este lead?')">
         {% csrf_token %}
-        <button type="submit" class="botao-primario botao-largo">♻️ Reabrir lead</button>
+        <div class="campo">
+          <label>Mover para:</label>
+          <select name="etapa" required
+                  @change="tipo = $event.target.selectedOptions[0].dataset.tipo || ''">
+            <option value="">—</option>
+            {% for e in etapas_todas %}<option value="{{ e.id }}" data-tipo="{{ e.tipo }}" {% if e.id == op.etapa_id %}disabled{% endif %}>{{ e.nome }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="campo" x-show="tipo === 'perdido'" x-cloak>
+          <label>Motivo da perda:</label>
+          {{ perda_form.motivo }}
+        </div>
+        <div class="campo">
+          <label>Motivo do movimento (obrigatório):</label>
+          <input type="text" name="justificativa" maxlength="255" required
+                 placeholder="Por que está movendo este lead?">
+        </div>
+        <button type="submit" class="botao-primario botao-largo">Mover lead</button>
       </form>
     </div>
     {% endif %}
