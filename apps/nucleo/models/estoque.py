@@ -234,6 +234,26 @@ def produtos_abaixo_minimo() -> int:
     return sum(1 for linha in posicao_estoque() if linha["abaixo_minimo"])
 
 
+def cmv_por_modulo(ano: int, mes: int) -> dict[str, Decimal]:
+    """
+    CMV (Custo das Mercadorias Vendidas) do mês, por módulo (centro).
+
+    Interface pública p/ a camada Contábil. Soma o custo das SAÍDAS POR VENDA
+    no período, agrupado por `local.modulo`.
+    """
+    from collections import defaultdict
+
+    qs = MovimentoEstoque.objects.filter(
+        tipo=MovimentoEstoque.Tipo.SAIDA_VENDA,
+        criado_em__year=ano, criado_em__month=mes,
+    ).select_related("local")
+    por_modulo: dict[str, Decimal] = defaultdict(lambda: ZERO)
+    for mov in qs:
+        custo = (abs(mov.quantidade) * mov.custo_unitario).quantize(Decimal("0.01"))
+        por_modulo[mov.local.modulo] += custo
+    return {m: v for m, v in por_modulo.items() if v > 0}
+
+
 # ---------- Movimentações (interface pública do motor) ----------
 
 

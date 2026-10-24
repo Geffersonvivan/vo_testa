@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+{% load moeda %}
+
+{% block titulo %}Contábil · Gerencial{% endblock %}
+
+{% block conteudo %}
+<style>
+/* ===== Camada Contábil — réplica do mockup, em tokens Lampião. Escopo .ctb ===== */
+.ctb { --acc: var(--lampiao); }
+.ctb .eyebrow { text-transform:uppercase; letter-spacing:.14em; font-size:.72rem; font-weight:600; color:var(--acc); }
+.ctb .cab { display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:1rem; margin-bottom:.4rem; }
+.ctb h1 { font-size:2.2rem; letter-spacing:-.02em; margin:.2rem 0; }
+.ctb .filtro { display:flex; gap:.5rem; align-items:flex-end; }
+.ctb .filtro label { display:block; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--tinta-suave); margin-bottom:2px; }
+.ctb .filtro select { padding:.4rem .6rem; border:1px solid var(--fio); border-radius:var(--raio-p); background:var(--superficie); color:var(--tinta); font-family:inherit; }
+.ctb .periodo { color:var(--tinta-suave); margin-bottom:1.2rem; }
+
+/* tabs */
+.ctb .tabs { display:flex; gap:4px; overflow-x:auto; border-bottom:1px solid var(--fio); margin-bottom:1.4rem; }
+.ctb .tab-btn { white-space:nowrap; padding:.6rem 1rem; border:none; background:transparent; color:var(--tinta-suave); font-family:inherit; font-size:.92rem; font-weight:500; cursor:pointer; border-bottom:2px solid transparent; transition:all .15s; }
+.ctb .tab-btn:hover { color:var(--tinta); }
+.ctb .tab-btn.on { color:var(--tinta); border-bottom-color:var(--acc); }
+.ctb .painel-aba { display:none; }
+.ctb .painel-aba.on { display:block; animation:ctbfade .35s ease; }
+@keyframes ctbfade { from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;} }
+
+/* kpis */
+.ctb .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin-bottom:1.4rem; }
+.ctb .kpi .rotulo { text-transform:uppercase; letter-spacing:.07em; font-size:.72rem; color:var(--tinta-suave); font-weight:600; }
+.ctb .kpi .valor { font-size:2rem; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; margin-top:.2rem; }
+.ctb .kpi .valor.pos { color:var(--sucesso); } .ctb .kpi .valor.neg { color:var(--perigo); } .ctb .kpi .valor.acc { color:var(--acc); }
+.ctb .kpi .foot { font-size:.78rem; color:var(--tinta-suave); margin-top:.1rem; }
+
+.ctb .duas { display:grid; grid-template-columns:1.25fr .9fr; gap:1.2rem; align-items:start; }
+@media (max-width:900px){ .ctb .duas { grid-template-columns:1fr; } }
+.ctb .chart-box { position:relative; height:320px; }
+.ctb .chart-box.sm { height:240px; }
+
+/* DRE table */
+.ctb table.dre { width:100%; border-collapse:collapse; font-size:.94rem; }
+.ctb table.dre td { padding:.6rem .8rem; border-bottom:1px solid var(--fio); }
+.ctb table.dre td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.ctb tr.l-grupo td { font-weight:700; background:color-mix(in srgb, var(--lampiao) 8%, transparent); }
+.ctb tr.l-sub td:first-child { padding-left:2rem; color:var(--tinta-suave); }
+.ctb tr.l-resultado td { font-weight:800; border-top:2px solid var(--fio); }
+
+/* bridge */
+.ctb .bridge { display:grid; grid-template-columns:1fr auto 1fr auto 1fr; gap:.6rem; align-items:center; }
+@media (max-width:760px){ .ctb .bridge{ grid-template-columns:1fr;} .ctb .bridge .op{display:none;} }
+.ctb .bridge .op { font-size:1.4rem; color:var(--acc); text-align:center; }
+.ctb .bridge .b { background:var(--canvas); border:1px solid var(--fio); border-radius:var(--raio); padding:1rem; text-align:center; }
+.ctb .bridge .b .l { font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--tinta-suave); }
+.ctb .bridge .b .v { font-size:1.3rem; font-weight:700; font-variant-numeric:tabular-nums; margin-top:.2rem; }
+
+/* plano tree */
+.ctb .conta-linha { display:flex; align-items:center; gap:.8rem; padding:.5rem .6rem; border-bottom:1px solid var(--fio); font-size:.92rem; }
+.ctb .conta-linha .cod { font-variant-numeric:tabular-nums; color:var(--acc); font-weight:700; min-width:80px; }
+.ctb .conta-linha.sintetica { font-weight:700; background:color-mix(in srgb, var(--lampiao) 6%, transparent); }
+.ctb .conta-linha.sintetica .cod { color:var(--tinta); }
+.ctb .conta-linha .v { margin-left:auto; font-variant-numeric:tabular-nums; }
+.ctb .ind-1{padding-left:1rem;} .ctb .ind-2{padding-left:2rem;} .ctb .ind-3{padding-left:3rem;}
+
+/* fechar form */
+.ctb .form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1.1rem 1.2rem; margin-bottom:1rem; align-items:start; }
+.ctb .form-campo { display:flex; flex-direction:column; }
+.ctb .form-grid label { min-height:2.5em; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--tinta-suave); margin-bottom:.3rem; line-height:1.25; }
+.ctb .hint { text-transform:none; letter-spacing:0; font-weight:400; opacity:.75; }
+.ctb .form-grid input { width:100%; padding:.55rem .7rem; border:1px solid var(--fio); border-radius:var(--raio-p); background:var(--superficie); color:var(--tinta); font-family:inherit; font-variant-numeric:tabular-nums; }
+.ctb .folha-dica { display:block; margin-top:.4rem; line-height:1.5; }
+.ctb .botao-usar { border:none; background:color-mix(in srgb,var(--sucesso) 14%,transparent); color:var(--sucesso); font-family:inherit; font-size:.72rem; font-weight:600; padding:.18rem .6rem; border-radius:999px; cursor:pointer; margin-left:.25rem; white-space:nowrap; }
+.ctb .botao-usar:hover { background:color-mix(in srgb,var(--sucesso) 24%,transparent); }
+
+.ctb .export-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1rem; }
+.ctb .pill { display:inline-flex; align-items:center; gap:.4rem; font-size:.74rem; font-weight:600; padding:.15rem .6rem; border-radius:999px; }
+.ctb .pill.ok { color:var(--sucesso); background:color-mix(in srgb,var(--sucesso) 14%,transparent); }
+.ctb .pill.al { color:var(--perigo); background:color-mix(in srgb,var(--perigo) 12%,transparent); }
+.ctb .vazio { color:var(--tinta-suave); padding:1rem; text-align:center; }
+@media print { .ctb .tabs, .ctb .filtro, .botao-neutro { display:none !important; } .ctb .painel-aba { display:block !important; } }
+</style>
+
+<div class="ctb">
+  <div class="cab">
+    <div>
+      <p class="eyebrow">Financeiro</p>
+      <h1>Painel Contábil</h1>
+    </div>
+    <form method="get" class="filtro">
+      <div><label>Mês</label>
+        <select name="mes" onchange="this.form.submit()">
+          {% for num, nome in meses %}<option value="{{ num }}" {% if num == mes_sel %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+        </select></div>
+      <div><label>Ano</label>
+        <select name="ano" onchange="this.form.submit()">
+          {% for a in anos %}<option value="{{ a }}" {% if a == ano_sel %}selected{% endif %}>{{ a }}</option>{% endfor %}
+        </select></div>
+      <button type="button" class="botao-neutro" onclick="window.print()">Imprimir / PDF</button>
+    </form>
+  </div>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab-btn on" data-aba="dre">DRE Gerencial</button>
+    <button class="tab-btn" data-aba="fluxo">Fluxo de Caixa</button>
+    <button class="tab-btn" data-aba="plano">Plano de Contas</button>
+    <button class="tab-btn" data-aba="depara">A classificar{% if orfaos.total %} ({{ orfaos.total }}){% endif %}</button>
+    <button class="tab-btn" data-aba="fechar">Fechar o mês</button>
+    <button class="tab-btn" data-aba="export">Exportar</button>
+  </nav>
+
+  {# ===================== DRE ===================== #}
+  <section class="painel-aba on" id="aba-dre">
+    <div class="kpis">
+      <div class="cartao kpi"><div class="rotulo">Receita líquida</div><div class="valor">{{ dre.receita_liquida|intcomma_brl }}</div></div>
+      <div class="cartao kpi"><div class="rotulo">Lucro bruto</div><div class="valor acc">{{ dre.lucro_bruto|intcomma_brl }}</div></div>
+      <div class="cartao kpi"><div class="rotulo">Despesas operacionais</div><div class="valor neg">{{ dre.despesas|intcomma_brl }}</div></div>
+      <div class="cartao kpi"><div class="rotulo">Resultado do período</div><div class="valor {% if dre.resultado < 0 %}neg{% else %}pos{% endif %}">{{ dre.resultado|intcomma_brl }}</div><div class="foot">margem {{ dre.margem }}</div></div>
+    </div>
+
+    {% if dre.nao_classificado %}
+    <p class="pill al" style="margin-bottom:1rem;">{{ dre.nao_classificado|intcomma_brl }} em lançamentos sem conta — ver aba "A classificar"</p>
+    {% endif %}
+
+    <div class="duas">
+      <div class="cartao" style="padding:.4rem .4rem;">
+        <table class="dre">
+          {% for nivel, rotulo, valor, estilo in dre.linhas %}
+          <tr class="l-{{ estilo }}"><td>{{ rotulo }}</td><td class="num">{{ valor|intcomma_brl }}</td></tr>
+          {% endfor %}
+        </table>
+      </div>
+      <div style="display:grid; gap:1.2rem;">
+        <div class="cartao"><h3 style="font-size:1rem; margin-bottom:.4rem;">Composição do resultado</h3>
+          <div class="chart-box"><canvas id="ctbWaterfall"></canvas></div></div>
+        <div class="cartao"><h3 style="font-size:1rem; margin-bottom:.4rem;">Receita por natureza</h3>
+          <div class="chart-box sm"><canvas id="ctbDonut"></canvas></div></div>
+      </div>
+    </div>
+  </section>
+
+  {# ===================== FLUXO ===================== #}
+  <section class="painel-aba" id="aba-fluxo">
+    <div class="kpis">
+      <div class="cartao kpi"><div class="rotulo">Entradas (caixa)</div><div class="valor pos">{{ fluxo.entradas|intcomma_brl }}</div></div>
+      <div class="cartao kpi"><div class="rotulo">Saídas (caixa)</div><div class="valor neg">{{ fluxo.saidas|intcomma_brl }}</div></div>
+      <div class="cartao kpi"><div class="rotulo">Líquido realizado</div><div class="valor {% if fluxo.liquido < 0 %}neg{% else %}pos{% endif %}">{{ fluxo.liquido|intcomma_brl }}</div></div>
+      <div class="cartao kpi"><div class="rotulo">Projetado (fim do mês)</div><div class="valor {% if fluxo.projetado < 0 %}neg{% else %}acc{% endif %}">{{ fluxo.projetado|intcomma_brl }}</div></div>
+    </div>
+
+    <div class="cartao" style="margin-bottom:1.2rem;">
+      <h3 style="font-size:1rem; margin-bottom:.8rem;">Ponte realizado → projetado</h3>
+      <div class="bridge">
+        <div class="b"><div class="l">Líquido realizado</div><div class="v">{{ fluxo.liquido|intcomma_brl }}</div></div>
+        <div class="op">+</div>
+        <div class="b"><div class="l">A receber (aberto)</div><div class="v" style="color:var(--sucesso)">{{ fluxo.a_receber|intcomma_brl }}</div></div>
+        <div class="op">−</div>
+        <div class="b"><div class="l">A pagar (aberto)</div><div class="v" style="color:var(--perigo)">{{ fluxo.a_pagar|intcomma_brl }}</div></div>
+      </div>
+    </div>
+
+    <div class="cartao" style="margin-bottom:1.2rem;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:.5rem; margin-bottom:.6rem;">
+        <h3 style="font-size:1rem;">Receita contratada a entrar</h3>
+        <span class="hint">reservas confirmadas ainda não hospedadas · {{ futura.qtd }} reserva{{ futura.qtd|pluralize }} · total {{ futura.total|intcomma_brl }}</span>
+      </div>
+      {% if futura.por_mes %}
+      <table class="dre">
+        <tr class="l-grupo"><td>Mês de entrada</td><td class="num">Reservas</td><td class="num">Diárias contratadas</td></tr>
+        {% for m in futura.por_mes %}
+        <tr><td>{{ m.rotulo }}</td><td class="num">{{ m.qtd }}</td><td class="num">{{ m.total|intcomma_brl }}</td></tr>
+        {% endfor %}
+        <tr class="l-resultado"><td>Total contratado</td><td class="num">{{ futura.qtd }}</td><td class="num">{{ futura.total|intcomma_brl }}</td></tr>
+      </table>
+      {% else %}
+      <p class="vazio">Nenhuma reserva confirmada com entrada futura.</p>
+      {% endif %}
+      <p class="hint" style="display:block; margin-top:.5rem;">Estimativa pelo valor fechado (diária × noites). Vira receita de fato no check-in; ainda não está na DRE (competência).</p>
+    </div>
+
+    <div class="cartao" style="padding:.4rem .4rem;">
+      <table class="dre">
+        <tr class="l-grupo"><td>Data</td><td>Descrição</td><td class="num">Entrada</td><td class="num">Saída</td></tr>
+        {% for m in fluxo.movimentos %}
+        <tr><td>{{ m.criado_em|date:"d/m" }}</td><td>{{ m.descricao }}</td>
+          <td class="num">{% if m.tipo == 'recebimento' or m.tipo == 'reforco' %}{{ m.valor|intcomma_brl }}{% else %}—{% endif %}</td>
+          <td class="num">{% if m.tipo == 'sangria' or m.tipo == 'estorno' %}{{ m.valor|intcomma_brl }}{% else %}—{% endif %}</td></tr>
+        {% empty %}
+        <tr><td colspan="4" class="vazio">Sem movimentos de caixa no período.</td></tr>
+        {% endfor %}
+      </table>
+    </div>
+  </section>
+
+  {# ===================== PLANO ===================== #}
+  <section class="painel-aba" id="aba-plano">
+    <div class="cartao" style="padding:.4rem;">
+      {% for item in contas %}
+      <div class="conta-linha {{ item.conta.tipo }} ind-{{ item.conta.classificacao|length }}">
+        <span class="cod">{{ item.conta.classificacao }}</span>
+        <span>{{ item.conta.nome }}</span>
+        {% if item.conta.tipo == 'analitica' %}<span class="v">{{ item.total|intcomma_brl }}</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <p class="periodo" style="margin-top:.8rem;">Códigos do contador preservados para o export. Patrimonial (Ativo/Passivo) fica com o contador.</p>
+  </section>
+
+  {# ===================== A CLASSIFICAR (órfãos) ===================== #}
+  <section class="painel-aba" id="aba-depara">
+    <h3 style="font-size:1.05rem; margin-bottom:.6rem;">Categorias sem de‑para</h3>
+    <div class="cartao" style="padding:.4rem; margin-bottom:1.4rem;">
+      {% for c in orfaos.categorias %}
+      <div class="conta-linha"><span>{{ c.nome }}</span><span class="pill al" style="margin-left:auto;">{{ c.get_tipo_display }}</span></div>
+      {% empty %}<div class="vazio">Todas as categorias estão mapeadas. ✓</div>{% endfor %}
+    </div>
+    <h3 style="font-size:1.05rem; margin-bottom:.6rem;">Lançamentos sem conta contábil</h3>
+    <div class="cartao" style="padding:.4rem;">
+      {% for l in orfaos.lancamentos|slice:":50" %}
+      <div class="conta-linha"><span class="cod">{{ l.data|date:"d/m/y" }}</span><span>{{ l.descricao }}</span><span class="v">{{ l.valor|intcomma_brl }}</span></div>
+      {% empty %}<div class="vazio">Nenhum lançamento órfão. ✓</div>{% endfor %}
+    </div>
+    <p class="periodo" style="margin-top:.8rem;">Classificação se resolve no de‑para (admin) ou criando a categoria já mapeada.</p>
+  </section>
+
+  {# ===================== FECHAR O MÊS ===================== #}
+  <section class="painel-aba" id="aba-fechar">
+    <div class="cartao" style="max-width:640px;">
+      <h3 style="font-size:1.1rem; margin-bottom:.3rem;">Fechar {{ mes_sel }}/{{ ano_sel }}</h3>
+      <p class="periodo">Os números de baixa frequência que não nascem no sistema. Gera os lançamentos de competência já classificados. Recomputável (reenviar atualiza).</p>
+      <form method="post" action="{% url 'contabil:fechar' %}">
+        {% csrf_token %}
+        <input type="hidden" name="ano" value="{{ ano_sel }}"><input type="hidden" name="mes" value="{{ mes_sel }}">
+        <div class="form-grid">
+          <div class="form-campo">
+            <label>Folha <span class="hint">→ 4.2.01.01</span></label>
+            <input id="campo-folha" name="folha" inputmode="decimal" value="{% if fechamento %}{{ fechamento.folha }}{% else %}{{ folha_cadastro.total }}{% endif %}" data-cadastro="{{ folha_cadastro.total }}">
+            <span class="hint folha-dica">
+              {{ folha_cadastro.qtd }} funcionário{{ folha_cadastro.qtd|pluralize }} no cadastro · {{ folha_cadastro.total|intcomma_brl }}
+              <button type="button" class="botao-usar" onclick="var i=document.getElementById('campo-folha'); i.value=i.dataset.cadastro;">usar do cadastro</button>
+            </span>
+          </div>
+          <div class="form-campo"><label>Encargos FGTS/INSS <span class="hint">→ 4.2.01.01</span></label><input name="encargos" inputmode="decimal" value="{{ fechamento.encargos|default:'0' }}"></div>
+          <div class="form-campo"><label>Pró‑labore <span class="hint">→ 5.1.02.02</span></label><input name="pro_labore" inputmode="decimal" value="{{ fechamento.pro_labore|default:'0' }}"></div>
+          <div class="form-campo"><label>DAS / Simples <span class="hint">→ 3.1.02.01</span></label><input name="das" inputmode="decimal" value="{{ fechamento.das|default:'0' }}"></div>
+        </div>
+        <button type="submit" class="botao-primario">Aplicar à DRE</button>
+        {% if fechamento %}<span class="pill ok" style="margin-left:.6rem;">fechado em {{ fechamento.fechado_em|date:"d/m/Y H:i" }}</span>{% endif %}
+      </form>
+    </div>
+  </section>
+
+  {# ===================== EXPORT ===================== #}
+  <section class="painel-aba" id="aba-export">
+    <p class="periodo">Arquivos CSV (pt‑BR, Excel) no layout do contador — com o código numérico das contas.</p>
+    <div class="export-grid">
+      <div class="cartao"><h3 style="font-size:1.05rem;">Resumo por conta</h3><p class="periodo">Saldo do mês por conta analítica.</p><a class="botao-primario" href="{% url 'contabil:export' 'resumo' %}?ano={{ ano_sel }}&mes={{ mes_sel }}">Baixar CSV</a></div>
+      <div class="cartao"><h3 style="font-size:1.05rem;">Lançamentos</h3><p class="periodo">Linha a linha, com conta e centro.</p><a class="botao-primario" href="{% url 'contabil:export' 'lancamentos' %}?ano={{ ano_sel }}&mes={{ mes_sel }}">Baixar CSV</a></div>
+      <div class="cartao"><h3 style="font-size:1.05rem;">Plano de contas</h3><p class="periodo">Estrutura + códigos do contador.</p><a class="botao-primario" href="{% url 'contabil:export' 'plano' %}">Baixar CSV</a></div>
+    </div>
+  </section>
+</div>
+
+{{ waterfall|json_script:"ctb-wf" }}
+{{ donut|json_script:"ctb-donut" }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function(){
+  // tabs
+  var btns = document.querySelectorAll('.ctb .tab-btn');
+  btns.forEach(function(b){ b.addEventListener('click', function(){
+    btns.forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    document.querySelectorAll('.ctb .painel-aba').forEach(function(p){ p.classList.remove('on'); });
+    var el = document.getElementById('aba-' + b.dataset.aba); if(el) el.classList.add('on');
+  }); });
+  if (location.hash === '#fechar') { var fb = document.querySelector('[data-aba="fechar"]'); if(fb) fb.click(); }
+
+  if (typeof Chart === 'undefined') return;
+  var css = getComputedStyle(document.documentElement);
+  function tok(n, fb){ return (css.getPropertyValue(n)||'').trim() || fb; }
+  var acc = tok('--lampiao','#b9801f'), ok = tok('--sucesso','#2f8d6a'),
+      bad = tok('--perigo','#c0493f'), ink = tok('--tinta-suave','#7a7161'),
+      fio = tok('--fio','rgba(0,0,0,.1)'), sup = tok('--superficie','#fff');
+  Chart.defaults.animation = false; Chart.defaults.color = ink; Chart.defaults.font.family = 'inherit';
+
+  var wf = JSON.parse(document.getElementById('ctb-wf').textContent);
+  new Chart(document.getElementById('ctbWaterfall'), {
+    type:'bar',
+    data:{ labels: wf.labels, datasets:[
+      { data:[0, wf.receita_liquida, wf.lucro_bruto, wf.resultado, 0], backgroundColor:'transparent', stack:'s' },
+      { data:[wf.receita_bruta, wf.deducoes, wf.custos, wf.despesas, wf.resultado],
+        backgroundColor:[acc,bad,bad,bad, wf.resultado<0?bad:ok], borderRadius:5, stack:'s' } ]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false},tooltip:{enabled:true}},
+      scales:{ x:{grid:{display:false},ticks:{font:{size:11}}}, y:{grid:{color:fio},stacked:true}, } }
+  });
+
+  var dn = JSON.parse(document.getElementById('ctb-donut').textContent);
+  new Chart(document.getElementById('ctbDonut'), {
+    type:'doughnut',
+    data:{ labels:['Serviços','Mercadorias'], datasets:[{ data:dn, backgroundColor:[acc, ok], borderColor:sup, borderWidth:3 }] },
+    options:{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{legend:{position:'bottom'},tooltip:{enabled:true}} }
+  });
+})();
+</script>
+{% endblock %}

@@ -39,6 +39,7 @@ from .estoque import (
 from .financeiro import (
     CategoriaFinanceira,
     ContaPagarReceber,
+    ContaRecorrente,
     FormaPagamento,
     LancamentoFinanceiro,
     MovimentoCaixa,
@@ -74,6 +75,7 @@ __all__ = [
     "saldo",
     "transferir",
     "ContaPagarReceber",
+    "ContaRecorrente",
     "EntradaLogbook",
     "ComentarioLogbook",
     "FormaPagamento",

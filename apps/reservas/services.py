@@ -1945,3 +1945,34 @@ def diarias_periodo(inicio, fim) -> Decimal:
     return (LancamentoConta.objects.filter(
         criado_em__date__range=(inicio, fim), tipo=LancamentoConta.Tipo.DIARIA
     ).aggregate(t=Sum("valor"))["t"] or Decimal("0"))
+
+
+def receita_contratada_futura(a_partir_de=None) -> dict:
+    """
+    Receita de diárias já CONTRATADA mas ainda não realizada: reservas
+    confirmadas (sinal/garantia) cujo check-in ainda não aconteceu. É a ponte
+    que faltava — a reserva futura não vira folio (só no check-in), então aqui
+    estimamos o valor fechado (`valor_diaria × noites`) agrupado por mês de
+    entrada. Interface pública p/ a camada Contábil.
+    """
+    from collections import defaultdict
+
+    hoje = a_partir_de or timezone.localdate()
+    qs = Reserva.objects.filter(
+        status=Reserva.Status.CONFIRMADA, checkin__gte=hoje
+    )
+    por_mes = defaultdict(lambda: {"total": Decimal("0"), "qtd": 0})
+    total = Decimal("0")
+    qtd = 0
+    for r in qs:
+        valor = (r.valor_diaria or Decimal("0")) * r.noites
+        chave = (r.checkin.year, r.checkin.month)
+        por_mes[chave]["total"] += valor
+        por_mes[chave]["qtd"] += 1
+        total += valor
+        qtd += 1
+    linhas = [
+        {"ano": a, "mes": m, "total": d["total"], "qtd": d["qtd"]}
+        for (a, m), d in sorted(por_mes.items())
+    ]
+    return {"total": total, "qtd": qtd, "por_mes": linhas}

@@ -203,6 +203,19 @@ class Funcionario(models.Model):
         return f"{self.pessoa.nome} ({self.cargo})"
 
 
+def folha_base():
+    """
+    Soma dos salários base dos funcionários ativos — sugestão para a folha do
+    fechamento mensal (vem do cadastro, não se digita do zero). Editável depois
+    (13º, horas extras, admissões/demissões no meio do mês).
+    """
+    from django.db.models import Sum
+
+    qs = Funcionario.objects.filter(pessoa__ativo=True, salario__isnull=False)
+    total = qs.aggregate(s=Sum("salario"))["s"] or Decimal("0.00")
+    return {"total": total, "qtd": qs.count()}
+
+
 class Fornecedor(models.Model):
     pessoa = models.OneToOneField(
         Pessoa, on_delete=models.CASCADE, related_name="fornecedor",

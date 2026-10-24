@@ -1,0 +1,43 @@
+name: Cron financeiro (capturas contábeis)
+
+# Mantém a DRE atualizada sozinha: chama o endpoint protegido que roda (1) as capturas
+# automáticas (receita do folio, taxa de cartão, CMV) por competência e (2) a geração
+# das contas recorrentes do mês (aluguel, folha, etc.). Idempotente — rodar várias vezes
+# não duplica (chaves `referencia` / recorrência×competência). O trabalho real acontece
+# no servidor (Railway); aqui é só o despertador.
+#
+# Pré-requisitos (uma vez):
+#   1. Gerar um token forte e colocá-lo nos DOIS lados com o MESMO valor:
+#        - Railway (env do serviço web): CONTABIL_CRON_TOKEN=<token>
+#        - GitHub (Settings → Secrets → Actions): CONTABIL_CRON_TOKEN=<token>
+#   2. (Opcional) Ajustar o horário abaixo.
+# Sem o token no Railway, o endpoint responde 404 (fail-safe).
+
+on:
+  schedule:
+    - cron: "0 6 * * *"      # 06:00 UTC = 03:00 America/Sao_Paulo, todo dia
+  workflow_dispatch: {}       # permite rodar manualmente pelo botão "Run workflow"
+
+concurrency:
+  group: cron-financeiro
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  capturar:
+    name: Disparar capturas do mês
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar endpoint de captura
+        env:
+          TOKEN: ${{ secrets.CONTABIL_CRON_TOKEN }}
+          URL: https://www.pousadavotesta.com.br/crm/contabil/cron/capturar/
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "CONTABIL_CRON_TOKEN não configurado — nada a fazer."; exit 0
+          fi
+          echo "Disparando capturas em $URL"
+          curl -fsS -X POST "$URL" -H "X-Cron-Token: $TOKEN" | tee /tmp/resp.json
+          echo

@@ -88,6 +88,7 @@ INSTALLED_APPS = [
     "apps.auditoria",
     "apps.relatorios",
     "apps.conciliacao",  # conciliação bancária (OFX) + cartão (NSU/SafraPay)
+    "apps.contabil",  # camada contábil/gerencial (plano de contas + de-para) — Etapa 1
     "apps.comercial.apps.ComercialConfig",
     "apps.marketing",  # camada de fluxo das campanhas (embrulha comercial.Campanha)
 ]
@@ -304,6 +305,12 @@ FNRH_API_SENHA = os.environ.get("FNRH_API_SENHA", "")
 # Fiscal — gateway plugável: "simulado" (sandbox), "focus" (Focus NFe) ou "governo".
 # Ver docs/Implementar_fiscal.md. Focus/Governo são stubs até ter credenciais/certificado.
 FISCAL_GATEWAY = os.environ.get("FISCAL_GATEWAY", "simulado")
+
+# Contábil — token do cron de capturas (a DRE se atualiza sozinha). Vazio = endpoint
+# de cron DESATIVADO (fail-safe). Definir o mesmo valor no Railway (env) e no GitHub
+# (secret CONTABIL_CRON_TOKEN). Ver apps/contabil/views.py:cron_capturar e
+# .github/workflows/cron-financeiro.yml.
+CONTABIL_CRON_TOKEN = os.environ.get("CONTABIL_CRON_TOKEN", "")
 
 # Mídia/Impulsionamento — gateway de conversões (Fase B do Gestor de Impulsionamento):
 # "simulado" (sem rede, dev/testes) / "meta" (Conversions API) / "google" (Offline Import).

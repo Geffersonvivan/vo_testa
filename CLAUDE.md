@@ -453,6 +453,71 @@ o kit `templates/comercial/_estilo_elegante.html` (telas de painel/lista/detalhe
   quanto entrou **no caixa do setor** (venda na hora) × **lançado no quarto** (recepção
   recebe via folio) + total vendido. Fecha o ciclo do caixa por módulo (a soma de
   "lançado no quarto" = o que o caixa Reservas coleta de outros setores + diárias).
+- **Camada Contábil/Gerencial — Etapa 1 (espinha de classificação)**: app
+  `apps/contabil` (ainda não contratável; padrão `conciliacao`, telas p/ etapa futura).
+  `ContaContabil` (plano de contas hierárquico enxuto de pousada, com `codigo_contador`
+  p/ casar o export com o balancete) + `MapeamentoContabil` (de‑para: categoria/centro/
+  natureza/origem → conta, por prioridade+especificidade). **Camada ADITIVA e de LEITURA,
+  SEM partidas dobradas** — não toca `MovimentoCaixa`/`LancamentoFinanceiro`/
+  `ContaPagarReceber`. Seeds: plano (22 contas) + de‑para padrão (serviço/consumo, cmv,
+  taxa cartão, comissão OTA, Simples, fallbacks por tipo) + de‑para das categorias
+  existentes (heurístico sem acento, só cria linhas). Service `resolver_conta()` (nunca
+  órfão) + `plano_de_contas()`. Desenho em `docs/FINANCEIRO/` (`Mockup_Estrutural_Contabil.md`,
+  `Plano_Saneamento_Financeiro.md`).
+- **Camada Contábil — Etapa 2 (conta a pagar como porta única + recorrentes)**:
+  **arquitetura por sinais** (núcleo NÃO depende de `contabil`). Núcleo ganhou só o campo
+  neutro `conta_contabil` (string) em `LancamentoFinanceiro` e `ContaPagarReceber`; o
+  `contabil` escuta (`receivers.py` em `ContabilConfig.ready`) e **carimba** a conta no
+  `post_save` via `resolver_conta` (`.update()` → sem recursão/ruído de auditoria).
+  Categoria nova ganha **de-para automático** (`contabil/classificacao.py`). Novo model
+  `nucleo.ContaRecorrente` (categoria+centro obrigatórios; nasce classificada) gera
+  `ContaPagarReceber` por competência — idempotente (unicidade `recorrencia`×`competencia`);
+  comando `manage.py gerar_recorrentes`. Migrações `nucleo.0046` + `contabil.0005` (backfill
+  defensivo). Suíte 934 OK.
+- **Camada Contábil — Etapa 3 (capturas automáticas)**: campos `origem`+`referencia`
+  (idempotência) em `LancamentoFinanceiro` (`nucleo.0047`). `contabil/capturas.py` gera
+  lançamentos por competência lendo **só services públicos** (sem inverter dependência):
+  **taxa de cartão** (`pagamentos.services.taxas_do_periodo`, novo) → `5.1.03.02`, 1 por
+  cobrança liquidada; **CMV** (`nucleo…estoque.cmv_por_modulo`, novo) → `4.5.01.01`, 1 por
+  módulo/mês recomputável. **Comissão OTA = STUB** (`CONTABIL_COMISSAO_OTA_PCT` default 0;
+  o CRM ainda não registra comissão — virá no módulo Canais/OTAs). Robô `_contabil` assina;
+  comando `manage.py capturar_lancamentos`. **Captura de RECEITA** (elo que faltava):
+  `capturar_receita` lê folio/vendas pelos services do Relatórios (diárias+lavanderia→
+  `3.1.01.03`; loja+restaurante→`3.1.01.01`), 1 lançamento/setor/mês. **Anti‑dupla‑contagem:**
+  `CategoriaFinanceira.automatica` (`nucleo.0048`) marca categorias geridas pelo sistema
+  (receita dos 4 setores + folha/encargos/pró‑labore/DAS + taxa/CMV/OTA); forms manuais de
+  lançamento/conta **excluem** as automáticas (não se digita o que o módulo já sabe).
+  Migração `contabil.0008`. Suíte 961 OK.
+- **Camada Contábil — pipeline + cron**: **Receita futura contratada** —
+  `reservas.services.receita_contratada_futura()` soma reservas CONFIRMADAS ainda não
+  hospedadas (`valor_diaria×noites`) por mês de entrada; painel (aba Fluxo) mostra "Receita
+  contratada a entrar" (não entra na DRE — competência só no check‑in). **Folha do
+  cadastro**: `nucleo…cadastros.folha_base()` pré‑preenche a Folha do fechamento (soma dos
+  salários dos funcionários ativos, editável). **Cron das capturas**: endpoint
+  `POST /crm/contabil/cron/capturar/` (token `CONTABIL_CRON_TOKEN`, `@csrf_exempt`, 404 sem
+  token) roda `capturar_mes` (mês corrente + anterior nos 1os 5 dias) **e gera as contas
+  recorrentes do mês** (`ContaRecorrente.gerar`, idempotente, não retroage); agendador
+  `.github/workflows/cron-financeiro.yml` (GitHub Action diário). **Ativar (ops):** mesmo
+  token no Railway (env) e GitHub (secret). Suíte 970 OK. **Saneamento financeiro completo;
+  não commitado/deployado.**
+- **Camada Contábil — Etapa 4 (fechamento mensal guiado)**: model
+  `contabil.FechamentoMensal` (único por ano/mês; folha, encargos FGTS/INSS, pró‑labore,
+  DAS). `aplicar()` gera 4 `LancamentoFinanceiro` de competência (`origem="fechamento"`),
+  classificados: folha+encargos→`4.2.01.01`, pró‑labore→`5.1.02.02`, **DAS→`3.1.02.01`**
+  (dedução; o `conta_contabil` manda, não o tipo). Recomputável/idempotente (valor 0 apaga).
+  Admin aplica ao salvar; comando `manage.py aplicar_fechamento`. Migração `contabil.0006`.
+- **Camada Contábil — Etapa 5 (telas + export)**: `Modulo.CONTABIL` (grupo Gestão, menu
+  `contabil:painel`, seed `contabil.0007`). **Painel único em abas** (réplica do mockup,
+  tokens Lampião + Chart.js, gated `@requer_modulo(CONTABIL)`+`@requer_gerencia`):
+  **DRE** (KPIs+tabela+waterfall+donut), **Fluxo de Caixa** (ponte realizado→projetado),
+  **Plano de Contas** (árvore c/ saldo), **A classificar** (órfãos), **Fechar o mês**
+  (`FechamentoMensal`), **Exportar** (3 CSV com código do contador). Services
+  `contabil/relatorios.py` (`dre`/`fluxo_caixa`/`orfaos`, por soma). Seletor mês/ano de
+  `nucleo.periodos`. **Pendente:** aba "Reservas" rica do mockup (precisa de agregações do
+  módulo Reservas — ADR/RevPAR/adiantamentos; não entra com nº fictício), `centro`
+  obrigatório nos forms e o "Resolver" 1‑clique dos órfãos. Suíte 956 OK (simulado).
+  **Saneamento financeiro (Etapas 1‑5) concluído; não commitado.** Plano/telas em
+  `docs/FINANCEIRO/`.
 - Fase 1 de módulos concluída. Fase 2 (§8): CRM do Hóspede, Canais/OTAs, Fiscal
   (provider real), integração site↔CRM (cutover), Safrapay.
 - Perguntas de negócio em aberto: §9 da especificação (parâmetros, não bloqueiam).

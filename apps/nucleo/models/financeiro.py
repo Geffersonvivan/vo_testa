@@ -11,11 +11,13 @@ Regras que não se quebram:
 - Uma sessão de caixa aberta por operador × módulo (constraint no banco).
 """
 
+import calendar
+from datetime import date
 from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models import Q, Sum
 from django.utils import timezone
@@ -384,6 +386,12 @@ class CategoriaFinanceira(models.Model):
     nome = models.CharField("nome", max_length=80)
     tipo = models.CharField("tipo", max_length=8, choices=Tipo.choices)
     ativo = models.BooleanField("ativa", default=True)
+    automatica = models.BooleanField(
+        "gerida pelo sistema", default=False,
+        help_text="Categoria alimentada por captura automática (folio, estoque, "
+                  "pagamentos, fechamento) — não aparece no lançamento manual, "
+                  "para não haver dupla contagem.",
+    )
 
     class Meta:
         verbose_name = "categoria financeira"
@@ -424,11 +432,30 @@ class LancamentoFinanceiro(models.Model):
         related_name="lancamentos_financeiros", verbose_name="registrado por",
     )
     criado_em = models.DateTimeField("registrado em", auto_now_add=True)
+    conta_contabil = models.CharField(
+        "conta contábil", max_length=20, blank=True,
+        help_text="Classificação no plano de contas (preenchida pela camada Contábil).",
+    )
+    origem = models.CharField(
+        "origem", max_length=20, default="manual",
+        help_text="manual, ou uma captura automática (taxa_cartao, comissao_ota, cmv).",
+    )
+    referencia = models.CharField(
+        "referência de origem", max_length=80, blank=True,
+        help_text="Chave de idempotência das capturas automáticas.",
+    )
 
     class Meta:
         verbose_name = "lançamento financeiro"
         verbose_name_plural = "lançamentos financeiros"
         ordering = ["-data", "-criado_em"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["referencia"],
+                condition=~Q(referencia=""),
+                name="lancamento_referencia_unica",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_tipo_display()}: {self.descricao} (R$ {self.valor})"
@@ -486,11 +513,27 @@ class ContaPagarReceber(models.Model):
         related_name="conta", verbose_name="lançamento da baixa",
     )
     criado_em = models.DateTimeField("criada em", auto_now_add=True)
+    conta_contabil = models.CharField(
+        "conta contábil", max_length=20, blank=True,
+        help_text="Classificação no plano de contas (preenchida pela camada Contábil).",
+    )
+    recorrencia = models.ForeignKey(
+        "nucleo.ContaRecorrente", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="titulos", verbose_name="recorrência de origem",
+    )
+    competencia = models.CharField("competência (AAAA-MM)", max_length=7, blank=True)
 
     class Meta:
         verbose_name = "conta a pagar/receber"
         verbose_name_plural = "contas a pagar/receber"
         ordering = ["status", "vencimento"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["recorrencia", "competencia"],
+                condition=Q(recorrencia__isnull=False),
+                name="conta_unica_por_recorrencia_competencia",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_tipo_display()}: {self.descricao} (venc. {self.vencimento})"
@@ -541,6 +584,83 @@ class ContaPagarReceber(models.Model):
             usuario, "baixa_conta", self, {"valor": str(self.valor), "data": str(data)}
         )
         return lancamento
+
+
+class ContaRecorrente(models.Model):
+    """
+    Modelo recorrente que gera UMA ContaPagarReceber por mês (aluguel, folha,
+    energia, internet, pró-labore...). É a "porta única" das despesas fixas:
+    nasce já classificada (categoria + centro obrigatórios) e o título gerado
+    herda a classificação. Geração idempotente por competência (AAAA-MM).
+    """
+
+    tipo = models.CharField(
+        "tipo", max_length=8, choices=ContaPagarReceber.Tipo.choices,
+        default=ContaPagarReceber.Tipo.PAGAR,
+    )
+    pessoa = models.ForeignKey(
+        "nucleo.Pessoa", on_delete=models.PROTECT, null=True, blank=True,
+        related_name="recorrencias", verbose_name="fornecedor/cliente",
+    )
+    categoria = models.ForeignKey(
+        CategoriaFinanceira, on_delete=models.PROTECT,
+        related_name="recorrencias", verbose_name="categoria",
+    )
+    centro = models.CharField(
+        "centro de receita/custo", max_length=20, choices=centro_choices,
+        help_text="Setor de origem — obrigatório (nasce classificada).",
+    )
+    descricao = models.CharField("descrição", max_length=200)
+    valor = models.DecimalField(
+        "valor (R$)", max_digits=10, decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    dia_vencimento = models.PositiveSmallIntegerField(
+        "dia do vencimento", default=10,
+        validators=[MinValueValidator(1), MaxValueValidator(31)],
+    )
+    ativo = models.BooleanField("ativa", default=True)
+    criado_em = models.DateTimeField("criada em", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "conta recorrente"
+        verbose_name_plural = "contas recorrentes"
+        ordering = ["descricao"]
+
+    def __str__(self):
+        return f"{self.descricao} (todo dia {self.dia_vencimento})"
+
+    def clean(self):
+        if self.categoria_id and self.tipo:
+            esperado = (
+                CategoriaFinanceira.Tipo.DESPESA
+                if self.tipo == ContaPagarReceber.Tipo.PAGAR
+                else CategoriaFinanceira.Tipo.RECEITA
+            )
+            if self.categoria.tipo != esperado:
+                raise ValidationError(
+                    {"categoria": "Recorrente a pagar usa categoria de despesa; "
+                                  "a receber, de receita."}
+                )
+
+    def vencimento_na_competencia(self, ano: int, mes: int) -> date:
+        ultimo_dia = calendar.monthrange(ano, mes)[1]
+        return date(ano, mes, min(self.dia_vencimento, ultimo_dia))
+
+    def gerar(self, ano: int, mes: int) -> ContaPagarReceber:
+        """Cria (idempotente) o título desta recorrência na competência AAAA-MM."""
+        competencia = f"{ano:04d}-{mes:02d}"
+        existente = ContaPagarReceber.objects.filter(
+            recorrencia=self, competencia=competencia
+        ).first()
+        if existente:
+            return existente
+        return ContaPagarReceber.objects.create(
+            tipo=self.tipo, pessoa=self.pessoa, categoria=self.categoria,
+            centro=self.centro, descricao=self.descricao, valor=self.valor,
+            vencimento=self.vencimento_na_competencia(ano, mes),
+            recorrencia=self, competencia=competencia,
+        )
 
 
 class TrilhaAuditoria(models.Model):

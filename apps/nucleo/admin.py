@@ -7,6 +7,7 @@ from .models import (
     CategoriaFinanceira,
     CategoriaProduto,
     ContaPagarReceber,
+    ContaRecorrente,
     EntradaLogbook,
     FormaPagamento,
     Fornecedor,
@@ -101,8 +102,9 @@ class FormaPagamentoAdmin(admin.ModelAdmin):
 
 @admin.register(CategoriaFinanceira)
 class CategoriaFinanceiraAdmin(admin.ModelAdmin):
-    list_display = ["nome", "tipo", "ativo"]
-    list_filter = ["tipo", "ativo"]
+    list_display = ["nome", "tipo", "ativo", "automatica"]
+    list_filter = ["tipo", "ativo", "automatica"]
+    search_fields = ["nome"]
 
 
 @admin.register(SessaoCaixa)
@@ -139,8 +141,17 @@ class LancamentoFinanceiroAdmin(admin.ModelAdmin):
 
 @admin.register(ContaPagarReceber)
 class ContaPagarReceberAdmin(admin.ModelAdmin):
-    list_display = ["descricao", "tipo", "pessoa", "valor", "vencimento", "status"]
+    list_display = ["descricao", "tipo", "pessoa", "valor", "vencimento", "status",
+                    "conta_contabil"]
     list_filter = ["tipo", "status"]
+
+
+@admin.register(ContaRecorrente)
+class ContaRecorrenteAdmin(admin.ModelAdmin):
+    list_display = ["descricao", "tipo", "categoria", "centro", "valor",
+                    "dia_vencimento", "ativo"]
+    list_filter = ["tipo", "ativo", "centro"]
+    search_fields = ["descricao"]
 
 
 @admin.register(EntradaLogbook)

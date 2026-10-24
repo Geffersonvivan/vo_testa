@@ -79,6 +79,7 @@ urlpatterns = [
     path("crm/conciliacao/", include("apps.conciliacao.urls")),
     path("crm/comercial/", include("apps.comercial.urls")),
     path("crm/marketing/", include("apps.marketing.urls")),
+    path("crm/contabil/", include("apps.contabil.urls")),
     path("crm/nps/", include("apps.nps.urls")),
 
     # Raiz "/": LP Fundador quando HOME_MODO=lp_fundador; senão o site (home_root delega).

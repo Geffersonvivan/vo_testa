@@ -287,3 +287,22 @@ def autorizar_cartao_online(cobranca, card: dict, usuario=None, remote_ip=""):
         return False, "Cartão não autorizado pela operadora. Tente outro cartão."
     return False, ("Não foi possível confirmar o pagamento agora. "
                    "Se o valor foi debitado, ele será conciliado automaticamente.")
+
+
+def taxas_do_periodo(ano: int, mes: int):
+    """
+    Interface pública p/ a camada Contábil: taxas de adquirente das cobranças
+    LIQUIDADAS no mês (status pago + taxa informada). Não importa o model lá fora.
+    Retorna lista de dicts: {id, taxa, data}.
+    """
+    qs = Cobranca.objects.filter(
+        status=Cobranca.Status.PAGO, taxa__gt=0,
+        pago_em__year=ano, pago_em__month=mes,
+    ).values("id", "taxa", "pago_em")
+    # `pago_em__month` filtra no fuso local (TIME_ZONE); a data do lançamento
+    # tem de usar o MESMO fuso, senão um pagamento à noite perto da virada do mês
+    # cairia na competência errada.
+    return [
+        {"id": c["id"], "taxa": c["taxa"], "data": timezone.localtime(c["pago_em"]).date()}
+        for c in qs
+    ]

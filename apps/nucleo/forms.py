@@ -282,7 +282,7 @@ class LancamentoFinanceiroForm(forms.ModelForm):
             label="Centro de receita/custo", choices=centro_choices()
         )
         self.fields["categoria"].queryset = CategoriaFinanceira.objects.filter(
-            ativo=True
+            ativo=True, automatica=False
         )
 
 
@@ -300,7 +300,7 @@ class ContaPagarReceberForm(forms.ModelForm):
             label="Centro de receita/custo", choices=centro_choices()
         )
         self.fields["categoria"].queryset = CategoriaFinanceira.objects.filter(
-            ativo=True
+            ativo=True, automatica=False
         )
         self.fields["pessoa"].queryset = Pessoa.objects.filter(ativo=True)
 
