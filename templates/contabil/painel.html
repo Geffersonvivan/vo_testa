@@ -63,7 +63,7 @@
 /* fechar form */
 .ctb .form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1.1rem 1.2rem; margin-bottom:1rem; align-items:start; }
 .ctb .form-campo { display:flex; flex-direction:column; }
-.ctb .form-grid label { min-height:2.5em; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--tinta-suave); margin-bottom:.3rem; line-height:1.25; }
+.ctb .form-grid label { min-height:2.5em; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--tinta-suave); margin-bottom:.3rem; line-height:1.4; }
 .ctb .hint { text-transform:none; letter-spacing:0; font-weight:400; opacity:.75; }
 .ctb .form-grid input { width:100%; padding:.55rem .7rem; border:1px solid var(--fio); border-radius:var(--raio-p); background:var(--superficie); color:var(--tinta); font-family:inherit; font-variant-numeric:tabular-nums; }
 .ctb .folha-dica { display:block; margin-top:.4rem; line-height:1.5; }
@@ -230,16 +230,24 @@
         <input type="hidden" name="ano" value="{{ ano_sel }}"><input type="hidden" name="mes" value="{{ mes_sel }}">
         <div class="form-grid">
           <div class="form-campo">
-            <label>Folha <span class="hint">→ 4.2.01.01</span></label>
+            <label>Folha</label>
             <input id="campo-folha" name="folha" inputmode="decimal" value="{% if fechamento %}{{ fechamento.folha }}{% else %}{{ folha_cadastro.total }}{% endif %}" data-cadastro="{{ folha_cadastro.total }}">
             <span class="hint folha-dica">
               {{ folha_cadastro.qtd }} funcionário{{ folha_cadastro.qtd|pluralize }} no cadastro · {{ folha_cadastro.total|intcomma_brl }}
               <button type="button" class="botao-usar" onclick="var i=document.getElementById('campo-folha'); i.value=i.dataset.cadastro;">usar do cadastro</button>
             </span>
           </div>
-          <div class="form-campo"><label>Encargos FGTS/INSS <span class="hint">→ 4.2.01.01</span></label><input name="encargos" inputmode="decimal" value="{{ fechamento.encargos|default:'0' }}"></div>
-          <div class="form-campo"><label>Pró‑labore <span class="hint">→ 5.1.02.02</span></label><input name="pro_labore" inputmode="decimal" value="{{ fechamento.pro_labore|default:'0' }}"></div>
-          <div class="form-campo"><label>DAS / Simples <span class="hint">→ 3.1.02.01</span></label><input name="das" inputmode="decimal" value="{{ fechamento.das|default:'0' }}"></div>
+          <div class="form-campo"><label>Encargos FGTS/INSS</label><input name="encargos" inputmode="decimal" value="{{ fechamento.encargos|default:'0' }}"></div>
+          <div class="form-campo">
+            <label>Pró‑labore</label>
+            <input name="pro_labore" inputmode="decimal" value="{{ fechamento.pro_labore|default:'0' }}">
+            <span class="hint folha-dica">Em geral R$ 0 — a empresa não paga pró‑labore (contrato, cl. 16ª); o sócio retira por distribuição de lucros, que não é despesa.</span>
+          </div>
+          <div class="form-campo">
+            <label>Impostos s/ receita</label>
+            <input name="das" inputmode="decimal" value="{{ fechamento.das|default:'0' }}">
+            <span class="hint folha-dica">PIS, COFINS e ISS sobre a receita (Lucro Presumido).</span>
+          </div>
         </div>
         <button type="submit" class="botao-primario">Aplicar à DRE</button>
         {% if fechamento %}<span class="pill ok" style="margin-left:.6rem;">fechado em {{ fechamento.fechado_em|date:"d/m/Y H:i" }}</span>{% endif %}

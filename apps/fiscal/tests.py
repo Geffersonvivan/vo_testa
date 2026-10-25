@@ -14,6 +14,108 @@ from .models import DocumentoFiscal
 Usuario = get_user_model()
 
 
+class GatewaySpedyTests(TestCase):
+    def test_registro_e_selecao(self):
+        from django.test import override_settings
+
+        from .gateways import GatewaySpedy, get_gateway
+        with override_settings(FISCAL_GATEWAY="spedy"):
+            self.assertIsInstance(get_gateway(), GatewaySpedy)
+
+    def test_base_url_sandbox_vs_producao(self):
+        from django.test import override_settings
+
+        from .gateways import GatewaySpedy
+        g = GatewaySpedy()
+        with override_settings(SPEDY_SANDBOX=True):
+            self.assertIn("sandbox-api.spedy.com.br", g.base_url())
+        with override_settings(SPEDY_SANDBOX=False):
+            self.assertEqual(g.base_url(), "https://api.spedy.com.br/v1")
+
+    def test_endpoint_por_tipo(self):
+        from .gateways import GatewaySpedy
+
+        class Doc:
+            tipo = "nfse"
+        self.assertEqual(GatewaySpedy()._endpoint(Doc()), "service-invoices")
+        Doc.tipo = "nfce"
+        self.assertEqual(GatewaySpedy()._endpoint(Doc()), "consumer-invoices")
+
+    def test_emitir_sem_chave_erra_claro(self):
+        from django.test import override_settings
+
+        from .gateways import GatewaySpedy
+        with override_settings(SPEDY_API_KEY=""):
+            with self.assertRaises(NotImplementedError):
+                GatewaySpedy().emitir(object())
+
+    def test_emitir_monta_payload_nfse_e_posta(self):
+        import json
+        from unittest.mock import patch
+
+        from django.test import override_settings
+
+        from .gateways import GatewaySpedy
+
+        class Doc:
+            tipo = "nfse"
+            pk = 7
+            referencia = "conta:7"
+            descricao = "Hospedagem em hotelaria — Quarto 01"
+            valor = Decimal("910.00")
+            tomador = None
+
+        class FakeResp:
+            status = 200
+            def read(self): return json.dumps({"id": "SP-123", "status": "created"}).encode()
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+
+        capt = {}
+
+        def fake_urlopen(req, timeout=None):
+            capt["req"] = req
+            return FakeResp()
+
+        with override_settings(SPEDY_API_KEY="k-abc", SPEDY_SANDBOX=True,
+                               FISCAL_NFSE_LC116="9.01", FISCAL_NFSE_ISS_ALIQUOTA="4.0"):
+            with patch("urllib.request.urlopen", fake_urlopen):
+                res = GatewaySpedy().emitir(Doc())
+
+        req = capt["req"]
+        self.assertIn("sandbox-api.spedy.com.br/v1/service-invoices", req.get_full_url())
+        headers = {k.lower(): v for k, v in req.headers.items()}
+        self.assertEqual(headers.get("x-api-key"), "k-abc")
+        body = json.loads(req.data.decode())
+        self.assertEqual(body["integrationId"], "conta:7")
+        self.assertEqual(body["federalServiceCode"], "9.01")
+        self.assertEqual(body["total"]["invoiceAmount"], 910.0)
+        self.assertEqual(body["total"]["issRate"], 4.0)
+        # resposta "created" → processando (assíncrono; fecho vem por webhook)
+        self.assertEqual(res["status"], "processando")
+        self.assertEqual(res["gateway_id"], "SP-123")
+
+    def test_webhook_spedy_autoriza(self):
+        from .models import DocumentoFiscal
+        from .services import processar_retorno_spedy
+        op = Usuario.objects.create_superuser("fscw", password="x" * 12)
+        doc = DocumentoFiscal.objects.create(
+            tipo=DocumentoFiscal.Tipo.NFSE, natureza="servico",
+            descricao="Hospedagem", valor=Decimal("910.00"),
+            referencia="conta:7", gateway="spedy", gateway_id="SP-123",
+            status=DocumentoFiscal.Status.PROCESSANDO, criado_por=op,
+        )
+        processar_retorno_spedy({
+            "event": "invoice.status_changed",
+            "data": {"integrationId": "conta:7", "status": "authorized",
+                     "number": "33005", "accessKey": "CHAVE123", "pdfUrl": "https://x/pdf"},
+        })
+        doc.refresh_from_db()
+        self.assertEqual(doc.status, DocumentoFiscal.Status.AUTORIZADA)
+        self.assertEqual(doc.numero, "33005")
+        self.assertEqual(doc.chave, "CHAVE123")
+
+
 class EmissaoTests(TestCase):
     def setUp(self):
         self.op = Usuario.objects.create_superuser(username="fisc", password="senha-forte-123")

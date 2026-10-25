@@ -69,7 +69,7 @@ def dre(ano: int, mes: int) -> dict:
         ("sub", "Prestação de Serviços (hospedagem, day use, eventos)", v("3.1.01.03"), "sub"),
         ("sub", "Revenda de Mercadorias (restaurante, loja)", v("3.1.01.01"), "sub"),
         ("grupo", "(−) Deduções", -deducoes, "grupo"),
-        ("sub", "Simples Nacional (DAS)", v("3.1.02.01"), "sub"),
+        ("sub", "Impostos sobre a receita (PIS/COFINS/ISS)", v("3.1.02.01"), "sub"),
         ("sub", "Devoluções e abatimentos", v("3.1.02.02"), "sub"),
         ("resultado", "= RECEITA LÍQUIDA", receita_liquida, "resultado"),
         ("grupo", "(−) Custos dos Serviços e Mercadorias", -custos, "grupo"),

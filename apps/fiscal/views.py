@@ -61,7 +61,7 @@ def webhook(request):
     import hmac
     gateway = getattr(settings, "FISCAL_GATEWAY", "simulado")
     esperado = getattr(settings, "FISCAL_WEBHOOK_TOKEN", "")
-    if gateway in ("focus", "governo") and not esperado:
+    if gateway in ("focus", "governo", "spedy") and not esperado:
         # Gateway real sem token = webhook aberto. Recusa até configurar o segredo.
         return JsonResponse({"erro": "webhook não configurado"}, status=503)
     recebido = request.headers.get("Authorization", "")
@@ -71,7 +71,10 @@ def webhook(request):
         payload = json.loads(request.body or b"{}")
     except ValueError:
         payload = request.POST.dict()
-    doc = services.processar_retorno_focus(payload)
+    if gateway == "spedy":
+        doc = services.processar_retorno_spedy(payload)
+    else:
+        doc = services.processar_retorno_focus(payload)
     if not doc:
         return JsonResponse({"erro": "documento (ref) não encontrado"}, status=404)
     return JsonResponse({"ok": True, "status": doc.status})

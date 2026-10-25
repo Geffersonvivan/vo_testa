@@ -9,10 +9,23 @@ Documento vivo — atualizar conforme contador/prefeitura confirmarem os parâme
 
 ## 0. Dados confirmados pelo contador (jul/2026) ✅
 
-**Empresa:** POUSADA VO TESTA LTDA · CNPJ **26.003.246/0001-00** · Inscrição Municipal
-**4829** · **sem Inscrição Estadual** · Rod SC 155, Km 129, Lago Azul, **Itá/SC** ·
-CNAE **55.10-8-01 (Hotéis)** · Natureza 206-2 (Ltda) · Porte ME ·
+**Empresa:** POUSADA VO TESTA LTDA (fantasia **POUSADA VÔ TESTA**) · CNPJ
+**26.003.246/0001-00** · Inscrição Municipal **4829** · **sem Inscrição Estadual** ·
+Lago Azul, **Itá/SC** · **município IBGE `4208005`** (conferido — *não* 4208302, que é
+Itapema) · CEP 89760-000 · NIRE 42205500310 · CNAE **55.10-8-01 (Hotéis)** ·
+Natureza 206-2 (Ltda **unipessoal**, sócio único Flávio Calgaro) · Porte ME ·
 Contador **Escritório Contábil Itá Ltda**.
+*Fontes: contrato social 2ª alt. (JUCESC 02/09/2026) + Comprovante de Inscrição Municipal
+de Itá — em `docs/Contrato_Social/`. Esses valores estão em `settings.EMPRESA_*`.*
+
+- **Pró-labore = R$ 0** (contrato, cláusula 16ª: o sócio não retira pró-labore; remunera-se
+  por **distribuição de lucros**, que **não** é despesa). Reflexo no CRM: campo Pró-labore
+  do "Fechar o mês" fica zerado.
+- **✅ Regime: LUCRO PRESUMIDO (confirmado, out/2026).** A parametrização do contador
+  (aba PRODUTOS/SERVIÇOS) usa **CST** (não CSOSN) e **PIS 0,65% / COFINS 3%** cumulativos —
+  assinatura de Presumido. (O "Porte ME" do Cartão CNPJ é só tamanho, não regime.) Reflexo
+  no CRM: tributo sobre a receita no fechamento = **PIS/COFINS/ISS**, conta `3.1.02.01`
+  ("(-) Impostos sobre a receita"). NFC-e/NFS-e usam **CST**.
 
 - **Regime tributário:** **Lucro Presumido** → usar **CST** (não CSOSN).
 - **NFS-e:** Itá emite pelo **Emissor Nacional (Portal Nacional)** ✅.
@@ -120,6 +133,47 @@ excedente a R$ 0,10 cada (ex.: 300 notas ≈ R$ 110/mês) — barato e previsív
 NFC-e). A **NFS-e** ainda pode ser emitida **de graça** no `nfse.gov.br`. Por isso o módulo
 tem **gateway plugável** (`focus` × `governo` × `simulado`) — dá pra começar grátis e trocar
 depois sem retrabalho. **Escolha inicial sugerida: Focus NFe** (teste grátis 30 dias).
+
+### 5.2 Provedor verificado: Spedy (spedy.com.br) — gateway `spedy` esboçado
+
+Verificado na doc oficial deles (out/2026) e **atende**: emite **NFS-e pelo Ambiente
+Nacional** (`issueType: "annfs"` — exatamente Itá/SC) + **NFC-e** + NF-e numa **API REST
+única**, com **sandbox gratuito**. Preço de entrada **R$ 74/mês · 1.800 notas/ano** (mais
+barato que o Focus). Encaixa no nosso gateway plugável.
+
+| Item | Spedy |
+|---|---|
+| Ambientes | prod `api.spedy.com.br/v1` · sandbox `sandbox-api.spedy.com.br/v1` |
+| Auth | header **`X-Api-Key`** (estática por empresa/ambiente) |
+| Emissão | POST `/service-invoices` (NFS-e) · `/consumer-invoices` (NFC-e) · `/product-invoices` (NF-e) |
+| Idempotência | campo **`integrationId`** (≤36) → casa com `DocumentoFiscal.referencia` |
+| Cancelar | DELETE `/{tipo}-invoices/{id}` (campo `reason`) |
+| Certificado A1 | POST `/companies/{id}/certificates` (multipart `.pfx` + senha) |
+| Status | **webhooks** `invoice.authorized` / `invoice.rejected` / `invoice.status_changed` |
+| NFC-e em SC | exige **IE + CSC + credenciamento PAF-NFC-e** (confirmar com suporte Spedy) |
+
+**Integração IMPLEMENTADA (NFS-e) — falta só credencial + homologação:**
+`apps/fiscal/gateways.py → GatewaySpedy` já faz o **HTTP real** (urllib, padrão do projeto):
+- `emitir()` monta o payload da NFS-e e faz **POST `/service-invoices`** com `X-Api-Key`.
+  Campos: `integrationId` (= `DocumentoFiscal.referencia`, idempotente), `effectiveDate`,
+  `description`, **`federalServiceCode` = `9.01`** (LC 116, não o 090101 municipal — novo
+  setting **`FISCAL_NFSE_LC116`**), `total.{invoiceAmount, issRate}` (ISS 4%), e `receiver`
+  (nome/CPF/e-mail do hóspede). *Endereço do tomador fica de fora por ora — validar na
+  homologação se Itá exige.*
+- **Assíncrono:** o POST volta `created/enqueued` → o `DocumentoFiscal` fica **PROCESSANDO**;
+  o `emitir()` do service já trata esse estado (não marca rejeitada).
+- **Webhook** (`fiscal:webhook`, roteado por `FISCAL_GATEWAY`): `processar_retorno_spedy`
+  trata `invoice.status_changed/authorized/rejected` — acha a nota por `integrationId`/`id`
+  e grava status + número/chave/XML/PDF. Idempotente; cancelada é terminal.
+- `cancelar()` = DELETE `/service-invoices/{id}` com `reason`.
+- Settings: `SPEDY_API_KEY`, `SPEDY_SANDBOX` (default sandbox), `FISCAL_WEBHOOK_TOKEN` (valida
+  o webhook). **7 testes** (payload/headers/status, webhook autoriza).
+
+**Para ir ao ar (ops, 1×):** (1) criar conta no **Spedy** (sandbox grátis) → `SPEDY_API_KEY`;
+(2) cadastrar a empresa + subir o **certificado A1** no painel Spedy; (3) `FISCAL_GATEWAY=spedy`
++ apontar o webhook do Spedy para `/crm/fiscal/webhook/` (com `FISCAL_WEBHOOK_TOKEN`);
+(4) **homologar no sandbox** (uma NFS-e de teste) e conferir `receiver`/endereço; (5) virar
+`SPEDY_SANDBOX=0`. **NFS-e pronta; NFC-e espera a IE.**
 
 ---
 

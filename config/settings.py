@@ -349,15 +349,37 @@ JEV_API_URL = os.environ.get("JEV_API_URL", "")
 JEV_API_KEY = os.environ.get("JEV_API_KEY", "")
 JEV_TIMEOUT_MS = int(os.environ.get("JEV_TIMEOUT_MS", "800"))
 
-# Parâmetros fiscais confirmados pelo contador (jul/2026) — Pousada Vô Testa, Itá/SC.
-# Regime Lucro Presumido; NFS-e pelo Emissor Nacional. NFC-e aguarda Inscrição Estadual.
+# Identidade fiscal da empresa (emissor das notas). Fonte: contrato social (2ª alt.,
+# JUCESC 02/09/2026) + Comprovante de Inscrição Municipal de Itá (IM 4829). Não é segredo
+# — defaults reais, sobreponíveis por env. Usado pelo gateway fiscal (Spedy) p/ o prestador.
+EMPRESA_RAZAO_SOCIAL = os.environ.get("EMPRESA_RAZAO_SOCIAL", "POUSADA VÔ TESTA LTDA")
+EMPRESA_NOME_FANTASIA = os.environ.get("EMPRESA_NOME_FANTASIA", "POUSADA VÔ TESTA")
+EMPRESA_CNPJ = os.environ.get("EMPRESA_CNPJ", "26003246000100")
+EMPRESA_INSCRICAO_MUNICIPAL = os.environ.get("EMPRESA_INSCRICAO_MUNICIPAL", "4829")
+EMPRESA_INSCRICAO_ESTADUAL = os.environ.get("EMPRESA_INSCRICAO_ESTADUAL", "")  # não possui → bloqueia NFC-e
+EMPRESA_MUNICIPIO = os.environ.get("EMPRESA_MUNICIPIO", "Itá")
+EMPRESA_UF = os.environ.get("EMPRESA_UF", "SC")
+EMPRESA_MUNICIPIO_IBGE = os.environ.get("EMPRESA_MUNICIPIO_IBGE", "4208005")  # Itá/SC (conferido no IBGE)
+EMPRESA_CEP = os.environ.get("EMPRESA_CEP", "89760000")
+
+# Parâmetros fiscais — Pousada Vô Testa, Itá/SC. NFS-e pelo Emissor Nacional.
+# NFC-e aguarda Inscrição Estadual.
+# Regime: LUCRO PRESUMIDO (confirmado — contador + parametrização do contador, out/2026:
+# CST + PIS 0,65% / COFINS 3% cumulativos). Usar CST (não CSOSN). O tributo sobre a
+# receita no fechamento = PIS/COFINS/ISS (conta 3.1.02.01).
 FISCAL_REGIME = os.environ.get("FISCAL_REGIME", "lucro_presumido")
-FISCAL_NFSE_CODIGO_SERVICO = os.environ.get("FISCAL_NFSE_CODIGO_SERVICO", "090101")  # hospedagem
+FISCAL_NFSE_CODIGO_SERVICO = os.environ.get("FISCAL_NFSE_CODIGO_SERVICO", "090101")  # código municipal de Itá
+FISCAL_NFSE_LC116 = os.environ.get("FISCAL_NFSE_LC116", "9.01")  # item LC 116 (hospedagem) — NFS-e Nacional/Spedy
 FISCAL_NFSE_ISS_ALIQUOTA = os.environ.get("FISCAL_NFSE_ISS_ALIQUOTA", "4.0")  # % ISS Itá
 FISCAL_NFCE_HABILITADA = os.environ.get("FISCAL_NFCE_HABILITADA", "0") == "1"  # depende da IE
 # Segredo compartilhado com o Focus (campo "Chave de Autorização" do webhook). O Focus
 # envia no header Authorization; o endpoint /crm/fiscal/webhook/ valida.
 FISCAL_WEBHOOK_TOKEN = os.environ.get("FISCAL_WEBHOOK_TOKEN", "")
+
+# Spedy (provedor NF-e/NFS-e/NFC-e) — ative com FISCAL_GATEWAY=spedy. Vazio = stub.
+# Sandbox por padrão; produção quando SPEDY_SANDBOX=0. Ver apps/fiscal/gateways.py.
+SPEDY_API_KEY = os.environ.get("SPEDY_API_KEY", "")
+SPEDY_SANDBOX = os.environ.get("SPEDY_SANDBOX", "1") == "1"
 
 # Preço ao hóspede (motor de tarifa — Manual de Vendas §2 + taxas).
 # ISS reaproveita a alíquota fiscal (4%). Taxa de turismo = valor fixo por diária (noite).

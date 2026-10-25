@@ -46,10 +46,17 @@ def emitir(operador, *, natureza, valor, descricao, tomador=None, referencia="")
                   "protocolo", "xml_url", "pdf_url", "payload"):
         if campo in resultado:
             setattr(doc, campo, resultado[campo])
-    if resultado.get("status") == "autorizada":
+    estado = resultado.get("status")
+    if estado == "autorizada":
         doc.status = DocumentoFiscal.Status.AUTORIZADA
         doc.autorizada_em = timezone.now()
         EventoFiscal.objects.create(documento=doc, tipo="autorizada")
+    elif estado in ("processando", "pendente", "enviada"):
+        # Emissão assíncrona (ex.: Spedy): aceita pelo gateway, aguarda o webhook
+        # para autorizar/rejeitar. Fica PROCESSANDO (status já setado na criação).
+        doc.status = DocumentoFiscal.Status.PROCESSANDO
+        EventoFiscal.objects.create(documento=doc, tipo="enviada",
+                                    detalhe={"gateway_id": resultado.get("gateway_id", "")})
     else:
         doc.status = DocumentoFiscal.Status.REJEITADA
         doc.motivo_rejeicao = resultado.get("motivo_rejeicao", "")[:255]
@@ -163,6 +170,57 @@ def processar_retorno_focus(payload: dict):
         )[:255]
         EventoFiscal.objects.create(documento=doc, tipo="rejeitada",
                                     detalhe={"origem": "webhook"})
+    doc.save()
+    return doc
+
+
+@transaction.atomic
+def processar_retorno_spedy(payload: dict):
+    """
+    Webhook do Spedy (`invoice.status_changed`/`invoice.authorized`/`invoice.rejected`).
+    Acha o documento por `integrationId` (= referencia) ou pelo `id` do gateway, e atualiza
+    status + número/chave/XML/PDF. Idempotente; cancelada é terminal (não ressuscita).
+    """
+    # O payload pode vir achatado ou dentro de "data"/"invoice".
+    dados = payload.get("data") or payload.get("invoice") or payload
+    integration_id = dados.get("integrationId") or payload.get("integrationId")
+    gw_id = str(dados.get("id") or payload.get("id") or "")
+
+    doc = None
+    if integration_id:
+        doc = DocumentoFiscal.objects.filter(referencia=integration_id).first()
+    if not doc and gw_id:
+        doc = DocumentoFiscal.objects.filter(gateway_id=gw_id).first()
+    if not doc:
+        return None
+
+    if doc.status == DocumentoFiscal.Status.CANCELADA:
+        EventoFiscal.objects.create(documento=doc, tipo="webhook_ignorado",
+                                    detalhe={"atual": "cancelada"})
+        return doc
+
+    status = (dados.get("status") or payload.get("status") or "").lower()
+    doc.payload = {**doc.payload, "webhook_spedy": payload}
+
+    if status == "authorized":
+        doc.numero = str(dados.get("number") or doc.numero or "")
+        doc.chave = dados.get("accessKey") or dados.get("verificationCode") or doc.chave
+        doc.pdf_url = dados.get("pdfUrl") or dados.get("pdf") or doc.pdf_url
+        doc.xml_url = dados.get("xmlUrl") or dados.get("xml") or doc.xml_url
+        doc.status = DocumentoFiscal.Status.AUTORIZADA
+        doc.autorizada_em = timezone.now()
+        EventoFiscal.objects.create(documento=doc, tipo="autorizada", detalhe={"origem": "spedy"})
+    elif status == "rejected":
+        doc.status = DocumentoFiscal.Status.REJEITADA
+        doc.motivo_rejeicao = str(dados.get("rejectionReason") or dados.get("message") or "Rejeitada")[:255]
+        EventoFiscal.objects.create(documento=doc, tipo="rejeitada", detalhe={"origem": "spedy"})
+    elif status in ("canceled", "cancelled"):
+        doc.status = DocumentoFiscal.Status.CANCELADA
+        EventoFiscal.objects.create(documento=doc, tipo="cancelada", detalhe={"origem": "spedy"})
+    else:
+        # created/enqueued/received/inContingent → só registra, não muda o status final
+        EventoFiscal.objects.create(documento=doc, tipo="webhook_info",
+                                    detalhe={"status": status, "origem": "spedy"})
     doc.save()
     return doc
 

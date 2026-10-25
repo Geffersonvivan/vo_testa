@@ -173,7 +173,8 @@ class FechamentoMensal(models.Model):
         ("folha", "folha", "Folha de pagamento", "4.2.01.01", "Folha de pagamento"),
         ("encargos", "encargos", "Encargos sociais (FGTS/INSS)", "4.2.01.01", "Encargos (FGTS/INSS)"),
         ("pro_labore", "pro_labore", "Pró-labore", "5.1.02.02", "Pró-labore dos sócios"),
-        ("das", "das", "Simples Nacional (DAS)", "3.1.02.01", "DAS — Simples Nacional"),
+        ("das", "das", "Impostos sobre a receita", "3.1.02.01",
+         "Impostos sobre a receita (PIS/COFINS/ISS)"),
     ]
 
     ano = models.PositiveIntegerField("ano")
